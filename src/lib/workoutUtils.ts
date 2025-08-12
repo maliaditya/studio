@@ -28,6 +28,7 @@ const singleMuscleDailySchedule: Record<number, ExerciseCategory | null> = {
  * @param mode The current workout mode ('one-muscle' or 'two-muscle').
  * @param plans The complete set of user-defined workout plans.
  * @param definitions The master list of all available exercise definitions.
+ * @param rotationEnabled Whether to rotate weekly workout plans.
  * @param findLastPerformance Optional function to get previous performance data for an exercise.
  * @returns An object containing the list of exercises and a description of the generated workout.
  */
@@ -36,6 +37,7 @@ export const getExercisesForDay = (
     mode: WorkoutMode,
     plans: AllWorkoutPlans,
     definitions: ExerciseDefinition[],
+    rotationEnabled: boolean,
     findLastPerformance?: (exerciseDefinitionId: string) => { reps: number; weight: number } | null
 ): { exercises: WorkoutExercise[], description: string } => {
     const dayOfWeek = getDay(date);
@@ -50,18 +52,26 @@ export const getExercisesForDay = (
         muscleGroups = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
         exercisesPerGroup = 4;
         if (muscleGroups.length > 0) {
-            const isOddWeek = isoWeek % 2 !== 0;
-            planKey = isOddWeek
-                ? (dayOfWeek <= 3 ? 'W1' : 'W2')
-                : (dayOfWeek <= 3 ? 'W3' : 'W4');
+            if (rotationEnabled) {
+                const isOddWeek = isoWeek % 2 !== 0;
+                planKey = isOddWeek
+                    ? (dayOfWeek <= 3 ? 'W1' : 'W2')
+                    : (dayOfWeek <= 3 ? 'W3' : 'W4');
+            } else {
+                planKey = 'W1';
+            }
         }
     } else { // 'one-muscle' mode
         const muscle = singleMuscleDailySchedule[dayOfWeek];
         if (muscle) {
             muscleGroups = [muscle];
             exercisesPerGroup = 6;
-            const isOddWeek = isoWeek % 2 !== 0;
-            planKey = isOddWeek ? 'W5' : 'W6';
+            if (rotationEnabled) {
+                const isOddWeek = isoWeek % 2 !== 0;
+                planKey = isOddWeek ? 'W5' : 'W6';
+            } else {
+                planKey = 'W5';
+            }
         }
     }
 

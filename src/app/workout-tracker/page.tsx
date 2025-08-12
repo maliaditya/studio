@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -76,6 +77,7 @@ function WorkoutPageContent() {
     removeExerciseFromWorkout,
     swapWorkoutExercise,
     workoutMode, setWorkoutMode,
+    workoutPlanRotation, setWorkoutPlanRotation,
     workoutPlans, setWorkoutPlans,
     exerciseDefinitions, setExerciseDefinitions,
   } = useAuth();
@@ -143,7 +145,7 @@ function WorkoutPageContent() {
     const workoutExists = allWorkoutLogs.some(log => log.id === dateKey);
 
     if (!workoutExists) {
-        const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+        const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
         
         if (exercises.length > 0) {
             const newDatedWorkout: DatedWorkout = { id: dateKey, date: dateKey, exercises };
@@ -154,7 +156,7 @@ function WorkoutPageContent() {
             });
         }
     }
-  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlans, allWorkoutLogs, setAllWorkoutLogs, toast]);
+  }, [selectedDate, currentUser, exerciseDefinitions, workoutMode, workoutPlanRotation, workoutPlans, allWorkoutLogs, setAllWorkoutLogs, toast]);
 
   useEffect(() => {
       if (!currentUser) return;
@@ -521,13 +523,13 @@ function WorkoutPageContent() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
-                <div className="space-y-2">
-                  <Label>Workout Plan</Label>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">Workout Plan</Label>
                     <RadioGroup
                       value={workoutMode}
                       onValueChange={(value) => handleWorkoutModeChange(value as WorkoutMode)}
-                      className="flex flex-wrap gap-x-4 gap-y-2"
+                      className="flex flex-wrap gap-x-4 gap-y-2 pt-2"
                     >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="two-muscle" id="r1" />
@@ -538,6 +540,12 @@ function WorkoutPageContent() {
                         <Label htmlFor="r2" className="font-normal">One Muscle / Day</Label>
                       </div>
                     </RadioGroup>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="plan-rotation" checked={workoutPlanRotation} onCheckedChange={setWorkoutPlanRotation}/>
+                        <Label htmlFor="plan-rotation">Plan Rotation</Label>
+                    </div>
                     <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
                       <Settings className="h-4 w-4 mr-2" />
                       Edit Plans

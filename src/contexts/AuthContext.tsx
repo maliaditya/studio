@@ -104,6 +104,8 @@ interface AuthContextType {
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
   setWorkoutMode: React.Dispatch<React.SetStateAction<WorkoutMode>>;
+  workoutPlanRotation: boolean;
+  setWorkoutPlanRotation: React.Dispatch<React.SetStateAction<boolean>>;
   workoutPlans: AllWorkoutPlans;
   setWorkoutPlans: React.Dispatch<React.SetStateAction<AllWorkoutPlans>>;
   exerciseDefinitions: ExerciseDefinition[];
@@ -292,6 +294,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Data Definitions & Plans
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
+  const [workoutPlanRotation, setWorkoutPlanRotation] = useState(true);
   const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>(DEFAULT_EXERCISE_DEFINITIONS);
   const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
@@ -447,6 +450,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Data Definitions & Plans
       const storedMode = loadItem(`workoutMode_${username}`, false);
       if (storedMode === 'one-muscle' || storedMode === 'two-muscle') setWorkoutMode(storedMode as WorkoutMode); else setWorkoutMode('two-muscle');
+      const storedRotation = loadItem(`workoutPlanRotation_${username}`, false); setWorkoutPlanRotation(storedRotation === null ? true : storedRotation === 'true');
       try { const d = loadItem(`workoutPlans_${username}`); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
       try { const d = loadItem(`exerciseDefinitions_${username}`); setExerciseDefinitions(d ? JSON.parse(d) : DEFAULT_EXERCISE_DEFINITIONS); } catch (e) { setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS); }
       try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
@@ -543,7 +547,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({}); setDailyPurposes({});
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
-      setWorkoutMode('two-muscle'); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
+      setWorkoutMode('two-muscle'); setWorkoutPlanRotation(true); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
       setUpskillDefinitions([]); setTopicGoals({});
       setDeepWorkDefinitions([]);
       setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
@@ -591,6 +595,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Definitions, Plans, and Goals
       localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
       localStorage.setItem(`workoutMode_${username}`, workoutMode);
+      localStorage.setItem(`workoutPlanRotation_${username}`, String(workoutPlanRotation));
       localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
       localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
       localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
@@ -648,7 +653,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
     schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-    exerciseDefinitions, workoutMode, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
+    exerciseDefinitions, workoutMode, workoutPlanRotation, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
     productizationPlans, offerizationPlans,
     resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
     canvasLayout,
@@ -723,7 +728,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           switch (activity.type) {
             case 'workout': {
-              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions);
+              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
               newDetails = description.split(' for ')[1] || "Workout";
               break;
             }
@@ -767,7 +772,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlans, exerciseDefinitions]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
 
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
@@ -776,6 +781,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setWorkoutPlans(data.workoutPlans || INITIAL_PLANS);
     setAllWorkoutLogs(data.allWorkoutLogs || []);
     setWorkoutMode(data.workoutMode || 'two-muscle');
+    setWorkoutPlanRotation(data.workoutPlanRotation === null || data.workoutPlanRotation === undefined ? true : data.workoutPlanRotation);
     
     setUpskillDefinitions(data.upskillDefinitions || []);
     setAllUpskillLogs(data.upskillLogs || []);
@@ -874,7 +880,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const getAllUserData = () => {
     const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
     return {
-      exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode,
+      exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode, workoutPlanRotation,
       upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
       deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
       brandingLogs,
@@ -1771,7 +1777,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
-    workoutMode, setWorkoutMode, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
+    workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions, setLeadGenDefinitions,
