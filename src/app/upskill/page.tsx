@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -515,6 +516,7 @@ function UpskillPageContent() {
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
+  const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
 
   // State for hierarchical linking
   const [skillSelectionStep, setSkillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
@@ -973,6 +975,17 @@ function UpskillPageContent() {
     return visualizations;
   }, [upskillDefinitions]);
 
+  const availableSpecializations = useMemo(() => {
+    return coreSkills.filter(s => s.type === 'Specialization');
+  }, [coreSkills]);
+
+  const microSkillsForSpecialization = useMemo(() => {
+    if (!selectedSpecializationId) return [];
+    const spec = coreSkills.find(s => s.id === selectedSpecializationId);
+    if (!spec) return [];
+    return spec.skillAreas.flatMap(area => area.microSkills.map(ms => ms.name));
+  }, [coreSkills, selectedSpecializationId]);
+
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
@@ -991,26 +1004,21 @@ function UpskillPageContent() {
         });
     }
     
-    let definitionsSource: any[];
-    if (skillSelectionStep === 'curiosity') {
-        definitionsSource = (upskillDefinitions || []).filter(def => {
-            if (def.category !== selectedUpskillTopic) return false;
-            const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-            const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
-            return isParent && !isLinkedAsChild;
-        });
-    } else if (skillSelectionStep === 'visualization' && selectedUpskillCuriosity) {
-        definitionsSource = getVisualizationsRecursive(selectedUpskillCuriosity.id);
-    } else {
-        definitionsSource = allKnownTopics.map(t => ({ id: t, name: t }));
-    }
-    
-    return definitionsSource.filter(item => {
-        if (!item.name || item.name === 'placeholder' || item.id === parent.id) return false;
-        if (linkSearchTerm && !item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) return false;
+    let filteredDefs = upskillDefinitions.filter(def => {
+        if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
         return true;
     });
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, skillSelectionStep, selectedUpskillTopic, selectedUpskillCuriosity, resourceFolders, currentFolderIdForLinking, linkedUpskillChildIds, allKnownTopics, getVisualizationsRecursive]);
+
+    if (selectedSpecializationId) {
+        filteredDefs = filteredDefs.filter(def => microSkillsForSpecialization.includes(def.category));
+    }
+    
+    if (linkSearchTerm) {
+        filteredDefs = filteredDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
+    }
+    return filteredDefs;
+
+  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, selectedSpecializationId, microSkillsForSpecialization]);
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
@@ -1333,23 +1341,33 @@ function UpskillPageContent() {
                           <div className="flex flex-col h-full">
                               <div className="flex gap-2 mb-2 p-1">
                                 <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
+                                <Select value={manageLinksConfig.type} onValueChange={(value) => setManageLinksConfig(prev => prev ? { ...prev, type: value as any } : null)}>
+                                    <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="upskill">Upskill</SelectItem>
+                                        <SelectItem value="resource">Resource</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={selectedSpecializationId || ''} onValueChange={setSelectedSpecializationId}>
+                                    <SelectTrigger className="w-[240px]">
+                                        <SelectValue placeholder="Filter by Specialization..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value=''>All Specializations</SelectItem>
+                                        {availableSpecializations.map(spec => (
+                                            <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                               </div>
                               <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
-                                {manageLinksConfig.type === 'resource' ? (
+                                {manageLinksConfig.type === 'resource' && (
                                   <>
                                     <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
                                     {folderPath.map((folderId, index) => {
                                         const folder = resourceFolders.find(f => f.id === folderId);
                                         return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
                                     })}
-                                  </>
-                                ) : (
-                                  <>
-                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('topic'); setSelectedUpskillTopic(''); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'topic'}>Topics</Button>
-                                    {selectedUpskillTopic && <ChevronRightIcon className="h-4 w-4" />}
-                                    <Button variant="ghost" size="sm" onClick={() => { setSkillSelectionStep('curiosity'); setSelectedUpskillCuriosity(null); }} disabled={skillSelectionStep === 'curiosity' || !selectedUpskillTopic} className="truncate">{selectedUpskillTopic}</Button>
-                                    {selectedUpskillCuriosity && <ChevronRightIcon className="h-4 w-4" />}
-                                    <span className="font-semibold text-foreground truncate">{selectedUpskillCuriosity?.name}</span>
                                   </>
                                 )}
                               </div>
