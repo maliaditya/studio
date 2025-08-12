@@ -1023,6 +1023,42 @@ function MyPlatePageContent() {
     ];
   }, [productivityStats.todayHoursData]);
 
+  const dashboardStats = useMemo(() => {
+    const {
+      latestConsistency,
+      consistencyChange,
+      todayDeepWorkHours,
+      deepWorkChange,
+      todayUpskillHours,
+      upskillChange,
+    } = productivityStats;
+
+    const todayActivities = schedule[todayKey] || {};
+    const hasPlannedOrCompleted = Object.values(todayActivities).flat().length > 0;
+    const allCompleted = Object.values(todayActivities).flat().every(a => a.completed);
+    const direction = hasPlannedOrCompleted && allCompleted;
+    
+    // Find the next upcoming learning milestone
+    const learningMilestones = Object.values(productivityStats.learningStats)
+      .map(s => s.nextMilestone)
+      .filter(m => m !== null)
+      .sort((a,b) => a.daysRemaining - b.daysRemaining);
+
+    const overallNextMilestone = learningMilestones.length > 0 ? learningMilestones[0] : null;
+
+    return {
+      latestConsistency,
+      consistencyChange,
+      todayDeepWorkHours,
+      deepWorkChange,
+      todayUpskillHours,
+      upskillChange,
+      direction,
+      overallNextMilestone,
+    };
+  }, [productivityStats, schedule, todayKey]);
+
+
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -1044,6 +1080,7 @@ function MyPlatePageContent() {
               </Popover>
           </CardHeader>
           <CardContent>
+            <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               <div className="lg:col-span-3">
                 <ProductivitySnapshot 
