@@ -347,9 +347,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <div className="space-y-2">
                                           {(rule.stoppers || []).map(stopper => {
                                               const isClickable = !!stopper.linkedResourceId;
-                                              const Wrapper = isClickable ? 'button' : 'div';
+                                              const WrapperElement = isClickable ? 'button' : 'div';
                                               return (
-                                                  <Wrapper 
+                                                  <WrapperElement
                                                     key={stopper.id} 
                                                     className={cn(
                                                         "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
@@ -378,7 +378,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                               <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                                           </Button>
                                                       </div>
-                                                  </Wrapper>
+                                                  </WrapperElement>
                                               )
                                           })}
                                       </div>
@@ -951,4 +951,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
