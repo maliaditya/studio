@@ -102,8 +102,14 @@ export function PistonsHead() {
     }, 300);
   };
   
-  const handleViewChange = (newView: 'desires' | 'thoughts' | 'autosuggestion' | 'starred') => {
-    setCurrentView(newView);
+  const handleViewChange = (newView: 'desires' | 'thoughts' | 'autosuggestion' | 'starred' | PistonType) => {
+    if (Object.keys(PISTON_ICONS).includes(newView)) {
+        setCurrentView('desires');
+        setSelectedTopicId(newView);
+    } else {
+        setCurrentView(newView);
+        setSelectedTopicId(null);
+    }
   };
 
   const onBack = () => {
@@ -120,8 +126,11 @@ export function PistonsHead() {
 
   const renderContent = () => {
     const commonProps = { onBack };
+    if (currentView === 'desires' && selectedTopicId) {
+        return <DesireDetailView type={selectedTopicId as PistonType} {...commonProps} />;
+    }
     switch (currentView) {
-      case 'desires': return <div className="p-4 text-center text-muted-foreground">Desires Coming Soon</div>;
+      case 'desires': return <DesiresView onSelect={(type) => handleViewChange(type)} />;
       case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Fantasy' ? 'positive-thoughts' : 'negative-thoughts')} />;
       case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { /* handle selection */ }} onSchedule={() => {}} />;
       case 'positive-thoughts': return <PositiveThoughtsView onSelect={(state) => { /* handle selection */ }} onSchedule={() => {}} />;
@@ -195,6 +204,96 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'desires' | 'thoughts' 
         </div>
     </CardContent>
 );
+
+const DesiresView = ({ onSelect }: { onSelect: (type: PistonType) => void }) => {
+    return (
+        <CardContent className="p-4">
+            <div className="grid grid-cols-1 gap-2">
+                <Button onClick={() => onSelect('Fire')} variant="outline" className="justify-start h-12 text-base"><Flame className="h-5 w-5 mr-3 text-red-500"/>Fire (Passion, Inspiration)</Button>
+                <Button onClick={() => onSelect('Clarity')} variant="outline" className="justify-start h-12 text-base"><Sun className="h-5 w-5 mr-3 text-yellow-500"/>Clarity (Focus, Vision)</Button>
+                <Button onClick={() => onSelect('Bridge')} variant="outline" className="justify-start h-12 text-base"><GitBranch className="h-5 w-5 mr-3 text-green-500"/>Bridge (Connection, Empathy)</Button>
+                <Button onClick={() => onSelect('Stabilizer')} variant="outline" className="justify-start h-12 text-base"><Anchor className="h-5 w-5 mr-3 text-purple-500"/>Stabilizer (Security, Grounding)</Button>
+                <Button onClick={() => onSelect('Explorer')} variant="outline" className="justify-start h-12 text-base"><Compass className="h-5 w-5 mr-3 text-sky-500"/>Explorer (Curiosity, Growth)</Button>
+            </div>
+        </CardContent>
+    )
+}
+
+const DesireDetailView = ({ type, onBack }: { type: PistonType; onBack: () => void; }) => {
+    const { pistons, setPistons, resources, setResources } = useAuth();
+    const [newDesire, setNewDesire] = useState('');
+
+    const currentPistonState = pistons[type] || [];
+    
+    const handleAddDesire = () => {
+        if (!newDesire.trim()) return;
+        const newEntry: PistonEntry = {
+            id: `piston_${Date.now()}`,
+            text: newDesire.trim(),
+            timestamp: Date.now()
+        };
+        setPistons(prev => ({
+            ...prev,
+            [type]: [...(prev[type] || []), newEntry]
+        }));
+        setNewDesire('');
+    };
+    
+    const handleDeleteDesire = (id: string) => {
+        setPistons(prev => ({
+            ...prev,
+            [type]: (prev[type] || []).filter(d => d.id !== id)
+        }));
+    };
+
+    const handleConvertToMechanism = (desire: PistonEntry) => {
+        const newMechanism: Resource = {
+            id: `res_mech_${Date.now()}`,
+            name: desire.text,
+            folderId: '', // User will need to assign this later
+            type: 'mechanism',
+            mechanismFramework: 'positive',
+            trigger: { action: desire.text },
+            createdAt: new Date().toISOString(),
+        };
+        setResources(prev => [...prev, newMechanism]);
+        handleDeleteDesire(desire.id);
+    };
+
+    return (
+        <CardContent className="p-4">
+            <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 font-semibold">
+                    {PISTON_ICONS[type]}
+                    {type}
+                </div>
+                <div className="flex gap-2">
+                    <Input value={newDesire} onChange={e => setNewDesire(e.target.value)} placeholder="What do you want?" onKeyDown={e => e.key === 'Enter' && handleAddDesire()} />
+                    <Button onClick={handleAddDesire} size="icon"><Plus/></Button>
+                </div>
+                <ScrollArea className="h-60">
+                    <ul className="space-y-2 pr-2">
+                        {currentPistonState.map(desire => (
+                            <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/30">
+                                <span className="text-sm">{desire.text}</span>
+                                <div className="flex items-center">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleConvertToMechanism(desire)}>
+                                        <Workflow className="h-4 w-4"/>
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteDesire(desire.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive"/>
+                                    </Button>
+                                </div>
+                            </li>
+                        ))}
+                         {currentPistonState.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No desires logged for this category.</p>}
+                    </ul>
+                </ScrollArea>
+            </div>
+        </CardContent>
+    )
+};
+
 
 const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
     <CardContent className="p-4">
