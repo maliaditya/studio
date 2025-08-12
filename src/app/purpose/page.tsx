@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -284,16 +285,6 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
 
     const pattern = patterns.find(p => p.id === rule.patternId);
     
-    const categorizedPhrases = pattern?.phrases.reduce((acc, phrase) => {
-        if (phrase.category === 'Habit Cards') return acc;
-        if (!acc[phrase.category]) { // @ts-ignore
-            acc[phrase.category] = [];
-        }
-        // @ts-ignore
-        acc[phrase.category].push(phrase.text);
-        return acc;
-    }, {} as Record<string, string[]>);
-
     const linkedHabits = useMemo(() => {
         if (!pattern) return [];
         const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
@@ -303,6 +294,27 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     }, [pattern, habitCards]);
 
     const currentHabit = linkedHabits[currentHabitIndex];
+
+    const categorizedPhrasesForHabit = useMemo(() => {
+        if (!pattern || !currentHabit) return {};
+
+        const relevantMechanismIds = new Set([
+            currentHabit.response?.resourceId,
+            currentHabit.newResponse?.resourceId
+        ].filter(Boolean));
+
+        return pattern.phrases.reduce((acc, phrase) => {
+            if (phrase.category === 'Habit Cards' || !relevantMechanismIds.has(phrase.mechanismCardId)) {
+                return acc;
+            }
+            if (!acc[phrase.category]) {
+                acc[phrase.category] = [];
+            }
+            acc[phrase.category].push(phrase.text);
+            return acc;
+        }, {} as Record<string, string[]>);
+    }, [pattern, currentHabit]);
+
 
     const handleNextHabit = () => {
         setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
@@ -507,7 +519,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                             {/* Left Column: Phrases */}
                             <div className="space-y-4">
-                                {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                {categorizedPhrasesForHabit && Object.entries(categorizedPhrasesForHabit).map(([category, phrases]) => (
                                     <div key={category}>
                                         <h4 className="font-semibold text-sm mb-2 border-b pb-1">{category}</h4>
                                         <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
@@ -551,7 +563,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                     <Tabs defaultValue="resistance" className="w-full">
                                                         <TabsList className="grid w-full grid-cols-2">
                                                             <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                            <TabsTrigger value="truth">{pattern?.type === 'Negative' ? 'Truth' : 'Truth'}</TabsTrigger>
+                                                            <TabsTrigger value="truth">Truth</TabsTrigger>
                                                         </TabsList>
                                                         <TabsContent value="resistance" className="mt-2">
                                                             <ResistanceSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
