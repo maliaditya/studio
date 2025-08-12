@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -550,7 +551,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                     <Tabs defaultValue="resistance" className="w-full">
                                                         <TabsList className="grid w-full grid-cols-2">
                                                             <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                            <TabsTrigger value="truth">Truth</TabsTrigger>
+                                                            <TabsTrigger value="truth">{pattern?.type === 'Negative' ? 'Truth' : 'Truth'}</TabsTrigger>
                                                         </TabsList>
                                                         <TabsContent value="resistance" className="mt-2">
                                                             <ResistanceSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
@@ -709,13 +710,13 @@ function PurposePageContent() {
     } = useAuth();
     const { toast } = useToast();
 
-    const [isEditingPurpose, setIsEditingPurpose = useState(false);
-    const [purposeInput, setPurposeInput = useState(purposeStatement);
+    const [isEditingPurpose, setIsEditingPurpose] = useState(false);
+    const [purposeInput, setPurposeInput] = useState(purposeStatement);
     
-    const [editingMetaRuleId, setEditingMetaRuleId = useState<string | null>(null);
-    const [editedMetaRuleText, setEditedMetaRuleText = useState('');
+    const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
+    const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
-    const [ruleDetailPopup, setRuleDetailPopup = useState<RuleDetailPopupState | null>(null);
+    const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
     
     useEffect(() => {
         setPurposeInput(purposeStatement);
