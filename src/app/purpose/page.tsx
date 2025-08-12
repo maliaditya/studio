@@ -345,26 +345,42 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                     <h4 className="font-semibold text-sm mb-2 border-b pb-1">Resistance</h4>
                                     <ScrollArea className={cn((rule.stoppers || []).length > 4 && "h-40", "pr-2")}>
                                       <div className="space-y-2">
-                                          {(rule.stoppers || []).map(stopper => (
-                                              <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group">
-                                                  <div className="flex-grow pr-2">
-                                                    <p>{stopper.text}</p>
-                                                    {stopper.managementStrategy && (
-                                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
-                                                        Strategy: {stopper.managementStrategy}
-                                                      </p>
+                                          {(rule.stoppers || []).map(stopper => {
+                                              const isClickable = !!stopper.linkedResourceId;
+                                              const Wrapper = isClickable ? 'button' : 'div';
+                                              return (
+                                                  <Wrapper 
+                                                    key={stopper.id} 
+                                                    className={cn(
+                                                        "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
+                                                        isClickable && "cursor-pointer hover:bg-muted/50"
                                                     )}
-                                                  </div>
-                                                  <div className="flex-shrink-0 flex items-center gap-1">
-                                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
-                                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                                      </Button>
-                                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
-                                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                                      </Button>
-                                                  </div>
-                                              </div>
-                                          ))}
+                                                    onClick={(e) => {
+                                                      if (isClickable && cardRef.current) {
+                                                          e.stopPropagation();
+                                                          openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
+                                                      }
+                                                    }}
+                                                  >
+                                                      <div className="flex-grow pr-2">
+                                                        <p>{stopper.text}</p>
+                                                        {stopper.managementStrategy && (
+                                                          <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                                            Strategy: {stopper.managementStrategy}
+                                                          </p>
+                                                        )}
+                                                      </div>
+                                                      <div className="flex-shrink-0 flex items-center gap-1">
+                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
+                                                              <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                                          </Button>
+                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
+                                                              <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                                          </Button>
+                                                      </div>
+                                                  </Wrapper>
+                                              )
+                                          })}
                                       </div>
                                     </ScrollArea>
                                     <div className="mt-2 flex gap-2">
@@ -410,7 +426,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                         </div>
                         <div>
                             <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                             <Select value={linkedResourceId} onValueChange={setLinkedResourceId}>
+                             <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
                                 <SelectTrigger id="linked-resource">
                                     <SelectValue placeholder="Select a resource..." />
                                 </SelectTrigger>
