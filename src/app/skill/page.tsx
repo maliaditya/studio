@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -615,6 +616,19 @@ function SkillPageContent() {
                                                       <div className="flex justify-between items-start gap-2">
                                                           <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
                                                           {selectedCoreSkill && <Badge variant="outline">{area.name}</Badge>}
+                                                           <div className="flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
+                                                            <AlertDialog>
+                                                              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
+                                                              <AlertDialogContent>
+                                                                  <AlertDialogHeader>
+                                                                      <AlertDialogTitle>Delete "{micro.name}"?</AlertDialogTitle>
+                                                                      <AlertDialogDescription>This will permanently delete this micro-skill.</AlertDialogDescription>
+                                                                  </AlertDialogHeader>
+                                                                  <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteMicroSkill(selectedCoreSkill!.id, area.id, micro.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                                              </AlertDialogContent>
+                                                            </AlertDialog>
+                                                          </div>
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">

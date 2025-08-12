@@ -1721,6 +1721,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return s;
     }));
+    toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill has been removed.' });
   };
 
   const handleExpansionChange = useCallback((value: string[]) => {
