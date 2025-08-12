@@ -520,7 +520,7 @@ function UpskillPageContent() {
 
   // State for hierarchical linking
   const [skillSelectionStep, setSkillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
-  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState('');
+  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState<string | null>(null);
   const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
   const [folderPath, setFolderPath] = useState<string[]>([]);
 
@@ -1009,7 +1009,7 @@ function UpskillPageContent() {
         return true;
     });
 
-    if (selectedSpecializationId) {
+    if (selectedSpecializationId && selectedSpecializationId !== 'all') {
         filteredDefs = filteredDefs.filter(def => microSkillsForSpecialization.includes(def.category));
     }
     
@@ -1348,12 +1348,12 @@ function UpskillPageContent() {
                                         <SelectItem value="resource">Resource</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <Select value={selectedSpecializationId || ''} onValueChange={setSelectedSpecializationId}>
+                                <Select value={selectedSpecializationId || 'all'} onValueChange={setSelectedSpecializationId}>
                                     <SelectTrigger className="w-[240px]">
                                         <SelectValue placeholder="Filter by Specialization..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value=''>All Specializations</SelectItem>
+                                        <SelectItem value='all'>All Specializations</SelectItem>
                                         {availableSpecializations.map(spec => (
                                             <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
                                         ))}
@@ -1414,7 +1414,7 @@ function UpskillPageContent() {
                                       </>
                                   ) : (
                                       <>
-                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{/* TODO */}</SelectContent></Select></div>
+                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
                                           <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
                                       </>
                                   )}
