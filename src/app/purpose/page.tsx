@@ -32,6 +32,13 @@ interface RuleDetailPopupState {
     y: number;
 }
 
+interface ManageResistancePopupState {
+    stopper: Stopper;
+    x: number;
+    y: number;
+}
+
+
 const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
     <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
         {children}
@@ -153,6 +160,92 @@ const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern
     );
 };
 
+const ManageResistancePopup = ({ rule, popupState, onClose }: { 
+    rule: MetaRule;
+    popupState: ManageResistancePopupState;
+    onClose: () => void;
+}) => {
+    const { setMetaRules, habitCards, mechanismCards } = useAuth();
+    const { stopper, x, y } = popupState;
+    
+    const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
+    const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
+
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `manage-resistance-${stopper.id}` });
+    
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: y,
+        left: x,
+        zIndex: 120,
+        willChange: 'transform',
+    };
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    const handleSaveManagementStrategy = () => {
+        const updatedStoppers = (rule.stoppers || []).map(s =>
+            s.id === stopper.id ? { 
+                ...s, 
+                status: 'manageable', 
+                managementStrategy: managementStrategy.trim(), 
+                linkedResourceId: linkedResourceId || undefined
+            } : s
+        );
+        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+        onClose();
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+             <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base">Manage Resistance</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
+                    <div>
+                        <Label htmlFor="management-strategy">How will you manage this?</Label>
+                        <Textarea 
+                            id="management-strategy" 
+                            value={managementStrategy}
+                            onChange={(e) => setManagementStrategy(e.target.value)}
+                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                         <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                            <SelectTrigger id="linked-resource">
+                                <SelectValue placeholder="Select a resource..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">-- None --</SelectItem>
+                                {habitCards.map(card => (
+                                    <SelectItem key={card.id} value={card.id}>{card.name} (Habit)</SelectItem>
+                                ))}
+                                 {mechanismCards.map(card => (
+                                    <SelectItem key={card.id} value={card.id}>{card.name} (Mechanism)</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+                <CardFooter className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
+
 
 const RuleDetailPopupCard = ({ popupState, onClose }: { 
     popupState: RuleDetailPopupState;
@@ -167,10 +260,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
 
     const [newStopperText, setNewStopperText] = useState('');
     const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
-    const [manageResistanceModalState, setManageResistanceModalState] = useState<{ isOpen: boolean, stopper: Stopper | null }>({ isOpen: false, stopper: null });
-    const [managementStrategy, setManagementStrategy] = useState('');
-    const [linkedResourceId, setLinkedResourceId] = useState('');
-
+    const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -235,34 +325,22 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
         setNewStopperText('');
     };
 
-    const handleStopperStatusChange = (stopperId: string, status: Stopper['status']) => {
+    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+        e.stopPropagation();
         const stopper = (rule.stoppers || []).find(s => s.id === stopperId);
         if (status === 'manageable' && stopper) {
-            setManagementStrategy(stopper.managementStrategy || '');
-            setLinkedResourceId(stopper.linkedResourceId || '');
-            setManageResistanceModalState({ isOpen: true, stopper });
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setManageResistancePopupState({
+                stopper,
+                x: rect.right + 10,
+                y: rect.top
+            });
         } else {
             const updatedStoppers = (rule.stoppers || []).map(s =>
                 s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
             );
             setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
         }
-    };
-    
-    const handleSaveManagementStrategy = () => {
-        const { stopper } = manageResistanceModalState;
-        if (!stopper) return;
-        
-        const updatedStoppers = (rule.stoppers || []).map(s =>
-            s.id === stopper.id ? { 
-                ...s, 
-                status: 'manageable', 
-                managementStrategy: managementStrategy.trim(), 
-                linkedResourceId: linkedResourceId || undefined
-            } : s
-        );
-        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
-        setManageResistanceModalState({ isOpen: false, stopper: null });
     };
 
     return (
@@ -347,9 +425,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <div className="space-y-2">
                                           {(rule.stoppers || []).map(stopper => {
                                               const isClickable = !!stopper.linkedResourceId;
-                                              const WrapperElement = 'div';
+                                              const WrapperElement = isClickable ? 'button' : 'div';
                                               return (
-                                                  <WrapperElement
+                                                  <div
                                                     key={stopper.id} 
                                                     className={cn(
                                                         "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
@@ -371,14 +449,14 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                         )}
                                                       </div>
                                                       <div className="flex-shrink-0 flex items-center gap-1">
-                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
+                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, stopper.id, 'manageable'); }}>
                                                               <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                                           </Button>
-                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
+                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
                                                               <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                                           </Button>
                                                       </div>
-                                                  </WrapperElement>
+                                                  </div>
                                               )
                                           })}
                                       </div>
@@ -406,49 +484,13 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                     onClose={() => setLogicDiagramRule(null)} 
                 />
             )}
-            
-            <Dialog open={manageResistanceModalState.isOpen} onOpenChange={(isOpen) => setManageResistanceModalState(prev => ({ ...prev, isOpen }))}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Manage Resistance</DialogTitle>
-                        <DialogDescription>Define how you will manage this point of resistance.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4">
-                        <p className="font-semibold border p-3 rounded-md bg-muted/50">"{manageResistanceModalState.stopper?.text}"</p>
-                        <div>
-                            <Label htmlFor="management-strategy">How will you manage this?</Label>
-                            <Textarea 
-                                id="management-strategy" 
-                                value={managementStrategy}
-                                onChange={(e) => setManagementStrategy(e.target.value)}
-                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                             <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                                <SelectTrigger id="linked-resource">
-                                    <SelectValue placeholder="Select a resource..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">-- None --</SelectItem>
-                                    {habitCards.map(card => (
-                                        <SelectItem key={card.id} value={card.id}>{card.name} (Habit)</SelectItem>
-                                    ))}
-                                     {mechanismCards.map(card => (
-                                        <SelectItem key={card.id} value={card.id}>{card.name} (Mechanism)</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setManageResistanceModalState({isOpen: false, stopper: null})}>Cancel</Button>
-                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
+             {manageResistancePopupState && (
+                <ManageResistancePopup
+                    rule={rule}
+                    popupState={manageResistancePopupState}
+                    onClose={() => setManageResistancePopupState(null)}
+                />
+            )}
         </>
     );
 };
@@ -951,6 +993,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
