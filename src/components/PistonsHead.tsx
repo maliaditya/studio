@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon } from 'lucide-react';
+import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -21,11 +22,11 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
-    'Stabilizer': <Anchor className="h-5 w-5 text-purple-500" />,
-    'Fire': <Flame className="h-5 w-5 text-red-500" />,
-    'Explorer': <Compass className="h-5 w-5 text-sky-500" />,
-    'Clarity': <Sun className="h-5 w-5 text-yellow-500" />,
-    'Bridge': <GitBranch className="h-5 w-5 text-green-500" />,
+    'Gratitude': <HeartPulse className="h-5 w-5 text-pink-500" />,
+    'Curiosity': <Search className="h-5 w-5 text-sky-500" />,
+    'Inspiration': <Flame className="h-5 w-5 text-red-500" />,
+    'Compassion': <HeartPulse className="h-5 w-5 text-green-500" />,
+    'Truth Seeking': <Lightbulb className="h-5 w-5 text-yellow-500" />,
 };
 
 const EMOTIONAL_STATES = {
@@ -209,11 +210,11 @@ const DesiresView = ({ onSelect }: { onSelect: (type: PistonType) => void }) => 
     return (
         <CardContent className="p-4">
             <div className="grid grid-cols-1 gap-2">
-                <Button onClick={() => onSelect('Fire')} variant="outline" className="justify-start h-12 text-base"><Flame className="h-5 w-5 mr-3 text-red-500"/>Fire (Passion, Inspiration)</Button>
-                <Button onClick={() => onSelect('Clarity')} variant="outline" className="justify-start h-12 text-base"><Sun className="h-5 w-5 mr-3 text-yellow-500"/>Clarity (Focus, Vision)</Button>
-                <Button onClick={() => onSelect('Bridge')} variant="outline" className="justify-start h-12 text-base"><GitBranch className="h-5 w-5 mr-3 text-green-500"/>Bridge (Connection, Empathy)</Button>
-                <Button onClick={() => onSelect('Stabilizer')} variant="outline" className="justify-start h-12 text-base"><Anchor className="h-5 w-5 mr-3 text-purple-500"/>Stabilizer (Security, Grounding)</Button>
-                <Button onClick={() => onSelect('Explorer')} variant="outline" className="justify-start h-12 text-base"><Compass className="h-5 w-5 mr-3 text-sky-500"/>Explorer (Curiosity, Growth)</Button>
+                <Button onClick={() => onSelect('Gratitude')} variant="outline" className="justify-start h-12 text-base"><HeartPulse className="h-5 w-5 mr-3 text-pink-500"/>Gratitude</Button>
+                <Button onClick={() => onSelect('Curiosity')} variant="outline" className="justify-start h-12 text-base"><Search className="h-5 w-5 mr-3 text-sky-500"/>Curiosity</Button>
+                <Button onClick={() => onSelect('Inspiration')} variant="outline" className="justify-start h-12 text-base"><Flame className="h-5 w-5 mr-3 text-red-500"/>Inspiration</Button>
+                <Button onClick={() => onSelect('Compassion')} variant="outline" className="justify-start h-12 text-base"><HeartPulse className="h-5 w-5 mr-3 text-green-500"/>Compassion</Button>
+                <Button onClick={() => onSelect('Truth Seeking')} variant="outline" className="justify-start h-12 text-base"><Lightbulb className="h-5 w-5 mr-3 text-yellow-500"/>Truth Seeking</Button>
             </div>
         </CardContent>
     )
