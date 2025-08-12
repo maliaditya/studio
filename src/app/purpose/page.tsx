@@ -347,7 +347,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       <div className="space-y-2">
                                           {(rule.stoppers || []).map(stopper => {
                                               const isClickable = !!stopper.linkedResourceId;
-                                              const WrapperElement = isClickable ? 'button' : 'div';
+                                              const WrapperElement = 'div';
                                               return (
                                                   <WrapperElement
                                                     key={stopper.id} 
@@ -951,5 +951,6 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
