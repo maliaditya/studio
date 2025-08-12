@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -213,6 +214,14 @@ export interface GapAnalysis {
 }
 
 // Resource Library Types
+export interface Stopper {
+  id: string;
+  text: string;
+  status: 'manageable' | 'unmanageable' | 'none';
+  managementStrategy?: string;
+  linkedResourceId?: string;
+}
+
 export interface ResourcePoint {
   id: string;
   text: string;
@@ -246,6 +255,7 @@ export interface Resource {
   law?: { premise?: string; outcome?: string; };
   response?: { text?: string; resourceId?: string; visualize?: string; };
   newResponse?: { text?: string; resourceId?: string; action?: string; visualize?: string; };
+  stoppers?: Stopper[];
   
   // For 'model3d' type
   modelUrl?: string;
@@ -422,20 +432,11 @@ export interface Pattern {
   phrases: PatternPhrase[];
 }
 
-export interface Stopper {
-  id: string;
-  text: string;
-  status: 'manageable' | 'unmanageable' | 'none';
-  managementStrategy?: string;
-  linkedResourceId?: string;
-}
-
 export interface MetaRule {
   id: string;
   text: string;
   patternId: string;
   purposePillar?: string;
-  stoppers?: Stopper[];
 }
 
 export type PistonsInitialState = {

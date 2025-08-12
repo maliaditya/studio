@@ -33,6 +33,7 @@ interface RuleDetailPopupState {
 }
 
 interface ManageResistancePopupState {
+    habitId: string;
     stopper: Stopper;
     x: number;
     y: number;
@@ -84,7 +85,7 @@ const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern
     
     const negativeMechanism = mechanismCards.find(m => m.id === linkedHabit.response?.resourceId);
     const positiveMechanism = mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId);
-    const stoppers = rule.stoppers || [];
+    const stoppers = linkedHabit.stoppers || [];
     
     const negativeCosts = [
         negativeMechanism?.reward ? `Blocks: ${negativeMechanism.reward}` : null,
@@ -160,13 +161,13 @@ const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern
     );
 };
 
-const ManageResistancePopup = ({ rule, popupState, onClose }: { 
-    rule: MetaRule;
+const ManageResistancePopup = ({ habit, popupState, onClose }: { 
+    habit: Resource;
     popupState: ManageResistancePopupState;
     onClose: () => void;
 }) => {
-    const { setMetaRules, habitCards, mechanismCards } = useAuth();
-    const { stopper, x, y } = popupState;
+    const { setResources, resources: allResources } = useAuth();
+    const { stopper } = popupState;
     
     const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
     const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
@@ -175,8 +176,8 @@ const ManageResistancePopup = ({ rule, popupState, onClose }: {
     
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: y,
-        left: x,
+        top: popupState.y,
+        left: popupState.x,
         zIndex: 120,
         willChange: 'transform',
     };
@@ -185,15 +186,15 @@ const ManageResistancePopup = ({ rule, popupState, onClose }: {
     }
 
     const handleSaveManagementStrategy = () => {
-        const updatedStoppers = (rule.stoppers || []).map(s =>
-            s.id === stopper.id ? { 
-                ...s, 
-                status: 'manageable', 
-                managementStrategy: managementStrategy.trim(), 
-                linkedResourceId: linkedResourceId || undefined
-            } : s
-        );
-        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const updatedStoppers = (r.stoppers || []).map(s =>
+                    s.id === stopper.id ? { ...s, status: 'manageable', managementStrategy: managementStrategy.trim(), linkedResourceId: linkedResourceId || undefined } : s
+                );
+                return { ...r, stoppers: updatedStoppers };
+            }
+            return r;
+        }));
         onClose();
     };
 
@@ -227,11 +228,8 @@ const ManageResistancePopup = ({ rule, popupState, onClose }: {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="none">-- None --</SelectItem>
-                                {habitCards.map(card => (
-                                    <SelectItem key={card.id} value={card.id}>{card.name} (Habit)</SelectItem>
-                                ))}
-                                 {mechanismCards.map(card => (
-                                    <SelectItem key={card.id} value={card.id}>{card.name} (Mechanism)</SelectItem>
+                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -251,14 +249,13 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     popupState: RuleDetailPopupState;
     onClose: () => void; 
 }) => {
-    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, setMetaRules, resources } = useAuth();
+    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, resources, setResources } = useAuth();
     const { ruleId, x, y } = popupState;
     const rule = metaRules.find(r => r.id === ruleId);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
-    const [newStopperText, setNewStopperText] = useState('');
     const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
     const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
 
@@ -277,29 +274,6 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     if (!rule) return null;
 
     const pattern = patterns.find(p => p.id === rule.patternId);
-
-    const getHabitLinksForRule = (currentRule: MetaRule) => {
-        if (!pattern) return [];
-
-        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
-
-        return habitPhrases.map(phrase => {
-            const habit = habitCards.find(h => h.id === phrase.mechanismCardId);
-            if (!habit) return null;
-
-            const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-            const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-            
-            return {
-                habitId: habit.id,
-                habitName: habit.name,
-                negativeMechanismText: responseMechanism?.response?.visualize || '...',
-                negativeMechanismName: responseMechanism?.name || 'Unlinked',
-                positiveMechanismText: newResponseMechanism?.newResponse?.action || '...',
-                positiveMechanismName: newResponseMechanism?.name || 'Unlinked',
-            };
-        }).filter((h): h is NonNullable<typeof h> => h !== null);
-    };
     
     const categorizedPhrases = pattern?.phrases.reduce((acc, phrase) => {
         if (phrase.category === 'Habit Cards') return acc;
@@ -311,37 +285,114 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
         return acc;
     }, {} as Record<string, string[]>);
 
-    const linkedHabits = getHabitLinksForRule(rule);
+    const linkedHabits = useMemo(() => {
+        if (!pattern) return [];
+        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
+        return habitPhrases.map(phrase => {
+            return habitCards.find(h => h.id === phrase.mechanismCardId);
+        }).filter((h): h is Resource => !!h);
+    }, [pattern, habitCards]);
 
-    const handleAddStopper = () => {
+
+    const handleAddStopper = (habitId: string, newStopperText: string) => {
         if (!newStopperText.trim()) return;
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
             text: newStopperText.trim(),
             status: 'none',
         };
-        const updatedStoppers = [...(rule.stoppers || []), newStopper];
-        setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
-        setNewStopperText('');
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
+            }
+            return r;
+        }));
     };
 
-    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+    const handleStopperStatusChange = (e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
-        const stopper = (rule.stoppers || []).find(s => s.id === stopperId);
+        const habit = resources.find(r => r.id === habitId);
+        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
+
         if (status === 'manageable' && stopper) {
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setManageResistancePopupState({
+                habitId,
                 stopper,
                 x: rect.right + 10,
                 y: rect.top
             });
         } else {
-            const updatedStoppers = (rule.stoppers || []).map(s =>
-                s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
-            );
-            setMetaRules(prev => prev.map(r => r.id === rule.id ? { ...r, stoppers: updatedStoppers } : r));
+            setResources(prev => prev.map(r => {
+                if (r.id === habitId) {
+                    const updatedStoppers = (r.stoppers || []).map(s => 
+                        s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
+                    );
+                    return { ...r, stoppers: updatedStoppers };
+                }
+                return r;
+            }));
         }
     };
+    
+    const ResistanceSection = ({ habit }: { habit: Resource }) => {
+        const [newStopperText, setNewStopperText] = useState('');
+      
+        return (
+            <div>
+                <h4 className="font-semibold text-sm mb-2 border-b pb-1">Resistance</h4>
+                <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
+                  <div className="space-y-2">
+                      {(habit.stoppers || []).map(stopper => {
+                          const isClickable = !!stopper.linkedResourceId;
+                          return (
+                              <div
+                                key={stopper.id} 
+                                className={cn(
+                                    "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
+                                    isClickable && "cursor-pointer hover:bg-muted/50"
+                                )}
+                                onClick={(e) => {
+                                  if (isClickable && cardRef.current) {
+                                      e.stopPropagation();
+                                      openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
+                                  }
+                                }}
+                              >
+                                  <div className="flex-grow pr-2">
+                                    <p>{stopper.text}</p>
+                                    {stopper.managementStrategy && (
+                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                        Strategy: {stopper.managementStrategy}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex-shrink-0 flex items-center gap-1">
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
+                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
+                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                      </Button>
+                                  </div>
+                              </div>
+                          )
+                      })}
+                  </div>
+                </ScrollArea>
+                <div className="mt-2 flex gap-2">
+                    <Input
+                        value={newStopperText}
+                        onChange={(e) => setNewStopperText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); } }}
+                        placeholder="What's stopping you?"
+                        className="h-8 text-xs"
+                    />
+                    <Button size="sm" onClick={() => { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); }} className="h-8">Add</Button>
+                </div>
+            </div>
+        );
+      };
 
     return (
         <>
@@ -385,93 +436,45 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                     <div>
                                         <h4 className="font-semibold text-sm mb-2 border-b pb-1">Linked Habits</h4>
                                         <div className="space-y-2">
-                                            {linkedHabits.map((habit, i) => (
-                                                <Card 
-                                                    key={i} 
-                                                    className="bg-muted/50 cursor-pointer hover:bg-muted"
-                                                    onClick={(e) => {
-                                                        if (cardRef.current) {
-                                                            const parentPopupState = {
-                                                                resourceId: rule.id,
-                                                                x,
-                                                                y,
-                                                                level: 0,
-                                                            }
-                                                            openGeneralPopup(habit.habitId, e, parentPopupState, cardRef.current.getBoundingClientRect());
-                                                        }
-                                                    }}
-                                                >
-                                                    <CardHeader className="p-3">
-                                                        <CardTitle className="text-sm font-semibold text-foreground mb-1">{habit.habitName}</CardTitle>
-                                                    </CardHeader>
-                                                    <CardContent className="p-3 pt-0 text-xs space-y-2">
-                                                        <div>
-                                                            <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
-                                                            <p className="text-muted-foreground">{habit.negativeMechanismText} <span className="text-xs italic">({habit.negativeMechanismName})</span></p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
-                                                            <p className="text-muted-foreground">{habit.positiveMechanismText} <span className="text-xs italic">({habit.positiveMechanismName})</span></p>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            ))}
+                                            {linkedHabits.map((habit, i) => {
+                                                const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+                                                const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+                                                return (
+                                                  <Card 
+                                                      key={i} 
+                                                      className="bg-muted/50"
+                                                  >
+                                                      <CardHeader className="p-3">
+                                                          <CardTitle 
+                                                            className="text-sm font-semibold text-foreground mb-1 cursor-pointer hover:underline"
+                                                            onClick={(e) => {
+                                                              if (cardRef.current) {
+                                                                  openGeneralPopup(habit.id, e, popupState, cardRef.current.getBoundingClientRect());
+                                                              }
+                                                            }}
+                                                          >
+                                                            {habit.name}
+                                                          </CardTitle>
+                                                      </CardHeader>
+                                                      <CardContent className="p-3 pt-0 text-xs space-y-2">
+                                                          <div>
+                                                              <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
+                                                              <p className="text-muted-foreground">{responseMechanism?.response?.visualize || '...'} <span className="text-xs italic">({responseMechanism?.name || 'Unlinked'})</span></p>
+                                                          </div>
+                                                          <div>
+                                                              <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
+                                                              <p className="text-muted-foreground">{newResponseMechanism?.newResponse?.action || '...'} <span className="text-xs italic">({newResponseMechanism?.name || 'Unlinked'})</span></p>
+                                                          </div>
+                                                          <div className="pt-2 mt-2 border-t">
+                                                            <ResistanceSection habit={habit} />
+                                                          </div>
+                                                      </CardContent>
+                                                  </Card>
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 )}
-                                <div>
-                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Resistance</h4>
-                                    <ScrollArea className={cn((rule.stoppers || []).length > 4 && "h-40", "pr-2")}>
-                                      <div className="space-y-2">
-                                          {(rule.stoppers || []).map(stopper => {
-                                              const isClickable = !!stopper.linkedResourceId;
-                                              const WrapperElement = isClickable ? 'button' : 'div';
-                                              return (
-                                                  <div
-                                                    key={stopper.id} 
-                                                    className={cn(
-                                                        "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
-                                                        isClickable && "cursor-pointer hover:bg-muted/50"
-                                                    )}
-                                                    onClick={(e) => {
-                                                      if (isClickable && cardRef.current) {
-                                                          e.stopPropagation();
-                                                          openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
-                                                      }
-                                                    }}
-                                                  >
-                                                      <div className="flex-grow pr-2">
-                                                        <p>{stopper.text}</p>
-                                                        {stopper.managementStrategy && (
-                                                          <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
-                                                            Strategy: {stopper.managementStrategy}
-                                                          </p>
-                                                        )}
-                                                      </div>
-                                                      <div className="flex-shrink-0 flex items-center gap-1">
-                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, stopper.id, 'manageable'); }}>
-                                                              <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                                          </Button>
-                                                          <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
-                                                              <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                                          </Button>
-                                                      </div>
-                                                  </div>
-                                              )
-                                          })}
-                                      </div>
-                                    </ScrollArea>
-                                    <div className="mt-2 flex gap-2">
-                                        <Input
-                                            value={newStopperText}
-                                            onChange={(e) => setNewStopperText(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddStopper()}
-                                            placeholder="What's stopping you?"
-                                            className="h-8 text-xs"
-                                        />
-                                        <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -486,7 +489,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
             )}
              {manageResistancePopupState && (
                 <ManageResistancePopup
-                    rule={rule}
+                    habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
                     popupState={manageResistancePopupState}
                     onClose={() => setManageResistancePopupState(null)}
                 />
@@ -993,6 +996,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
