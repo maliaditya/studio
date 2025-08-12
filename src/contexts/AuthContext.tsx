@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -166,6 +166,12 @@ interface AuthContextType {
   closeGeneralPopup: (resourceId: string) => void;
   handleUpdateResource: (resource: Resource) => void;
 
+  // Meta Rule Popup
+  ruleDetailPopup: RuleDetailPopupState | null;
+  openRuleDetailPopup: (ruleId: string, event: React.MouseEvent) => void;
+  closeRuleDetailPopup: () => void;
+  handleRulePopupDragEnd: (event: DragEndEvent) => void;
+
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -323,6 +329,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // General Popups (New System)
   const [generalPopups, setGeneralPopups] = useState<Map<string, PopupState>>(new Map());
+
+  // Meta Rule Popup
+  const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
 
   // Sidebar State
@@ -1753,6 +1762,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newPopups;
     });
   };
+  
+  const openRuleDetailPopup = (ruleId: string, event: React.MouseEvent) => {
+    const popupWidth = 600;
+    const popupHeight = 500;
+    const x = window.innerWidth / 2 - popupWidth / 2;
+    const y = window.innerHeight / 2 - popupHeight / 2;
+    setRuleDetailPopup({ ruleId, x: Math.max(20, x), y: Math.max(20, y) });
+  };
+  
+  const closeRuleDetailPopup = () => {
+    setRuleDetailPopup(null);
+  };
+  
+  const handleRulePopupDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    if (ruleDetailPopup && active.id === `rule-popup-${ruleDetailPopup.ruleId}`) {
+        setRuleDetailPopup(prev => prev ? {
+            ...prev,
+            x: prev.x + delta.x,
+            y: prev.y + delta.y,
+        } : null);
+    }
+  };
+
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
@@ -1800,6 +1833,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     intentionPopups, openIntentionPopup, closeIntentionPopup,
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
+    ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,

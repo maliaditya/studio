@@ -445,6 +445,13 @@ export interface MetaRule {
   purposePillar?: string;
 }
 
+export interface RuleDetailPopupState {
+    ruleId: string;
+    x: number;
+    y: number;
+}
+
+
 export type PistonsInitialState = {
     view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts';
     topicId?: string;

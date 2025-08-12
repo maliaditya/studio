@@ -20,6 +20,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
+import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
 
 
 // export const metadata: Metadata = {
@@ -29,7 +30,14 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
-  const { isPistonsHeadOpen, setIsPistonsHeadOpen, openPopups, ResourcePopup, handlePopupDragEnd, intentionPopups, closeIntentionPopup, closeAllResourcePopups, generalPopups, openGeneralPopup, handleUpdateResource, closeGeneralPopup } = useAuth();
+  const { 
+    isPistonsHeadOpen, setIsPistonsHeadOpen, 
+    openPopups, ResourcePopup, handlePopupDragEnd, 
+    intentionPopups, closeIntentionPopup, 
+    closeAllResourcePopups, generalPopups, 
+    openGeneralPopup, handleUpdateResource, closeGeneralPopup,
+    ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd
+  } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
 
   useEffect(() => {
@@ -39,13 +47,15 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       // If there are no popups, do nothing.
-      if (openPopups.size === 0 && generalPopups.size === 0) return;
+      if (openPopups.size === 0 && generalPopups.size === 0 && !ruleDetailPopup) return;
 
       const target = event.target as HTMLElement;
 
       // Check if the click was inside any of the open popups.
       if (!target.closest('[data-popup-id]')) {
         closeAllResourcePopups();
+        // We might want to close other popups here too, or handle them separately.
+        // For now, only resource popups close on outside click.
       }
     };
 
@@ -53,10 +63,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openPopups, generalPopups, closeAllResourcePopups]);
+  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup]);
 
   return (
-    <DndContext onDragEnd={handlePopupDragEnd}>
+    <DndContext onDragEnd={(e) => {
+        handlePopupDragEnd(e);
+        handleRulePopupDragEnd(e);
+    }}>
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
@@ -84,6 +97,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 onOpenNestedPopup={(resourceId, event, parentPopupState) => openGeneralPopup(resourceId, event, parentPopupState)}
               />
             ))}
+             {ruleDetailPopup && (
+                <RuleDetailPopupCard 
+                    popupState={ruleDetailPopup}
+                    onClose={closeRuleDetailPopup}
+                />
+            )}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {
                   if (!popup.parentId) return null;

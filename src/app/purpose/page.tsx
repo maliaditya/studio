@@ -27,683 +27,6 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
-interface RuleDetailPopupState {
-    ruleId: string;
-    x: number;
-    y: number;
-}
-
-interface ManageResistancePopupState {
-    habitId: string;
-    stopper: Stopper;
-    x: number;
-    y: number;
-}
-
-
-const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
-        {children}
-    </div>
-);
-
-const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern: Pattern | undefined; onClose: () => void; }) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `logic-diagram-${rule.id}` });
-    const { habitCards, mechanismCards } = useAuth();
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px), 0)` : 'translate(-50%, -50%)',
-        zIndex: 110,
-    };
-
-    const linkedHabit = useMemo(() => {
-        if (!pattern) return null;
-        const habitPhrase = pattern.phrases.find(p => p.category === 'Habit Cards');
-        if (!habitPhrase) return null;
-        return habitCards.find(h => h.id === habitPhrase.mechanismCardId);
-    }, [pattern, habitCards]);
-
-    if (!linkedHabit) {
-        return (
-            <div ref={setNodeRef} style={style} {...attributes}>
-                <Card className="w-[400px] shadow-2xl border-2 border-primary/30 bg-card">
-                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 text-center text-muted-foreground">
-                        No Habit Card is linked to this pattern. A logic diagram cannot be generated.
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-    
-    const negativeMechanism = mechanismCards.find(m => m.id === linkedHabit.response?.resourceId);
-    const positiveMechanism = mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId);
-    const stoppers = linkedHabit.stoppers || [];
-    
-    const negativeCosts = [
-        negativeMechanism?.reward ? `Blocks: ${negativeMechanism.reward}` : null,
-        negativeMechanism?.benefit ? `Costs me: ${negativeMechanism.benefit}` : null
-    ].filter(Boolean);
-
-    const positiveBenefits = [
-        positiveMechanism?.benefit ? `Enables: ${positiveMechanism.benefit}` : null,
-        positiveMechanism?.reward ? `Gives me: ${positiveMechanism.reward}` : null
-    ].filter(Boolean);
-
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-auto max-w-[90vw] shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic for: "{rule.text}"</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                    <div className="flex flex-col items-center space-y-2">
-                        <FlowNode>Trigger: When I {linkedHabit.trigger?.action || '...'}</FlowNode>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        <FlowNode className="font-bold bg-primary/10">{rule.text}</FlowNode>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        
-                        <div className="flex w-full justify-around items-start gap-4">
-                            {/* Negative Path */}
-                            <div className="flex flex-col items-center space-y-2 w-1/2">
-                                <Badge variant="destructive">Old Path</Badge>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="bg-red-100/50 border-red-500/50 w-full">Response: {linkedHabit.response?.visualize || '...'}</FlowNode>
-                                {stoppers.length > 0 && (
-                                    <>
-                                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                        <FlowNode className="border-yellow-500/50 bg-yellow-100/30 w-full">
-                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Resistance</p>
-                                            <ul className="list-disc list-inside text-left mt-1">
-                                                {stoppers.map(s => <li key={s.id}>{s.text}</li>)}
-                                            </ul>
-                                        </FlowNode>
-                                    </>
-                                )}
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="w-full bg-red-100/20">
-                                    <p className="font-semibold">Costs & Consequences</p>
-                                    <ul className="list-disc list-inside text-left mt-1">
-                                        {negativeCosts.length > 0 ? negativeCosts.map((c, i) => <li key={i}>{c}</li>) : <li>Not specified</li>}
-                                    </ul>
-                                </FlowNode>
-                            </div>
-
-                             {/* Positive Path */}
-                            <div className="flex flex-col items-center space-y-2 w-1/2">
-                                <Badge variant="secondary" className="bg-green-600 text-white">New Path</Badge>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="bg-green-100/50 border-green-500/50 w-full">New Response: {linkedHabit.newResponse?.action || '...'}</FlowNode>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="w-full bg-green-100/20">
-                                     <p className="font-semibold">Benefits & Rewards</p>
-                                     <ul className="list-disc list-inside text-left mt-1">
-                                        {positiveBenefits.length > 0 ? positiveBenefits.map((b, i) => <li key={i}>{b}</li>) : <li>Not specified</li>}
-                                    </ul>
-                                </FlowNode>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    );
-};
-
-const ManageResistancePopup = ({ habit, popupState, onClose }: { 
-    habit: Resource;
-    popupState: ManageResistancePopupState;
-    onClose: () => void;
-}) => {
-    const { setResources, resources: allResources } = useAuth();
-    const { stopper } = popupState;
-    
-    const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
-    const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
-
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `manage-resistance-${stopper.id}` });
-    
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        zIndex: 120,
-        willChange: 'transform',
-    };
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-
-    const handleSaveManagementStrategy = () => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                const updatedStoppers = (r.stoppers || []).map(s =>
-                    s.id === stopper.id ? { ...s, status: 'manageable', managementStrategy: managementStrategy.trim(), linkedResourceId: linkedResourceId || undefined } : s
-                );
-                return { ...r, stoppers: updatedStoppers };
-            }
-            return r;
-        }));
-        onClose();
-    };
-
-    return (
-        <DialogPortal>
-            <div ref={setNodeRef} style={style} {...attributes}>
-                 <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                    <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-base">Manage Resistance</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                        <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
-                        <div>
-                            <Label htmlFor="management-strategy">How will you manage this?</Label>
-                            <Textarea 
-                                id="management-strategy" 
-                                value={managementStrategy}
-                                onChange={(e) => setManagementStrategy(e.target.value)}
-                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                            <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                                <SelectTrigger id="linked-resource">
-                                    <SelectValue placeholder="Select a resource..." />
-                                </SelectTrigger>
-                                <DialogPortal>
-                                  <SelectContent>
-                                      <SelectItem value="none">-- None --</SelectItem>
-                                      {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                          <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </DialogPortal>
-                            </Select>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                    </CardFooter>
-                </Card>
-            </div>
-        </DialogPortal>
-    );
-};
-
-
-const RuleDetailPopupCard = ({ popupState, onClose }: { 
-    popupState: RuleDetailPopupState;
-    onClose: () => void; 
-}) => {
-    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, resources, setResources } = useAuth();
-    const { ruleId, x, y } = popupState;
-    const rule = metaRules.find(r => r.id === ruleId);
-    
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `rule-popup-${rule?.id}` });
-    const cardRef = useRef<HTMLDivElement>(null);
-
-    const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
-    const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
-    const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: y,
-        left: x,
-        zIndex: 60,
-        willChange: 'transform',
-    };
-
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
-
-    useEffect(() => {
-        setCurrentHabitIndex(0);
-    }, [ruleId]);
-
-    if (!rule) return null;
-
-    const pattern = patterns.find(p => p.id === rule.patternId);
-    
-    const linkedHabits = useMemo(() => {
-        if (!pattern) return [];
-        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
-        return habitPhrases.map(phrase => {
-            return habitCards.find(h => h.id === phrase.mechanismCardId);
-        }).filter((h): h is Resource => !!h);
-    }, [pattern, habitCards]);
-
-    const currentHabit = linkedHabits[currentHabitIndex];
-
-    const categorizedPhrasesForHabit = useMemo(() => {
-        if (!pattern || !currentHabit) return {};
-
-        const relevantMechanismIds = new Set([
-            currentHabit.response?.resourceId,
-            currentHabit.newResponse?.resourceId
-        ].filter(Boolean));
-
-        return pattern.phrases.reduce((acc, phrase) => {
-            if (phrase.category === 'Habit Cards' || !relevantMechanismIds.has(phrase.mechanismCardId)) {
-                return acc;
-            }
-            if (!acc[phrase.category]) {
-                acc[phrase.category] = [];
-            }
-            acc[phrase.category].push(phrase.text);
-            return acc;
-        }, {} as Record<string, string[]>);
-    }, [pattern, currentHabit]);
-
-
-    const handleNextHabit = () => {
-        setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
-    };
-
-    const handlePrevHabit = () => {
-        setCurrentHabitIndex((prevIndex) => (prevIndex - 1 + linkedHabits.length) % linkedHabits.length);
-    };
-
-
-    const handleAddStopper = (habitId: string, newStopperText: string) => {
-        if (!newStopperText.trim()) return;
-        const newStopper: Stopper = {
-            id: `stopper_${Date.now()}`,
-            text: newStopperText.trim(),
-            status: 'none',
-        };
-        setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
-                return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
-            }
-            return r;
-        }));
-    };
-    
-    const handleAddStrength = (habitId: string, newStrengthText: string) => {
-        if (!newStrengthText.trim()) return;
-        const newStrength: Strength = {
-            id: `strength_${Date.now()}`,
-            text: newStrengthText.trim(),
-        };
-        setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
-                return { ...r, strengths: [...(r.strengths || []), newStrength] };
-            }
-            return r;
-        }));
-    };
-
-    const handleDeleteStopper = (habitId: string, stopperId: string) => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
-                return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
-            }
-            return r;
-        }));
-    };
-    
-    const handleDeleteStrength = (habitId: string, strengthId: string) => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
-                return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
-            }
-            return r;
-        }));
-    };
-
-    const handleStopperStatusChange = (e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
-        e.stopPropagation();
-        const habit = resources.find(r => r.id === habitId);
-        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
-
-        if (status === 'manageable' && stopper) {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            setManageResistancePopupState({
-                habitId,
-                stopper,
-                x: rect.right + 10,
-                y: rect.top
-            });
-        } else {
-            setResources(prev => prev.map(r => {
-                if (r.id === habitId) {
-                    const updatedStoppers = (r.stoppers || []).map(s => 
-                        s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
-                    );
-                    return { ...r, stoppers: updatedStoppers };
-                }
-                return r;
-            }));
-        }
-    };
-    
-    const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const [newStopperText, setNewStopperText] = useState('');
-        const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
-      
-        return (
-            <div>
-                <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
-                  <div className="space-y-2">
-                      {(habit.stoppers || []).map(stopper => {
-                          const isClickable = !!stopper.linkedResourceId;
-                          return (
-                            <div
-                                key={stopper.id}
-                                className={cn(
-                                    "text-xs p-2 rounded-md bg-background group w-full text-left",
-                                    isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
-                                )}
-                                onClick={(e) => {
-                                    if (isClickable && cardRef.current) {
-                                        e.stopPropagation();
-                                        openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
-                                    }
-                                }}
-                            >
-                                  <div className="flex-grow pr-2">
-                                    <p>{stopper.text}</p>
-                                    {stopper.managementStrategy && (
-                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
-                                        Strategy: {stopper.managementStrategy}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
-                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
-                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                      </Button>
-                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
-                                          <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                  </div>
-                              </div>
-                          )
-                      })}
-                  </div>
-                </ScrollArea>
-                <div className="mt-2 flex gap-2">
-                    <Input
-                        value={newStopperText}
-                        onChange={(e) => setNewStopperText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); } }}
-                        placeholder={placeholder}
-                        className="h-8 text-xs"
-                    />
-                    <Button size="sm" onClick={() => { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); }} className="h-8">Add</Button>
-                </div>
-            </div>
-        );
-      };
-
-    const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const [newStrengthText, setNewStrengthText] = useState('');
-        const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
-      
-        return (
-            <div>
-                <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
-                  <div className="space-y-2">
-                      {(habit.strengths || []).map(strength => (
-                          <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
-                              <p className="flex-grow pr-2">{strength.text}</p>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                          </div>
-                      ))}
-                  </div>
-                </ScrollArea>
-                <div className="mt-2 flex gap-2">
-                    <Input
-                        value={newStrengthText}
-                        onChange={(e) => setNewStrengthText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); } }}
-                        placeholder={placeholder}
-                        className="h-8 text-xs"
-                    />
-                    <Button size="sm" onClick={() => { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); }} className="h-8">Add</Button>
-                </div>
-            </div>
-        );
-    };
-
-
-    return (
-        <>
-            <div ref={setNodeRef} style={style} {...attributes}>
-                <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
-                    <CardHeader className="p-4 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-start">
-                            <div className="flex-grow pr-10">
-                                <CardTitle className="text-lg">{rule.text}</CardTitle>
-                                {pattern && (
-                                    <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
-                                )}
-                            </div>
-                            <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule(rule); }}>
-                                    <Workflow className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                            {/* Left Column: Phrases */}
-                            <div className="space-y-4">
-                                {categorizedPhrasesForHabit && Object.entries(categorizedPhrasesForHabit).map(([category, phrases]) => (
-                                    <div key={category}>
-                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">{category}</h4>
-                                        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                            {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                        </ul>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Right Column: Habits and Resistance/Truth */}
-                            <div className="space-y-4">
-                                {linkedHabits.length > 0 && currentHabit && (
-                                    <div>
-                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">
-                                            Linked Habit ({currentHabitIndex + 1}/{linkedHabits.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            <Card key={currentHabit.id} className="bg-muted/50">
-                                                <CardHeader className="p-3">
-                                                    <CardTitle 
-                                                    className="text-sm font-semibold text-foreground mb-1 cursor-pointer hover:underline"
-                                                    onClick={(e) => {
-                                                        if (cardRef.current) {
-                                                            openGeneralPopup(currentHabit.id, e, popupState, cardRef.current.getBoundingClientRect());
-                                                        }
-                                                    }}
-                                                    >
-                                                    {currentHabit.name}
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-3 pt-0 text-xs space-y-2">
-                                                    <div>
-                                                        <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
-                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'})</span></p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
-                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'})</span></p>
-                                                    </div>
-                                                    <div className="pt-2 mt-2">
-                                                    <Tabs defaultValue="resistance" className="w-full">
-                                                        <TabsList className="grid w-full grid-cols-2">
-                                                            <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                                            <TabsTrigger value="truth">Truth</TabsTrigger>
-                                                        </TabsList>
-                                                        <TabsContent value="resistance" className="mt-2">
-                                                            <ResistanceSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
-                                                        </TabsContent>
-                                                        <TabsContent value="truth" className="mt-2">
-                                                            <TruthSection habit={currentHabit} isNegative={pattern?.type === 'Negative'}/>
-                                                        </TabsContent>
-                                                    </Tabs>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                     {linkedHabits.length > 1 && (
-                        <CardFooter className="p-2 flex justify-between items-center">
-                            <Button variant="ghost" size="sm" onClick={handlePrevHabit} className="truncate">
-                                <ArrowLeft className="mr-2 h-4 w-4 shrink-0" />
-                                <span className="truncate">
-                                    {linkedHabits[(currentHabitIndex - 1 + linkedHabits.length) % linkedHabits.length].name}
-                                </span>
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                                {currentHabitIndex + 1} / {linkedHabits.length}
-                            </span>
-                            <Button variant="ghost" size="sm" onClick={handleNextHabit} className="truncate">
-                                 <span className="truncate">
-                                    {linkedHabits[(currentHabitIndex + 1) % linkedHabits.length].name}
-                                </span>
-                                <ArrowRight className="ml-2 h-4 w-4 shrink-0" />
-                            </Button>
-                        </CardFooter>
-                    )}
-                </Card>
-            </div>
-            {logicDiagramRule && (
-                <LogicDiagramPopup 
-                    rule={logicDiagramRule} 
-                    pattern={pattern} 
-                    onClose={() => setLogicDiagramRule(null)} 
-                />
-            )}
-             {manageResistancePopupState && (
-                <ManageResistancePopup
-                    habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
-                    popupState={manageResistancePopupState}
-                    onClose={() => setManageResistancePopupState(null)}
-                />
-            )}
-        </>
-    );
-};
-
-const StrategicOverviewDiagram = () => {
-    const PillarCard = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
-      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-40 shadow-sm">
-        <div className="text-primary">{icon}</div>
-        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
-      </div>
-    );
-  
-    const ActionCard = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
-      <div className="flex flex-col items-center text-center p-3 border rounded-lg bg-card/50 w-32 shadow-sm">
-        <div className="text-primary">{icon}</div>
-        <h4 className="font-semibold mt-2 text-sm text-foreground">{title}</h4>
-      </div>
-    );
-  
-    const OutcomeBadge = ({ children }: { children: React.ReactNode }) => (
-      <Badge variant="outline" className="text-sm py-1 px-3 border-primary/30 text-primary">{children}</Badge>
-    );
-  
-    const EgoOutcomeBadge = ({ children }: { children: React.ReactNode }) => (
-      <Badge variant="destructive" className="text-sm py-1 px-3 bg-destructive/10 text-destructive-foreground border-destructive/30">{children}</Badge>
-    );
-  
-    return (
-      <div className="flex flex-col xl:flex-row items-center justify-center gap-8 lg:gap-6 p-4 overflow-x-auto">
-  
-        {/* Negative Flow (Ego Path) - Flows Right to Left */}
-        <div className="flex flex-col-reverse xl:flex-row items-center gap-4 text-center">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-                <EgoOutcomeBadge>Dependent</EgoOutcomeBadge>
-                <EgoOutcomeBadge>Poor</EgoOutcomeBadge>
-                <EgoOutcomeBadge>Addict</EgoOutcomeBadge>
-                <EgoOutcomeBadge>Fear</EgoOutcomeBadge>
-                <EgoOutcomeBadge>Bondages</EgoOutcomeBadge>
-            </div>
-            <ArrowLeft className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-            <div className="flex xl:flex-col gap-3">
-                <ActionCard icon={<ShoppingBag className="h-5 w-5"/>} title="Consumption" />
-                <ActionCard icon={<Smile className="h-5 w-5"/>} title="Pleasure" />
-            </div>
-        </div>
-
-        <ArrowLeft className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-
-        {/* Central Heart */}
-        <div className="flex flex-col items-center gap-4 text-center">
-            <PillarCard icon={<HandHeart className="h-5 w-5"/>} title="Heart" />
-        </div>
-
-        <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-  
-        {/* Positive Flow (Virtue Path) - Flows Left to Right */}
-        <div className="flex flex-col xl:flex-row items-center gap-4 text-center">
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex xl:flex-col gap-3">
-                <PillarCard icon={<Brain className="h-5 w-5" />} title="Mind" />
-                <PillarCard icon={<HeartPulse className="h-5 w-5" />} title="Body" />
-                <PillarCard icon={<TrendingUp className="h-5 w-5" />} title="Spirit" />
-            </div>
-            <div className="mt-2 p-2 border rounded-md bg-card/50 text-sm font-semibold">Attention</div>
-          </div>
-          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-          <div className="flex xl:flex-col gap-3">
-            <ActionCard icon={<Activity className="h-5 w-5" />} title="Skill" />
-            <ActionCard icon={<Package className="h-5 w-5" />} title="Product" />
-          </div>
-          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-          <div className="flex items-center gap-2 p-3 border-2 border-primary/50 rounded-lg bg-card/80 shadow">
-            <DollarSign className="h-6 w-6 text-green-500" />
-            <h3 className="text-lg font-bold">Monetization</h3>
-          </div>
-          <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <OutcomeBadge>Freedom</OutcomeBadge>
-            <OutcomeBadge>Limitless</OutcomeBadge>
-            <OutcomeBadge>Fearless</OutcomeBadge>
-            <OutcomeBadge>Independent</OutcomeBadge>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-
 function PurposePageContent() {
     const { 
         purposeStatement, 
@@ -718,7 +41,8 @@ function PurposePageContent() {
         metaRules,
         setMetaRules,
         generalPopups,
-        handlePopupDragEnd
+        handlePopupDragEnd,
+        openRuleDetailPopup, ruleDetailPopup
     } = useAuth();
     const { toast } = useToast();
 
@@ -727,8 +51,6 @@ function PurposePageContent() {
     
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
-    
-    const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
     
     useEffect(() => {
         setPurposeInput(purposeStatement);
@@ -774,34 +96,6 @@ function PurposePageContent() {
         setMetaRules(prev => prev.filter(r => r.id !== ruleId));
     };
 
-
-    const handleOpenRuleDetail = (e: React.MouseEvent, rule: MetaRule) => {
-        const popupWidth = 600;
-        const popupHeight = 500; // Approximate height
-        const x = window.innerWidth / 2 - popupWidth / 2;
-        const y = window.innerHeight / 2 - popupHeight / 2;
-        setRuleDetailPopup({ ruleId: rule.id, x: Math.max(20, x), y: Math.max(20, y) });
-    };
-    
-    const handleDragEndLocal = (event: DragEndEvent) => {
-        const { active, delta } = event;
-        const activeId = active.id as string;
-    
-        if (ruleDetailPopup && activeId === `rule-popup-${ruleDetailPopup.ruleId}`) {
-            setRuleDetailPopup(prev => prev ? {
-                ...prev,
-                x: prev.x + delta.x,
-                y: prev.y + delta.y,
-            } : null);
-        } else if (activeId.startsWith('logic-diagram-')) {
-            // This is a placeholder as the LogicDiagramPopup is now the component to drag
-            // Its internal useDraggable handles its own state
-        }
-        else {
-            handlePopupDragEnd(event);
-        }
-    };
-
     const pillars = [
         { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
         { name: 'Body', icon: <HeartPulse className="h-6 w-6 text-red-500" />, attributes: ['Health', 'Strength', 'Energy'] },
@@ -811,7 +105,7 @@ function PurposePageContent() {
     
     const renderMetaRule = (rule: { id: string, text: string, patternId: string, purposePillar?: string }) => {
         return (
-            <div key={rule.id} className="group relative text-sm p-2 rounded-md transition-colors hover:bg-muted/50 cursor-pointer" onClick={(e) => handleOpenRuleDetail(e, rule)}>
+            <div key={rule.id} className="group relative text-sm p-2 rounded-md transition-colors hover:bg-muted/50 cursor-pointer" onClick={(e) => openRuleDetailPopup(rule.id, e)}>
                 <p>{rule.text}</p>
                 <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <DropdownMenu>
@@ -860,237 +154,227 @@ function PurposePageContent() {
 
 
     return (
-        <DndContext onDragEnd={handleDragEndLocal}>
-            <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
-                <Card className="shadow-lg">
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="flex items-center gap-3 text-xl">
-                                <BrainCircuit className="h-6 w-6 text-primary" />
-                                My Central Purpose
-                            </CardTitle>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        {isEditingPurpose ? (
-                            <div className="space-y-4">
-                                <Textarea
-                                    value={purposeInput}
-                                    onChange={(e) => setPurposeInput(e.target.value)}
-                                    placeholder="“Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.”"
-                                    className="min-h-[100px] text-base"
-                                    autoFocus
-                                />
-                                <div className="flex justify-end gap-2">
-                                    <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
-                                    <Button onClick={handleSavePurpose}>
-                                        <Save className="mr-2 h-4 w-4" />
-                                        Save Purpose
-                                    </Button>
-                                </div>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+            <Card className="shadow-lg">
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="flex items-center gap-3 text-xl">
+                            <BrainCircuit className="h-6 w-6 text-primary" />
+                            My Central Purpose
+                        </CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {isEditingPurpose ? (
+                        <div className="space-y-4">
+                            <Textarea
+                                value={purposeInput}
+                                onChange={(e) => setPurposeInput(e.target.value)}
+                                placeholder="“Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.”"
+                                className="min-h-[100px] text-base"
+                                autoFocus
+                            />
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" onClick={() => setIsEditingPurpose(false)}>Cancel</Button>
+                                <Button onClick={handleSavePurpose}>
+                                    <Save className="mr-2 h-4 w-4" />
+                                    Save Purpose
+                                </Button>
                             </div>
-                        ) : (
-                            <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                                {purposeStatement || "Click to define your purpose..."}
-                            </p>
-                        )}
-                        <StrategicOverviewDiagram />
-                    </CardContent>
-                </Card>
+                        </div>
+                    ) : (
+                        <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
+                            {purposeStatement || "Click to define your purpose..."}
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    {pillars.map(pillar => {
-                        const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
-                        const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
-                        const projectsForPillar = projects.filter(p => p.purposePillar === pillar.name || pillar.attributes.includes(p.purposePillar || ''));
-                        
-                        return (
-                            <Card key={pillar.name}>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div>
-                                        <h4 className="font-semibold text-sm mb-2">Meta-Rules</h4>
-                                        <div className="space-y-1">
-                                            {rulesForPillar.length > 0 ? (
-                                                rulesForPillar.map(renderMetaRule)
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground text-center py-4">No rules assigned.</p>
-                                            )}
-                                        </div>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                {pillars.map(pillar => {
+                    const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
+                    const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
+                    const projectsForPillar = projects.filter(p => p.purposePillar === pillar.name || pillar.attributes.includes(p.purposePillar || ''));
+                    
+                    return (
+                        <Card key={pillar.name}>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-2">Meta-Rules</h4>
+                                    <div className="space-y-1">
+                                        {rulesForPillar.length > 0 ? (
+                                            rulesForPillar.map(renderMetaRule)
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground text-center py-4">No rules assigned.</p>
+                                        )}
                                     </div>
-                                    <Separator />
-                                    <div>
-                                        <h4 className="font-semibold text-sm mb-2">Specializations</h4>
-                                        <div className="space-y-1">
-                                            {skillsForPillar.length > 0 ? (
-                                                skillsForPillar.map(skill => (
-                                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                        <span>{skill.name}</span>
-                                                         <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                                <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                {pillars.map(p => (
-                                                                    <DropdownMenuGroup key={p.name}>
-                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
-                                                                            {p.name}
+                                </div>
+                                <Separator />
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-2">Specializations</h4>
+                                    <div className="space-y-1">
+                                        {skillsForPillar.length > 0 ? (
+                                            skillsForPillar.map(skill => (
+                                                <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                    <span>{skill.name}</span>
+                                                     <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                            <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            {pillars.map(p => (
+                                                                <DropdownMenuGroup key={p.name}>
+                                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
+                                                                        {p.name}
+                                                                    </DropdownMenuItem>
+                                                                    {p.attributes.map(attr => (
+                                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                                            {attr}
                                                                         </DropdownMenuItem>
-                                                                        {p.attributes.map(attr => (
-                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
-                                                                                {attr}
-                                                                            </DropdownMenuItem>
-                                                                        ))}
-                                                                    </DropdownMenuGroup>
-                                                                ))}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground text-center py-4">No skills assigned.</p>
-                                            )}
-                                        </div>
+                                                                    ))}
+                                                                </DropdownMenuGroup>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground text-center py-4">No skills assigned.</p>
+                                        )}
                                     </div>
-                                     <Separator />
-                                    <div>
-                                        <h4 className="font-semibold text-sm mb-2">Projects</h4>
-                                        <div className="space-y-1">
-                                            {projectsForPillar.length > 0 ? (
-                                                projectsForPillar.map(project => (
-                                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                        <span>{project.name}</span>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                                <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                {pillars.map(p => (
-                                                                    <DropdownMenuGroup key={p.name}>
-                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
-                                                                            {p.name}
+                                </div>
+                                 <Separator />
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-2">Projects</h4>
+                                    <div className="space-y-1">
+                                        {projectsForPillar.length > 0 ? (
+                                            projectsForPillar.map(project => (
+                                                <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                    <span>{project.name}</span>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                            <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent>
+                                                            {pillars.map(p => (
+                                                                <DropdownMenuGroup key={p.name}>
+                                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
+                                                                        {p.name}
+                                                                    </DropdownMenuItem>
+                                                                    {p.attributes.map(attr => (
+                                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
+                                                                            {attr}
                                                                         </DropdownMenuItem>
-                                                                        {p.attributes.map(attr => (
-                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
-                                                                                {attr}
-                                                                            </DropdownMenuItem>
-                                                                        ))}
-                                                                    </DropdownMenuGroup>
-                                                                ))}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground text-center py-4">No projects assigned.</p>
-                                            )}
-                                        </div>
+                                                                    ))}
+                                                                </DropdownMenuGroup>
+                                                            ))}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground text-center py-4">No projects assigned.</p>
+                                        )}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {uncategorizedRules.length > 0 && (
-                      <Card>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {uncategorizedRules.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Uncategorized Meta-Rules</CardTitle>
+                      <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {uncategorizedRules.map(renderMetaRule)}
+                    </CardContent>
+                  </Card>
+                )}
+                {uncategorizedSkills.length > 0 && (
+                    <Card>
                         <CardHeader>
-                          <CardTitle>Uncategorized Meta-Rules</CardTitle>
-                          <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
+                            <CardTitle>Uncategorized Specializations</CardTitle>
+                            <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                          {uncategorizedRules.map(renderMetaRule)}
+                            {uncategorizedSkills.map(skill => (
+                                <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                    <span>{skill.name}</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                            <Badge className="capitalize">?</Badge>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            {pillars.map(p => (
+                                                <DropdownMenuGroup key={p.name}>
+                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
+                                                        {p.name}
+                                                    </DropdownMenuItem>
+                                                    {p.attributes.map(attr => (
+                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                            {attr}
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                </DropdownMenuGroup>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            ))}
                         </CardContent>
-                      </Card>
-                    )}
-                    {uncategorizedSkills.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Uncategorized Specializations</CardTitle>
-                                <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {uncategorizedSkills.map(skill => (
-                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
-                                        <span>{skill.name}</span>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                <Badge className="capitalize">?</Badge>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                {pillars.map(p => (
-                                                    <DropdownMenuGroup key={p.name}>
-                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
-                                                            {p.name}
+                    </Card>
+                )}
+                {uncategorizedProjects.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Uncategorized Projects</CardTitle>
+                            <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {uncategorizedProjects.map(project => (
+                                <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                    <span>{project.name}</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                            <Badge className="capitalize">?</Badge>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
+                                            {pillars.map(p => (
+                                                <DropdownMenuGroup key={p.name}>
+                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
+                                                        {p.name}
+                                                    </DropdownMenuItem>
+                                                    {p.attributes.map(attr => (
+                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
+                                                            {attr}
                                                         </DropdownMenuItem>
-                                                        {p.attributes.map(attr => (
-                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
-                                                                {attr}
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </DropdownMenuGroup>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
-                    {uncategorizedProjects.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Uncategorized Projects</CardTitle>
-                                <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {uncategorizedProjects.map(project => (
-                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
-                                        <span>{project.name}</span>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                <Badge className="capitalize">?</Badge>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                {pillars.map(p => (
-                                                    <DropdownMenuGroup key={p.name}>
-                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
-                                                            {p.name}
-                                                        </DropdownMenuItem>
-                                                        {p.attributes.map(attr => (
-                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
-                                                                {attr}
-                                                            </DropdownMenuItem>
-                                                        ))}
-                                                    </DropdownMenuGroup>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
-
+                                                    ))}
+                                                </DropdownMenuGroup>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
             </div>
-            {ruleDetailPopup && (
-                <RuleDetailPopupCard 
-                    popupState={ruleDetailPopup}
-                    onClose={() => setRuleDetailPopup(null)}
-                />
-            )}
             {editingMetaRuleId && (
               <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingMetaRuleId(null)}>
                   <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
@@ -1107,7 +391,7 @@ function PurposePageContent() {
                   </div>
               </div>
             )}
-        </DndContext>
+        </div>
     );
 }
 
