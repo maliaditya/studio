@@ -8,12 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -29,6 +29,87 @@ interface RuleDetailPopupState {
     y: number;
 }
 
+const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern: Pattern | undefined; onClose: () => void; }) => {
+    const { habitCards, mechanismCards } = useAuth();
+    const cardRef = useRef<HTMLDivElement>(null);
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `logic-diagram-${rule.id}` });
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px), 0)` : 'translate(-50%, -50%)',
+        zIndex: 110,
+    };
+
+    const linkedHabit = pattern?.phrases.find(p => p.category === 'Habit Cards');
+    const habitCard = linkedHabit ? habitCards.find(h => h.id === linkedHabit.mechanismCardId) : null;
+    
+    const negativeMechanism = habitCard?.response?.resourceId ? mechanismCards.find(m => m.id === habitCard.response!.resourceId) : null;
+    const positiveMechanism = habitCard?.newResponse?.resourceId ? mechanismCards.find(m => m.id === habitCard.newResponse!.resourceId) : null;
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card ref={cardRef} className="w-[800px] shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                           <Workflow className="h-4 w-4 text-primary"/>
+                           Logic Flow for: {rule.text}
+                        </CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                    {!habitCard ? (
+                        <p className="text-muted-foreground text-center">No linked habit card found for this pattern.</p>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="text-center p-2 rounded-lg bg-background border">
+                                <p className="text-xs uppercase text-muted-foreground font-semibold">Trigger</p>
+                                <p className="font-medium">When I {habitCard.trigger?.action || '...'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 items-start">
+                                {/* Negative Path */}
+                                <div className="space-y-2 p-3 rounded-lg border border-destructive/50 bg-destructive/5">
+                                    <h4 className="font-semibold text-center text-destructive">Old Path</h4>
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="text-center p-2 rounded-md bg-background w-full">
+                                            <p className="text-xs uppercase text-muted-foreground font-semibold">Response</p>
+                                            <p className="font-medium text-sm">{negativeMechanism?.response?.visualize || '...'}</p>
+                                        </div>
+                                        <ArrowDown className="h-4 w-4 text-muted-foreground"/>
+                                        <div className="text-center p-2 rounded-md bg-background w-full">
+                                            <p className="text-xs uppercase text-muted-foreground font-semibold">Cost</p>
+                                            <p className="font-medium text-sm">{negativeMechanism?.reward || '...'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                {/* Positive Path */}
+                                <div className="space-y-2 p-3 rounded-lg border border-green-500/50 bg-green-500/5">
+                                    <h4 className="font-semibold text-center text-green-600">New Path</h4>
+                                     <div className="flex flex-col items-center gap-2">
+                                        <div className="text-center p-2 rounded-md bg-background w-full">
+                                            <p className="text-xs uppercase text-muted-foreground font-semibold">Response</p>
+                                            <p className="font-medium text-sm">{positiveMechanism?.newResponse?.action || '...'}</p>
+                                        </div>
+                                        <ArrowDown className="h-4 w-4 text-muted-foreground"/>
+                                        <div className="text-center p-2 rounded-md bg-background w-full">
+                                            <p className="text-xs uppercase text-muted-foreground font-semibold">Benefit</p>
+                                            <p className="font-medium text-sm">{positiveMechanism?.benefit || '...'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
 const RuleDetailPopupCard = ({ popupState, onClose }: { 
     popupState: RuleDetailPopupState;
     onClose: () => void; 
@@ -41,6 +122,8 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [newStopperText, setNewStopperText] = useState('');
+    const [logicDiagramRule, setLogicDiagramRule] = useState<MetaRule | null>(null);
+
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -113,112 +196,124 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-4 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-start">
-                        <div className="flex-grow pr-10">
-                            <CardTitle className="text-lg">{rule.text}</CardTitle>
-                            {pattern && (
-                                <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
-                            )}
+        <>
+            <div ref={setNodeRef} style={style} {...attributes}>
+                <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
+                    <CardHeader className="p-4 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-start">
+                            <div className="flex-grow pr-10">
+                                <CardTitle className="text-lg">{rule.text}</CardTitle>
+                                {pattern && (
+                                    <CardDescription>Based on pattern: <span className="font-semibold text-foreground">{pattern.name}</span></CardDescription>
+                                )}
+                            </div>
+                            <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule(rule); }}>
+                                    <Workflow className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
-                         <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0 absolute top-2 right-2" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                        {/* Left Column: Phrases */}
-                        <div className="space-y-4">
-                            {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => (
-                                <div key={category}>
-                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">{category}</h4>
-                                    <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                        {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                            {/* Left Column: Phrases */}
+                            <div className="space-y-4">
+                                {categorizedPhrases && Object.entries(categorizedPhrases).map(([category, phrases]) => (
+                                    <div key={category}>
+                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">{category}</h4>
+                                        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                            {phrases.map((phrase, i) => <li key={i}>{phrase}</li>)}
+                                        </ul>
+                                    </div>
+                                ))}
+                            </div>
 
-                        {/* Right Column: Habits and Stoppers */}
-                        <div className="space-y-4">
-                            {linkedHabits.length > 0 && (
-                                <div>
-                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Linked Habits</h4>
-                                    <div className="space-y-2">
-                                        {linkedHabits.map((habit, i) => (
-                                            <Card 
-                                                key={i} 
-                                                className="bg-muted/50 cursor-pointer hover:bg-muted"
-                                                onClick={(e) => {
-                                                    if (cardRef.current) {
-                                                        const parentPopupState = {
-                                                            resourceId: rule.id,
-                                                            x,
-                                                            y,
-                                                            level: 0,
+                            {/* Right Column: Habits and Stoppers */}
+                            <div className="space-y-4">
+                                {linkedHabits.length > 0 && (
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2 border-b pb-1">Linked Habits</h4>
+                                        <div className="space-y-2">
+                                            {linkedHabits.map((habit, i) => (
+                                                <Card 
+                                                    key={i} 
+                                                    className="bg-muted/50 cursor-pointer hover:bg-muted"
+                                                    onClick={(e) => {
+                                                        if (cardRef.current) {
+                                                            const parentPopupState = {
+                                                                resourceId: rule.id,
+                                                                x,
+                                                                y,
+                                                                level: 0,
+                                                            }
+                                                            openGeneralPopup(habit.habitId, e, parentPopupState, cardRef.current.getBoundingClientRect());
                                                         }
-                                                        openGeneralPopup(habit.habitId, e, parentPopupState, cardRef.current.getBoundingClientRect());
-                                                    }
-                                                }}
-                                            >
-                                                <CardHeader className="p-3">
-                                                    <CardTitle className="text-sm font-semibold text-foreground mb-1">{habit.habitName}</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-3 pt-0 text-xs space-y-2">
-                                                    <div>
-                                                        <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
-                                                        <p className="text-muted-foreground">{habit.negativeMechanismText} <span className="text-xs italic">({habit.negativeMechanismName})</span></p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
-                                                        <p className="text-muted-foreground">{habit.positiveMechanismText} <span className="text-xs italic">({habit.positiveMechanismName})</span></p>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
+                                                    }}
+                                                >
+                                                    <CardHeader className="p-3">
+                                                        <CardTitle className="text-sm font-semibold text-foreground mb-1">{habit.habitName}</CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-3 pt-0 text-xs space-y-2">
+                                                        <div>
+                                                            <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
+                                                            <p className="text-muted-foreground">{habit.negativeMechanismText} <span className="text-xs italic">({habit.negativeMechanismName})</span></p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
+                                                            <p className="text-muted-foreground">{habit.positiveMechanismText} <span className="text-xs italic">({habit.positiveMechanismName})</span></p>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                             <div>
-                                <h4 className="font-semibold text-sm mb-2 border-b pb-1">Stoppers</h4>
-                                <div className={cn((rule.stoppers || []).length > 4 && "h-40")}>
-                                  <ScrollArea className="h-full pr-2">
-                                    <div className="space-y-2">
-                                        {(rule.stoppers || []).map(stopper => (
-                                            <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-muted/50 group">
-                                                <p className="flex-grow pr-2">{stopper.text}</p>
-                                                <div className="flex-shrink-0 flex items-center gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
-                                                        <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
-                                                        <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                )}
+                                <div>
+                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Stoppers</h4>
+                                    <ScrollArea className={cn((rule.stoppers || []).length > 4 && "h-40", "pr-2")}>
+                                      <div className="space-y-2">
+                                          {(rule.stoppers || []).map(stopper => (
+                                              <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group">
+                                                  <p className="flex-grow pr-2">{stopper.text}</p>
+                                                  <div className="flex-shrink-0 flex items-center gap-1">
+                                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
+                                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                                      </Button>
+                                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
+                                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                                      </Button>
+                                                  </div>
+                                              </div>
+                                          ))}
+                                      </div>
+                                    </ScrollArea>
+                                    <div className="mt-2 flex gap-2">
+                                        <Input
+                                            value={newStopperText}
+                                            onChange={(e) => setNewStopperText(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleAddStopper()}
+                                            placeholder="What's stopping you?"
+                                            className="h-8 text-xs"
+                                        />
+                                        <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
                                     </div>
-                                  </ScrollArea>
-                                </div>
-                                <div className="mt-2 flex gap-2">
-                                    <Input
-                                        value={newStopperText}
-                                        onChange={(e) => setNewStopperText(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleAddStopper()}
-                                        placeholder="What's stopping you?"
-                                        className="h-8 text-xs"
-                                    />
-                                    <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+                    </CardContent>
+                </Card>
+            </div>
+            {logicDiagramRule && (
+                <LogicDiagramPopup 
+                    rule={logicDiagramRule} 
+                    pattern={pattern} 
+                    onClose={() => setLogicDiagramRule(null)} 
+                />
+            )}
+        </>
     );
 };
 
@@ -275,10 +370,13 @@ const StrategicOverviewDiagram = () => {
   
         {/* Positive Flow (Virtue Path) - Flows Left to Right */}
         <div className="flex flex-col xl:flex-row items-center gap-4 text-center">
-          <div className="flex xl:flex-col gap-3">
-            <PillarCard icon={<Brain className="h-5 w-5" />} title="Mind" />
-            <PillarCard icon={<HeartPulse className="h-5 w-5" />} title="Body" />
-            <PillarCard icon={<TrendingUp className="h-5 w-5" />} title="Spirit" />
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex xl:flex-col gap-3">
+                <PillarCard icon={<Brain className="h-5 w-5" />} title="Mind" />
+                <PillarCard icon={<HeartPulse className="h-5 w-5" />} title="Body" />
+                <PillarCard icon={<TrendingUp className="h-5 w-5" />} title="Spirit" />
+            </div>
+            <div className="mt-2 p-2 border rounded-md bg-card/50 text-sm font-semibold">Attention</div>
           </div>
           <ArrowRight className="h-6 w-6 text-muted-foreground shrink-0 rotate-90 xl:rotate-0" />
           <div className="flex xl:flex-col gap-3">
@@ -415,7 +513,7 @@ function PurposePageContent() {
                           <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent>
+                      <DropdownMenuContent className="w-56">
                         {pillars.map(pillar => (
                             <DropdownMenuGroup key={pillar.name}>
                                 <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name, 'meta-rule')}>
