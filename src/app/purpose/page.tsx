@@ -158,7 +158,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
     popupState: RuleDetailPopupState;
     onClose: () => void; 
 }) => {
-    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, setMetaRules } = useAuth();
+    const { patterns, habitCards, mechanismCards, openGeneralPopup, metaRules, setMetaRules, resources } = useAuth();
     const { ruleId, x, y } = popupState;
     const rule = metaRules.find(r => r.id === ruleId);
     
@@ -415,7 +415,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                     <SelectValue placeholder="Select a resource..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">-- None --</SelectItem>
+                                    <SelectItem value="none">-- None --</SelectItem>
                                     {habitCards.map(card => (
                                         <SelectItem key={card.id} value={card.id}>{card.name} (Habit)</SelectItem>
                                     ))}
@@ -935,3 +935,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
