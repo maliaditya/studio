@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -181,10 +180,10 @@ const RuleDetailPopupCard = ({ popupState, onClose }: { popupState: RuleDetailPo
                                         <div key={stopper.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-muted/50">
                                             <p className="flex-grow pr-2">{stopper.text}</p>
                                             <div className="flex-shrink-0 flex items-center gap-1">
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStopperStatusChange(stopper.id, 'manageable')}>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'manageable'); }}>
                                                     <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                                 </Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleStopperStatusChange(stopper.id, 'unmanageable')}>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(stopper.id, 'unmanageable'); }}>
                                                     <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                                 </Button>
                                             </div>
