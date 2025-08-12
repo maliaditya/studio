@@ -48,10 +48,6 @@ export function MechanismResourceCard({ resource, onUpdate, onDelete, onLinkClic
                         </DropdownMenu>
                     </div>
                 </div>
-                <RadioGroup value={resource.mechanismFramework || 'negative'} onValueChange={handleFrameworkChange} className="flex items-center space-x-4 mt-2">
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id={`neg-${resource.id}`} /><Label htmlFor={`neg-${resource.id}`}>Negative Framework</Label></div>
-                    <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id={`pos-${resource.id}`} /><Label htmlFor={`pos-${resource.id}`}>Positive Framework</Label></div>
-                </RadioGroup>
             </CardHeader>
             <CardContent className="flex-grow space-y-4">
                  {resource.mechanismFramework === 'positive' ? (
