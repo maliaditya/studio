@@ -847,10 +847,27 @@ function UpskillPageContent() {
 
   const handleViewProgress = (definition: ExerciseDefinition) => { setProgressModalConfig({ isOpen: true, exercise: definition }); };
   
+  const getSpecializationForCategory = useCallback((category: string) => {
+    const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
+    if (microSkillInfo) {
+      const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+      if (coreSkill) {
+        const spec = availableSpecializations.find(s => s.id === coreSkill.id);
+        if (spec) return spec.id;
+      }
+    }
+    return null;
+  }, [microSkillMap, coreSkills, availableSpecializations]);
+
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
     setNewLinkedItemTopic(parent.category);
+    
+    // Set default specialization based on parent's category
+    const parentSpecId = getSpecializationForCategory(parent.category);
+    setSelectedSpecializationId(parentSpecId);
+
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
     setNewLinkedItemLink(''); 

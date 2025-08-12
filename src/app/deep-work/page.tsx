@@ -1100,6 +1100,26 @@ function UpskillPageContent() {
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
+    
+    const parentCategory = parent.category;
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === parentCategory);
+    if (microSkill) {
+        const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+        if (coreSkill) {
+            const spec = coreSkills.find(s => s.id === coreSkill.id && s.type === 'Specialization');
+            if(spec) {
+                setSelectedSpecializationId(spec.id);
+            } else {
+                // Find parent specialization if it's not the core skill itself
+                const parentDomain = skillDomains.find(sd => sd.id === coreSkill.domainId);
+                const firstSpecInDomain = coreSkills.find(cs => cs.domainId === parentDomain?.id && cs.type === 'Specialization');
+                setSelectedSpecializationId(firstSpecInDomain?.id || null);
+            }
+        }
+    } else {
+        setSelectedSpecializationId(null);
+    }
+    
     setNewLinkedItemTopic(parent.category);
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
