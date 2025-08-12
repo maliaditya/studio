@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -112,7 +113,7 @@ const LogicDiagramPopup = ({ rule, pattern, onClose }: { rule: MetaRule; pattern
                                     <>
                                         <ArrowDown className="h-5 w-5 text-muted-foreground" />
                                         <FlowNode className="border-yellow-500/50 bg-yellow-100/30 w-full">
-                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Stoppers</p>
+                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Resistance</p>
                                             <ul className="list-disc list-inside text-left mt-1">
                                                 {stoppers.map(s => <li key={s.id}>{s.text}</li>)}
                                             </ul>
@@ -312,7 +313,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                     </div>
                                 )}
                                 <div>
-                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Stoppers</h4>
+                                    <h4 className="font-semibold text-sm mb-2 border-b pb-1">Resistance</h4>
                                     <ScrollArea className={cn((rule.stoppers || []).length > 4 && "h-40", "pr-2")}>
                                       <div className="space-y-2">
                                           {(rule.stoppers || []).map(stopper => (
