@@ -372,8 +372,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
         }
     };
     
-    const ResistanceSection = ({ habit }: { habit: Resource }) => {
+    const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const [newStopperText, setNewStopperText] = useState('');
+        const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
       
         return (
             <div>
@@ -382,19 +383,19 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                       {(habit.stoppers || []).map(stopper => {
                           const isClickable = !!stopper.linkedResourceId;
                           return (
-                              <div
-                                key={stopper.id} 
+                            <div
+                                key={stopper.id}
                                 className={cn(
-                                    "text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left",
-                                    isClickable && "cursor-pointer hover:bg-muted/50"
+                                    "text-xs p-2 rounded-md bg-background group w-full text-left",
+                                    isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
                                 )}
                                 onClick={(e) => {
-                                  if (isClickable && cardRef.current) {
-                                      e.stopPropagation();
-                                      openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
-                                  }
+                                    if (isClickable && cardRef.current) {
+                                        e.stopPropagation();
+                                        openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
+                                    }
                                 }}
-                              >
+                            >
                                   <div className="flex-grow pr-2">
                                     <p>{stopper.text}</p>
                                     {stopper.managementStrategy && (
@@ -403,11 +404,11 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                       </p>
                                     )}
                                   </div>
-                                  <div className="flex-shrink-0 flex items-center gap-1">
+                                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                       </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
                                        <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
@@ -424,7 +425,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                         value={newStopperText}
                         onChange={(e) => setNewStopperText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); } }}
-                        placeholder="What's stopping you?"
+                        placeholder={placeholder}
                         className="h-8 text-xs"
                     />
                     <Button size="sm" onClick={() => { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); }} className="h-8">Add</Button>
@@ -433,8 +434,9 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
         );
       };
 
-    const StrengthsSection = ({ habit }: { habit: Resource }) => {
+    const StrengthsSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const [newStrengthText, setNewStrengthText] = useState('');
+        const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
       
         return (
             <div>
@@ -455,7 +457,7 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                         value={newStrengthText}
                         onChange={(e) => setNewStrengthText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); } }}
-                        placeholder="What's a reinforcing truth?"
+                        placeholder={placeholder}
                         className="h-8 text-xs"
                     />
                     <Button size="sm" onClick={() => { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); }} className="h-8">Add</Button>
@@ -510,6 +512,8 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                             {linkedHabits.map((habit, i) => {
                                                 const responseMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
                                                 const newResponseMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+                                                const isNegativePattern = pattern?.type === 'Negative';
+                                                
                                                 return (
                                                   <Card key={i} className="bg-muted/50">
                                                       <CardHeader className="p-3">
@@ -536,14 +540,14 @@ const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                           <div className="pt-2 mt-2">
                                                             <Tabs defaultValue="resistance" className="w-full">
                                                                 <TabsList className="grid w-full grid-cols-2">
-                                                                    <TabsTrigger value="resistance">Resistance</TabsTrigger>
-                                                                    <TabsTrigger value="strengths">Strengths</TabsTrigger>
+                                                                    <TabsTrigger value="resistance">{isNegativePattern ? 'Urge' : 'Resistance'}</TabsTrigger>
+                                                                    <TabsTrigger value="strengths">{isNegativePattern ? 'Truth' : 'Strengths'}</TabsTrigger>
                                                                 </TabsList>
                                                                 <TabsContent value="resistance" className="mt-2">
-                                                                    <ResistanceSection habit={habit} />
+                                                                    <ResistanceSection habit={habit} isNegative={isNegativePattern}/>
                                                                 </TabsContent>
                                                                 <TabsContent value="strengths" className="mt-2">
-                                                                    <StrengthsSection habit={habit} />
+                                                                    <StrengthsSection habit={habit} isNegative={isNegativePattern}/>
                                                                 </TabsContent>
                                                             </Tabs>
                                                           </div>
