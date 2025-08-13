@@ -27,6 +27,43 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 
 
+const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
+    const parts = name.split(' → ').map(p => p.trim());
+    
+    const positiveColors = ["text-yellow-500", "text-orange-500", "text-green-500"];
+    const negativeColors = ["text-blue-500", "text-teal-500", "text-red-500"];
+    
+    const colors = type === 'Positive' ? positiveColors : negativeColors;
+
+    if (parts.length >= 2) {
+      const primaryPart = parts[0];
+      const outcome = parts[parts.length - 1];
+      
+      if (parts.length >= 3) {
+        const secondaryPart = parts[1];
+        return (
+          <span className="font-semibold">
+            <span className={colors[0]}>{primaryPart}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[1]}>{secondaryPart}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[2]}>{outcome}</span>
+          </span>
+        )
+      } else {
+         return (
+          <span className="font-semibold">
+            <span className={colors[0]}>{primaryPart}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[2]}>{outcome}</span>
+          </span>
+        )
+      }
+    }
+    
+    return <span className="font-semibold">{name}</span>;
+};
+
 function PurposePageContent() {
     const { 
         purposeStatement, 
@@ -45,6 +82,7 @@ function PurposePageContent() {
         openRuleDetailPopup, ruleDetailPopup,
         pillarEquations, setPillarEquations,
         habitCards,
+        mechanismCards,
     } = useAuth();
     const { toast } = useToast();
 
@@ -111,7 +149,7 @@ function PurposePageContent() {
             if (equationPopupState.equation?.id) { // Editing existing
                 const index = pillarEqs.findIndex(eq => eq.id === equationPopupState.equation!.id);
                 if (index > -1) {
-                    pillarEqs[index] = { ...equationPopupState.equation, ...equation };
+                    pillarEqs[index] = { ...equationPopupState.equation, ...equation, metaRuleIds: equation.metaRuleIds || [] };
                 }
             } else { // Adding new
                 pillarEqs.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
@@ -333,21 +371,33 @@ function PurposePageContent() {
                                     <div className="space-y-2">
                                         {equationsForPillar.length > 0 ? (
                                             equationsForPillar.map(eq => {
+                                                const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter(Boolean);
                                                 return (
-                                                    <div key={eq.id} className="text-xs p-2 rounded-md border bg-muted/30 group relative" onClick={() => handleOpenEquationPopup(pillar.name, eq)}>
-                                                        <ul className="space-y-1">
-                                                            {(eq.metaRuleIds || []).map(ruleId => {
-                                                                const rule = metaRules.find(r => r.id === ruleId);
-                                                                return <li key={ruleId} className="font-medium text-primary truncate" title={rule?.text}>{rule?.text || 'Unknown Rule'}</li>
-                                                            })}
-                                                        </ul>
-                                                        <p className="flex items-center gap-1 mt-1 pt-1 border-t">
-                                                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                                    <div key={eq.id} className="p-2 rounded-md border bg-muted/30 group relative">
+                                                        <div className="space-y-2">
+                                                            {rulesInEquation.map(rule => (
+                                                                <Card key={rule!.id} className="bg-card">
+                                                                    <CardContent className="p-2 text-xs space-y-1">
+                                                                        <p className="font-medium text-primary">{rule!.text}</p>
+                                                                        <p className="text-muted-foreground italic">
+                                                                            <FormattedPatternName name={patterns.find(p => p.id === rule!.patternId)?.name || '...'} type={patterns.find(p => p.id === rule!.patternId)?.type || 'Positive'} />
+                                                                        </p>
+                                                                    </CardContent>
+                                                                </Card>
+                                                            ))}
+                                                        </div>
+                                                        <p className="flex items-center gap-1 mt-1 pt-1 border-t text-sm font-semibold">
+                                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                                             <span>{eq.outcome}</span>
                                                         </p>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id)}}>
-                                                            <Trash2 className="h-3 w-3 text-destructive"/>
-                                                        </Button>
+                                                        <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
+                                                                <Edit className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
+                                                                <Trash2 className="h-3 w-3 text-destructive"/>
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 )
                                             })
@@ -490,7 +540,7 @@ const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, me
 
     useEffect(() => {
         if (equation) {
-            setSelectedRuleIds(equation.metaRuleIds);
+            setSelectedRuleIds(equation.metaRuleIds || []);
             setOutcome(equation.outcome);
         } else {
             setSelectedRuleIds([]);
