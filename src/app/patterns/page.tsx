@@ -40,11 +40,16 @@ function PatternsPageContent() {
     
     const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
     const [editingPatternName, setEditingPatternName] = useState('');
-
+    
     const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
     const [editedPatternPhrases, setEditedPatternPhrases] = useState<PatternPhrase[]>([]);
     
     const [showSecondaryAction, setShowSecondaryAction] = useState(false);
+    
+    const [editedPatternFields, setEditedPatternFields] = useState({
+        action1: '', cause1: '', action2: '', cause2: '', outcome: '', type: 'Positive' as 'Positive' | 'Negative'
+    });
+    const [showSecondaryActionEdit, setShowSecondaryActionEdit] = useState(false);
 
 
     useEffect(() => {
@@ -52,6 +57,23 @@ function PatternsPageContent() {
             const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
             if (patternToEdit) {
                 setSelectedPhrases(patternToEdit.phrases);
+                
+                const parts = patternToEdit.name.split(' → ');
+                if (parts.length === 3) { // Action -> Cause -> Outcome
+                    setEditedPatternFields({
+                        action1: parts[0], cause1: parts[1], outcome: parts[2],
+                        action2: '', cause2: '', type: patternToEdit.type
+                    });
+                    setShowSecondaryActionEdit(false);
+                } else if (parts.length === 5) { // Action -> Cause -> Action -> Cause -> Outcome
+                    setEditedPatternFields({
+                        action1: parts[0], cause1: parts[1], action2: parts[2], cause2: parts[3], outcome: parts[4], type: patternToEdit.type
+                    });
+                    setShowSecondaryActionEdit(true);
+                } else { // Fallback for old format
+                    setEditedPatternFields({ action1: patternToEdit.name, cause1: '', action2: '', cause2: '', outcome: '', type: patternToEdit.type });
+                    setShowSecondaryActionEdit(false);
+                }
             }
         } else {
             setSelectedPhrases([]);
@@ -65,10 +87,7 @@ function PatternsPageContent() {
     }, [resources]);
     
      const aggregatedFields = useMemo(() => {
-        // First, gather all possible phrases from all mechanisms
         const allPhrasesFromAllMechanisms: PatternPhrase[] = [];
-        const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
-        
         mechanismCards.forEach(card => {
             if (card.mechanismFramework === 'positive') {
                 if (card.benefit) allPhrasesFromAllMechanisms.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
@@ -81,11 +100,10 @@ function PatternsPageContent() {
             }
         });
 
-        // Determine which habits to display
         const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
-        
+
         let habitsToDisplay: Resource[] = [];
-        if (selectedPatternToUpdate) { // Edit mode
+        if (selectedPatternToUpdate) {
             const currentPatternHabitIds = new Set(
                 patterns.find(p => p.id === selectedPatternToUpdate)?.phrases
                     .filter(ph => ph.category === 'Habit Cards')
@@ -94,7 +112,7 @@ function PatternsPageContent() {
             habitsToDisplay = habitCards.filter(h => 
                 currentPatternHabitIds.has(h.id) || !allHabitIdsInAnyPattern.has(h.id)
             );
-        } else { // Create mode
+        } else {
             habitsToDisplay = habitCards.filter(h => !allHabitIdsInAnyPattern.has(h.id));
         }
 
@@ -106,18 +124,17 @@ function PatternsPageContent() {
             return { category: 'Habit Cards' as const, text: habit.name, mechanismCardId: habit.id, linkedMechanisms: linkedMechanisms as string[] };
         });
         
-        const mechanismIdsInScope = new Set(habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean));
-        const phrasesInScope = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && mechanismIdsInScope.has(p.mechanismCardId));
-
         const phrasesByCategory: Record<string, PatternPhrase[]> = { 'Habit Cards': allHabitCardPhrases };
-        phrasesInScope.forEach(p => {
-            if (!phrasesByCategory[p.category]) phrasesByCategory[p.category] = [];
-            phrasesByCategory[p.category].push(p);
+        allPhrasesFromAllMechanisms.forEach(p => {
+            const associatedHabit = habitsToDisplay.find(h => [h.response?.resourceId, h.newResponse?.resourceId].includes(p.mechanismCardId));
+            if (associatedHabit) {
+                if (!phrasesByCategory[p.category]) phrasesByCategory[p.category] = [];
+                phrasesByCategory[p.category].push(p);
+            }
         });
         
         return phrasesByCategory;
-
-    }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate, resources]);
+    }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate]);
 
 
      const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -127,7 +144,6 @@ function PatternsPageContent() {
             const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
             if (!habitCard) return; 
             
-            // Re-fetch all phrases directly, don't rely on aggregatedFields which might be filtered
             const allPossiblePhrases: PatternPhrase[] = [];
              mechanismCards.forEach(card => {
                 if (card.mechanismFramework === 'positive') {
@@ -165,7 +181,6 @@ function PatternsPageContent() {
     
                 setSelectedPhrases(prev => prev.filter(p => {
                     if (!phrasesToRemoveTexts.has(p.text)) return true;
-                    // Keep the phrase if it's part of ANOTHER selected habit's mechanisms
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
@@ -189,10 +204,22 @@ function PatternsPageContent() {
         }
 
         if (selectedPatternToUpdate) {
+            const { action1, cause1, action2, cause2, outcome, type } = editedPatternFields;
+            if (!action1.trim() || !cause1.trim() || !outcome.trim()) {
+                 toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
+                return;
+            }
+            let nameParts = [action1.trim(), cause1.trim()];
+            if (showSecondaryActionEdit && action2.trim() && cause2.trim()) {
+                nameParts.push(action2.trim(), cause2.trim());
+            }
+            nameParts.push(outcome.trim());
+            const updatedName = nameParts.join(' → ');
+
             setPatterns(prev => prev.map(p => 
-                p.id === selectedPatternToUpdate ? { ...p, phrases: selectedPhrases } : p
+                p.id === selectedPatternToUpdate ? { ...p, phrases: selectedPhrases, name: updatedName, type: type } : p
             ));
-            toast({ title: 'Pattern Updated!', description: `The pattern has been updated with your new phrase selections.`});
+            toast({ title: 'Pattern Updated!', description: `The pattern has been updated.`});
         } else {
             if (!newPatternAction.trim() || !newPatternCause.trim() || !newPatternOutcome.trim()) {
                 toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
@@ -456,14 +483,14 @@ function PatternsPageContent() {
                             ))}
                         </RadioGroup>
 
-                        {!selectedPatternToUpdate && (
+                        {!selectedPatternToUpdate ? (
                             <div className="space-y-4 pl-6 border-l-2 ml-2">
                                  <div className="space-y-1">
                                     <Label htmlFor="pattern-action">Action</Label>
                                     <Input id="pattern-action" value={newPatternAction} onChange={e => setNewPatternAction(e.target.value)} placeholder="e.g., Late Night Snacking" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="pattern-cause">→ causes</Label>
+                                    <Label htmlFor="pattern-cause">→ causes</Label>
                                     <Input id="pattern-cause" value={newPatternCause} onChange={e => setNewPatternCause(e.target.value)} placeholder="e.g., Lowered Cortisol" />
                                 </div>
                                 {!showSecondaryAction ? (
@@ -494,6 +521,47 @@ function PatternsPageContent() {
                                     <RadioGroup value={newPatternType} onValueChange={(v) => setNewPatternType(v as any)} className="flex items-center space-x-4 mt-2">
                                         <div className="flex items-center space-x-2"><RadioGroupItem value="Positive" id="type-positive" /><Label htmlFor="type-positive">Positive</Label></div>
                                         <div className="flex items-center space-x-2"><RadioGroupItem value="Negative" id="type-negative" /><Label htmlFor="type-negative">Negative</Label></div>
+                                    </RadioGroup>
+                                </div>
+                            </div>
+                        ) : (
+                             <div className="space-y-4 pl-6 border-l-2 ml-2">
+                                 <div className="space-y-1">
+                                    <Label htmlFor="edit-pattern-action1">Action</Label>
+                                    <Input id="edit-pattern-action1" value={editedPatternFields.action1} onChange={e => setEditedPatternFields(f => ({...f, action1: e.target.value}))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-pattern-cause1">→ causes</Label>
+                                    <Input id="edit-pattern-cause1" value={editedPatternFields.cause1} onChange={e => setEditedPatternFields(f => ({...f, cause1: e.target.value}))} />
+                                </div>
+                                {!showSecondaryActionEdit ? (
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setShowSecondaryActionEdit(true)}>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add secondary action
+                                    </Button>
+                                ) : (
+                                    <div className="space-y-4 border-l-2 pl-4 border-dashed">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="edit-pattern-action2">→ Action</Label>
+                                            <Input id="edit-pattern-action2" value={editedPatternFields.action2} onChange={e => setEditedPatternFields(f => ({...f, action2: e.target.value}))} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="edit-pattern-cause2">→ causes</Label>
+                                            <Input id="edit-pattern-cause2" value={editedPatternFields.cause2} onChange={e => setEditedPatternFields(f => ({...f, cause2: e.target.value}))} />
+                                        </div>
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setShowSecondaryActionEdit(false)} className="text-destructive hover:text-destructive">
+                                            <MinusCircle className="mr-2 h-4 w-4" /> Remove secondary
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="space-y-1">
+                                    <Label htmlFor="edit-pattern-outcome">Outcome</Label>
+                                    <Input id="edit-pattern-outcome" value={editedPatternFields.outcome} onChange={e => setEditedPatternFields(f => ({...f, outcome: e.target.value}))} />
+                                </div>
+                                <div>
+                                    <Label>Pattern Type</Label>
+                                    <RadioGroup value={editedPatternFields.type} onValueChange={(v) => setEditedPatternFields(f => ({...f, type: v as any}))} className="flex items-center space-x-4 mt-2">
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Positive" id="edit-type-positive" /><Label htmlFor="edit-type-positive">Positive</Label></div>
+                                        <div className="flex items-center space-x-2"><RadioGroupItem value="Negative" id="edit-type-negative" /><Label htmlFor="edit-type-negative">Negative</Label></div>
                                     </RadioGroup>
                                 </div>
                             </div>
@@ -764,5 +832,6 @@ export default function PatternsPage() {
 
 
     
+
 
 
