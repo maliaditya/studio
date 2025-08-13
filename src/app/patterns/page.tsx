@@ -452,7 +452,7 @@ function PatternsPageContent() {
                                                 <div className="flex flex-row items-center justify-between">
                                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                                         <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                        <div className="flex-grow cursor-pointer" onClick={() => handleStartEditPattern(p)}>
+                                                        <div className="flex-grow cursor-pointer" onClick={(e) => { e.stopPropagation(); handleStartEditPattern(p); }}>
                                                             {editingPatternId === p.id ? (
                                                                 <Input 
                                                                     value={editingPatternName}
@@ -597,4 +597,5 @@ export default function PatternsPage() {
     );
 }
     
+
 
