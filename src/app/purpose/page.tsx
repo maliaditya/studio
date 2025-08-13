@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -25,6 +23,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 function PurposePageContent() {
@@ -325,7 +324,7 @@ function PurposePageContent() {
                                 
                                 <div className="border-l pl-6">
                                     <div className="flex justify-between items-center mb-2">
-                                        <h4 className="font-semibold text-sm">Habit Equations</h4>
+                                        <h4 className="font-semibold text-sm">Rule Equations</h4>
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEquationPopup(pillar.name)}>
                                             <PlusCircle className="h-4 w-4 text-green-500"/>
                                         </Button>
@@ -333,16 +332,15 @@ function PurposePageContent() {
                                     <div className="space-y-2">
                                         {equationsForPillar.length > 0 ? (
                                             equationsForPillar.map(eq => {
-                                                const habit1 = habitCards.find(h => h.id === eq.habit1Id);
-                                                const habit2 = habitCards.find(h => h.id === eq.habit2Id);
                                                 return (
                                                     <div key={eq.id} className="text-xs p-2 rounded-md border bg-muted/30 group relative" onClick={() => handleOpenEquationPopup(pillar.name, eq)}>
-                                                        <p>
-                                                            <span className="font-medium text-primary">{habit1?.name || 'Habit 1'}</span>
-                                                            <span className="mx-1 text-muted-foreground">+</span>
-                                                            <span className="font-medium text-primary">{habit2?.name || 'Habit 2'}</span>
-                                                        </p>
-                                                        <p className="flex items-center gap-1">
+                                                        <ul className="space-y-1">
+                                                            {eq.metaRuleIds.map(ruleId => {
+                                                                const rule = metaRules.find(r => r.id === ruleId);
+                                                                return <li key={ruleId} className="font-medium text-primary truncate" title={rule?.text}>{rule?.text || 'Unknown Rule'}</li>
+                                                            })}
+                                                        </ul>
+                                                        <p className="flex items-center gap-1 mt-1 pt-1 border-t">
                                                             <ArrowRight className="h-3 w-3 text-muted-foreground" />
                                                             <span>{eq.outcome}</span>
                                                         </p>
@@ -471,73 +469,73 @@ function PurposePageContent() {
                     pillarName={equationPopupState.pillar}
                     equation={equationPopupState.equation}
                     onSave={handleSaveEquation}
-                    habitCards={habitCards}
+                    metaRules={metaRules.filter(r => r.purposePillar === equationPopupState.pillar || pillars.find(p => p.name === equationPopupState.pillar)?.attributes.includes(r.purposePillar || ''))}
                 />
             )}
         </div>
     );
 }
 
-const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, habitCards }: {
+const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, metaRules }: {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     pillarName: string;
     equation?: HabitEquation;
     onSave: (pillar: string, equation: Omit<HabitEquation, 'id'>) => void;
-    habitCards: Resource[];
+    metaRules: MetaRule[];
 }) => {
-    const [habit1Id, setHabit1Id] = useState('');
-    const [habit2Id, setHabit2Id] = useState('');
+    const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
     const [outcome, setOutcome] = useState('');
 
     useEffect(() => {
         if (equation) {
-            setHabit1Id(equation.habit1Id);
-            setHabit2Id(equation.habit2Id);
+            setSelectedRuleIds(equation.metaRuleIds);
             setOutcome(equation.outcome);
         } else {
-            setHabit1Id('');
-            setHabit2Id('');
+            setSelectedRuleIds([]);
             setOutcome('');
         }
     }, [equation, isOpen]);
 
     const handleSaveClick = () => {
-        if (!habit1Id || !habit2Id || !outcome.trim()) {
-            alert('Please fill out all fields.');
+        if (selectedRuleIds.length === 0 || !outcome.trim()) {
+            alert('Please select at least one rule and provide an outcome.');
             return;
         }
-        onSave(pillarName, { habit1Id, habit2Id, outcome: outcome.trim() });
+        onSave(pillarName, { metaRuleIds: selectedRuleIds, outcome: outcome.trim() });
+    };
+
+    const handleToggleRule = (ruleId: string) => {
+        setSelectedRuleIds(prev =>
+            prev.includes(ruleId) ? prev.filter(id => id !== ruleId) : [...prev, ruleId]
+        );
     };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{equation ? 'Edit' : 'Create'} Habit Equation for {pillarName}</DialogTitle>
+                    <DialogTitle>{equation ? 'Edit' : 'Create'} Rule Equation for {pillarName}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                    <div className="space-y-1">
-                        <Label>Habit 1</Label>
-                        <Select value={habit1Id} onValueChange={setHabit1Id}>
-                            <SelectTrigger><SelectValue placeholder="Select first habit..."/></SelectTrigger>
-                            <SelectContent>
-                                {habitCards.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-1">
-                        <Label>Habit 2</Label>
-                        <Select value={habit2Id} onValueChange={setHabit2Id}>
-                            <SelectTrigger><SelectValue placeholder="Select second habit..."/></SelectTrigger>
-                            <SelectContent>
-                                {habitCards.filter(h => h.id !== habit1Id).map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
+                    <div className="space-y-2">
+                        <Label>Select Meta-Rules</Label>
+                        <ScrollArea className="h-40 w-full rounded-md border p-2">
+                            {metaRules.map(rule => (
+                                <div key={rule.id} className="flex items-center space-x-2 p-1">
+                                    <Checkbox
+                                        id={`rule-${rule.id}`}
+                                        checked={selectedRuleIds.includes(rule.id)}
+                                        onCheckedChange={() => handleToggleRule(rule.id)}
+                                    />
+                                    <Label htmlFor={`rule-${rule.id}`} className="text-sm font-normal w-full cursor-pointer">{rule.text}</Label>
+                                </div>
+                            ))}
+                        </ScrollArea>
                     </div>
                      <div className="space-y-1">
                         <Label>Expected Outcome</Label>
-                        <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="e.g., Increased morning focus"/>
+                        <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="e.g., Increased productivity"/>
                     </div>
                 </div>
                 <DialogFooter>
@@ -556,4 +554,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-

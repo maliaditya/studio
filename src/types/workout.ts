@@ -1,5 +1,3 @@
-
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -419,8 +417,7 @@ export interface Position {
 // Purpose & Patterns Data
 export interface HabitEquation {
   id: string;
-  habit1Id: string;
-  habit2Id: string;
+  metaRuleIds: string[];
   outcome: string;
 }
 

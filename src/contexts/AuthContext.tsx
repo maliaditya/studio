@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1888,4 +1886,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
