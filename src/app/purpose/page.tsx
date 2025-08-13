@@ -145,18 +145,16 @@ function PurposePageContent() {
 
     const handleSaveEquation = (pillar: string, equation: Omit<HabitEquation, 'id'>) => {
         setPillarEquations(prev => {
-            const newEquations = { ...prev };
-            const pillarEqs = newEquations[pillar] || [];
+            const newEquationsForPillar = [...(prev[pillar] || [])];
             if (equationPopupState.equation?.id) { // Editing existing
-                const index = pillarEqs.findIndex(eq => eq.id === equationPopupState.equation!.id);
+                const index = newEquationsForPillar.findIndex(eq => eq.id === equationPopupState.equation!.id);
                 if (index > -1) {
-                    pillarEqs[index] = { ...equationPopupState.equation, ...equation, metaRuleIds: equation.metaRuleIds || [] };
+                    newEquationsForPillar[index] = { ...equationPopupState.equation, ...equation, metaRuleIds: equation.metaRuleIds || [] };
                 }
             } else { // Adding new
-                pillarEqs.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
+                newEquationsForPillar.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
             }
-            newEquations[pillar] = pillarEqs;
-            return newEquations;
+            return { ...prev, [pillar]: newEquationsForPillar };
         });
         setEquationPopupState({ pillar: '', isOpen: false });
     };
@@ -215,35 +213,39 @@ function PurposePageContent() {
     }
     
     const uncategorizedItems = useMemo(() => {
-      const assignedRuleIds = new Set<string>();
-      const assignedSkillIds = new Set<string>();
-      const assignedProjectIds = new Set<string>();
-
-      pillars.forEach(pillar => {
+        const assignedRuleIds = new Set(Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds));
+        pillars.forEach(pillar => {
           const allPillarNames = [pillar.name, ...pillar.attributes];
           metaRules.forEach(rule => {
               if (rule.purposePillar && allPillarNames.includes(rule.purposePillar)) {
                   assignedRuleIds.add(rule.id);
               }
           });
-          specializations.forEach(skill => {
-              if (skill.purposePillar && allPillarNames.includes(skill.purposePillar)) {
-                  assignedSkillIds.add(skill.id);
-              }
-          });
-          projects.forEach(project => {
-              if (project.purposePillar && allPillarNames.includes(project.purposePillar)) {
-                  assignedProjectIds.add(project.id);
-              }
-          });
-      });
-  
-      const uncategorizedRules = metaRules.filter(r => !assignedRuleIds.has(r.id));
-      const uncategorizedSkills = specializations.filter(s => !assignedSkillIds.has(s.id));
-      const uncategorizedProjects = projects.filter(p => !assignedProjectIds.has(p.id));
-  
-      return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
-    }, [metaRules, specializations, projects, pillars]);
+        });
+
+        const assignedSkillIds = new Set<string>();
+        const assignedProjectIds = new Set<string>();
+    
+        pillars.forEach(pillar => {
+            const allPillarNames = [pillar.name, ...pillar.attributes];
+            specializations.forEach(skill => {
+                if (skill.purposePillar && allPillarNames.includes(skill.purposePillar)) {
+                    assignedSkillIds.add(skill.id);
+                }
+            });
+            projects.forEach(project => {
+                if (project.purposePillar && allPillarNames.includes(project.purposePillar)) {
+                    assignedProjectIds.add(project.id);
+                }
+            });
+        });
+    
+        const uncategorizedRules = metaRules.filter(r => !assignedRuleIds.has(r.id));
+        const uncategorizedSkills = specializations.filter(s => !assignedSkillIds.has(s.id));
+        const uncategorizedProjects = projects.filter(p => !assignedProjectIds.has(p.id));
+    
+        return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
+    }, [metaRules, specializations, projects, pillars, pillarEquations]);
 
 
     return (
