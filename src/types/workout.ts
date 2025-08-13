@@ -391,6 +391,13 @@ export interface Feature {
   linkedSkills: ProjectSkillLink[];
 }
 
+export interface ProjectPlan {
+    targetDate: string;
+    requiredMoney: number | null;
+    requiredHours: number | null;
+    linkedRuleEquationIds: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -401,6 +408,7 @@ export interface Project {
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
   purposePillar?: string;
+  productPlan?: ProjectPlan;
 }
 
 // Professional Experience Types

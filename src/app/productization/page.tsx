@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2 } from 'lucide-react';
+import { Briefcase, Package, PlusCircle, Calendar as CalendarIcon, Edit, Trash2, Book, Target, Clock, Banknote } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   DropdownMenu,
@@ -17,7 +17,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
-import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Project, Release } from '@/types/workout';
+import type { ExerciseCategory, ExerciseDefinition, GapAnalysis, Project, Release, ProjectPlan } from '@/types/workout';
 import { productTypes, GAP_TYPES } from '@/lib/constants';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,12 +31,15 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 function ProductizationPageContent() {
-  const { currentUser, projects, setProjects, deepWorkDefinitions, setDeepWorkDefinitions, productizationPlans, setProductizationPlans } = useAuth();
+  const { currentUser, projects, setProjects, deepWorkDefinitions, setDeepWorkDefinitions, productizationPlans, setProductizationPlans, metaRules, pillarEquations } = useAuth();
   const { toast } = useToast();
   
   // State for release planning
   const [editingRelease, setEditingRelease] = useState<{ projectId: string; release: Partial<Release> } | null>(null);
   
+  // State for product planning
+  const [editingPlan, setEditingPlan] = useState<{ projectId: string, plan: Partial<ProjectPlan> } | null>(null);
+
   const handleProductTypeChange = (projectId: string, productType: string) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, productType } : p));
     toast({ title: "Product Type Set!", description: `Set to "${productType}" for the project.` });
@@ -198,6 +201,27 @@ function ProductizationPageContent() {
     }
   };
 
+  const handleStartEditingPlan = (project: Project) => {
+    setEditingPlan({ projectId: project.id, plan: project.productPlan || {} });
+  };
+
+  const handleUpdateEditingPlan = (field: keyof ProjectPlan, value: any) => {
+    setEditingPlan(current => {
+        if (!current) return null;
+        return {
+            ...current,
+            plan: { ...current.plan, [field]: value }
+        };
+    });
+  };
+
+  const handleSavePlan = () => {
+    if (!editingPlan) return;
+    const { projectId, plan } = editingPlan;
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, productPlan: plan as ProjectPlan } : p));
+    setEditingPlan(null);
+    toast({ title: "Product Plan Saved" });
+  };
 
   const renderReleaseForm = (project: Project) => {
     if (!editingRelease || editingRelease.projectId !== project.id) return null;
@@ -254,6 +278,84 @@ function ProductizationPageContent() {
       </Card>
     )
   }
+  
+  const renderPlanForm = (project: Project) => {
+    if (!editingPlan || editingPlan.projectId !== project.id) return null;
+    const { plan } = editingPlan;
+    
+    return (
+      <Card className="mt-4 bg-muted/50">
+        <CardHeader>
+          <CardTitle className="text-lg">Product Plan</CardTitle>
+          <CardDescription>Define the state and resources required to build this product.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <h4 className="font-semibold flex items-center gap-2"><Target/> Required State</h4>
+            <p className="text-xs text-muted-foreground">Link the meta-rule equations that create the necessary mindset for this product.</p>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-2 p-1">
+                  {Object.values(pillarEquations).flat().map(eq => (
+                    <div key={eq.id} className="flex items-center space-x-2 p-1">
+                      <Checkbox 
+                        id={`eq-${eq.id}`}
+                        checked={(plan.linkedRuleEquationIds || []).includes(eq.id)}
+                        onCheckedChange={() => {
+                          const currentIds = plan.linkedRuleEquationIds || [];
+                          const newIds = currentIds.includes(eq.id) ? currentIds.filter(id => id !== eq.id) : [...currentIds, eq.id];
+                          handleUpdateEditingPlan('linkedRuleEquationIds', newIds);
+                        }}
+                      />
+                      <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <h4 className="font-semibold flex items-center gap-2"><Package/> Required Resources</h4>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date</Label>
+              <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant={"outline"} className="w-full justify-start text-left font-normal">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : <span>Pick a date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={plan.targetDate ? parseISO(plan.targetDate) : undefined}
+                      onSelect={(date) => handleUpdateEditingPlan('targetDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money Needed</Label>
+              <Input type="number" value={plan.requiredMoney || ''} onChange={(e) => handleUpdateEditingPlan('requiredMoney', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 500" />
+            </div>
+            <div className="space-y-1">
+              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy (Productive Hours)</Label>
+              <Input type="number" value={plan.requiredHours || ''} onChange={(e) => handleUpdateEditingPlan('requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
+            </div>
+          </div>
+           <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={() => setEditingPlan(null)}>Cancel</Button>
+            <Button onClick={handleSavePlan}>Save Plan</Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <>
@@ -284,7 +386,7 @@ function ProductizationPageContent() {
                         </div>
                     </CardHeader>
                     <CardContent className="flex-grow space-y-4">
-                      <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
+                      <Accordion type="multiple" collapsible className="w-full" defaultValue={['item-1']}>
                         <AccordionItem value="item-1">
                            <AccordionTrigger>Product Type</AccordionTrigger>
                            <AccordionContent>
@@ -309,6 +411,28 @@ function ProductizationPageContent() {
                                   </p>
                               )}
                            </AccordionContent>
+                        </AccordionItem>
+                        <AccordionItem value="item-plan">
+                          <AccordionTrigger>Product Plan</AccordionTrigger>
+                          <AccordionContent>
+                            {editingPlan?.projectId === project.id ? renderPlanForm(project) : (
+                              <div>
+                                {project.productPlan ? (
+                                  <div className="space-y-2 text-sm p-2 bg-muted/30 rounded-md">
+                                    <p><strong>Target Date:</strong> {project.productPlan.targetDate ? format(parseISO(project.productPlan.targetDate), 'PPP') : 'N/A'}</p>
+                                    <p><strong>Money:</strong> ${project.productPlan.requiredMoney || '0'}</p>
+                                    <p><strong>Energy:</strong> {project.productPlan.requiredHours || '0'} hrs</p>
+                                    <p><strong>State Links:</strong> {(project.productPlan.linkedRuleEquationIds || []).length} rules</p>
+                                    <Button size="sm" variant="outline" className="mt-2" onClick={() => handleStartEditingPlan(project)}>Edit Plan</Button>
+                                  </div>
+                                ) : (
+                                  <Button className="w-full" variant="outline" onClick={() => handleStartEditingPlan(project)}>
+                                      <PlusCircle className="mr-2 h-4 w-4" /> Create Product Plan
+                                  </Button>
+                                )}
+                              </div>
+                            )}
+                          </AccordionContent>
                         </AccordionItem>
                         <AccordionItem value="item-2">
                            <AccordionTrigger>Gap Analysis</AccordionTrigger>
