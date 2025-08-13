@@ -104,16 +104,16 @@ function PatternsPageContent() {
         });
 
         Object.keys(fields).forEach(key => {
+            const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
             if (key !== 'Habit Cards') {
-                const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
                 fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
-                 fields[key] = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+                 fields[key] = uniquePhrases;
             }
         });
 
         return fields;
-    }, [mechanismCards, habitCards, usedPhrases]);
+    }, [mechanismCards, habitCards, usedPhrases, patterns]);
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
@@ -589,5 +589,4 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
-
     
