@@ -27,11 +27,16 @@ function MonetizationEnginePageContent() {
     offerizationPlans,
     skillAcquisitionPlans, 
     setSkillAcquisitionPlans,
-    specializations,
+    coreSkills, // Use coreSkills
     pillarEquations,
     metaRules,
   } = useAuth();
   const router = useRouter();
+
+  // Derive specializations from coreSkills
+  const specializations = React.useMemo(() => {
+    return coreSkills.filter(skill => skill.type === 'Specialization');
+  }, [coreSkills]);
 
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [selectedPlanSpecId, setSelectedPlanSpecId] = useState<string | null>(null);
