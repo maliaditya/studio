@@ -57,55 +57,64 @@ function PatternsPageContent() {
         return { habitCards: habits, mechanismCards: mechanisms };
     }, [resources]);
     
-    const allMechanismPhrases = useMemo(() => {
-        const phrases: Record<string, PatternPhrase[]> = {
-            Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [],
-        };
-
+    const aggregatedFields = useMemo(() => {
+        // 1. Gather all possible phrases from all mechanisms
+        const allMechanismPhrases: Record<string, PatternPhrase[]> = { Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [] };
         mechanismCards.forEach(card => {
-            const cardId = card.id;
-            const cardName = card.name;
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) phrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.reward) phrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.law?.premise && card.law?.outcome) {
-                  const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  phrases['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-            } else { // Negative
-                if (card.trigger?.feeling && card.benefit) phrases.Costs.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.reward) phrases.Costs.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.law?.premise && card.law?.outcome) {
-                    const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    phrases['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
+                if (card.benefit) allMechanismPhrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allMechanismPhrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allMechanismPhrases['Positive Laws'].push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+            } else {
+                if (card.trigger?.feeling && card.benefit) allMechanismPhrases.Costs.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allMechanismPhrases.Costs.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allMechanismPhrases['Negative Laws'].push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             }
         });
-        return phrases;
-    }, [mechanismCards]);
-    
-    const aggregatedFields = useMemo(() => {
         const allPhrasesFromAllMechanisms = Object.values(allMechanismPhrases).flat();
+
+        // 2. Identify which habits are already used in other patterns
+        const habitIdsInOtherPatterns = new Set<string>();
+        patterns.forEach(p => {
+            if (p.id !== selectedPatternToUpdate) {
+                p.phrases.forEach(phrase => {
+                    if (phrase.category === 'Habit Cards') habitIdsInOtherPatterns.add(phrase.mechanismCardId);
+                });
+            }
+        });
+
+        // 3. Determine which habits to display
+        let habitsToDisplay = habitCards;
+        if (!selectedPatternToUpdate) { // Create New mode
+            habitsToDisplay = habitCards.filter(h => !habitIdsInOtherPatterns.has(h.id));
+        }
         
-        const allHabitCardPhrases = habitCards.map(habit => {
+        const allHabitCardPhrases = habitsToDisplay.map(habit => {
             const linkedMechanisms = [
                 habit.response?.resourceId,
                 habit.newResponse?.resourceId
             ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
-
-            return {
-                category: 'Habit Cards' as const,
-                text: habit.name,
-                mechanismCardId: habit.id,
-                linkedMechanisms: linkedMechanisms as string[]
-            };
+            return { category: 'Habit Cards' as const, text: habit.name, mechanismCardId: habit.id, linkedMechanisms: linkedMechanisms as string[] };
         });
         
-        return {
-            ...allMechanismPhrases,
-            'Habit Cards': allHabitCardPhrases,
-        };
-    }, [habitCards, allMechanismPhrases, mechanismCards]);
+        // 4. Determine which mechanism phrases to display
+        let phrasesToDisplay = allPhrasesFromAllMechanisms;
+        if (!selectedPatternToUpdate) { // Create New mode
+            const unlinkedHabitMechanismIds = new Set(
+                habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean)
+            );
+            phrasesToDisplay = allPhrasesFromAllMechanisms.filter(p => unlinkedHabitMechanismIds.has(p.mechanismCardId));
+        }
+
+        const phrasesByCategory: Record<string, PatternPhrase[]> = { 'Habit Cards': allHabitCardPhrases };
+        phrasesToDisplay.forEach(p => {
+            if (!phrasesByCategory[p.category]) phrasesByCategory[p.category] = [];
+            phrasesByCategory[p.category].push(p);
+        });
+        
+        return phrasesByCategory;
+
+    }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -116,13 +125,12 @@ function PatternsPageContent() {
             if (!habitCard) return; 
     
             const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-            const allPhrasesFromAllMechanisms = Object.values(allMechanismPhrases).flat();
+            const allPhrasesFromAllMechanisms = Object.values(aggregatedFields).flat();
             const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
             
             const allPhrasesToToggle = [phrase, ...relatedPhrases];
     
             if (!isSelected) {
-                // Add the habit card and all its related phrases, avoiding duplicates.
                 setSelectedPhrases(prev => {
                     const newSelectionMap = new Map(prev.map(p => [p.text, p]));
                     allPhrasesToToggle.forEach(pToAdd => {
@@ -133,7 +141,6 @@ function PatternsPageContent() {
                     return Array.from(newSelectionMap.values());
                 });
             } else {
-                // Remove the habit card and its related phrases, but only if they aren't required by another selected habit.
                 const phrasesToRemoveTexts = new Set(allPhrasesToToggle.map(p => p.text));
     
                 const otherSelectedHabitMechanisms = new Set<string>();
@@ -148,10 +155,9 @@ function PatternsPageContent() {
                 });
     
                 setSelectedPhrases(prev => prev.filter(p => {
-                    if (!phrasesToRemoveTexts.has(p.text)) return true; // Keep if not part of the toggled group
-                    if (p.mechanismCardId === phrase.mechanismCardId && p.category === 'Habit Cards') return false; // Remove the habit card itself
+                    if (!phrasesToRemoveTexts.has(p.text)) return true;
+                    if (p.mechanismCardId === phrase.mechanismCardId && p.category === 'Habit Cards') return false;
                     
-                    // For mechanism phrases, check if they are needed by another selected habit
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
@@ -159,7 +165,6 @@ function PatternsPageContent() {
                 }));
             }
         } else {
-            // Standard phrase toggle
              if (!isSelected) {
                 setSelectedPhrases(prev => [...prev, phrase]);
             } else {
@@ -311,12 +316,12 @@ function PatternsPageContent() {
 
     const allAvailablePhrases = useMemo(() => {
         const allPhrasesMap = new Map<string, PatternPhrase>();
-        Object.values(allMechanismPhrases).flat().forEach(p => allPhrasesMap.set(p.text, p));
+        Object.values(aggregatedFields).flat().forEach(p => allPhrasesMap.set(p.text, p));
         if (editingPattern) {
             editingPattern.phrases.forEach(p => allPhrasesMap.set(p.text, p));
         }
         return Array.from(allPhrasesMap.values());
-    }, [allMechanismPhrases, editingPattern]);
+    }, [aggregatedFields, editingPattern]);
 
     return (
         <>
@@ -347,7 +352,7 @@ function PatternsPageContent() {
                                 {title}
                                 </h3>
                                 <ScrollArea className="h-60 border rounded-md p-2">
-                                    {phrases.length > 0 ? (
+                                    {(phrases || []).length > 0 ? (
                                         <div className="space-y-2">
                                             {phrases.map((phrase, i) => (
                                                 <div key={i} className="flex items-start space-x-2">
@@ -376,7 +381,7 @@ function PatternsPageContent() {
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : <p className="text-xs text-muted-foreground text-center pt-8">No unassigned data for this category.</p>}
+                                    ) : <p className="text-xs text-muted-foreground text-center pt-8">No data for this category.</p>}
                                 </ScrollArea>
                             </div>
                         ))}
@@ -688,5 +693,6 @@ export default function PatternsPage() {
     
 
     
+
 
 
