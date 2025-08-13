@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -32,6 +32,9 @@ function PatternsPageContent() {
 
     const [newMetaRuleText, setNewMetaRuleText] = useState('');
     const [selectedPatternForRule, setSelectedPatternForRule] = useState<string | null>(null);
+    
+    const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
+    const [editingPatternName, setEditingPatternName] = useState('');
 
 
     const mechanismCards = useMemo(() => {
@@ -276,6 +279,22 @@ function PatternsPageContent() {
         setMetaRules(prev => prev.map(r => r.id === id ? { ...r, purposePillar: pillar } : r));
     };
 
+    const handleStartEditPattern = (pattern: Pattern) => {
+        setEditingPatternId(pattern.id);
+        setEditingPatternName(pattern.name);
+    };
+
+    const handleSavePatternName = () => {
+        if (!editingPatternId || !editingPatternName.trim()) {
+            setEditingPatternId(null);
+            return;
+        }
+        setPatterns(prev => prev.map(p => 
+            p.id === editingPatternId ? { ...p, name: editingPatternName.trim() } : p
+        ));
+        setEditingPatternId(null);
+    };
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             <div className="text-center">
@@ -425,15 +444,31 @@ function PatternsPageContent() {
                                             <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
                                                 <CardHeader className="p-3">
                                                 <div className="flex flex-row items-center justify-between">
-                                                    <div className="flex items-center gap-2 flex-grow">
-                                                    <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                    <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex-grow">
-                                                        <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'} className="mr-2">{p.type}</Badge>
-                                                        {p.name}
-                                                    </Label>
+                                                    <div className="flex items-center gap-2 flex-grow min-w-0">
+                                                        <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
+                                                        <div className="flex-grow">
+                                                            {editingPatternId === p.id ? (
+                                                                <Input 
+                                                                    value={editingPatternName}
+                                                                    onChange={(e) => setEditingPatternName(e.target.value)}
+                                                                    onBlur={handleSavePatternName}
+                                                                    onKeyDown={(e) => e.key === 'Enter' && handleSavePatternName()}
+                                                                    className="h-8"
+                                                                    autoFocus
+                                                                />
+                                                            ) : (
+                                                                <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex items-center gap-2">
+                                                                    <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'}>{p.type}</Badge>
+                                                                    <span className="font-semibold">{p.name}</span>
+                                                                    <button onClick={() => handleStartEditPattern(p)} className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <Edit className="h-3 w-3 text-muted-foreground" />
+                                                                    </button>
+                                                                </Label>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
                                                 </div>
                                                 </CardHeader>
