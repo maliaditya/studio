@@ -547,14 +547,14 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                         <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
                                                         <p className="text-muted-foreground">
                                                             <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'}:</span>
-                                                            &nbsp;{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'}
+                                                            &nbsp;{`It causes ${mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'} internally.`}
                                                         </p>
                                                     </div>
                                                     <div>
                                                         <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
                                                         <p className="text-muted-foreground">
-                                                          <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'}:</span>
-                                                          &nbsp;{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'}
+                                                            <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'}:</span>
+                                                            &nbsp;{`Only when ${mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.visualize || '...'}, ${mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'} happens.`}
                                                         </p>
                                                     </div>
                                                     <div className="pt-2 mt-2">
