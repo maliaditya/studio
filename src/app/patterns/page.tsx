@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,15 +71,24 @@ function PatternsPageContent() {
             'Habit Cards': [],
         };
 
-        const allUsedPhrasesText = new Set(patterns.flatMap(p => p.phrases.map(phrase => phrase.text)));
-        let phrasesForCurrentPatternText = new Set<string>();
-
-        if (selectedPatternToUpdate) {
-            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
-            if (patternToEdit) {
-                phrasesForCurrentPatternText = new Set(patternToEdit.phrases.map(p => p.text));
-            }
-        }
+        const phrasesFromSelectedHabits = new Set(
+            selectedPhrases
+                .filter(p => p.category === 'Habit Cards')
+                .flatMap(habitPhrase => {
+                    const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
+                    if (!habitCard) return [];
+                    const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
+                    return Object.values(fields)
+                        .flat()
+                        .filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId))
+                        .map(p => p.text);
+                })
+        );
+        
+        const allUsedPhrasesText = new Set(patterns.flatMap(p => {
+            if (p.id === selectedPatternToUpdate) return [];
+            return p.phrases.map(phrase => phrase.text);
+        }));
 
         mechanismCards.forEach(card => {
             const cardName = card.name;
@@ -111,13 +120,19 @@ function PatternsPageContent() {
         Object.keys(fields).forEach(key => {
             if (key !== 'Habit Cards') {
                 const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-                fields[key] = uniquePhrases.filter(phrase => !allUsedPhrasesText.has(phrase.text) || phrasesForCurrentPatternText.has(phrase.text));
+                 fields[key] = uniquePhrases.filter(phrase => {
+                    const isUsedElsewhere = allUsedPhrasesText.has(phrase.text);
+                    const isPartOfSelectedHabit = phrasesFromSelectedHabits.has(phrase.text);
+                    
+                    return !isUsedElsewhere || isPartOfSelectedHabit;
+                });
             }
         });
         
-        const allUsedHabitCardIds = new Set(patterns.flatMap(p => p.phrases)
-            .filter(p => p.category === 'Habit Cards')
-            .map(p => p.mechanismCardId));
+        const allUsedHabitCardIds = new Set(patterns.flatMap(p => {
+            if (p.id === selectedPatternToUpdate) return [];
+            return p.phrases.filter(phrase => phrase.category === 'Habit Cards').map(phrase => phrase.mechanismCardId);
+        }));
 
         let habitIdsForCurrentPattern = new Set<string>();
         if (selectedPatternToUpdate) {
@@ -153,7 +168,7 @@ function PatternsPageContent() {
             });
 
         return fields;
-    }, [mechanismCards, habitCards, patterns, selectedPatternToUpdate]);
+    }, [mechanismCards, habitCards, patterns, selectedPatternToUpdate, selectedPhrases]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -604,7 +619,7 @@ function PatternsPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">Defined Meta-Rules</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><Lightbulb /> Defined Meta-Rules</CardTitle>
                     <CardDescription>A list of all the life rules you've created from your patterns.</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -726,6 +741,7 @@ export default function PatternsPage() {
     );
 }
     
+
 
 
 
