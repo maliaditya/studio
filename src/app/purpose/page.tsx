@@ -17,7 +17,7 @@ import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, P
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
+import { format, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -214,20 +214,17 @@ function PurposePageContent() {
         )
     }
     
-    const uncategorizedRules = useMemo(() => {
-      const allRuleIdsInEquations = Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds);
-      const ruleIdSet = new Set(allRuleIdsInEquations);
-      return metaRules.filter(r => !r.purposePillar && !ruleIdSet.has(r.id));
-    }, [metaRules, pillarEquations]);
+    const uncategorizedItems = useMemo(() => {
+        const categorizedRuleIds = new Set(Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds));
+        const categorizedSkillIds = new Set(coreSkills.filter(s => s.purposePillar).map(s => s.id));
+        const categorizedProjectIds = new Set(projects.filter(p => p.purposePillar).map(p => p.id));
+        
+        const uncategorizedRules = metaRules.filter(r => !r.purposePillar && !categorizedRuleIds.has(r.id));
+        const uncategorizedSkills = specializations.filter(s => !s.purposePillar && !categorizedSkillIds.has(s.id));
+        const uncategorizedProjects = projects.filter(p => !p.purposePillar && !categorizedProjectIds.has(p.id));
 
-    const uncategorizedSkills = useMemo(() => {
-        return specializations.filter(s => !s.purposePillar);
-    }, [specializations]);
-    
-    const uncategorizedProjects = useMemo(() => {
-        return projects.filter(p => !p.purposePillar);
-    }, [projects]);
-
+        return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
+    }, [metaRules, coreSkills, projects, pillarEquations, specializations]);
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -437,25 +434,25 @@ function PurposePageContent() {
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {uncategorizedRules.length > 0 && (
+                {uncategorizedItems.rules.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Uncategorized Meta-Rules</CardTitle>
                       <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                      {uncategorizedRules.map(renderMetaRule)}
+                      {uncategorizedItems.rules.map(renderMetaRule)}
                     </CardContent>
                   </Card>
                 )}
-                {uncategorizedSkills.length > 0 && (
+                {uncategorizedItems.skills.length > 0 && (
                     <Card>
                         <CardHeader>
                             <CardTitle>Uncategorized Specializations</CardTitle>
                             <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            {uncategorizedSkills.map(skill => (
+                            {uncategorizedItems.skills.map(skill => (
                                 <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
                                     <span>{skill.name}</span>
                                     <DropdownMenu>
@@ -484,14 +481,14 @@ function PurposePageContent() {
                         </CardContent>
                     </Card>
                 )}
-                {uncategorizedProjects.length > 0 && (
+                {uncategorizedItems.projects.length > 0 && (
                     <Card>
                         <CardHeader>
                             <CardTitle>Uncategorized Projects</CardTitle>
                             <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            {uncategorizedProjects.map(project => (
+                            {uncategorizedItems.projects.map(project => (
                                 <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
                                     <span>{project.name}</span>
                                     <DropdownMenu>
@@ -629,5 +626,6 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
