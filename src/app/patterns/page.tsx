@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -13,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit, Save } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit, Save, MinusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -28,6 +29,8 @@ function PatternsPageContent() {
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
     const [newPatternAction, setNewPatternAction] = useState('');
     const [newPatternCause, setNewPatternCause] = useState('');
+    const [newPatternAction2, setNewPatternAction2] = useState('');
+    const [newPatternCause2, setNewPatternCause2] = useState('');
     const [newPatternOutcome, setNewPatternOutcome] = useState('');
     const [newPatternType, setNewPatternType] = useState<'Positive' | 'Negative'>('Positive');
     const [selectedPatternToUpdate, setSelectedPatternToUpdate] = useState<string | null>(null);
@@ -40,6 +43,9 @@ function PatternsPageContent() {
 
     const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
     const [editedPatternPhrases, setEditedPatternPhrases] = useState<PatternPhrase[]>([]);
+    
+    const [showSecondaryAction, setShowSecondaryAction] = useState(false);
+
 
     useEffect(() => {
         if (selectedPatternToUpdate) {
@@ -58,7 +64,7 @@ function PatternsPageContent() {
         return { habitCards: habits, mechanismCards: mechanisms };
     }, [resources]);
     
-    const aggregatedFields = useMemo(() => {
+     const aggregatedFields = useMemo(() => {
         // First, gather all possible phrases from all mechanisms
         const allPhrasesFromAllMechanisms: PatternPhrase[] = [];
         const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
@@ -114,16 +120,29 @@ function PatternsPageContent() {
     }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate, resources]);
 
 
-    const handlePhraseToggle = (phrase: PatternPhrase) => {
+     const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
     
         if (phrase.category === 'Habit Cards') {
             const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
             if (!habitCard) return; 
+            
+            // Re-fetch all phrases directly, don't rely on aggregatedFields which might be filtered
+            const allPossiblePhrases: PatternPhrase[] = [];
+             mechanismCards.forEach(card => {
+                if (card.mechanismFramework === 'positive') {
+                    if (card.benefit) allPossiblePhrases.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
+                    if (card.reward) allPossiblePhrases.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
+                    if (card.law?.premise && card.law?.outcome) allPossiblePhrases.push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+                } else { // negative
+                    if (card.trigger?.feeling && card.benefit) allPossiblePhrases.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                    if (card.reward) allPossiblePhrases.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                    if (card.law?.premise && card.law?.outcome) allPossiblePhrases.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+                }
+            });
 
-            const allPhrasesFromAllMechanisms = Object.values(aggregatedFields).flat();
             const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-            const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
+            const relatedPhrases = allPossiblePhrases.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
             
             const allPhrasesToToggle = [phrase, ...relatedPhrases];
     
@@ -146,6 +165,7 @@ function PatternsPageContent() {
     
                 setSelectedPhrases(prev => prev.filter(p => {
                     if (!phrasesToRemoveTexts.has(p.text)) return true;
+                    // Keep the phrase if it's part of ANOTHER selected habit's mechanisms
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
@@ -178,7 +198,14 @@ function PatternsPageContent() {
                 toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
                 return;
             }
-            const newPatternName = `${newPatternAction.trim()} → ${newPatternCause.trim()} → ${newPatternOutcome.trim()}`;
+             let nameParts = [newPatternAction.trim(), newPatternCause.trim()];
+            if (showSecondaryAction && newPatternAction2.trim() && newPatternCause2.trim()) {
+                nameParts.push(newPatternAction2.trim(), newPatternCause2.trim());
+            }
+            nameParts.push(newPatternOutcome.trim());
+
+            const newPatternName = nameParts.join(' → ');
+
             const newPattern: Pattern = {
                 id: `pattern_${Date.now()}`,
                 name: newPatternName,
@@ -188,7 +215,10 @@ function PatternsPageContent() {
             setPatterns(prev => [...prev, newPattern]);
             setNewPatternAction('');
             setNewPatternCause('');
+            setNewPatternAction2('');
+            setNewPatternCause2('');
             setNewPatternOutcome('');
+            setShowSecondaryAction(false);
             toast({ title: 'Pattern Created!', description: `The "${newPatternName}" pattern has been saved.`});
         }
 
@@ -432,11 +462,30 @@ function PatternsPageContent() {
                                     <Label htmlFor="pattern-action">Action</Label>
                                     <Input id="pattern-action" value={newPatternAction} onChange={e => setNewPatternAction(e.target.value)} placeholder="e.g., Late Night Snacking" />
                                 </div>
-                                <div>
-                                    <Label htmlFor="pattern-cause">causes</Label>
+                                <div className="space-y-1">
+                                    <Label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="pattern-cause">→ causes</Label>
                                     <Input id="pattern-cause" value={newPatternCause} onChange={e => setNewPatternCause(e.target.value)} placeholder="e.g., Lowered Cortisol" />
                                 </div>
-                                <div>
+                                {!showSecondaryAction ? (
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setShowSecondaryAction(true)}>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add secondary action
+                                    </Button>
+                                ) : (
+                                    <div className="space-y-4 border-l-2 pl-4 border-dashed">
+                                        <div className="space-y-1">
+                                            <Label htmlFor="pattern-action2">→ Action</Label>
+                                            <Input id="pattern-action2" value={newPatternAction2} onChange={e => setNewPatternAction2(e.target.value)} placeholder="e.g., Procrastination" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="pattern-cause2">→ causes</Label>
+                                            <Input id="pattern-cause2" value={newPatternCause2} onChange={e => setNewPatternCause2(e.target.value)} placeholder="e.g., Dopamine depletion" />
+                                        </div>
+                                        <Button type="button" variant="ghost" size="sm" onClick={() => setShowSecondaryAction(false)} className="text-destructive hover:text-destructive">
+                                            <MinusCircle className="mr-2 h-4 w-4" /> Remove secondary
+                                        </Button>
+                                    </div>
+                                )}
+                                <div className="space-y-1">
                                     <Label htmlFor="pattern-outcome">Outcome</Label>
                                     <Input id="pattern-outcome" value={newPatternOutcome} onChange={e => setNewPatternOutcome(e.target.value)} placeholder="e.g., Low Energy" />
                                 </div>
@@ -715,4 +764,5 @@ export default function PatternsPage() {
 
 
     
+
 
