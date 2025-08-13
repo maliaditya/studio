@@ -23,35 +23,35 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
-    const parts = name.split('→').map(p => p.trim());
-
+    const parts = name.split(' → ').map(p => p.trim());
+    
     const positiveColors = ["text-yellow-500", "text-orange-500", "text-green-500"];
     const negativeColors = ["text-blue-500", "text-teal-500", "text-red-500"];
     
     const colors = type === 'Positive' ? positiveColors : negativeColors;
 
     if (parts.length >= 3) {
-      const primaryAction = parts[0];
-      const primaryCause = parts[1];
+      const primaryPart = parts[0];
       const outcome = parts[parts.length - 1];
-
+      
       if (parts.length >= 5) { // secondary action/cause exists
-        const secondaryAction = parts[2];
-        const secondaryCause = parts[3];
+        const secondaryPart = parts[2] + ' → ' + parts[3];
         return (
           <span className="font-semibold">
-            <span className={colors[0]}>{primaryAction} + {primaryCause}</span>
+            <span className={colors[0]}>{primaryPart.replace(' + ', ' → ')}</span>
             <span className="text-muted-foreground mx-1">→</span>
-            <span className={colors[1]}>{secondaryAction} + {secondaryCause}</span>
+            <span className={colors[1]}>{secondaryPart.replace(' + ', ' → ')}</span>
             <span className="text-muted-foreground mx-1">→</span>
             <span className={colors[2]}>{outcome}</span>
           </span>
         )
-
       } else { // only primary action/cause
-        return (
+         const causePart = parts[1];
+         return (
           <span className="font-semibold">
-            <span className={colors[0]}>{primaryAction} + {primaryCause}</span>
+            <span className={colors[0]}>{primaryPart}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[1]}>{causePart}</span>
             <span className="text-muted-foreground mx-1">→</span>
             <span className={colors[2]}>{outcome}</span>
           </span>
@@ -59,7 +59,19 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
       }
     }
 
-    // Fallback for any other format
+    if (parts.length === 3) {
+      return (
+        <span className="font-semibold">
+          <span className={colors[0]}>{parts[0]}</span>
+          <span className="text-muted-foreground mx-1">→</span>
+          <span className={colors[1]}>{parts[1]}</span>
+          <span className="text-muted-foreground mx-1">→</span>
+          <span className={colors[2]}>{outcome}</span>
+        </span>
+      );
+    }
+    
+    // Fallback for old format or simple patterns
     return <span className="font-semibold">{name}</span>;
 };
 
@@ -881,6 +893,7 @@ export default function PatternsPage() {
 
 
     
+
 
 
 
