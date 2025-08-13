@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -87,9 +86,7 @@ function PurposePageContent() {
         handlePopupDragEnd,
         openRuleDetailPopup, ruleDetailPopup,
         pillarEquations, setPillarEquations,
-        skillAcquisitionPlans, setSkillAcquisitionPlans,
         habitCards,
-        mechanismCards,
     } = useAuth();
     const { toast } = useToast();
 
@@ -100,9 +97,6 @@ function PurposePageContent() {
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
     const [equationPopupState, setEquationPopupState] = useState<{ pillar: string; equation?: HabitEquation; isOpen: boolean }>({ pillar: '', isOpen: false });
-
-    // State for Skill Acquisition Plan
-    const [selectedPlanSpecId, setSelectedPlanSpecId] = useState<string | null>(null);
 
     useEffect(() => {
         setPurposeInput(purposeStatement);
@@ -178,44 +172,6 @@ function PurposePageContent() {
         });
     };
 
-    const handleAcquisitionPlanChange = (specializationId: string, field: keyof Omit<SkillAcquisitionPlan, 'specializationId' | 'linkedRuleEquationIds'>, value: string | number | null) => {
-        setSkillAcquisitionPlans(prev => {
-            const index = prev.findIndex(p => p.specializationId === specializationId);
-            if (index > -1) {
-                const updatedPlans = [...prev];
-                updatedPlans[index] = { ...updatedPlans[index], [field]: value };
-                return updatedPlans;
-            } else {
-                return [...prev, { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [], [field]: value }];
-            }
-        });
-    };
-
-    const handleAcquisitionPlanRuleLink = (specializationId: string, ruleId: string) => {
-        setSkillAcquisitionPlans(prev => {
-            const index = prev.findIndex(p => p.specializationId === specializationId);
-            let planToUpdate: SkillAcquisitionPlan;
-            if (index > -1) {
-                planToUpdate = { ...prev[index] };
-            } else {
-                planToUpdate = { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [] };
-            }
-    
-            const newLinkedIds = (planToUpdate.linkedRuleEquationIds || []).includes(ruleId)
-                ? (planToUpdate.linkedRuleEquationIds || []).filter(id => id !== ruleId)
-                : [...(planToUpdate.linkedRuleEquationIds || []), ruleId];
-            planToUpdate.linkedRuleEquationIds = newLinkedIds;
-    
-            if (index > -1) {
-                const updatedPlans = [...prev];
-                updatedPlans[index] = planToUpdate;
-                return updatedPlans;
-            } else {
-                return [...prev, planToUpdate];
-            }
-        });
-    };
-
     const pillars = [
         { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
         { name: 'Body', icon: <HeartPulse className="h-6 w-6 text-red-500" />, attributes: ['Health', 'Strength', 'Energy'] },
@@ -283,15 +239,6 @@ function PurposePageContent() {
                     assignedItemIds.add(item.id);
                 }
             });
-
-            const equationsForPillar = pillarEquations[pillar.name] || [];
-            equationsForPillar.forEach(eq => {
-                (eq.metaRuleIds || []).forEach(ruleId => {
-                    if (metaRules.find(r => r.id === ruleId)) {
-                        assignedItemIds.add(ruleId);
-                    }
-                });
-            });
         });
 
         const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
@@ -299,9 +246,7 @@ function PurposePageContent() {
         const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
-    }, [metaRules, specializations, projects, pillars, pillarEquations]);
-
-
+    }, [metaRules, specializations, projects, pillars]);
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -353,158 +298,7 @@ function PurposePageContent() {
                     </p>
                 </CardContent>
             </Card>
-
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                        <Book className="h-6 w-6 text-primary" />
-                        Skill Acquisition Plan
-                    </CardTitle>
-                    <CardDescription>Define the state and resources required to acquire a new specialization.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="mb-4">
-                        <Label>Select Specialization to Plan</Label>
-                        <Select value={selectedPlanSpecId || ''} onValueChange={setSelectedPlanSpecId}>
-                            <SelectTrigger><SelectValue placeholder="Choose a specialization..." /></SelectTrigger>
-                            <SelectContent>
-                                {specializations.map(spec => (
-                                    <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {selectedPlanSpecId && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 pt-4 border-t">
-                            <div className="space-y-4">
-                                <h3 className="font-semibold flex items-center gap-2"><Target className="h-5 w-5"/> Required State</h3>
-                                <p className="text-xs text-muted-foreground">Link the meta-rule equations that create the necessary mindset for this skill acquisition.</p>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-80">
-                                        <ScrollArea className="h-60">
-                                            <div className="space-y-2 p-1">
-                                                {Object.entries(pillarEquations).flatMap(([pillar, equations]) => 
-                                                    equations.map(eq => {
-                                                        const isSelected = (skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.linkedRuleEquationIds || []).includes(eq.id);
-                                                        return (
-                                                        <div key={eq.id} className="flex items-center space-x-2 p-1">
-                                                            <Checkbox 
-                                                                id={`eq-${eq.id}`}
-                                                                checked={isSelected}
-                                                                onCheckedChange={() => handleAcquisitionPlanRuleLink(selectedPlanSpecId!, eq.id)}
-                                                            />
-                                                            <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                                        </div>
-                                                        )
-                                                    })
-                                                )}
-                                            </div>
-                                        </ScrollArea>
-                                    </PopoverContent>
-                                </Popover>
-                                <div className="space-y-2 pt-2 border-t">
-                                    {(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.linkedRuleEquationIds || []).map(id => {
-                                        const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
-                                        return equation ? <Badge key={id}>{equation.outcome}</Badge> : null;
-                                    })}
-                                </div>
-                            </div>
-                            <div className="space-y-4">
-                                <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
-                                <div className="space-y-1">
-                                    <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Time (Target Date)</Label>
-                                     <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate) && "text-muted-foreground")}>
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate ? format(parseISO(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)!.targetDate), 'PPP') : <span>Pick a date</span>}
-                                        </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                            mode="single"
-                                            selected={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate ? parseISO(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)!.targetDate) : undefined}
-                                            onSelect={(date) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'targetDate', date ? format(date, 'yyyy-MM-dd') : '')}
-                                            initialFocus
-                                        />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                                <div className="space-y-1">
-                                     <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money (Total Amount)</Label>
-                                    <Input type="number" value={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.requiredMoney || ''} onChange={(e) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'requiredMoney', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 500" />
-                                </div>
-                                <div className="space-y-1">
-                                     <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy (Total Productive Hours)</Label>
-                                    <Input type="number" value={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.requiredHours || ''} onChange={(e) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            {skillAcquisitionPlans.length > 0 && (
-                <div className="space-y-4">
-                    <h2 className="text-2xl font-bold tracking-tight">Your Acquisition Plans</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {skillAcquisitionPlans.map(plan => {
-                            const spec = specializations.find(s => s.id === plan.specializationId);
-                            if (!spec) return null;
-                            
-                            const linkedEquations = (plan.linkedRuleEquationIds || []).map(id => {
-                                for (const pillar in pillarEquations) {
-                                    const found = pillarEquations[pillar].find(eq => eq.id === id);
-                                    if (found) return found;
-                                }
-                                return null;
-                            }).filter((eq): eq is HabitEquation => !!eq);
-
-                            return (
-                                <Card key={plan.specializationId}>
-                                    <CardHeader>
-                                        <CardTitle>{spec.name}</CardTitle>
-                                        <CardDescription>Acquisition Plan</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div>
-                                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Target/> Required State</h4>
-                                            {linkedEquations.length > 0 ? (
-                                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                                    {linkedEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
-                                                </ul>
-                                            ) : <p className="text-xs text-muted-foreground">No state linked.</p>}
-                                        </div>
-                                        <Separator />
-                                        <div>
-                                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package/> Required Resources</h4>
-                                            <ul className="text-xs space-y-1">
-                                                <li className="flex justify-between">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4"/> Target Date:</span>
-                                                    <span className="font-medium">{plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4"/> Money Needed:</span>
-                                                    <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
-                                                </li>
-                                                <li className="flex justify-between">
-                                                    <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4"/> Energy Needed:</span>
-                                                    <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
-                    </div>
-                </div>
-            )}
-
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pillars.map(pillar => {
                     const allPillarNames = [pillar.name, ...pillar.attributes];
@@ -621,8 +415,6 @@ function PurposePageContent() {
                                                             {rulesInEquation.map(rule => {
                                                                 if (!rule) return null;
                                                                 const pattern = patterns.find(p => p.id === rule.patternId);
-                                                                const linkedHabits = pattern ? habitCards.filter(h => pattern.phrases.some(p => p.category === 'Habit Cards' && p.mechanismCardId === h.id)) : [];
-                                                                
                                                                 return (
                                                                     <Card key={rule.id} className="bg-card">
                                                                         <CardContent className="p-2 text-xs space-y-2">
@@ -631,25 +423,6 @@ function PurposePageContent() {
                                                                                 <p className="text-muted-foreground italic">
                                                                                     <FormattedPatternName name={pattern.name} type={pattern.type} />
                                                                                 </p>
-                                                                            )}
-                                                                             {linkedHabits.length > 0 && (
-                                                                                <div className="pt-2 border-t mt-2">
-                                                                                    <div className="font-semibold text-foreground">Habit: 
-                                                                                        {linkedHabits.length === 1 ? (
-                                                                                            <span className="font-normal"> {linkedHabits[0].name}</span>
-                                                                                        ) : (
-                                                                                            <ul className="list-disc list-inside font-normal text-muted-foreground">
-                                                                                                {linkedHabits.map(h => <li key={h.id}>{h.name}</li>)}
-                                                                                            </ul>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    {linkedHabits.length === 1 && (
-                                                                                        <ul className="list-disc list-inside pl-2 text-muted-foreground">
-                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId) && <li>Negative: {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId)?.response?.visualize || '...'}</li>}
-                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId) && <li>Positive: {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId)?.newResponse?.action || '...'}</li>}
-                                                                                        </ul>
-                                                                                    )}
-                                                                                </div>
                                                                             )}
                                                                         </CardContent>
                                                                     </Card>
@@ -876,9 +649,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
