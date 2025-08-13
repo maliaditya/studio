@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +40,19 @@ function PatternsPageContent() {
     const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
     const [editedPatternPhrases, setEditedPatternPhrases] = useState<PatternPhrase[]>([]);
 
+    // Effect to update selected phrases when an existing pattern is chosen for editing
+    useEffect(() => {
+        if (selectedPatternToUpdate) {
+            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
+            if (patternToEdit) {
+                setSelectedPhrases(patternToEdit.phrases);
+            }
+        } else {
+            // When switching back to "Create New", clear the selection
+            setSelectedPhrases([]);
+        }
+    }, [selectedPatternToUpdate, patterns]);
+
 
     const mechanismCards = useMemo(() => {
         return resources.filter(r => r.type === 'mechanism');
@@ -50,8 +63,19 @@ function PatternsPageContent() {
     }, [resources]);
 
     const usedPhrases = useMemo(() => {
-        return new Set(patterns.flatMap(p => p.phrases.map(phrase => phrase.text)));
-    }, [patterns]);
+        const phrasesInPatterns = patterns.flatMap(p => p.phrases.map(phrase => phrase.text));
+        
+        // When editing, the phrases of the currently edited pattern should be considered "available"
+        if (selectedPatternToUpdate) {
+            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
+            if (patternToEdit) {
+                const phrasesToExcludeFromUsed = new Set(patternToEdit.phrases.map(p => p.text));
+                return new Set(phrasesInPatterns.filter(text => !phrasesToExcludeFromUsed.has(text)));
+            }
+        }
+        
+        return new Set(phrasesInPatterns);
+    }, [patterns, selectedPatternToUpdate]);
 
     const aggregatedFields = useMemo(() => {
         const fields: Record<string, PatternPhrase[]> = {
@@ -108,18 +132,16 @@ function PatternsPageContent() {
             });
         });
         
-        const usedHabitCardIds = new Set(
-            patterns.flatMap(p => p.phrases)
+        const usedHabitCardIds = new Set(patterns.flatMap(p => p.phrases)
                     .filter(phrase => phrase.category === 'Habit Cards')
-                    .map(phrase => phrase.mechanismCardId)
-        );
+                    .map(phrase => phrase.mechanismCardId));
 
         Object.keys(fields).forEach(key => {
             const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-             if (key !== 'Habit Cards') {
+            if (key !== 'Habit Cards') {
                 fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
-                 fields[key] = uniquePhrases.filter(phrase => !usedHabitCardIds.has(phrase.mechanismCardId));
+                 fields[key] = uniquePhrases;
             }
         });
 
@@ -196,15 +218,11 @@ function PatternsPageContent() {
         }
 
         if (selectedPatternToUpdate) {
-            setPatterns(prev => prev.map(p => {
-                if (p.id === selectedPatternToUpdate) {
-                    const existingPhraseTexts = new Set(p.phrases.map(ph => ph.text));
-                    const newPhrasesToAdd = selectedPhrases.filter(sp => !existingPhraseTexts.has(sp.text));
-                    return { ...p, phrases: [...p.phrases, ...newPhrasesToAdd] };
-                }
-                return p;
-            }));
-            toast({ title: 'Pattern Updated!', description: `Phrases added to the existing pattern.`});
+            // Update existing pattern
+            setPatterns(prev => prev.map(p => 
+                p.id === selectedPatternToUpdate ? { ...p, phrases: selectedPhrases } : p
+            ));
+            toast({ title: 'Pattern Updated!', description: `The pattern has been updated with your new phrase selections.`});
         }
         else {
             if (!newPatternName.trim()) {
@@ -411,8 +429,8 @@ function PatternsPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Zap /> Steps 3 &amp; 4: Spot &amp; Name Patterns</CardTitle>
-                    <CardDescription>Group your selected phrases into a new pattern or add them to an existing one.</CardDescription>
+                    <CardTitle className="flex items-center gap-2"><Zap /> Step 3: Define Your Pattern</CardTitle>
+                    <CardDescription>Group your selected phrases into a new pattern or edit an existing one.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div>
@@ -422,7 +440,7 @@ function PatternsPageContent() {
                                 <ul className="list-disc list-inside space-y-1">
                                     {selectedPhrases.map((phrase, i) => <li key={i} className="text-sm">{phrase.text} <span className="text-xs text-muted-foreground">({phrase.category})</span></li>)}
                                 </ul>
-                            ) : <p className="text-xs text-muted-foreground text-center pt-10">Select phrases from Step 2 to create a pattern.</p>}
+                            ) : <p className="text-xs text-muted-foreground text-center pt-10">Select phrases from Step 2 to create or edit a pattern.</p>}
                         </ScrollArea>
                     </div>
                     <div className="space-y-4">
@@ -434,7 +452,7 @@ function PatternsPageContent() {
                             {patterns.map(p => (
                                 <div key={p.id} className="flex items-center space-x-2">
                                     <RadioGroupItem value={p.id} id={`pattern-${p.id}`} />
-                                    <Label htmlFor={`pattern-${p.id}`}>Add to: <span className="font-semibold">{p.name}</span></Label>
+                                    <Label htmlFor={`pattern-${p.id}`}>Edit Pattern: <span className="font-semibold">{p.name}</span></Label>
                                 </div>
                             ))}
                         </RadioGroup>
@@ -455,9 +473,9 @@ function PatternsPageContent() {
                             </div>
                         )}
 
-                        <Button onClick={handleCreateOrUpdatePattern} disabled={selectedPhrases.length === 0 || (!selectedPatternToUpdate && !newPatternName.trim())}>
+                        <Button onClick={handleCreateOrUpdatePattern} disabled={selectedPhrases.length === 0}>
                             <PlusCircle className="mr-2 h-4 w-4"/>
-                            {selectedPatternToUpdate ? 'Add to Pattern' : 'Create Pattern'}
+                            {selectedPatternToUpdate ? 'Update Pattern' : 'Create Pattern'}
                         </Button>
                     </div>
                 </CardContent>
@@ -465,7 +483,7 @@ function PatternsPageContent() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Lightbulb /> Step 5: Create Meta-Rules</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><Lightbulb /> Step 4: Create Meta-Rules</CardTitle>
                     <CardDescription>Turn your defined patterns into actionable life rules. These will appear on your Purpose page.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -700,6 +718,7 @@ export default function PatternsPage() {
     );
 }
     
+
 
 
 
