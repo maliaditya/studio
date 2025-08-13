@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -457,13 +456,10 @@ function PatternsPageContent() {
                                                                     autoFocus
                                                                 />
                                                             ) : (
-                                                                <Label htmlFor={`rule-pattern-${p.id}`} className="cursor-pointer flex items-center gap-2">
+                                                                <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleStartEditPattern(p)}>
                                                                     <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'}>{p.type}</Badge>
                                                                     <span className="font-semibold">{p.name}</span>
-                                                                    <button onClick={() => handleStartEditPattern(p)} className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <Edit className="h-3 w-3 text-muted-foreground" />
-                                                                    </button>
-                                                                </Label>
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -593,3 +589,5 @@ export default function PatternsPage() {
         </AuthGuard>
     );
 }
+
+    
