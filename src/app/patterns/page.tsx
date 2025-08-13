@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -20,6 +19,45 @@ import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+
+
+const FormattedPatternName = ({ name }: { name: string }) => {
+    const parts = name.split(' → ').map(p => p.trim());
+    
+    if (parts.length < 3) {
+        return <span className="font-semibold">{name}</span>;
+    }
+
+    const action1 = parts[0];
+    const cause1 = parts[1];
+    let action2, cause2, outcome;
+
+    if (parts.length === 5) {
+        action2 = parts[2];
+        cause2 = parts[3];
+        outcome = parts[4];
+    } else {
+        outcome = parts[2];
+    }
+
+    return (
+        <span className="font-semibold">
+            <span className="text-blue-600 dark:text-blue-400">{action1}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className="text-purple-600 dark:text-purple-400">{cause1}</span>
+            {action2 && cause2 && (
+                <>
+                    <span className="text-muted-foreground mx-1">→</span>
+                    <span className="text-blue-600 dark:text-blue-400">{action2}</span>
+                    <span className="text-muted-foreground mx-1">→</span>
+                    <span className="text-purple-600 dark:text-purple-400">{cause2}</span>
+                </>
+            )}
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className="text-green-600 dark:text-green-400">{outcome}</span>
+        </span>
+    );
+};
 
 
 function PatternsPageContent() {
@@ -705,7 +743,7 @@ function PatternsPageContent() {
                                                 <p className="font-medium">{rule.text}</p>
                                                 {pattern && (
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        Based on pattern: <span className="font-semibold">{pattern.name}</span>
+                                                        Based on pattern: <FormattedPatternName name={pattern.name} />
                                                     </p>
                                                 )}
                                             </div>
@@ -832,6 +870,7 @@ export default function PatternsPage() {
 
 
     
+
 
 
 
