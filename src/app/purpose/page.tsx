@@ -213,27 +213,30 @@ function PurposePageContent() {
     }
     
     const uncategorizedItems = useMemo(() => {
-        const assignedPillarItems = new Set<string>();
+        const assignedItemIds = new Set<string>();
 
         pillars.forEach(pillar => {
             const allPillarNames = [pillar.name, ...pillar.attributes];
             
             metaRules.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedPillarItems.add(item.id);
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
             });
             specializations.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedPillarItems.add(item.id);
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
             });
             projects.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedPillarItems.add(item.id);
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
+            });
+            
+            const equationsForPillar = pillarEquations[pillar.name] || [];
+            equationsForPillar.forEach(eq => {
+                (eq.metaRuleIds || []).forEach(ruleId => assignedItemIds.add(ruleId));
             });
         });
 
-        const assignedEquationRuleIds = new Set(Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds));
-        
-        const uncategorizedRules = metaRules.filter(r => !assignedPillarItems.has(r.id) && !assignedEquationRuleIds.has(r.id));
-        const uncategorizedSkills = specializations.filter(s => !assignedPillarItems.has(s.id));
-        const uncategorizedProjects = projects.filter(p => !assignedPillarItems.has(p.id));
+        const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
+        const uncategorizedSkills = specializations.filter(s => !assignedItemIds.has(s.id));
+        const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
     }, [metaRules, specializations, projects, pillars, pillarEquations]);
@@ -279,9 +282,10 @@ function PurposePageContent() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pillars.map(pillar => {
-                    const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
-                    const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
-                    const projectsForPillar = projects.filter(p => p.purposePillar === pillar.name || pillar.attributes.includes(p.purposePillar || ''));
+                    const allPillarNames = [pillar.name, ...pillar.attributes];
+                    const rulesForPillar = metaRules.filter(r => r.purposePillar && allPillarNames.includes(r.purposePillar));
+                    const skillsForPillar = specializations.filter(s => s.purposePillar && allPillarNames.includes(s.purposePillar));
+                    const projectsForPillar = projects.filter(p => p.purposePillar && allPillarNames.includes(p.purposePillar));
                     const equationsForPillar = pillarEquations[pillar.name] || [];
                     
                     return (
@@ -403,169 +407,169 @@ function PurposePageContent() {
                                                                                     <FormattedPatternName name={pattern.name} type={pattern.type} />
                                                                                 </p>
                                                                             )}
-                                                                             {linkedHabits.length > 0 && (
+                                                                            {linkedHabits.length > 0 && (
                                                                                 <div className="pt-2 border-t mt-2">
                                                                                     <div className="font-semibold text-foreground">Habit: {
                                                                                         linkedHabits.length > 1 ? (
-                                                                                            &lt;div&gt;&lt;ul className="list-disc list-inside font-normal text-muted-foreground"&gt;
-                                                                                                {linkedHabits.map(h => &lt;li key={h.id}&gt;{h.name}&lt;/li&gt;)}
-                                                                                            &lt;/ul&gt;&lt;/div&gt;
+                                                                                            <div><ul className="list-disc list-inside font-normal text-muted-foreground">
+                                                                                                {linkedHabits.map(h => <li key={h.id}>{h.name}</li>)}
+                                                                                            </ul></div>
                                                                                         ) : (
-                                                                                            &lt;span className="font-normal"&gt;{linkedHabits[0].name}&lt;/span&gt;
+                                                                                            <span className="font-normal">{linkedHabits[0].name}</span>
                                                                                         )
-                                                                                    }&lt;/div&gt;
+                                                                                    }</div>
                                                                                     {linkedHabits.length === 1 && (
-                                                                                        &lt;ul className="list-disc list-inside pl-2 text-muted-foreground"&gt;
-                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId) && &lt;li&gt;Negative: {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId)?.response?.visualize || '...'}&lt;/li&gt;}
-                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId) && &lt;li&gt;Positive: {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId)?.newResponse?.action || '...'}&lt;/li&gt;}
-                                                                                        &lt;/ul&gt;
+                                                                                        <ul className="list-disc list-inside pl-2 text-muted-foreground">
+                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId) && <li>Negative: {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId)?.response?.visualize || '...'}</li>}
+                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId) && <li>Positive: {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId)?.newResponse?.action || '...'}</li>}
+                                                                                        </ul>
                                                                                     )}
-                                                                                &lt;/div&gt;
+                                                                                </div>
                                                                             )}
                                                                         </CardContent>
                                                                     </Card>
                                                                 )
                                                             })}
-                                                        &lt;/div&gt;
-                                                        &lt;p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold"&gt;
-                                                            &lt;ArrowRight className="h-4 w-4 text-muted-foreground" /&gt;
-                                                            &lt;span&gt;{eq.outcome}&lt;/span&gt;
-                                                        &lt;/p&gt;
-                                                    &lt;/div&gt;
-                                                     &lt;div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity"&gt;
-                                                        &lt;Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}&gt;
-                                                            &lt;Edit className="h-3 w-3" /&gt;
-                                                        &lt;/Button&gt;
-                                                        &lt;Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}&gt;
-                                                            &lt;Trash2 className="h-3 w-3 text-destructive"/&gt;
-                                                        &lt;/Button&gt;
-                                                    &lt;/div&gt;
-                                                &lt;/div&gt;
+                                                        </div>
+                                                        <p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold">
+                                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                                            <span>{eq.outcome}</span>
+                                                        </p>
+                                                    </div>
+                                                     <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
+                                                            <Edit className="h-3 w-3" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
+                                                            <Trash2 className="h-3 w-3 text-destructive"/>
+                                                        </Button>
+                                                    </div>
+                                                </div>
                                             )
                                         })}
                                         {equationsForPillar.length === 0 && (
-                                            &lt;p className="text-xs text-muted-foreground text-center py-4"&gt;No equations defined.&lt;/p&gt;
+                                            <p className="text-xs text-muted-foreground text-center py-4">No equations defined.</p>
                                         )}
-                                    &lt;/div&gt;
-                                &lt;/div&gt;
-                            &lt;/CardContent&gt;
-                        &lt;/Card&gt;
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )
                 })}
-            &lt;/div&gt;
+            </div>
             
-            &lt;div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"&gt;
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {uncategorizedItems.rules.length > 0 && (
-                  &lt;Card&gt;
-                    &lt;CardHeader&gt;
-                      &lt;CardTitle&gt;Uncategorized Meta-Rules&lt;/CardTitle&gt;
-                      &lt;CardDescription&gt;Assign these rules to a pillar using the dropdown menu.&lt;/CardDescription&gt;
-                    &lt;/CardHeader&gt;
-                    &lt;CardContent className="space-y-2"&gt;
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Uncategorized Meta-Rules</CardTitle>
+                      <CardDescription>Assign these rules to a pillar using the dropdown menu.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
                       {uncategorizedItems.rules.map(renderMetaRule)}
-                    &lt;/CardContent&gt;
-                  &lt;/Card&gt;
+                    </CardContent>
+                  </Card>
                 )}
                 {uncategorizedItems.skills.length > 0 && (
-                    &lt;Card&gt;
-                        &lt;CardHeader&gt;
-                            &lt;CardTitle&gt;Uncategorized Specializations&lt;/CardTitle&gt;
-                            &lt;CardDescription&gt;Assign these skills to a pillar using the dropdown menu.&lt;/CardDescription&gt;
-                        &lt;/CardHeader&gt;
-                        &lt;CardContent className="space-y-2"&gt;
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Uncategorized Specializations</CardTitle>
+                            <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
                             {uncategorizedItems.skills.map(skill => (
-                                &lt;div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50"&gt;
-                                    &lt;span&gt;{skill.name}&lt;/span&gt;
-                                    &lt;DropdownMenu&gt;
-                                        &lt;DropdownMenuTrigger asChild&gt;
-                                            &lt;Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"&gt;
-                                            &lt;Badge className="capitalize"&gt;?&lt;/Badge&gt;
-                                            &lt;/Button&gt;
-                                        &lt;/DropdownMenuTrigger&gt;
-                                        &lt;DropdownMenuContent&gt;
+                                <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                    <span>{skill.name}</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                            <Badge className="capitalize">?</Badge>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
                                             {pillars.map(p => (
-                                                &lt;DropdownMenuGroup key={p.name}&gt;
-                                                    &lt;DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}&gt;
+                                                <DropdownMenuGroup key={p.name}>
+                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
                                                         {p.name}
-                                                    &lt;/DropdownMenuItem&gt;
+                                                    </DropdownMenuItem>
                                                     {p.attributes.map(attr => (
-                                                        &lt;DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6"&gt;
+                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
                                                             {attr}
-                                                        &lt;/DropdownMenuItem&gt;
+                                                        </DropdownMenuItem>
                                                     ))}
-                                                &lt;/DropdownMenuGroup&gt;
+                                                </DropdownMenuGroup>
                                             ))}
-                                        &lt;/DropdownMenuContent&gt;
-                                    &lt;/DropdownMenu&gt;
-                                &lt;/div&gt;
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             ))}
-                        &lt;/CardContent&gt;
-                    &lt;/Card&gt;
+                        </CardContent>
+                    </Card>
                 )}
                 {uncategorizedItems.projects.length > 0 && (
-                    &lt;Card&gt;
-                        &lt;CardHeader&gt;
-                            &lt;CardTitle&gt;Uncategorized Projects&lt;/CardTitle&gt;
-                            &lt;CardDescription&gt;Assign these projects to a pillar using the dropdown menu.&lt;/CardDescription&gt;
-                        &lt;/CardHeader&gt;
-                        &lt;CardContent className="space-y-2"&gt;
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Uncategorized Projects</CardTitle>
+                            <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
                             {uncategorizedItems.projects.map(project => (
-                                &lt;div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50"&gt;
-                                    &lt;span&gt;{project.name}&lt;/span&gt;
-                                    &lt;DropdownMenu&gt;
-                                        &lt;DropdownMenuTrigger asChild&gt;
-                                            &lt;Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100"&gt;
-                                            &lt;Badge className="capitalize"&gt;?&lt;/Badge&gt;
-                                            &lt;/Button&gt;
-                                        &lt;/DropdownMenuTrigger&gt;
-                                        &lt;DropdownMenuContent&gt;
+                                <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
+                                    <span>{project.name}</span>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                            <Badge className="capitalize">?</Badge>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent>
                                             {pillars.map(p => (
-                                                &lt;DropdownMenuGroup key={p.name}&gt;
-                                                    &lt;DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}&gt;
+                                                <DropdownMenuGroup key={p.name}>
+                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
                                                         {p.name}
-                                                    &lt;/DropdownMenuItem&gt;
+                                                    </DropdownMenuItem>
                                                     {p.attributes.map(attr => (
-                                                        &lt;DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6"&gt;
+                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
                                                             {attr}
-                                                        &lt;/DropdownMenuItem&gt;
+                                                        </DropdownMenuItem>
                                                     ))}
-                                                &lt;/DropdownMenuGroup&gt;
+                                                </DropdownMenuGroup>
                                             ))}
-                                        &lt;/DropdownMenuContent&gt;
-                                    &lt;/DropdownMenu&gt;
-                                &lt;/div&gt;
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             ))}
-                        &lt;/CardContent&gt;
-                    &lt;/Card&gt;
+                        </CardContent>
+                    </Card>
                 )}
-            &lt;/div&gt;
+            </div>
             {editingMetaRuleId && (
-              &lt;div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingMetaRuleId(null)}&gt;
-                  &lt;div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}&gt;
-                      &lt;Card className="w-96"&gt;
-                          &lt;CardHeader&gt;&lt;CardTitle&gt;Edit Meta-Rule&lt;/CardTitle&gt;&lt;/CardHeader&gt;
-                          &lt;CardContent&gt;
-                              &lt;Textarea value={editedMetaRuleText} onChange={(e) => setEditedMetaRuleText(e.target.value)} autoFocus className="min-h-[100px]" /&gt;
-                          &lt;/CardContent&gt;
-                          &lt;CardFooter className="flex justify-end gap-2"&gt;
-                              &lt;Button variant="ghost" onClick={() => setEditingMetaRuleId(null)}&gt;Cancel&lt;/Button&gt;
-                              &lt;Button onClick={handleSaveMetaRule}&gt;Save&lt;/Button&gt;
-                          &lt;/CardFooter&gt;
-                      &lt;/Card&gt;
-                  &lt;/div&gt;
-              &lt;/div&gt;
+              <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingMetaRuleId(null)}>
+                  <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
+                      <Card className="w-96">
+                          <CardHeader><CardTitle>Edit Meta-Rule</CardTitle></CardHeader>
+                          <CardContent>
+                              <Textarea value={editedMetaRuleText} onChange={(e) => setEditedMetaRuleText(e.target.value)} autoFocus className="min-h-[100px]" />
+                          </CardContent>
+                          <CardFooter className="flex justify-end gap-2">
+                              <Button variant="ghost" onClick={() => setEditingMetaRuleId(null)}>Cancel</Button>
+                              <Button onClick={handleSaveMetaRule}>Save</Button>
+                          </CardFooter>
+                      </Card>
+                  </div>
+              </div>
             )}
             {equationPopupState.isOpen && (
-                &lt;EquationEditor
+                <EquationEditor
                     isOpen={equationPopupState.isOpen}
                     onOpenChange={() => setEquationPopupState({ pillar: '', isOpen: false })}
                     pillarName={equationPopupState.pillar}
                     equation={equationPopupState.equation}
                     onSave={handleSaveEquation}
                     metaRules={metaRules}
-                /&gt;
+                />
             )}
-        &lt;/div&gt;
+        </div>
     );
 }
 
@@ -574,10 +578,10 @@ const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, me
     onOpenChange: (open: boolean) => void;
     pillarName: string;
     equation?: HabitEquation;
-    onSave: (pillar: string, equation: Omit&lt;HabitEquation, 'id'&gt;) => void;
+    onSave: (pillar: string, equation: Omit<HabitEquation, 'id'>) => void;
     metaRules: MetaRule[];
 }) => {
-    const [selectedRuleIds, setSelectedRuleIds] = useState&lt;string[]&gt;([]);
+    const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
     const [outcome, setOutcome] = useState('');
 
     useEffect(() => {
@@ -605,47 +609,48 @@ const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, me
     };
 
     return (
-        &lt;Dialog open={isOpen} onOpenChange={onOpenChange}&gt;
-            &lt;DialogContent className="sm:max-w-md"&gt;
-                &lt;DialogHeader&gt;
-                    &lt;DialogTitle&gt;{equation ? 'Edit' : 'Create'} Rule Equation for {pillarName}&lt;/DialogTitle&gt;
-                &lt;/DialogHeader&gt;
-                &lt;div className="space-y-4 py-4"&gt;
-                    &lt;div className="space-y-2"&gt;
-                        &lt;Label&gt;Select Meta-Rules&lt;/Label&gt;
-                        &lt;ScrollArea className="h-40 w-full rounded-md border p-2"&gt;
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{equation ? 'Edit' : 'Create'} Rule Equation for {pillarName}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Select Meta-Rules</Label>
+                        <ScrollArea className="h-40 w-full rounded-md border p-2">
                             {metaRules.map(rule => (
-                                &lt;div key={rule.id} className="flex items-center space-x-2 p-1"&gt;
-                                    &lt;Checkbox
+                                <div key={rule.id} className="flex items-center space-x-2 p-1">
+                                    <Checkbox
                                         id={`rule-${rule.id}`}
                                         checked={selectedRuleIds.includes(rule.id)}
                                         onCheckedChange={() => handleToggleRule(rule.id)}
-                                    /&gt;
-                                    &lt;Label htmlFor={`rule-${rule.id}`} className="text-sm font-normal w-full cursor-pointer"&gt;{rule.text}&lt;/Label&gt;
-                                &lt;/div&gt;
+                                    />
+                                    <Label htmlFor={`rule-${rule.id}`} className="text-sm font-normal w-full cursor-pointer">{rule.text}</Label>
+                                </div>
                             ))}
-                        &lt;/ScrollArea&gt;
-                    &lt;/div&gt;
-                     &lt;div className="space-y-1"&gt;
-                        &lt;Label&gt;Expected Outcome&lt;/Label&gt;
-                        &lt;Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="e.g., Increased productivity"/&gt;
-                    &lt;/div&gt;
-                &lt;/div&gt;
-                &lt;DialogFooter&gt;
-                    &lt;Button variant="outline" onClick={() => onOpenChange(false)}&gt;Cancel&lt;/Button&gt;
-                    &lt;Button onClick={handleSaveClick}&gt;Save Equation&lt;/Button&gt;
-                &lt;/DialogFooter&gt;
-            &lt;/DialogContent&gt;
-        &lt;/Dialog&gt;
-    )
-}
+                        </ScrollArea>
+                    </div>
+                     <div className="space-y-1">
+                        <Label>Expected Outcome</Label>
+                        <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="e.g., Increased productivity"/>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleSaveClick}>Save Equation</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 export default function PurposePage() {
     return (
-        &lt;AuthGuard&gt;
-            &lt;PurposePageContent /&gt;
-        &lt;/AuthGuard&gt;
+        <AuthGuard>
+            <PurposePageContent />
+        </AuthGuard>
     );
 }
+
 
 
