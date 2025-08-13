@@ -283,7 +283,10 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
     }, [pattern, habitCards]);
 
     const currentHabit = linkedHabits[currentHabitIndex];
-
+    
+    const negativeMechanism = currentHabit ? mechanismCards.find(m => m.id === currentHabit.response?.resourceId) : null;
+    const positiveMechanism = currentHabit ? mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId) : null;
+    
     const categorizedPhrasesForHabit = useMemo(() => {
         if (!pattern || !currentHabit) return {};
 
@@ -543,15 +546,15 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                     <div>
                                                         <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
                                                         <p className="text-muted-foreground">
-                                                            <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'}:</span>
-                                                            &nbsp;{`It causes ${mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'} internally.`}
+                                                            <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}:</span>
+                                                            &nbsp;{`It causes ${negativeMechanism?.response?.visualize || '...'} internally.`}
                                                         </p>
                                                     </div>
                                                     <div>
                                                         <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
                                                         <p className="text-muted-foreground">
-                                                            <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'}:</span>
-                                                            &nbsp;{`Only when ${mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.visualize || '...'}, ${mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'} happens.`}
+                                                            <span className="font-semibold text-foreground">{positiveMechanism?.name || 'Unlinked'}:</span>
+                                                            &nbsp;{`Only when ${positiveMechanism?.newResponse?.visualize || '...'}, ${positiveMechanism?.newResponse?.action || '...'} happens.`}
                                                         </p>
                                                     </div>
                                                     <div className="pt-2 mt-2">
