@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -113,7 +114,7 @@ function PurposePageContent() {
                     pillarEqs[index] = { ...equationPopupState.equation, ...equation };
                 }
             } else { // Adding new
-                pillarEqs.push({ id: `eq_${Date.now()}`, ...equation });
+                pillarEqs.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
             }
             newEquations[pillar] = pillarEqs;
             return newEquations;
@@ -335,7 +336,7 @@ function PurposePageContent() {
                                                 return (
                                                     <div key={eq.id} className="text-xs p-2 rounded-md border bg-muted/30 group relative" onClick={() => handleOpenEquationPopup(pillar.name, eq)}>
                                                         <ul className="space-y-1">
-                                                            {eq.metaRuleIds.map(ruleId => {
+                                                            {(eq.metaRuleIds || []).map(ruleId => {
                                                                 const rule = metaRules.find(r => r.id === ruleId);
                                                                 return <li key={ruleId} className="font-medium text-primary truncate" title={rule?.text}>{rule?.text || 'Unknown Rule'}</li>
                                                             })}
