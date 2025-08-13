@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -369,39 +370,55 @@ function PurposePageContent() {
                                         </Button>
                                     </div>
                                     <div className="space-y-2">
-                                        {equationsForPillar.length > 0 ? (
-                                            equationsForPillar.map(eq => {
-                                                const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter(Boolean);
-                                                return (
-                                                    <div key={eq.id} className="p-2 rounded-md border bg-muted/30 group relative">
-                                                        <div className="space-y-2">
-                                                            {rulesInEquation.map(rule => (
-                                                                <Card key={rule!.id} className="bg-card">
-                                                                    <CardContent className="p-2 text-xs space-y-1">
-                                                                        <p className="font-medium text-primary">{rule!.text}</p>
-                                                                        <p className="text-muted-foreground italic">
-                                                                            <FormattedPatternName name={patterns.find(p => p.id === rule!.patternId)?.name || '...'} type={patterns.find(p => p.id === rule!.patternId)?.type || 'Positive'} />
-                                                                        </p>
+                                        {equationsForPillar.map(eq => {
+                                            const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter(Boolean);
+                                            return (
+                                                <div key={eq.id} className="p-2 rounded-md border bg-muted/30 group relative">
+                                                    <div className="space-y-2">
+                                                        {rulesInEquation.map(rule => {
+                                                            if (!rule) return null;
+                                                            const pattern = patterns.find(p => p.id === rule.patternId);
+                                                            const linkedHabit = pattern ? habitCards.find(h => pattern.phrases.some(p => p.category === 'Habit Cards' && p.mechanismCardId === h.id)) : null;
+
+                                                            return (
+                                                                <Card key={rule.id} className="bg-card">
+                                                                    <CardContent className="p-2 text-xs space-y-2">
+                                                                        <p className="font-medium text-primary cursor-pointer hover:underline" onClick={(e) => openRuleDetailPopup(rule.id, e)}>{rule.text}</p>
+                                                                        {pattern && (
+                                                                            <p className="text-muted-foreground italic">
+                                                                                <FormattedPatternName name={pattern.name} type={pattern.type} />
+                                                                            </p>
+                                                                        )}
+                                                                        {linkedHabit && (
+                                                                            <div className="pt-2 border-t mt-2">
+                                                                                <p className="font-semibold text-foreground">Habit: {linkedHabit.name}</p>
+                                                                                <ul className="list-disc list-inside pl-2 text-muted-foreground">
+                                                                                    {linkedHabit.response?.resourceId && <li>Response: {mechanismCards.find(m=>m.id === linkedHabit.response!.resourceId)?.name}</li>}
+                                                                                    {linkedHabit.newResponse?.resourceId && <li>New Response: {mechanismCards.find(m=>m.id === linkedHabit.newResponse!.resourceId)?.name}</li>}
+                                                                                </ul>
+                                                                            </div>
+                                                                        )}
                                                                     </CardContent>
                                                                 </Card>
-                                                            ))}
-                                                        </div>
-                                                        <p className="flex items-center gap-1 mt-1 pt-1 border-t text-sm font-semibold">
-                                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                                            <span>{eq.outcome}</span>
-                                                        </p>
-                                                        <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
-                                                                <Edit className="h-3 w-3" />
-                                                            </Button>
-                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
-                                                                <Trash2 className="h-3 w-3 text-destructive"/>
-                                                            </Button>
-                                                        </div>
+                                                            )
+                                                        })}
                                                     </div>
-                                                )
-                                            })
-                                        ) : (
+                                                    <p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold">
+                                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                                        <span>{eq.outcome}</span>
+                                                    </p>
+                                                     <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
+                                                            <Edit className="h-3 w-3" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
+                                                            <Trash2 className="h-3 w-3 text-destructive"/>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {equationsForPillar.length === 0 && (
                                             <p className="text-xs text-muted-foreground text-center py-4">No equations defined.</p>
                                         )}
                                     </div>
@@ -605,3 +622,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
