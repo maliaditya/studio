@@ -209,6 +209,7 @@ export interface GapAnalysis {
   whatYouCanFill: string;
   coreSolution: string;
   outcomeGoal: string;
+  strainReduction?: string;
 }
 
 // Resource Library Types

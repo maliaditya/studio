@@ -342,6 +342,10 @@ function ProductizationPageContent() {
                                       </DropdownMenuContent>
                                   </DropdownMenu>
                               </div>
+                               <div>
+                                  <Label htmlFor={`strain-${project.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
+                                  <Textarea id={`strain-${project.id}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
+                              </div>
                               <div>
                                   <Label htmlFor={`fill-${project.id}`} className="text-sm">What You Can Fill</Label>
                                   <Textarea id={`fill-${project.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />

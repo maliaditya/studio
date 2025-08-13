@@ -468,6 +468,10 @@ function OfferizationPageContent() {
                                   </DropdownMenu>
                               </div>
                               <div>
+                                  <Label htmlFor={`strain-${spec.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
+                                  <Textarea id={`strain-${spec.id}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
+                              </div>
+                              <div>
                                   <Label htmlFor={`fill-${spec.id}`} className="text-sm">What You Can Fill</Label>
                                   <Textarea id={`fill-${spec.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
                               </div>
