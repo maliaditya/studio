@@ -59,23 +59,8 @@ function PatternsPageContent() {
     }, [resources]);
 
     const habitCards = useMemo(() => {
-        return resources.filter(r => r.type === 'habit');
+        return resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
     }, [resources]);
-
-    const usedPhrases = useMemo(() => {
-        const phrasesInPatterns = patterns.flatMap(p => p.phrases.map(phrase => phrase.text));
-        
-        // When editing, the phrases of the currently edited pattern should be considered "available"
-        if (selectedPatternToUpdate) {
-            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
-            if (patternToEdit) {
-                const phrasesToExcludeFromUsed = new Set(patternToEdit.phrases.map(p => p.text));
-                return new Set(phrasesInPatterns.filter(text => !phrasesToExcludeFromUsed.has(text)));
-            }
-        }
-        
-        return new Set(phrasesInPatterns);
-    }, [patterns, selectedPatternToUpdate]);
 
     const aggregatedFields = useMemo(() => {
         const fields: Record<string, PatternPhrase[]> = {
@@ -85,6 +70,16 @@ function PatternsPageContent() {
             'Negative Laws': [],
             'Habit Cards': [],
         };
+
+        const allUsedPhrasesText = new Set(patterns.flatMap(p => p.phrases.map(phrase => phrase.text)));
+        let phrasesForCurrentPatternText = new Set<string>();
+
+        if (selectedPatternToUpdate) {
+            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
+            if (patternToEdit) {
+                phrasesForCurrentPatternText = new Set(patternToEdit.phrases.map(p => p.text));
+            }
+        }
 
         mechanismCards.forEach(card => {
             const cardName = card.name;
@@ -112,41 +107,54 @@ function PatternsPageContent() {
                 }
             }
         });
-
-        habitCards.forEach(habit => {
-            const linkedMechanisms: {id: string, name: string}[] = [];
-            const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
-            const mechanismForNewResponse = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-
-            if (mechanismForResponse) linkedMechanisms.push({id: mechanismForResponse.id, name: mechanismForResponse.name});
-            if (mechanismForNewResponse && mechanismForNewResponse.id !== mechanismForResponse?.id) {
-                linkedMechanisms.push({id: mechanismForNewResponse.id, name: mechanismForNewResponse.name});
+        
+        Object.keys(fields).forEach(key => {
+            if (key !== 'Habit Cards') {
+                const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
+                fields[key] = uniquePhrases.filter(phrase => !allUsedPhrasesText.has(phrase.text) || phrasesForCurrentPatternText.has(phrase.text));
             }
-
-            fields['Habit Cards'].push({
-                category: 'Habit Cards',
-                text: habit.name,
-                mechanismCardId: habit.id, // Using habit's own ID for uniqueness
-                // @ts-ignore
-                linkedMechanisms: linkedMechanisms.map(m => m.name) // Storing names for display
-            });
         });
         
-        const usedHabitCardIds = new Set(patterns.flatMap(p => p.phrases)
-                    .filter(phrase => phrase.category === 'Habit Cards')
-                    .map(phrase => phrase.mechanismCardId));
+        const allUsedHabitCardIds = new Set(patterns.flatMap(p => p.phrases)
+            .filter(p => p.category === 'Habit Cards')
+            .map(p => p.mechanismCardId));
 
-        Object.keys(fields).forEach(key => {
-            const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-            if (key !== 'Habit Cards') {
-                fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
-            } else {
-                 fields[key] = uniquePhrases;
+        let habitIdsForCurrentPattern = new Set<string>();
+        if (selectedPatternToUpdate) {
+            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
+            if (patternToEdit) {
+                habitIdsForCurrentPattern = new Set(
+                    patternToEdit.phrases
+                        .filter(p => p.category === 'Habit Cards')
+                        .map(p => p.mechanismCardId)
+                );
             }
-        });
+        }
+        
+        fields['Habit Cards'] = habitCards
+            .filter(habit => !allUsedHabitCardIds.has(habit.id) || habitIdsForCurrentPattern.has(habit.id))
+            .map(habit => {
+                const linkedMechanisms: {id: string, name: string}[] = [];
+                const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
+                const mechanismForNewResponse = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+
+                if (mechanismForResponse) linkedMechanisms.push({id: mechanismForResponse.id, name: mechanismForResponse.name});
+                if (mechanismForNewResponse && mechanismForNewResponse.id !== mechanismForResponse?.id) {
+                    linkedMechanisms.push({id: mechanismForNewResponse.id, name: mechanismForNewResponse.name});
+                }
+                
+                return {
+                    category: 'Habit Cards',
+                    text: habit.name,
+                    mechanismCardId: habit.id,
+                    // @ts-ignore - It's fine to add a temporary property for display
+                    linkedMechanisms: linkedMechanisms.map(m => m.name)
+                };
+            });
 
         return fields;
-    }, [mechanismCards, habitCards, usedPhrases, patterns]);
+    }, [mechanismCards, habitCards, patterns, selectedPatternToUpdate]);
+
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
@@ -718,6 +726,7 @@ export default function PatternsPage() {
     );
 }
     
+
 
 
 
