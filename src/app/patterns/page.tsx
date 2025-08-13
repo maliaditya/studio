@@ -27,6 +27,7 @@ function PatternsPageContent() {
 
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
     const [newPatternAction, setNewPatternAction] = useState('');
+    const [newPatternCause, setNewPatternCause] = useState('');
     const [newPatternOutcome, setNewPatternOutcome] = useState('');
     const [newPatternType, setNewPatternType] = useState<'Positive' | 'Negative'>('Positive');
     const [selectedPatternToUpdate, setSelectedPatternToUpdate] = useState<string | null>(null);
@@ -52,12 +53,13 @@ function PatternsPageContent() {
     }, [selectedPatternToUpdate, patterns]);
 
     const { habitCards, mechanismCards } = useMemo(() => {
-        const habits = resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
+        const habits = resources.filter(r => r.type === 'habit');
         const mechanisms = resources.filter(r => r.type === 'mechanism');
         return { habitCards: habits, mechanismCards: mechanisms };
     }, [resources]);
     
     const aggregatedFields = useMemo(() => {
+        // First, gather all possible phrases from all mechanisms
         const allMechanismPhrasesMap = new Map<string, PatternPhrase[]>();
         const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
         categories.forEach(cat => allMechanismPhrasesMap.set(cat, []));
@@ -73,8 +75,9 @@ function PatternsPageContent() {
                 if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Negative Laws')!.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             }
         });
-        
         const allPhrasesFromAllMechanisms = Array.from(allMechanismPhrasesMap.values()).flat();
+
+        // Then, determine which habits and their associated phrases to display based on the mode
         const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
         
         let habitsToDisplay: Resource[] = [];
@@ -98,9 +101,12 @@ function PatternsPageContent() {
             ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
             return { category: 'Habit Cards' as const, text: habit.name, mechanismCardId: habit.id, linkedMechanisms: linkedMechanisms as string[] };
         });
+        
+        const mechanismIdsInScope = new Set(habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean));
+        const phrasesInScope = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && mechanismIdsInScope.has(p.mechanismCardId));
 
         const phrasesByCategory: Record<string, PatternPhrase[]> = { 'Habit Cards': allHabitCardPhrases };
-        allPhrasesFromAllMechanisms.forEach(p => {
+        phrasesInScope.forEach(p => {
             if (!phrasesByCategory[p.category]) phrasesByCategory[p.category] = [];
             phrasesByCategory[p.category].push(p);
         });
@@ -170,11 +176,11 @@ function PatternsPageContent() {
             ));
             toast({ title: 'Pattern Updated!', description: `The pattern has been updated with your new phrase selections.`});
         } else {
-            if (!newPatternAction.trim() || !newPatternOutcome.trim()) {
-                toast({ title: 'Error', description: 'Action and Outcome cannot be empty.', variant: 'destructive' });
+            if (!newPatternAction.trim() || !newPatternCause.trim() || !newPatternOutcome.trim()) {
+                toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
                 return;
             }
-            const newPatternName = `${newPatternAction.trim()} → causes → ${newPatternOutcome.trim()}`;
+            const newPatternName = `${newPatternAction.trim()} → ${newPatternCause.trim()} → ${newPatternOutcome.trim()}`;
             const newPattern: Pattern = {
                 id: `pattern_${Date.now()}`,
                 name: newPatternName,
@@ -183,6 +189,7 @@ function PatternsPageContent() {
             };
             setPatterns(prev => [...prev, newPattern]);
             setNewPatternAction('');
+            setNewPatternCause('');
             setNewPatternOutcome('');
             toast({ title: 'Pattern Created!', description: `The "${newPatternName}" pattern has been saved.`});
         }
@@ -423,12 +430,16 @@ function PatternsPageContent() {
 
                         {!selectedPatternToUpdate && (
                             <div className="space-y-4 pl-6 border-l-2 ml-2">
-                                <div>
+                                 <div className="space-y-1">
                                     <Label htmlFor="pattern-action">Action</Label>
                                     <Input id="pattern-action" value={newPatternAction} onChange={e => setNewPatternAction(e.target.value)} placeholder="e.g., Late Night Snacking" />
                                 </div>
                                 <div>
-                                    <Label htmlFor="pattern-outcome">causes → Outcome</Label>
+                                    <Label htmlFor="pattern-cause">causes</Label>
+                                    <Input id="pattern-cause" value={newPatternCause} onChange={e => setNewPatternCause(e.target.value)} placeholder="e.g., Lowered Cortisol" />
+                                </div>
+                                <div>
+                                    <Label htmlFor="pattern-outcome">→ Outcome</Label>
                                     <Input id="pattern-outcome" value={newPatternOutcome} onChange={e => setNewPatternOutcome(e.target.value)} placeholder="e.g., Low Energy" />
                                 </div>
                                 <div>
