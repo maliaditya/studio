@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -40,7 +39,6 @@ function PatternsPageContent() {
     const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
     const [editedPatternPhrases, setEditedPatternPhrases] = useState<PatternPhrase[]>([]);
 
-    // Effect to update selected phrases when an existing pattern is chosen for editing
     useEffect(() => {
         if (selectedPatternToUpdate) {
             const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
@@ -48,123 +46,97 @@ function PatternsPageContent() {
                 setSelectedPhrases(patternToEdit.phrases);
             }
         } else {
-            // When switching back to "Create New", clear the selection
             setSelectedPhrases([]);
         }
     }, [selectedPatternToUpdate, patterns]);
-
-
-    const mechanismCards = useMemo(() => {
-        return resources.filter(r => r.type === 'mechanism');
-    }, [resources]);
 
     const habitCards = useMemo(() => {
         return resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
     }, [resources]);
 
-    const aggregatedFields = useMemo(() => {
-        const allPhrases: Record<string, PatternPhrase[]> = {
-            Benefits: [],
-            Costs: [],
-            'Positive Laws': [],
-            'Negative Laws': [],
+    const mechanismCards = useMemo(() => {
+        return resources.filter(r => r.type === 'mechanism');
+    }, [resources]);
+    
+    const allMechanismPhrases = useMemo(() => {
+        const phrases: Record<string, PatternPhrase[]> = {
+            Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [],
         };
 
         mechanismCards.forEach(card => {
-            const cardName = card.name;
             const cardId = card.id;
-
+            const cardName = card.name;
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) allPhrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.reward) allPhrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.benefit) phrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.reward) phrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
                   const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  allPhrases['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
+                  phrases['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
-            } else { // Negative Framework
-                if (card.trigger?.feeling && card.benefit) {
-                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
-                    allPhrases.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-                if (card.reward) { // This is a "Benefit" blocked by the negative action, hence a cost.
-                    const costText = `This blocks ${card.reward}.`;
-                    allPhrases.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
+            } else { // Negative
+                if (card.trigger?.feeling && card.benefit) phrases.Costs.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.reward) phrases.Costs.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: cardId, mechanismCardName: cardName });
                 if (card.law?.premise && card.law?.outcome) {
                     const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    allPhrases['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
+                    phrases['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
                 }
             }
         });
+        return phrases;
+    }, [mechanismCards]);
+    
+    const aggregatedFields = useMemo(() => {
+        const allPhrasesFromMechanisms = Object.values(allMechanismPhrases).flat();
+        const allUsedPhraseTextsInOtherPatterns = new Set(
+            patterns
+                .filter(p => p.id !== selectedPatternToUpdate)
+                .flatMap(p => p.phrases.filter(phrase => phrase.category !== 'Habit Cards'))
+                .map(p => p.text)
+        );
 
-        const phrasesFromSelectedHabits = new Set(
-            selectedPhrases
-                .filter(p => p.category === 'Habit Cards')
-                .flatMap(habitPhrase => {
-                    const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
-                    if (!habitCard) return [];
-                    const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-                    return Object.values(allPhrases)
-                        .flat()
-                        .filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId))
-                        .map(p => p.text);
-                })
+        const allUsedHabitCardIdsInOtherPatterns = new Set(
+            patterns
+                .filter(p => p.id !== selectedPatternToUpdate)
+                .flatMap(p => p.phrases.filter(phrase => phrase.category === 'Habit Cards'))
+                .map(phrase => phrase.mechanismCardId)
         );
         
-        const filteredFields: Record<string, PatternPhrase[]> = {
-            Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [], 'Habit Cards': []
-        };
-        
-        Object.keys(allPhrases).forEach(key => {
-            const uniquePhrases = Array.from(new Map(allPhrases[key].map(item => [item.text, item])).values());
-            filteredFields[key] = uniquePhrases.filter(phrase => {
-                const isUsedInOtherPatterns = patterns.some(p => {
-                    if (p.id === selectedPatternToUpdate) return false;
-                    return p.phrases.some(pPhrase => pPhrase.text === phrase.text);
-                });
-                const isPartOfSelectedHabit = phrasesFromSelectedHabits.has(phrase.text);
-                return !isUsedInOtherPatterns || isPartOfSelectedHabit;
-            });
-        });
-        
-        const allUsedHabitCardIdsInOtherPatterns = new Set(patterns.flatMap(p => {
-            if (p.id === selectedPatternToUpdate) return [];
-            return p.phrases.filter(phrase => phrase.category === 'Habit Cards').map(phrase => phrase.mechanismCardId);
-        }));
-        
-        let habitIdsForCurrentPattern = new Set<string>();
-        if (selectedPatternToUpdate) {
-            const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
-            if (patternToEdit) {
-                habitIdsForCurrentPattern = new Set(
-                    patternToEdit.phrases.filter(p => p.category === 'Habit Cards').map(p => p.mechanismCardId)
-                );
-            }
-        }
-        
-        filteredFields['Habit Cards'] = habitCards
-            .filter(habit => !allUsedHabitCardIdsInOtherPatterns.has(habit.id) || habitIdsForCurrentPattern.has(habit.id))
-            .map(habit => {
-                const linkedMechanisms: {id: string, name: string}[] = [];
-                const mechanismForResponse = mechanismCards.find(m => m.id === habit.response?.resourceId);
-                const mechanismForNewResponse = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+        const filteredFields: Record<string, PatternPhrase[]> = { Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [], 'Habit Cards': [] };
 
-                if (mechanismForResponse) linkedMechanisms.push({id: mechanismForResponse.id, name: mechanismForResponse.name});
-                if (mechanismForNewResponse && mechanismForNewResponse.id !== mechanismForResponse?.id) {
-                    linkedMechanisms.push({id: mechanismForNewResponse.id, name: mechanismForNewResponse.name});
-                }
-                
+        const uniqueMechanismPhrases = Array.from(new Map(allPhrasesFromMechanisms.map(item => [item.text, item])).values());
+        
+        uniqueMechanismPhrases.forEach(phrase => {
+            if (!allUsedPhraseTextsInOtherPatterns.has(phrase.text)) {
+                 if (!filteredFields[phrase.category]) filteredFields[phrase.category] = [];
+                filteredFields[phrase.category].push(phrase);
+            }
+        });
+
+        const currentHabitIdsForEditing = new Set(
+            selectedPatternToUpdate 
+            ? patterns.find(p => p.id === selectedPatternToUpdate)?.phrases.filter(p => p.category === 'Habit Cards').map(p => p.mechanismCardId) || []
+            : []
+        );
+
+        filteredFields['Habit Cards'] = habitCards
+            .filter(habit => !allUsedHabitCardIdsInOtherPatterns.has(habit.id) || currentHabitIdsForEditing.has(habit.id))
+            .map(habit => {
+                const linkedMechanisms = [
+                    habit.response?.resourceId,
+                    habit.newResponse?.resourceId
+                ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
+
                 return {
                     category: 'Habit Cards',
                     text: habit.name,
                     mechanismCardId: habit.id,
-                    // @ts-ignore
-                    linkedMechanisms: linkedMechanisms.map(m => m.name)
+                    linkedMechanisms: linkedMechanisms as string[]
                 };
             });
 
         return filteredFields;
-    }, [resources, patterns, selectedPatternToUpdate, selectedPhrases, habitCards, mechanismCards]);
+
+    }, [resources, patterns, selectedPatternToUpdate, allMechanismPhrases, habitCards, mechanismCards]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -172,17 +144,15 @@ function PatternsPageContent() {
 
         if (phrase.category === 'Habit Cards') {
             const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
-            if (!habitCard) return; // Should not happen
+            if (!habitCard) return; 
 
             const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-
-            const relatedPhrases = Object.values(aggregatedFields)
+            const relatedPhrases = Object.values(allMechanismPhrases)
                 .flat()
-                .filter(p => p.category !== 'Habit Cards' && p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
+                .filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
 
             if (!isSelected) {
-                // Add the habit and all its related unselected phrases
-                const phrasesToAdd = [...relatedPhrases, phrase];
+                const phrasesToAdd = [phrase, ...relatedPhrases];
                 setSelectedPhrases(prev => {
                     const newSelectionMap = new Map(prev.map(p => [p.text, p]));
                     phrasesToAdd.forEach(p_to_add => {
@@ -193,10 +163,8 @@ function PatternsPageContent() {
                     return Array.from(newSelectionMap.values());
                 });
             } else {
-                // Remove the habit and its related phrases, but only if they aren't part of another selected habit.
                 const phrasesToRemove = new Set([phrase.text, ...relatedPhrases.map(p => p.text)]);
 
-                // Get mechanism IDs of OTHER selected habits
                 const otherSelectedHabitsMechanisms = new Set<string>();
                 selectedPhrases.forEach(p => {
                     if (p.category === 'Habit Cards' && p.text !== phrase.text) {
@@ -209,20 +177,17 @@ function PatternsPageContent() {
                 });
 
                 setSelectedPhrases(prev => prev.filter(p => {
-                    if (!phrasesToRemove.has(p.text)) return true; // Keep if not part of the current habit's group
-                    if (p.text === phrase.text) return false; // Always remove the clicked habit
+                    if (!phrasesToRemove.has(p.text)) return true; 
+                    if (p.text === phrase.text) return false;
 
-                    // Keep a related phrase if it's also related to another selected habit
                     if (p.mechanismCardId && otherSelectedHabitsMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
-
                     return false;
                 }));
             }
         } else {
-             // Default behavior for non-habit phrases
-            if (!isSelected) {
+             if (!isSelected) {
                 setSelectedPhrases(prev => [...prev, phrase]);
             } else {
                 setSelectedPhrases(prev => prev.filter(p => p.text !== phrase.text));
@@ -237,7 +202,6 @@ function PatternsPageContent() {
         }
 
         if (selectedPatternToUpdate) {
-            // Update existing pattern
             setPatterns(prev => prev.map(p => 
                 p.id === selectedPatternToUpdate ? { ...p, phrases: selectedPhrases } : p
             ));
@@ -373,12 +337,12 @@ function PatternsPageContent() {
 
     const allAvailablePhrases = useMemo(() => {
         const allPhrasesMap = new Map<string, PatternPhrase>();
-        Object.values(aggregatedFields).flat().forEach(p => allPhrasesMap.set(p.text, p));
+        Object.values(allMechanismPhrases).flat().forEach(p => allPhrasesMap.set(p.text, p));
         if (editingPattern) {
             editingPattern.phrases.forEach(p => allPhrasesMap.set(p.text, p));
         }
         return Array.from(allPhrasesMap.values());
-    }, [aggregatedFields, editingPattern]);
+    }, [allMechanismPhrases, editingPattern]);
 
     return (
         <>
@@ -426,7 +390,6 @@ function PatternsPageContent() {
                                                                 <div className="mt-1 pt-1 border-t">
                                                                 <p className="text-xs text-muted-foreground font-medium">Linked Mechanisms:</p>
                                                                 <ul className="list-disc list-inside text-xs text-muted-foreground">
-                                                                    {/* @ts-ignore */}
                                                                     {phrase.linkedMechanisms.map((mech, hIndex) => <li key={hIndex}>{mech}</li>)}
                                                                 </ul>
                                                                 </div>
@@ -747,5 +710,7 @@ export default function PatternsPage() {
 
 
 
+
+    
 
     
