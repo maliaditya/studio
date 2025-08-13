@@ -34,7 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 function OfferizationPageContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans } = useAuth();
   const { toast } = useToast();
   
   const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
@@ -46,8 +46,9 @@ function OfferizationPageContent() {
   const [editingOffer, setEditingOffer] = useState<{ specializationId: string; offer: Partial<Offer> } | null>(null);
   
   const specializations = useMemo(() => {
-    return coreSkills.filter(skill => skill.type === 'Specialization');
-  }, [coreSkills]);
+    const plannedSpecializationIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
+    return coreSkills.filter(skill => skill.type === 'Specialization' && plannedSpecializationIds.has(skill.id));
+  }, [coreSkills, skillAcquisitionPlans]);
 
   const handleOfferTypeChange = (specializationId: string, offerTypeToAddOrRemove: string) => {
     setOfferizationPlans(prev => {
