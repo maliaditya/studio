@@ -16,7 +16,7 @@ import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } f
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from './ui/input';
@@ -545,11 +545,17 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                 <CardContent className="p-3 pt-0 text-xs space-y-2">
                                                     <div>
                                                         <p className="font-medium text-red-600 dark:text-red-400">Negative Mechanism:</p>
-                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'})</span></p>
+                                                        <p className="text-muted-foreground">
+                                                            <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.name || 'Unlinked'}:</span>
+                                                            &nbsp;{mechanismCards.find(m => m.id === currentHabit.response?.resourceId)?.response?.visualize || '...'}
+                                                        </p>
                                                     </div>
                                                     <div>
                                                         <p className="font-medium text-green-600 dark:text-green-400">Positive Mechanism:</p>
-                                                        <p className="text-muted-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'} <span className="text-xs italic">({mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'})</span></p>
+                                                        <p className="text-muted-foreground">
+                                                          <span className="font-semibold text-foreground">{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.name || 'Unlinked'}:</span>
+                                                          &nbsp;{mechanismCards.find(m => m.id === currentHabit.newResponse?.resourceId)?.newResponse?.action || '...'}
+                                                        </p>
                                                     </div>
                                                     <div className="pt-2 mt-2">
                                                     <Tabs defaultValue="resistance" className="w-full">
