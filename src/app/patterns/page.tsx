@@ -23,27 +23,52 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
-    const parts = name.split(' → ').map(p => p.trim());
+    const parts = name.split('→').map(p => p.trim());
 
-    if (parts.length < 3) {
-        return <span className="font-semibold">{name}</span>;
-    }
-
-    const positiveColors = ["text-yellow-500", "text-orange-500", "text-yellow-300", "text-orange-300", "text-amber-500", "text-red-500"];
-    const negativeColors = ["text-blue-500", "text-teal-500", "text-sky-400", "text-cyan-400", "text-amber-500", "text-green-500"];
+    const positiveColors = ["text-yellow-500", "text-orange-500", "text-green-500"];
+    const negativeColors = ["text-blue-500", "text-teal-500", "text-red-500"];
     
     const colors = type === 'Positive' ? positiveColors : negativeColors;
 
-    return (
-        <span className="font-semibold">
-            {parts.map((part, index) => (
-                <React.Fragment key={index}>
-                    <span className={cn(colors[index])}>{part}</span>
-                    {index < parts.length - 1 && <span className="text-muted-foreground mx-1">→</span>}
-                </React.Fragment>
-            ))}
-        </span>
-    );
+    if (parts.length === 3) { // Action → Cause → Outcome
+        return (
+            <span className="font-semibold">
+                <span className={colors[0]}>{parts[0]}</span>
+                <span className="text-muted-foreground mx-1">→</span>
+                <span className={colors[0]}>{parts[1]}</span>
+                <span className="text-muted-foreground mx-1">→</span>
+                <span className={colors[2]}>{parts[2]}</span>
+            </span>
+        );
+    }
+    
+    if (parts.length === 5) { // Action → Cause → Action → Cause → Outcome
+        return (
+            <span className="font-semibold">
+                {/* Group 1 */}
+                <span className={colors[0]}>{parts[0]}</span>
+                <span className="text-muted-foreground mx-1">→</span>
+                <span className={colors[0]}>{parts[1]}</span>
+
+                {/* Separator */}
+                <span className="text-muted-foreground mx-2 font-bold">→</span>
+
+                {/* Group 2 */}
+                <span className={colors[1]}>{parts[2]}</span>
+                <span className="text-muted-foreground mx-1">→</span>
+                <span className={colors[1]}>{parts[3]}</span>
+                
+                {/* Separator */}
+                <span className="text-muted-foreground mx-2 font-bold">→</span>
+
+                {/* Group 3 */}
+                <span className={colors[2]}>{parts[4]}</span>
+            </span>
+        )
+    }
+
+    // Fallback for any other format
+    return <span className="font-semibold">{name}</span>;
 };
 
 
@@ -84,13 +109,13 @@ function PatternsPageContent() {
                 setSelectedPhrases(patternToEdit.phrases);
                 
                 const parts = patternToEdit.name.split(' → ');
-                if (parts.length === 3) { // Action -> Cause -> Outcome
+                if (parts.length === 3) { // Action → Cause → Outcome
                     setEditedPatternFields({
                         action1: parts[0], cause1: parts[1], outcome: parts[2],
                         action2: '', cause2: '', type: patternToEdit.type
                     });
                     setShowSecondaryActionEdit(false);
-                } else if (parts.length === 5) { // Action -> Cause -> Action -> Cause -> Outcome
+                } else if (parts.length === 5) { // Action → Cause → Action → Cause → Outcome
                     setEditedPatternFields({
                         action1: parts[0], cause1: parts[1], action2: parts[2], cause2: parts[3], outcome: parts[4], type: patternToEdit.type
                     });
@@ -851,6 +876,7 @@ export default function PatternsPage() {
 
 
     
+
 
 
 
