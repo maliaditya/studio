@@ -24,42 +24,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
     const parts = name.split(' → ').map(p => p.trim());
-    
+
     if (parts.length < 3) {
         return <span className="font-semibold">{name}</span>;
     }
 
-    const action1 = parts[0];
-    const cause1 = parts[1];
-    let action2, cause2, outcome;
-
-    if (parts.length === 5) {
-        action2 = parts[2];
-        cause2 = parts[3];
-        outcome = parts[4];
-    } else {
-        outcome = parts[2];
-    }
-
-    const outcomeColor = type === 'Positive' 
-        ? "text-green-600 dark:text-green-400" 
-        : "text-red-600 dark:text-red-400";
+    const positiveColors = ["text-yellow-500", "text-orange-500", "text-yellow-300", "text-orange-300", "text-amber-500", "text-red-500"];
+    const negativeColors = ["text-blue-500", "text-teal-500", "text-sky-400", "text-cyan-400", "text-amber-500", "text-green-500"];
+    
+    const colors = type === 'Positive' ? positiveColors : negativeColors;
 
     return (
         <span className="font-semibold">
-            <span className="text-blue-600 dark:text-blue-400">{action1}</span>
-            <span className="text-muted-foreground mx-1">→</span>
-            <span className="text-purple-600 dark:text-purple-400">{cause1}</span>
-            {action2 && cause2 && (
-                <>
-                    <span className="text-muted-foreground mx-1">→</span>
-                    <span className="text-blue-600 dark:text-blue-400">{action2}</span>
-                    <span className="text-muted-foreground mx-1">→</span>
-                    <span className="text-purple-600 dark:text-purple-400">{cause2}</span>
-                </>
-            )}
-            <span className="text-muted-foreground mx-1">→</span>
-            <span className={cn(outcomeColor)}>{outcome}</span>
+            {parts.map((part, index) => (
+                <React.Fragment key={index}>
+                    <span className={cn(colors[index])}>{part}</span>
+                    {index < parts.length - 1 && <span className="text-muted-foreground mx-1">→</span>}
+                </React.Fragment>
+            ))}
         </span>
     );
 };
@@ -148,11 +130,16 @@ function PatternsPageContent() {
         let habitsToDisplay: Resource[];
         
         if (selectedPatternToUpdate) {
-            // EDIT MODE: Show habits from the current pattern AND any unlinked habits.
-            const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.id === selectedPatternToUpdate ? [] : p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
-            habitsToDisplay = habitCards.filter(h => !allHabitIdsInAnyPattern.has(h.id));
+            const currentPatternHabitIds = new Set(
+                patterns.find(p => p.id === selectedPatternToUpdate)?.phrases
+                    .filter(ph => ph.category === 'Habit Cards')
+                    .map(ph => ph.mechanismCardId) || []
+            );
+            const allOtherHabitIds = new Set(
+                patterns.flatMap(p => p.id === selectedPatternToUpdate ? [] : p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId))
+            );
+            habitsToDisplay = habitCards.filter(h => currentPatternHabitIds.has(h.id) || !allOtherHabitIds.has(h.id));
         } else {
-            // CREATE NEW MODE: Show only habits that are not part of ANY existing pattern.
             const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
             habitsToDisplay = habitCards.filter(h => !allHabitIdsInAnyPattern.has(h.id));
         }
@@ -185,7 +172,6 @@ function PatternsPageContent() {
      const handlePhraseToggle = (phrase: PatternPhrase) => {
         const isSelected = selectedPhrases.some(p => p.text === phrase.text);
         
-        // Find all possible phrases related to ALL mechanisms
         const allPossiblePhrases: PatternPhrase[] = [];
         mechanismCards.forEach(card => {
           if (card.mechanismFramework === 'positive') {
@@ -214,31 +200,11 @@ function PatternsPageContent() {
                     return [...prev, ...newPhrasesToAdd];
                 });
             } else {
-                // Remove habit and related phrases, but only if they are not part of another selected habit
+                // Remove habit and all its related phrases from the selection
                 const phrasesToRemoveTexts = new Set(allPhrasesToToggle.map(p => p.text));
-    
-                const otherSelectedHabitMechanisms = new Set<string>();
-                selectedPhrases.forEach(p => {
-                    if (p.category === 'Habit Cards' && p.mechanismCardId !== phrase.mechanismCardId) {
-                        const otherHabitCard = habitCards.find(h => h.id === p.mechanismCardId);
-                        if (otherHabitCard) {
-                            if (otherHabitCard.response?.resourceId) otherSelectedHabitMechanisms.add(otherHabitCard.response.resourceId);
-                            if (otherHabitCard.newResponse?.resourceId) otherSelectedHabitMechanisms.add(otherHabitCard.newResponse.resourceId);
-                        }
-                    }
-                });
-    
-                setSelectedPhrases(prev => prev.filter(p => {
-                    if (!phrasesToRemoveTexts.has(p.text)) return true; // Not part of the set to remove
-                    // Is part of the set to remove, check if it's used by another selected habit
-                    if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
-                        return true; // Keep it
-                    }
-                    return false; // Remove it
-                }));
+                setSelectedPhrases(prev => prev.filter(p => !phrasesToRemoveTexts.has(p.text)));
             }
         } else {
-             // For non-habit phrases, just toggle them individually
              if (!isSelected) {
                 setSelectedPhrases(prev => [...prev, phrase]);
             } else {
@@ -885,6 +851,7 @@ export default function PatternsPage() {
 
 
     
+
 
 
 
