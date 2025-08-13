@@ -8,13 +8,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle, Target, Book, Clock, Banknote } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation } from '@/types/workout';
-import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan } from '@/types/workout';
+import { DndContext, useDraggable } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
@@ -26,6 +27,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
@@ -83,6 +87,7 @@ function PurposePageContent() {
         handlePopupDragEnd,
         openRuleDetailPopup, ruleDetailPopup,
         pillarEquations, setPillarEquations,
+        skillAcquisitionPlans, setSkillAcquisitionPlans,
         habitCards,
         mechanismCards,
     } = useAuth();
@@ -95,6 +100,9 @@ function PurposePageContent() {
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
     const [equationPopupState, setEquationPopupState] = useState<{ pillar: string; equation?: HabitEquation; isOpen: boolean }>({ pillar: '', isOpen: false });
+
+    // State for Skill Acquisition Plan
+    const [selectedPlanSpecId, setSelectedPlanSpecId] = useState<string | null>(null);
 
     useEffect(() => {
         setPurposeInput(purposeStatement);
@@ -170,6 +178,36 @@ function PurposePageContent() {
         });
     };
 
+    const handleAcquisitionPlanChange = (specializationId: string, field: keyof Omit<SkillAcquisitionPlan, 'specializationId' | 'linkedRuleEquationIds'>, value: string | number | null) => {
+        setSkillAcquisitionPlans(prev => {
+            const index = prev.findIndex(p => p.specializationId === specializationId);
+            if (index > -1) {
+                const updatedPlans = [...prev];
+                updatedPlans[index] = { ...updatedPlans[index], [field]: value };
+                return updatedPlans;
+            } else {
+                return [...prev, { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [], [field]: value }];
+            }
+        });
+    };
+
+    const handleAcquisitionPlanRuleLink = (specializationId: string, ruleId: string) => {
+        setSkillAcquisitionPlans(prev => {
+            const index = prev.findIndex(p => p.specializationId === specializationId);
+            if (index > -1) {
+                const updatedPlans = [...prev];
+                const plan = updatedPlans[index];
+                const newLinkedIds = (plan.linkedRuleEquationIds || []).includes(ruleId)
+                    ? (plan.linkedRuleEquationIds || []).filter(id => id !== ruleId)
+                    : [...(plan.linkedRuleEquationIds || []), ruleId];
+                updatedPlans[index] = { ...plan, linkedRuleEquationIds: newLinkedIds };
+                return updatedPlans;
+            } else {
+                return [...prev, { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [ruleId] }];
+            }
+        });
+    };
+
 
     const pillars = [
         { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
@@ -221,25 +259,27 @@ function PurposePageContent() {
         pillars.forEach(pillar => {
             const allPillarNames = [pillar.name, ...pillar.attributes];
             
-            metaRules.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
-            });
-            specializations.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
-            });
-            projects.forEach(item => {
-                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) assignedItemIds.add(item.id);
-            });
+            const processItems = (items: (MetaRule | CoreSkill | Project)[], type: 'meta-rule' | 'specialization' | 'project') => {
+                items.forEach(item => {
+                    if (item.purposePillar && allPillarNames.includes(item.purposePillar)) {
+                        assignedItemIds.add(item.id);
+                    }
+                });
+            };
             
+            processItems(metaRules, 'meta-rule');
+            processItems(specializations, 'specialization');
+            processItems(projects, 'project');
+
             const equationsForPillar = pillarEquations[pillar.name] || [];
             equationsForPillar.forEach(eq => {
                 (eq.metaRuleIds || []).forEach(ruleId => assignedItemIds.add(ruleId));
             });
         });
 
-        const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
-        const uncategorizedSkills = specializations.filter(s => !assignedItemIds.has(s.id));
-        const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
+        const uncategorizedRules = metaRules.filter(r => !r.purposePillar);
+        const uncategorizedSkills = specializations.filter(s => !s.purposePillar);
+        const uncategorizedProjects = projects.filter(p => !p.purposePillar);
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
     }, [metaRules, specializations, projects, pillars, pillarEquations]);
@@ -294,6 +334,101 @@ function PurposePageContent() {
                     <p className="text-lg text-muted-foreground">
                         Monetization can happen if you have a skill that serves a product that reduces strain on human body or mind in work which he needs to do every day manually. Products either assist or automate, so to earn money you need a skill that serves such a product.
                     </p>
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-lg">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                        <Book className="h-6 w-6 text-primary" />
+                        Skill Acquisition Plan
+                    </CardTitle>
+                    <CardDescription>Define the state and resources required to acquire a new specialization.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="mb-4">
+                        <Label>Select Specialization to Plan</Label>
+                        <Select value={selectedPlanSpecId || ''} onValueChange={setSelectedPlanSpecId}>
+                            <SelectTrigger><SelectValue placeholder="Choose a specialization..." /></SelectTrigger>
+                            <SelectContent>
+                                {specializations.map(spec => (
+                                    <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    {selectedPlanSpecId && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4 pt-4 border-t">
+                            <div className="space-y-4">
+                                <h3 className="font-semibold flex items-center gap-2"><Target className="h-5 w-5"/> Required State</h3>
+                                <p className="text-xs text-muted-foreground">Link the meta-rule equations that create the necessary mindset for this skill acquisition.</p>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80">
+                                        <div className="space-y-2">
+                                            {Object.entries(pillarEquations).map(([pillar, equations]) => (
+                                                <div key={pillar}>
+                                                    <h4 className="font-semibold text-sm">{pillar}</h4>
+                                                    {equations.map(eq => {
+                                                        const isSelected = (skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.linkedRuleEquationIds || []).includes(eq.id);
+                                                        return (
+                                                        <div key={eq.id} className="flex items-center space-x-2 p-1">
+                                                            <Checkbox 
+                                                                id={`eq-${eq.id}`}
+                                                                checked={isSelected}
+                                                                onCheckedChange={() => handleAcquisitionPlanRuleLink(selectedPlanSpecId!, eq.id)}
+                                                            />
+                                                            <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                                        </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                                <div className="space-y-2 pt-2 border-t">
+                                    {(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.linkedRuleEquationIds || []).map(id => {
+                                        const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
+                                        return equation ? <Badge key={id}>{equation.outcome}</Badge> : null;
+                                    })}
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
+                                <div className="space-y-1">
+                                    <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Time (Target Date)</Label>
+                                     <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate) && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate ? format(parseISO(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)!.targetDate), 'PPP') : <span>Pick a date</span>}
+                                        </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.targetDate ? parseISO(skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)!.targetDate) : undefined}
+                                            onSelect={(date) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'targetDate', date ? format(date, 'yyyy-MM-dd') : '')}
+                                            initialFocus
+                                        />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                <div className="space-y-1">
+                                     <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money (Total Amount)</Label>
+                                    <Input type="number" value={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.requiredMoney || ''} onChange={(e) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'requiredMoney', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 500" />
+                                </div>
+                                <div className="space-y-1">
+                                     <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy (Total Productive Hours)</Label>
+                                    <Input type="number" value={skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.requiredHours || ''} onChange={(e) => handleAcquisitionPlanChange(selectedPlanSpecId!, 'requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -424,17 +559,17 @@ function PurposePageContent() {
                                                                                     <FormattedPatternName name={pattern.name} type={pattern.type} />
                                                                                 </p>
                                                                             )}
-                                                                            {linkedHabits.length > 0 && (
+                                                                             {linkedHabits.length > 0 && (
                                                                                 <div className="pt-2 border-t mt-2">
-                                                                                    <div className="font-semibold text-foreground">Habit: {
-                                                                                        linkedHabits.length > 1 ? (
+                                                                                    <div className="font-semibold text-foreground">Habit: 
+                                                                                        {linkedHabits.length === 1 ? (
+                                                                                            <span className="font-normal"> {linkedHabits[0].name}</span>
+                                                                                        ) : (
                                                                                             <ul className="list-disc list-inside font-normal text-muted-foreground">
                                                                                                 {linkedHabits.map(h => <li key={h.id}>{h.name}</li>)}
                                                                                             </ul>
-                                                                                        ) : (
-                                                                                            <span className="font-normal">{linkedHabits[0].name}</span>
-                                                                                        )
-                                                                                    }</div>
+                                                                                        )}
+                                                                                    </div>
                                                                                     {linkedHabits.length === 1 && (
                                                                                         <ul className="list-disc list-inside pl-2 text-muted-foreground">
                                                                                             {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId) && <li>Negative: {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId)?.response?.visualize || '...'}</li>}
@@ -668,6 +803,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 

@@ -344,6 +344,14 @@ export type PurposePillar =
   | 'Heart' | 'Relationships' | 'Emotional Health'
   | 'Spirit' | 'Meaning' | 'Contribution' | 'Legacy';
 
+export interface SkillAcquisitionPlan {
+    specializationId: string;
+    targetDate: string;
+    requiredMoney: number | null;
+    requiredHours: number | null;
+    linkedRuleEquationIds: string[];
+}
+
 export interface SkillDomain {
   id: string;
   name: string;

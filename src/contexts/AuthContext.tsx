@@ -1,9 +1,10 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -227,6 +228,8 @@ interface AuthContextType {
   setMetaRules: React.Dispatch<React.SetStateAction<MetaRule[]>>;
   pillarEquations: Record<string, HabitEquation[]>;
   setPillarEquations: React.Dispatch<React.SetStateAction<Record<string, HabitEquation[]>>>;
+  skillAcquisitionPlans: SkillAcquisitionPlan[];
+  setSkillAcquisitionPlans: React.Dispatch<React.SetStateAction<SkillAcquisitionPlan[]>>;
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
@@ -386,6 +389,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
   const [pillarEquations, setPillarEquations] = useState<Record<string, HabitEquation[]>>({});
+  const [skillAcquisitionPlans, setSkillAcquisitionPlans] = useState<SkillAcquisitionPlan[]>([]);
 
 
   // Persisted task state
@@ -530,6 +534,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`patterns_${username}`); setPatterns(d ? JSON.parse(d) : []); } catch(e) { setPatterns([]); }
       try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
       try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
+      try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
 
 
       // Persisted task state
@@ -574,6 +579,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCompanies([]); setPositions([]);
       setPurposeStatement(''); setSpecializationPurposes({});
       setPatterns([]); setMetaRules([]); setPillarEquations({});
+      setSkillAcquisitionPlans([]);
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
@@ -647,6 +653,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
       localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
       localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
+      localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
       
       // Persisted task state
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
@@ -673,7 +680,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations,
+    purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
     autoSuggestions
@@ -847,6 +854,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPatterns(data.patterns || []);
     setMetaRules(data.metaRules || []);
     setPillarEquations(data.pillarEquations || {});
+    setSkillAcquisitionPlans(data.skillAcquisitionPlans || []);
     
     // Auto Suggestion
     setAutoSuggestions(data.autoSuggestions || {});
@@ -911,7 +919,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       skillDomains, coreSkills, projects,
       companies, positions,
       purposeData: { statement: purposeStatement, specializationPurposes },
-      patterns, metaRules, pillarEquations,
+      patterns, metaRules, pillarEquations, skillAcquisitionPlans,
       // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask,
@@ -1861,6 +1869,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     patterns, setPatterns,
     metaRules, setMetaRules,
     pillarEquations, setPillarEquations,
+    skillAcquisitionPlans, setSkillAcquisitionPlans,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     microSkillMap,
