@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -35,12 +34,13 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
       const outcome = parts[parts.length - 1];
       
       if (parts.length >= 5) { // secondary action/cause exists
-        const secondaryPart = parts[2] + ' → ' + parts[3];
+        const secondaryPart = parts[2] + ' + ' + parts[3];
+        const causePart = parts[1];
         return (
           <span className="font-semibold">
-            <span className={colors[0]}>{primaryPart.replace(' + ', ' → ')}</span>
+            <span className={colors[0]}>{primaryPart} + {causePart}</span>
             <span className="text-muted-foreground mx-1">→</span>
-            <span className={colors[1]}>{secondaryPart.replace(' + ', ' → ')}</span>
+            <span className={colors[1]}>{secondaryPart}</span>
             <span className="text-muted-foreground mx-1">→</span>
             <span className={colors[2]}>{outcome}</span>
           </span>
@@ -49,26 +49,12 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
          const causePart = parts[1];
          return (
           <span className="font-semibold">
-            <span className={colors[0]}>{primaryPart}</span>
+            <span className={colors[0]}>{primaryPart} + {causePart}</span>
             <span className="text-muted-foreground mx-1">→</span>
-            <span className={colors[1]}>{causePart}</span>
-            <span className="text-muted-foreground mx-1">→</span>
-            <span className={colors[2]}>{outcome}</span>
+            <span className={colors[1]}>{outcome}</span>
           </span>
         )
       }
-    }
-
-    if (parts.length === 3) {
-      return (
-        <span className="font-semibold">
-          <span className={colors[0]}>{parts[0]}</span>
-          <span className="text-muted-foreground mx-1">→</span>
-          <span className={colors[1]}>{parts[1]}</span>
-          <span className="text-muted-foreground mx-1">→</span>
-          <span className={colors[2]}>{outcome}</span>
-        </span>
-      );
     }
     
     // Fallback for old format or simple patterns
@@ -113,17 +99,20 @@ function PatternsPageContent() {
                 setSelectedPhrases(patternToEdit.phrases);
                 
                 const parts = patternToEdit.name.split(' → ');
-                if (parts.length === 3) { // Action → Cause → Outcome
-                    setEditedPatternFields({
-                        action1: parts[0], cause1: parts[1], outcome: parts[2],
-                        action2: '', cause2: '', type: patternToEdit.type
-                    });
-                    setShowSecondaryActionEdit(false);
-                } else if (parts.length === 5) { // Action → Cause → Action → Cause → Outcome
-                    setEditedPatternFields({
-                        action1: parts[0], cause1: parts[1], action2: parts[2], cause2: parts[3], outcome: parts[4], type: patternToEdit.type
-                    });
+                if (parts.length >= 5) { // Action + Cause → Action + Cause → Outcome
+                    const action1 = parts[0].split(' + ')[0] || '';
+                    const cause1 = parts[0].split(' + ')[1] || '';
+                    const action2 = parts[1].split(' + ')[0] || '';
+                    const cause2 = parts[1].split(' + ')[1] || '';
+                    const outcome = parts[2] || '';
+                    setEditedPatternFields({ action1, cause1, action2, cause2, outcome, type: patternToEdit.type });
                     setShowSecondaryActionEdit(true);
+                } else if (parts.length >= 2) { // Action + Cause → Outcome
+                    const action1 = parts[0].split(' + ')[0] || '';
+                    const cause1 = parts[0].split(' + ')[1] || '';
+                    const outcome = parts[1] || '';
+                    setEditedPatternFields({ action1, cause1, outcome, action2: '', cause2: '', type: patternToEdit.type });
+                    setShowSecondaryActionEdit(false);
                 } else { // Fallback for old format
                     setEditedPatternFields({ action1: patternToEdit.name, cause1: '', action2: '', cause2: '', outcome: '', type: patternToEdit.type });
                     setShowSecondaryActionEdit(false);
@@ -249,13 +238,13 @@ function PatternsPageContent() {
 
         if (selectedPatternToUpdate) {
             const { action1, cause1, action2, cause2, outcome, type } = editedPatternFields;
-            if (!action1.trim() || !cause1.trim() || !outcome.trim()) {
-                 toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
+            if (!action1.trim() || !outcome.trim()) {
+                 toast({ title: 'Error', description: 'Action and Outcome cannot be empty.', variant: 'destructive' });
                 return;
             }
-            let nameParts = [action1.trim(), cause1.trim()];
-            if (showSecondaryActionEdit && action2.trim() && cause2.trim()) {
-                nameParts.push(action2.trim(), cause2.trim());
+            let nameParts = [`${action1.trim()}${cause1 ? ' + ' + cause1.trim() : ''}`];
+            if (showSecondaryActionEdit && action2.trim()) {
+                nameParts.push(`${action2.trim()}${cause2 ? ' + ' + cause2.trim() : ''}`);
             }
             nameParts.push(outcome.trim());
             const updatedName = nameParts.join(' → ');
@@ -265,13 +254,13 @@ function PatternsPageContent() {
             ));
             toast({ title: 'Pattern Updated!', description: `The pattern has been updated.`});
         } else {
-            if (!newPatternAction.trim() || !newPatternCause.trim() || !newPatternOutcome.trim()) {
-                toast({ title: 'Error', description: 'Action, Cause, and Outcome cannot be empty.', variant: 'destructive' });
+            if (!newPatternAction.trim() || !newPatternOutcome.trim()) {
+                toast({ title: 'Error', description: 'Action and Outcome cannot be empty.', variant: 'destructive' });
                 return;
             }
-             let nameParts = [newPatternAction.trim(), newPatternCause.trim()];
-            if (showSecondaryAction && newPatternAction2.trim() && newPatternCause2.trim()) {
-                nameParts.push(newPatternAction2.trim(), newPatternCause2.trim());
+            let nameParts = [`${newPatternAction.trim()}${newPatternCause ? ' + ' + newPatternCause.trim() : ''}`];
+            if (showSecondaryAction && newPatternAction2.trim()) {
+                nameParts.push(`${newPatternAction2.trim()}${newPatternCause2 ? ' + ' + newPatternCause2.trim() : ''}`);
             }
             nameParts.push(newPatternOutcome.trim());
 
@@ -903,3 +892,6 @@ export default function PatternsPage() {
 
 
 
+
+
+    
