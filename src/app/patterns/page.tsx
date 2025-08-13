@@ -59,17 +59,43 @@ function PatternsPageContent() {
     }, [resources]);
 
     const habitCards = useMemo(() => {
-        return resources.filter(r => r.type === 'habit');
+        return resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
     }, [resources]);
 
     const aggregatedFields = useMemo(() => {
-        const fields: Record<string, PatternPhrase[]> = {
+        const allPhrases: Record<string, PatternPhrase[]> = {
             Benefits: [],
             Costs: [],
             'Positive Laws': [],
             'Negative Laws': [],
-            'Habit Cards': [],
         };
+
+        mechanismCards.forEach(card => {
+            const cardName = card.name;
+            const cardId = card.id;
+
+            if (card.mechanismFramework === 'positive') {
+                if (card.benefit) allPhrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.reward) allPhrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
+                if (card.law?.premise && card.law?.outcome) {
+                  const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
+                  allPhrases['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
+                }
+            } else { // Negative Framework
+                if (card.trigger?.feeling && card.benefit) {
+                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
+                    allPhrases.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
+                }
+                if (card.reward) { // This is a "Benefit" blocked by the negative action, hence a cost.
+                    const costText = `This blocks ${card.reward}.`;
+                    allPhrases.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
+                }
+                if (card.law?.premise && card.law?.outcome) {
+                    const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
+                    allPhrases['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
+                }
+            }
+        });
 
         const phrasesFromSelectedHabits = new Set(
             selectedPhrases
@@ -78,75 +104,45 @@ function PatternsPageContent() {
                     const habitCard = habitCards.find(h => h.id === habitPhrase.mechanismCardId);
                     if (!habitCard) return [];
                     const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-                    return Object.values(fields)
+                    return Object.values(allPhrases)
                         .flat()
                         .filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId))
                         .map(p => p.text);
                 })
         );
         
-        mechanismCards.forEach(card => {
-            const cardName = card.name;
-            const cardId = card.id;
-
-            if (card.mechanismFramework === 'positive') {
-                if (card.benefit) fields.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.reward) fields.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: cardId, mechanismCardName: cardName });
-                if (card.law?.premise && card.law?.outcome) {
-                  const lawText = `${card.law.premise} can only happen when ${card.law.outcome}`;
-                  fields['Positive Laws'].push({ category: 'Positive Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-            } else { // Negative Framework
-                if (card.trigger?.feeling && card.benefit) {
-                    const costText = `That one ${card.trigger.feeling} costs me ${card.benefit}.`;
-                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-                if (card.reward) { // This is a "Benefit" blocked by the negative action, hence a cost.
-                    const costText = `This blocks ${card.reward}.`;
-                    fields.Costs.push({ category: 'Costs', text: costText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-                if (card.law?.premise && card.law?.outcome) {
-                    const lawText = `${card.law.premise} cannot happen when ${card.law.outcome}`;
-                    fields['Negative Laws'].push({ category: 'Negative Laws', text: lawText, mechanismCardId: cardId, mechanismCardName: cardName });
-                }
-            }
-        });
+        const filteredFields: Record<string, PatternPhrase[]> = {
+            Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [], 'Habit Cards': []
+        };
         
-        Object.keys(fields).forEach(key => {
-            if (key !== 'Habit Cards') {
-                const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-                 fields[key] = uniquePhrases.filter(phrase => {
-                    const isUsedInOtherPatterns = patterns.some(p => {
-                        if (p.id === selectedPatternToUpdate) return false;
-                        return p.phrases.some(pPhrase => pPhrase.text === phrase.text);
-                    });
-
-                    const isPartOfSelectedHabit = phrasesFromSelectedHabits.has(phrase.text);
-                    
-                    return !isUsedInOtherPatterns || isPartOfSelectedHabit;
+        Object.keys(allPhrases).forEach(key => {
+            const uniquePhrases = Array.from(new Map(allPhrases[key].map(item => [item.text, item])).values());
+            filteredFields[key] = uniquePhrases.filter(phrase => {
+                const isUsedInOtherPatterns = patterns.some(p => {
+                    if (p.id === selectedPatternToUpdate) return false;
+                    return p.phrases.some(pPhrase => pPhrase.text === phrase.text);
                 });
-            }
+                const isPartOfSelectedHabit = phrasesFromSelectedHabits.has(phrase.text);
+                return !isUsedInOtherPatterns || isPartOfSelectedHabit;
+            });
         });
         
         const allUsedHabitCardIdsInOtherPatterns = new Set(patterns.flatMap(p => {
-            if (p.id === selectedPatternToUpdate) return []; // Exclude the current pattern from this check
+            if (p.id === selectedPatternToUpdate) return [];
             return p.phrases.filter(phrase => phrase.category === 'Habit Cards').map(phrase => phrase.mechanismCardId);
         }));
-
+        
         let habitIdsForCurrentPattern = new Set<string>();
         if (selectedPatternToUpdate) {
             const patternToEdit = patterns.find(p => p.id === selectedPatternToUpdate);
             if (patternToEdit) {
                 habitIdsForCurrentPattern = new Set(
-                    patternToEdit.phrases
-                        .filter(p => p.category === 'Habit Cards')
-                        .map(p => p.mechanismCardId)
+                    patternToEdit.phrases.filter(p => p.category === 'Habit Cards').map(p => p.mechanismCardId)
                 );
             }
         }
         
-        fields['Habit Cards'] = habitCards
-            // A habit is available if it's not used in OTHER patterns, OR if it's part of the CURRENT pattern being edited.
+        filteredFields['Habit Cards'] = habitCards
             .filter(habit => !allUsedHabitCardIdsInOtherPatterns.has(habit.id) || habitIdsForCurrentPattern.has(habit.id))
             .map(habit => {
                 const linkedMechanisms: {id: string, name: string}[] = [];
@@ -162,13 +158,13 @@ function PatternsPageContent() {
                     category: 'Habit Cards',
                     text: habit.name,
                     mechanismCardId: habit.id,
-                    // @ts-ignore - It's fine to add a temporary property for display
+                    // @ts-ignore
                     linkedMechanisms: linkedMechanisms.map(m => m.name)
                 };
             });
 
-        return fields;
-    }, [resources, patterns, selectedPatternToUpdate, selectedPhrases]);
+        return filteredFields;
+    }, [resources, patterns, selectedPatternToUpdate, selectedPhrases, habitCards, mechanismCards]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -536,7 +532,7 @@ function PatternsPageContent() {
                                                     <div className="flex flex-row items-center justify-between">
                                                         <div className="flex items-center gap-2 flex-grow min-w-0">
                                                             <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                            <div className="flex-grow cursor-pointer" onClick={() => handleStartEditPattern(p)}>
+                                                            <div className="flex-grow cursor-pointer" onClick={(e) => { e.stopPropagation(); openEditModal(p); }}>
                                                                 {editingPatternId === p.id ? (
                                                                     <Input 
                                                                         value={editingPatternName}
@@ -750,3 +746,6 @@ export default function PatternsPage() {
 
 
 
+
+
+    
