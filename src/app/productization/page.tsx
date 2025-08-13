@@ -37,6 +37,10 @@ function ProductizationPageContent() {
   // State for release planning
   const [editingRelease, setEditingRelease] = useState<{ projectId: string; release: Partial<Release> } | null>(null);
 
+  const plannedProjects = useMemo(() => {
+    return projects.filter(p => p.productPlan);
+  }, [projects]);
+
   const handleProductTypeChange = (projectId: string, productType: string) => {
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, productType } : p));
     toast({ title: "Product Type Set!", description: `Set to "${productType}" for the project.` });
@@ -267,7 +271,7 @@ function ProductizationPageContent() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => {
+          {plannedProjects.map((project) => {
             const selectedProductType = project.productType;
             const gapAnalysis = project.gapAnalysis;
             const releases = project.releases || [];
