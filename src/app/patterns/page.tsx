@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -27,7 +26,8 @@ function PatternsPageContent() {
     const { toast } = useToast();
 
     const [selectedPhrases, setSelectedPhrases] = useState<PatternPhrase[]>([]);
-    const [newPatternName, setNewPatternName] = useState('');
+    const [newPatternAction, setNewPatternAction] = useState('');
+    const [newPatternOutcome, setNewPatternOutcome] = useState('');
     const [newPatternType, setNewPatternType] = useState<'Positive' | 'Negative'>('Positive');
     const [selectedPatternToUpdate, setSelectedPatternToUpdate] = useState<string | null>(null);
 
@@ -58,7 +58,6 @@ function PatternsPageContent() {
     }, [resources]);
     
     const aggregatedFields = useMemo(() => {
-        // 1. Gather all possible phrases from all mechanisms
         const allMechanismPhrasesMap = new Map<string, PatternPhrase[]>();
         const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
         categories.forEach(cat => allMechanismPhrasesMap.set(cat, []));
@@ -74,9 +73,8 @@ function PatternsPageContent() {
                 if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Negative Laws')!.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             }
         });
+        
         const allPhrasesFromAllMechanisms = Array.from(allMechanismPhrasesMap.values()).flat();
-
-        // 2. Determine which habits to display based on the mode (create vs. edit)
         const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
         
         let habitsToDisplay: Resource[] = [];
@@ -101,21 +99,15 @@ function PatternsPageContent() {
             return { category: 'Habit Cards' as const, text: habit.name, mechanismCardId: habit.id, linkedMechanisms: linkedMechanisms as string[] };
         });
 
-        // 3. Determine which mechanism phrases to display
-        const visibleHabitMechanismIds = new Set(
-            habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean)
-        );
-        const phrasesToDisplay = allPhrasesFromAllMechanisms.filter(p => visibleHabitMechanismIds.has(p.mechanismCardId));
-
         const phrasesByCategory: Record<string, PatternPhrase[]> = { 'Habit Cards': allHabitCardPhrases };
-        phrasesToDisplay.forEach(p => {
+        allPhrasesFromAllMechanisms.forEach(p => {
             if (!phrasesByCategory[p.category]) phrasesByCategory[p.category] = [];
             phrasesByCategory[p.category].push(p);
         });
         
         return phrasesByCategory;
 
-    }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate]);
+    }, [habitCards, mechanismCards, patterns, selectedPatternToUpdate, resources]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -125,25 +117,16 @@ function PatternsPageContent() {
             const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
             if (!habitCard) return; 
     
-            const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
             const allPhrasesFromAllMechanisms = Object.values(aggregatedFields).flat();
+            const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
             const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
             
             const allPhrasesToToggle = [phrase, ...relatedPhrases];
     
             if (!isSelected) {
-                // Add the habit card and all its related phrases.
-                setSelectedPhrases(prev => {
-                    const newSelectionMap = new Map(prev.map(p => [p.text, p]));
-                    allPhrasesToToggle.forEach(pToAdd => {
-                        if (!newSelectionMap.has(pToAdd.text)) {
-                            newSelectionMap.set(pToAdd.text, pToAdd);
-                        }
-                    });
-                    return Array.from(newSelectionMap.values());
-                });
+                const newPhrasesToAdd = allPhrasesToToggle.filter(p => !selectedPhrases.some(sp => sp.text === p.text));
+                setSelectedPhrases(prev => [...prev, ...newPhrasesToAdd]);
             } else {
-                 // Remove the habit card and its related phrases, but only if they aren't part of another selected habit.
                 const phrasesToRemoveTexts = new Set(allPhrasesToToggle.map(p => p.text));
     
                 const otherSelectedHabitMechanisms = new Set<string>();
@@ -158,17 +141,14 @@ function PatternsPageContent() {
                 });
     
                 setSelectedPhrases(prev => prev.filter(p => {
-                    if (!phrasesToRemoveTexts.has(p.text)) return true; // Keep if not part of the deselected habit's phrase set.
-                    
-                    // Specific logic for mechanism phrases: keep if linked to ANOTHER selected habit
+                    if (!phrasesToRemoveTexts.has(p.text)) return true;
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
-                    // If we reach here, it's either the habit card itself or an unshared mechanism phrase, so remove it.
                     return false;
                 }));
             }
-        } else { // It's a mechanism phrase
+        } else {
              if (!isSelected) {
                 setSelectedPhrases(prev => [...prev, phrase]);
             } else {
@@ -189,12 +169,12 @@ function PatternsPageContent() {
                 p.id === selectedPatternToUpdate ? { ...p, phrases: selectedPhrases } : p
             ));
             toast({ title: 'Pattern Updated!', description: `The pattern has been updated with your new phrase selections.`});
-        }
-        else {
-            if (!newPatternName.trim()) {
-                toast({ title: 'Error', description: 'Pattern name cannot be empty.', variant: 'destructive' });
+        } else {
+            if (!newPatternAction.trim() || !newPatternOutcome.trim()) {
+                toast({ title: 'Error', description: 'Action and Outcome cannot be empty.', variant: 'destructive' });
                 return;
             }
+            const newPatternName = `${newPatternAction.trim()} → causes → ${newPatternOutcome.trim()}`;
             const newPattern: Pattern = {
                 id: `pattern_${Date.now()}`,
                 name: newPatternName,
@@ -202,8 +182,9 @@ function PatternsPageContent() {
                 phrases: selectedPhrases,
             };
             setPatterns(prev => [...prev, newPattern]);
-            setNewPatternName('');
-            toast({ title: 'Pattern Created!', description: `The "${newPattern.name}" pattern has been saved.`});
+            setNewPatternAction('');
+            setNewPatternOutcome('');
+            toast({ title: 'Pattern Created!', description: `The "${newPatternName}" pattern has been saved.`});
         }
 
         setSelectedPhrases([]);
@@ -435,7 +416,7 @@ function PatternsPageContent() {
                             {patterns.map(p => (
                                 <div key={p.id} className="flex items-center space-x-2">
                                     <RadioGroupItem value={p.id} id={`pattern-${p.id}`} />
-                                    <Label htmlFor={`pattern-${p.id}`}>Edit Pattern: <span className="font-semibold">{p.name}</span></Label>
+                                    <Label htmlFor={`pattern-${p.id}`} className="truncate">Edit Pattern: <span className="font-semibold" title={p.name}>{p.name}</span></Label>
                                 </div>
                             ))}
                         </RadioGroup>
@@ -443,8 +424,12 @@ function PatternsPageContent() {
                         {!selectedPatternToUpdate && (
                             <div className="space-y-4 pl-6 border-l-2 ml-2">
                                 <div>
-                                    <Label htmlFor="pattern-name">New Pattern Name</Label>
-                                    <Input id="pattern-name" value={newPatternName} onChange={e => setNewPatternName(e.target.value)} placeholder="e.g., Energy Feeders" />
+                                    <Label htmlFor="pattern-action">Action</Label>
+                                    <Input id="pattern-action" value={newPatternAction} onChange={e => setNewPatternAction(e.target.value)} placeholder="e.g., Late Night Snacking" />
+                                </div>
+                                <div>
+                                    <Label htmlFor="pattern-outcome">causes → Outcome</Label>
+                                    <Input id="pattern-outcome" value={newPatternOutcome} onChange={e => setNewPatternOutcome(e.target.value)} placeholder="e.g., Low Energy" />
                                 </div>
                                 <div>
                                     <Label>Pattern Type</Label>
@@ -508,7 +493,7 @@ function PatternsPageContent() {
                                                             ) : (
                                                                 <div className="flex items-center gap-2">
                                                                     <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'}>{p.type}</Badge>
-                                                                    <span className="font-semibold">{p.name}</span>
+                                                                    <span className="font-semibold truncate" title={p.name}>{p.name}</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -718,3 +703,6 @@ export default function PatternsPage() {
 
 
 
+
+
+    
