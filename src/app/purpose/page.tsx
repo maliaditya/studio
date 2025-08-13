@@ -76,6 +76,7 @@ function PurposePageContent() {
         projects,
         setProjects,
         patterns,
+        setPatterns,
         metaRules,
         setMetaRules,
         generalPopups,
@@ -145,7 +146,8 @@ function PurposePageContent() {
 
     const handleSaveEquation = (pillar: string, equation: Omit<HabitEquation, 'id'>) => {
         setPillarEquations(prev => {
-            const newEquationsForPillar = [...(prev[pillar] || [])];
+            const newEquations = { ...prev };
+            const newEquationsForPillar = [...(newEquations[pillar] || [])];
             if (equationPopupState.equation?.id) { // Editing existing
                 const index = newEquationsForPillar.findIndex(eq => eq.id === equationPopupState.equation!.id);
                 if (index > -1) {
@@ -154,7 +156,8 @@ function PurposePageContent() {
             } else { // Adding new
                 newEquationsForPillar.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
             }
-            return { ...prev, [pillar]: newEquationsForPillar };
+            newEquations[pillar] = newEquationsForPillar;
+            return newEquations;
         });
         setEquationPopupState({ pillar: '', isOpen: false });
     };
@@ -277,6 +280,20 @@ function PurposePageContent() {
                             {purposeStatement || "Click to define your purpose..."}
                         </p>
                     )}
+                </CardContent>
+            </Card>
+
+            <Card className="shadow-lg">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                        <DollarSign className="h-6 w-6 text-primary" />
+                        Monetization
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-lg text-muted-foreground">
+                        Monetization can happen if you have a skill that serves a product that reduces strain on human body or mind in work which he needs to do every day manually. Products either assist or automate, so to earn money you need a skill that serves such a product.
+                    </p>
                 </CardContent>
             </Card>
 
@@ -411,9 +428,9 @@ function PurposePageContent() {
                                                                                 <div className="pt-2 border-t mt-2">
                                                                                     <div className="font-semibold text-foreground">Habit: {
                                                                                         linkedHabits.length > 1 ? (
-                                                                                            <div><ul className="list-disc list-inside font-normal text-muted-foreground">
+                                                                                            <ul className="list-disc list-inside font-normal text-muted-foreground">
                                                                                                 {linkedHabits.map(h => <li key={h.id}>{h.name}</li>)}
-                                                                                            </ul></div>
+                                                                                            </ul>
                                                                                         ) : (
                                                                                             <span className="font-normal">{linkedHabits[0].name}</span>
                                                                                         )
@@ -651,6 +668,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
