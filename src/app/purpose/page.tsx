@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -215,8 +215,10 @@ function PurposePageContent() {
     }
     
     const uncategorizedRules = useMemo(() => {
-      return metaRules.filter(r => !r.purposePillar);
-    }, [metaRules]);
+      const allRuleIdsInEquations = Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds);
+      const ruleIdSet = new Set(allRuleIdsInEquations);
+      return metaRules.filter(r => !r.purposePillar && !ruleIdSet.has(r.id));
+    }, [metaRules, pillarEquations]);
 
     const uncategorizedSkills = useMemo(() => {
         return specializations.filter(s => !s.purposePillar);
@@ -627,4 +629,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
