@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import type { ProductizationPlan } from '@/types/workout';
+import type { ProductizationPlan, Project } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
@@ -22,43 +22,48 @@ interface MatrixRow {
 }
 
 function MatrixPageContent() {
-  const { deepWorkTopicMetadata, productizationPlans, offerizationPlans } = useAuth();
+  const { projects, offerizationPlans } = useAuth();
 
   const matrixData = useMemo(() => {
     const data: MatrixRow[] = [];
 
-    Object.entries(deepWorkTopicMetadata).forEach(([topic, metadata]) => {
-      let plan: ProductizationPlan | undefined;
-      let format: string | string[] = '-';
-      
-      if (metadata.classification === 'product') {
-        plan = productizationPlans[topic];
-        if (plan) {
-            format = plan.productType || '-';
-        }
-      } else if (metadata.classification === 'service') {
-        plan = offerizationPlans[topic];
-        if (plan) {
-            format = plan.offerTypes || [];
-        }
-      }
-
+    // Process Products from the new `projects` state
+    (projects || []).forEach((project) => {
+      const plan = project; // The project itself now holds the plan data
       if (plan && plan.gapAnalysis) {
-        const isDefined = metadata.classification === 'product'
-            ? !!plan.productType
-            : !!(plan.offerTypes && plan.offerTypes.length > 0);
-
-        const status: MatrixRow['status'] = (plan.versions && plan.versions.length > 0)
-          ? 'In Progress'
-          : isDefined ? 'Defined' : 'Planning';
+        const isDefined = !!plan.productType;
+        const status: MatrixRow['status'] = (plan.releases && plan.releases.length > 0)
+            ? 'In Progress'
+            : isDefined ? 'Defined' : 'Planning';
         
         data.push({
-          topic,
-          classification: metadata.classification,
+          topic: project.name,
+          classification: 'product',
           gapTypes: plan.gapAnalysis.gapTypes || [],
           whatYouCanFill: plan.gapAnalysis.whatYouCanFill || '-',
           coreSolution: plan.gapAnalysis.coreSolution || '-',
-          format,
+          format: plan.productType || '-',
+          status,
+          outcomeGoal: plan.gapAnalysis.outcomeGoal || '-',
+        });
+      }
+    });
+
+    // Process Services from `offerizationPlans`
+    Object.entries(offerizationPlans || {}).forEach(([topic, plan]) => {
+      if (plan && plan.gapAnalysis) {
+        const isDefined = !!(plan.offerTypes && plan.offerTypes.length > 0);
+        const status: MatrixRow['status'] = (plan.releases && plan.releases.length > 0)
+          ? 'In Progress'
+          : isDefined ? 'Defined' : 'Planning';
+
+        data.push({
+          topic: topic,
+          classification: 'service',
+          gapTypes: plan.gapAnalysis.gapTypes || [],
+          whatYouCanFill: plan.gapAnalysis.whatYouCanFill || '-',
+          coreSolution: plan.gapAnalysis.coreSolution || '-',
+          format: plan.offerTypes || [],
           status,
           outcomeGoal: plan.gapAnalysis.outcomeGoal || '-',
         });
@@ -66,7 +71,7 @@ function MatrixPageContent() {
     });
 
     return data;
-  }, [deepWorkTopicMetadata, productizationPlans, offerizationPlans]);
+  }, [projects, offerizationPlans]);
   
   const renderTextAsList = (text: string, className?: string) => {
     if (!text || text.trim() === '-' || text.trim() === '') {
