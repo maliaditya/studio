@@ -8,12 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation } from '@/types/workout';
 import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -42,7 +42,9 @@ function PurposePageContent() {
         setMetaRules,
         generalPopups,
         handlePopupDragEnd,
-        openRuleDetailPopup, ruleDetailPopup
+        openRuleDetailPopup, ruleDetailPopup,
+        pillarEquations, setPillarEquations,
+        habitCards,
     } = useAuth();
     const { toast } = useToast();
 
@@ -52,6 +54,8 @@ function PurposePageContent() {
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
+    const [equationPopupState, setEquationPopupState] = useState<{ pillar: string; equation?: HabitEquation; isOpen: boolean }>({ pillar: '', isOpen: false });
+
     useEffect(() => {
         setPurposeInput(purposeStatement);
     }, [purposeStatement]);
@@ -95,6 +99,37 @@ function PurposePageContent() {
         e.stopPropagation();
         setMetaRules(prev => prev.filter(r => r.id !== ruleId));
     };
+
+    const handleOpenEquationPopup = (pillar: string, equation?: HabitEquation) => {
+        setEquationPopupState({ pillar, equation, isOpen: true });
+    };
+
+    const handleSaveEquation = (pillar: string, equation: Omit<HabitEquation, 'id'>) => {
+        setPillarEquations(prev => {
+            const newEquations = { ...prev };
+            const pillarEqs = newEquations[pillar] || [];
+            if (equationPopupState.equation?.id) { // Editing existing
+                const index = pillarEqs.findIndex(eq => eq.id === equationPopupState.equation!.id);
+                if (index > -1) {
+                    pillarEqs[index] = { ...equationPopupState.equation, ...equation };
+                }
+            } else { // Adding new
+                pillarEqs.push({ id: `eq_${Date.now()}`, ...equation });
+            }
+            newEquations[pillar] = pillarEqs;
+            return newEquations;
+        });
+        setEquationPopupState({ pillar: '', isOpen: false });
+    };
+
+    const handleDeleteEquation = (pillar: string, equationId: string) => {
+        setPillarEquations(prev => {
+            const newEquations = { ...prev };
+            newEquations[pillar] = (newEquations[pillar] || []).filter(eq => eq.id !== equationId);
+            return newEquations;
+        });
+    };
+
 
     const pillars = [
         { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
@@ -190,97 +225,135 @@ function PurposePageContent() {
                 </CardContent>
             </Card>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pillars.map(pillar => {
                     const rulesForPillar = metaRules.filter(r => r.purposePillar === pillar.name || pillar.attributes.includes(r.purposePillar || ''));
                     const skillsForPillar = specializations.filter(s => s.purposePillar === pillar.name || pillar.attributes.includes(s.purposePillar || ''));
                     const projectsForPillar = projects.filter(p => p.purposePillar === pillar.name || pillar.attributes.includes(p.purposePillar || ''));
+                    const equationsForPillar = pillarEquations[pillar.name] || [];
                     
                     return (
                         <Card key={pillar.name}>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-3 text-xl">{pillar.icon}{pillar.name}</CardTitle>
                             </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div>
-                                    <h4 className="font-semibold text-sm mb-2">Meta-Rules</h4>
-                                    <div className="space-y-1">
-                                        {rulesForPillar.length > 0 ? (
-                                            rulesForPillar.map(renderMetaRule)
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground text-center py-4">No rules assigned.</p>
-                                        )}
+                            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                                <div className='space-y-4'>
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Meta-Rules</h4>
+                                        <div className="space-y-1">
+                                            {rulesForPillar.length > 0 ? (
+                                                rulesForPillar.map(renderMetaRule)
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-2">No rules assigned.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Separator />
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Specializations</h4>
+                                        <div className="space-y-1">
+                                            {skillsForPillar.length > 0 ? (
+                                                skillsForPillar.map(skill => (
+                                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                        <span>{skill.name}</span>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                                <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                {pillars.map(p => (
+                                                                    <DropdownMenuGroup key={p.name}>
+                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
+                                                                            {p.name}
+                                                                        </DropdownMenuItem>
+                                                                        {p.attributes.map(attr => (
+                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
+                                                                                {attr}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
+                                                                    </DropdownMenuGroup>
+                                                                ))}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-2">No skills assigned.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <Separator />
+                                    <div>
+                                        <h4 className="font-semibold text-sm mb-2">Projects</h4>
+                                        <div className="space-y-1">
+                                            {projectsForPillar.length > 0 ? (
+                                                projectsForPillar.map(project => (
+                                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                        <span>{project.name}</span>
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                                                <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent>
+                                                                {pillars.map(p => (
+                                                                    <DropdownMenuGroup key={p.name}>
+                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
+                                                                            {p.name}
+                                                                        </DropdownMenuItem>
+                                                                        {p.attributes.map(attr => (
+                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
+                                                                                {attr}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
+                                                                    </DropdownMenuGroup>
+                                                                ))}
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground text-center py-2">No projects assigned.</p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <Separator />
-                                <div>
-                                    <h4 className="font-semibold text-sm mb-2">Specializations</h4>
-                                    <div className="space-y-1">
-                                        {skillsForPillar.length > 0 ? (
-                                            skillsForPillar.map(skill => (
-                                                <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                    <span>{skill.name}</span>
-                                                     <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                            <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent>
-                                                            {pillars.map(p => (
-                                                                <DropdownMenuGroup key={p.name}>
-                                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
-                                                                        {p.name}
-                                                                    </DropdownMenuItem>
-                                                                    {p.attributes.map(attr => (
-                                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
-                                                                            {attr}
-                                                                        </DropdownMenuItem>
-                                                                    ))}
-                                                                </DropdownMenuGroup>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground text-center py-4">No skills assigned.</p>
-                                        )}
+                                
+                                <div className="border-l pl-6">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h4 className="font-semibold text-sm">Habit Equations</h4>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEquationPopup(pillar.name)}>
+                                            <PlusCircle className="h-4 w-4 text-green-500"/>
+                                        </Button>
                                     </div>
-                                </div>
-                                 <Separator />
-                                <div>
-                                    <h4 className="font-semibold text-sm mb-2">Projects</h4>
-                                    <div className="space-y-1">
-                                        {projectsForPillar.length > 0 ? (
-                                            projectsForPillar.map(project => (
-                                                <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                    <span>{project.name}</span>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                            <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent>
-                                                            {pillars.map(p => (
-                                                                <DropdownMenuGroup key={p.name}>
-                                                                    <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
-                                                                        {p.name}
-                                                                    </DropdownMenuItem>
-                                                                    {p.attributes.map(attr => (
-                                                                        <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
-                                                                            {attr}
-                                                                        </DropdownMenuItem>
-                                                                    ))}
-                                                                </DropdownMenuGroup>
-                                                            ))}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </div>
-                                            ))
+                                    <div className="space-y-2">
+                                        {equationsForPillar.length > 0 ? (
+                                            equationsForPillar.map(eq => {
+                                                const habit1 = habitCards.find(h => h.id === eq.habit1Id);
+                                                const habit2 = habitCards.find(h => h.id === eq.habit2Id);
+                                                return (
+                                                    <div key={eq.id} className="text-xs p-2 rounded-md border bg-muted/30 group relative" onClick={() => handleOpenEquationPopup(pillar.name, eq)}>
+                                                        <p>
+                                                            <span className="font-medium text-primary">{habit1?.name || 'Habit 1'}</span>
+                                                            <span className="mx-1 text-muted-foreground">+</span>
+                                                            <span className="font-medium text-primary">{habit2?.name || 'Habit 2'}</span>
+                                                        </p>
+                                                        <p className="flex items-center gap-1">
+                                                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                                                            <span>{eq.outcome}</span>
+                                                        </p>
+                                                        <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id)}}>
+                                                            <Trash2 className="h-3 w-3 text-destructive"/>
+                                                        </Button>
+                                                    </div>
+                                                )
+                                            })
                                         ) : (
-                                            <p className="text-xs text-muted-foreground text-center py-4">No projects assigned.</p>
+                                            <p className="text-xs text-muted-foreground text-center py-4">No equations defined.</p>
                                         )}
                                     </div>
                                 </div>
@@ -391,8 +464,89 @@ function PurposePageContent() {
                   </div>
               </div>
             )}
+            {equationPopupState.isOpen && (
+                <EquationEditor
+                    isOpen={equationPopupState.isOpen}
+                    onOpenChange={() => setEquationPopupState({ pillar: '', isOpen: false })}
+                    pillarName={equationPopupState.pillar}
+                    equation={equationPopupState.equation}
+                    onSave={handleSaveEquation}
+                    habitCards={habitCards}
+                />
+            )}
         </div>
     );
+}
+
+const EquationEditor = ({ isOpen, onOpenChange, pillarName, equation, onSave, habitCards }: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    pillarName: string;
+    equation?: HabitEquation;
+    onSave: (pillar: string, equation: Omit<HabitEquation, 'id'>) => void;
+    habitCards: Resource[];
+}) => {
+    const [habit1Id, setHabit1Id] = useState('');
+    const [habit2Id, setHabit2Id] = useState('');
+    const [outcome, setOutcome] = useState('');
+
+    useEffect(() => {
+        if (equation) {
+            setHabit1Id(equation.habit1Id);
+            setHabit2Id(equation.habit2Id);
+            setOutcome(equation.outcome);
+        } else {
+            setHabit1Id('');
+            setHabit2Id('');
+            setOutcome('');
+        }
+    }, [equation, isOpen]);
+
+    const handleSaveClick = () => {
+        if (!habit1Id || !habit2Id || !outcome.trim()) {
+            alert('Please fill out all fields.');
+            return;
+        }
+        onSave(pillarName, { habit1Id, habit2Id, outcome: outcome.trim() });
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{equation ? 'Edit' : 'Create'} Habit Equation for {pillarName}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-1">
+                        <Label>Habit 1</Label>
+                        <Select value={habit1Id} onValueChange={setHabit1Id}>
+                            <SelectTrigger><SelectValue placeholder="Select first habit..."/></SelectTrigger>
+                            <SelectContent>
+                                {habitCards.map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1">
+                        <Label>Habit 2</Label>
+                        <Select value={habit2Id} onValueChange={setHabit2Id}>
+                            <SelectTrigger><SelectValue placeholder="Select second habit..."/></SelectTrigger>
+                            <SelectContent>
+                                {habitCards.filter(h => h.id !== habit1Id).map(h => <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-1">
+                        <Label>Expected Outcome</Label>
+                        <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="e.g., Increased morning focus"/>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleSaveClick}>Save Equation</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
 }
 
 export default function PurposePage() {
@@ -402,3 +556,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+

@@ -417,6 +417,13 @@ export interface Position {
 }
 
 // Purpose & Patterns Data
+export interface HabitEquation {
+  id: string;
+  habit1Id: string;
+  habit2Id: string;
+  outcome: string;
+}
+
 export interface PurposeData {
   statement: string;
   specializationPurposes: Record<string, string>; // Key is CoreSkill ID

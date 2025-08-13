@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -227,6 +227,8 @@ interface AuthContextType {
   setPatterns: React.Dispatch<React.SetStateAction<Pattern[]>>;
   metaRules: MetaRule[];
   setMetaRules: React.Dispatch<React.SetStateAction<MetaRule[]>>;
+  pillarEquations: Record<string, HabitEquation[]>;
+  setPillarEquations: React.Dispatch<React.SetStateAction<Record<string, HabitEquation[]>>>;
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
@@ -385,6 +387,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
+  const [pillarEquations, setPillarEquations] = useState<Record<string, HabitEquation[]>>({});
 
 
   // Persisted task state
@@ -528,6 +531,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       try { const d = loadItem(`patterns_${username}`); setPatterns(d ? JSON.parse(d) : []); } catch(e) { setPatterns([]); }
       try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
+      try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
 
 
       // Persisted task state
@@ -548,7 +552,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
       const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
-      // Auto Suggestion Data
+      // Auto Suggestion
       try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
 
     } else {
@@ -571,7 +575,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSkillDomains([]); setCoreSkills([]); setProjects([]);
       setCompanies([]); setPositions([]);
       setPurposeStatement(''); setSpecializationPurposes({});
-      setPatterns([]); setMetaRules([]);
+      setPatterns([]); setMetaRules([]); setPillarEquations({});
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
@@ -644,6 +648,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`purpose_data_${username}`, JSON.stringify({ statement: purposeStatement, specializationPurposes }));
       localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
       localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
+      localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
       
       // Persisted task state
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
@@ -656,7 +661,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
       if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
 
-      // Auto Suggestion Data
+      // Auto Suggestion
       localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
     }
   }, [
@@ -670,7 +675,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    purposeStatement, specializationPurposes, patterns, metaRules,
+    purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
     autoSuggestions
@@ -843,6 +848,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSpecializationPurposes(purposeData.specializationPurposes || {});
     setPatterns(data.patterns || []);
     setMetaRules(data.metaRules || []);
+    setPillarEquations(data.pillarEquations || {});
     
     // Auto Suggestion
     setAutoSuggestions(data.autoSuggestions || {});
@@ -907,7 +913,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       skillDomains, coreSkills, projects,
       companies, positions,
       purposeData: { statement: purposeStatement, specializationPurposes },
-      patterns, metaRules,
+      patterns, metaRules, pillarEquations,
       // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask,
@@ -1856,6 +1862,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     specializationPurposes, setSpecializationPurposes,
     patterns, setPatterns,
     metaRules, setMetaRules,
+    pillarEquations, setPillarEquations,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     microSkillMap,
@@ -1881,3 +1888,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
