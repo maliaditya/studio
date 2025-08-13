@@ -30,41 +30,33 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
     
     const colors = type === 'Positive' ? positiveColors : negativeColors;
 
-    if (parts.length === 3) { // Action → Cause → Outcome
+    if (parts.length >= 3) {
+      const primaryAction = parts[0];
+      const primaryCause = parts[1];
+      const outcome = parts[parts.length - 1];
+
+      if (parts.length >= 5) { // secondary action/cause exists
+        const secondaryAction = parts[2];
+        const secondaryCause = parts[3];
         return (
-            <span className="font-semibold">
-                <span className={colors[0]}>{parts[0]}</span>
-                <span className="text-muted-foreground mx-1">→</span>
-                <span className={colors[0]}>{parts[1]}</span>
-                <span className="text-muted-foreground mx-1">→</span>
-                <span className={colors[2]}>{parts[2]}</span>
-            </span>
-        );
-    }
-    
-    if (parts.length === 5) { // Action → Cause → Action → Cause → Outcome
-        return (
-            <span className="font-semibold">
-                {/* Group 1 */}
-                <span className={colors[0]}>{parts[0]}</span>
-                <span className="text-muted-foreground mx-1">→</span>
-                <span className={colors[0]}>{parts[1]}</span>
-
-                {/* Separator */}
-                <span className="text-muted-foreground mx-2 font-bold">→</span>
-
-                {/* Group 2 */}
-                <span className={colors[1]}>{parts[2]}</span>
-                <span className="text-muted-foreground mx-1">→</span>
-                <span className={colors[1]}>{parts[3]}</span>
-                
-                {/* Separator */}
-                <span className="text-muted-foreground mx-2 font-bold">→</span>
-
-                {/* Group 3 */}
-                <span className={colors[2]}>{parts[4]}</span>
-            </span>
+          <span className="font-semibold">
+            <span className={colors[0]}>{primaryAction} + {primaryCause}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[1]}>{secondaryAction} + {secondaryCause}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[2]}>{outcome}</span>
+          </span>
         )
+
+      } else { // only primary action/cause
+        return (
+          <span className="font-semibold">
+            <span className={colors[0]}>{primaryAction} + {primaryCause}</span>
+            <span className="text-muted-foreground mx-1">→</span>
+            <span className={colors[2]}>{outcome}</span>
+          </span>
+        )
+      }
     }
 
     // Fallback for any other format
@@ -137,7 +129,6 @@ function PatternsPageContent() {
     }, [resources]);
     
     const aggregatedFields = useMemo(() => {
-        // Step 1: Collect all possible phrases from all mechanisms.
         const allPossiblePhrases: PatternPhrase[] = [];
         mechanismCards.forEach(card => {
             if (card.mechanismFramework === 'positive') {
@@ -151,7 +142,6 @@ function PatternsPageContent() {
             }
         });
 
-        // Step 2: Determine which habits and phrases to display based on the current mode (create new vs. edit).
         let habitsToDisplay: Resource[];
         
         if (selectedPatternToUpdate) {
@@ -744,39 +734,54 @@ function PatternsPageContent() {
                                 {metaRules.map(rule => {
                                     const pattern = patterns.find(p => p.id === rule.patternId);
                                     return (
-                                        <div key={rule.id} className="p-3 rounded-md border bg-muted/30 flex justify-between items-center group">
-                                            <div>
-                                                <p className="font-medium">{rule.text}</p>
-                                                {pattern && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        Based on pattern: <FormattedPatternName name={pattern.name} type={pattern.type} />
-                                                    </p>
-                                                )}
-                                            </div>
-                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                            <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent className="w-56">
-                                                        {pillars.map(pillar => (
-                                                            <DropdownMenuGroup key={pillar.name}>
-                                                                <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name)}>
-                                                                    {pillar.name}
-                                                                </DropdownMenuItem>
-                                                                {pillar.attributes.map(attr => (
-                                                                    <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(rule.id, attr)} className="pl-6">
-                                                                        {attr}
-                                                                    </DropdownMenuItem>
+                                        <Dialog key={rule.id}>
+                                            <DialogTrigger asChild>
+                                                <div className="p-3 rounded-md border bg-muted/30 flex justify-between items-center group cursor-pointer">
+                                                    <p className="font-medium">{rule.text}</p>
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Badge className="capitalize">{rule.purposePillar?.[0] || '?'}</Badge>
+                                                    </div>
+                                                </div>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Meta-Rule Details</DialogTitle>
+                                                </DialogHeader>
+                                                <div className="space-y-4">
+                                                    <p className="font-semibold text-lg">{rule.text}</p>
+                                                    {pattern && (
+                                                        <div>
+                                                            <h4 className="font-semibold text-muted-foreground">Based on Pattern:</h4>
+                                                            <div className="p-2 rounded-md bg-muted/50 mt-1">
+                                                                <FormattedPatternName name={pattern.name} type={pattern.type} />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                     <div>
+                                                        <Label>Assign to Pillar</Label>
+                                                         <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="outline" className="w-full justify-start mt-1">{rule.purposePillar || 'Select Pillar...'}</Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent className="w-56">
+                                                                {pillars.map(pillar => (
+                                                                    <DropdownMenuGroup key={pillar.name}>
+                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(rule.id, pillar.name)}>
+                                                                            {pillar.name}
+                                                                        </DropdownMenuItem>
+                                                                        {pillar.attributes.map(attr => (
+                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(rule.id, attr)} className="pl-6">
+                                                                                {attr}
+                                                                            </DropdownMenuItem>
+                                                                        ))}
+                                                                    </DropdownMenuGroup>
                                                                 ))}
-                                                            </DropdownMenuGroup>
-                                                        ))}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                        </div>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
                                     )
                                 })}
                             </div>
@@ -876,6 +881,7 @@ export default function PatternsPage() {
 
 
     
+
 
 
 
