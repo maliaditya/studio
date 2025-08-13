@@ -194,20 +194,27 @@ function PurposePageContent() {
     const handleAcquisitionPlanRuleLink = (specializationId: string, ruleId: string) => {
         setSkillAcquisitionPlans(prev => {
             const index = prev.findIndex(p => p.specializationId === specializationId);
+            let planToUpdate: SkillAcquisitionPlan;
+            if (index > -1) {
+                planToUpdate = { ...prev[index] };
+            } else {
+                planToUpdate = { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [] };
+            }
+    
+            const newLinkedIds = (planToUpdate.linkedRuleEquationIds || []).includes(ruleId)
+                ? (planToUpdate.linkedRuleEquationIds || []).filter(id => id !== ruleId)
+                : [...(planToUpdate.linkedRuleEquationIds || []), ruleId];
+            planToUpdate.linkedRuleEquationIds = newLinkedIds;
+    
             if (index > -1) {
                 const updatedPlans = [...prev];
-                const plan = updatedPlans[index];
-                const newLinkedIds = (plan.linkedRuleEquationIds || []).includes(ruleId)
-                    ? (plan.linkedRuleEquationIds || []).filter(id => id !== ruleId)
-                    : [...(plan.linkedRuleEquationIds || []), ruleId];
-                updatedPlans[index] = { ...plan, linkedRuleEquationIds: newLinkedIds };
+                updatedPlans[index] = planToUpdate;
                 return updatedPlans;
             } else {
-                return [...prev, { specializationId, targetDate: '', requiredMoney: null, requiredHours: null, linkedRuleEquationIds: [ruleId] }];
+                return [...prev, planToUpdate];
             }
         });
     };
-
 
     const pillars = [
         { name: 'Mind', icon: <Brain className="h-6 w-6 text-blue-500" />, attributes: ['Focus', 'Learning', 'Creativity'] },
@@ -259,27 +266,37 @@ function PurposePageContent() {
         pillars.forEach(pillar => {
             const allPillarNames = [pillar.name, ...pillar.attributes];
             
-            const processItems = (items: (MetaRule | CoreSkill | Project)[], type: 'meta-rule' | 'specialization' | 'project') => {
-                items.forEach(item => {
-                    if (item.purposePillar && allPillarNames.includes(item.purposePillar)) {
-                        assignedItemIds.add(item.id);
-                    }
-                });
-            };
+            metaRules.forEach(item => {
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) {
+                    assignedItemIds.add(item.id);
+                }
+            });
             
-            processItems(metaRules, 'meta-rule');
-            processItems(specializations, 'specialization');
-            processItems(projects, 'project');
+            specializations.forEach(item => {
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) {
+                    assignedItemIds.add(item.id);
+                }
+            });
+
+            projects.forEach(item => {
+                if (item.purposePillar && allPillarNames.includes(item.purposePillar)) {
+                    assignedItemIds.add(item.id);
+                }
+            });
 
             const equationsForPillar = pillarEquations[pillar.name] || [];
             equationsForPillar.forEach(eq => {
-                (eq.metaRuleIds || []).forEach(ruleId => assignedItemIds.add(ruleId));
+                (eq.metaRuleIds || []).forEach(ruleId => {
+                    if (metaRules.find(r => r.id === ruleId)) {
+                        assignedItemIds.add(ruleId);
+                    }
+                });
             });
         });
 
-        const uncategorizedRules = metaRules.filter(r => !r.purposePillar);
-        const uncategorizedSkills = specializations.filter(s => !s.purposePillar);
-        const uncategorizedProjects = projects.filter(p => !p.purposePillar);
+        const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
+        const uncategorizedSkills = specializations.filter(s => !assignedItemIds.has(s.id));
+        const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
     }, [metaRules, specializations, projects, pillars, pillarEquations]);
@@ -332,7 +349,7 @@ function PurposePageContent() {
                 </CardHeader>
                 <CardContent>
                     <p className="text-lg text-muted-foreground">
-                        Monetization can happen if you have a skill that serves a product that reduces strain on human body or mind in work which he needs to do every day manually. Products either assist or automate, so to earn money you need a skill that serves such a product.
+                        Monetization can happen if you have a skill that serves a product that reduces strain on human body or mind in work which he needs to do every day manually. Products either assist or automate, so to earn money you need a skill that serve such a product.
                     </p>
                 </CardContent>
             </Card>
@@ -368,11 +385,10 @@ function PurposePageContent() {
                                         <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
                                     </PopoverTrigger>
                                     <PopoverContent className="w-80">
-                                        <div className="space-y-2">
-                                            {Object.entries(pillarEquations).map(([pillar, equations]) => (
-                                                <div key={pillar}>
-                                                    <h4 className="font-semibold text-sm">{pillar}</h4>
-                                                    {equations.map(eq => {
+                                        <ScrollArea className="h-60">
+                                            <div className="space-y-2 p-1">
+                                                {Object.entries(pillarEquations).flatMap(([pillar, equations]) => 
+                                                    equations.map(eq => {
                                                         const isSelected = (skillAcquisitionPlans.find(p => p.specializationId === selectedPlanSpecId)?.linkedRuleEquationIds || []).includes(eq.id);
                                                         return (
                                                         <div key={eq.id} className="flex items-center space-x-2 p-1">
@@ -384,10 +400,10 @@ function PurposePageContent() {
                                                             <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
                                                         </div>
                                                         )
-                                                    })}
-                                                </div>
-                                            ))}
-                                        </div>
+                                                    })
+                                                )}
+                                            </div>
+                                        </ScrollArea>
                                     </PopoverContent>
                                 </Popover>
                                 <div className="space-y-2 pt-2 border-t">
@@ -431,6 +447,63 @@ function PurposePageContent() {
                     )}
                 </CardContent>
             </Card>
+
+            {skillAcquisitionPlans.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-bold tracking-tight">Your Acquisition Plans</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {skillAcquisitionPlans.map(plan => {
+                            const spec = specializations.find(s => s.id === plan.specializationId);
+                            if (!spec) return null;
+                            
+                            const linkedEquations = (plan.linkedRuleEquationIds || []).map(id => {
+                                for (const pillar in pillarEquations) {
+                                    const found = pillarEquations[pillar].find(eq => eq.id === id);
+                                    if (found) return found;
+                                }
+                                return null;
+                            }).filter((eq): eq is HabitEquation => !!eq);
+
+                            return (
+                                <Card key={plan.specializationId}>
+                                    <CardHeader>
+                                        <CardTitle>{spec.name}</CardTitle>
+                                        <CardDescription>Acquisition Plan</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Target/> Required State</h4>
+                                            {linkedEquations.length > 0 ? (
+                                                <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                                                    {linkedEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
+                                                </ul>
+                                            ) : <p className="text-xs text-muted-foreground">No state linked.</p>}
+                                        </div>
+                                        <Separator />
+                                        <div>
+                                            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package/> Required Resources</h4>
+                                            <ul className="text-xs space-y-1">
+                                                <li className="flex justify-between">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4"/> Target Date:</span>
+                                                    <span className="font-medium">{plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}</span>
+                                                </li>
+                                                <li className="flex justify-between">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4"/> Money Needed:</span>
+                                                    <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
+                                                </li>
+                                                <li className="flex justify-between">
+                                                    <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4"/> Energy Needed:</span>
+                                                    <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pillars.map(pillar => {
@@ -803,6 +876,7 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
 
