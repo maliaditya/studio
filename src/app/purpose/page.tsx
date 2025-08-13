@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -215,16 +214,13 @@ function PurposePageContent() {
     }
     
     const uncategorizedItems = useMemo(() => {
-        const categorizedRuleIds = new Set(Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds));
-        const categorizedSkillIds = new Set(coreSkills.filter(s => s.purposePillar).map(s => s.id));
-        const categorizedProjectIds = new Set(projects.filter(p => p.purposePillar).map(p => p.id));
-        
-        const uncategorizedRules = metaRules.filter(r => !r.purposePillar && !categorizedRuleIds.has(r.id));
-        const uncategorizedSkills = specializations.filter(s => !s.purposePillar && !categorizedSkillIds.has(s.id));
-        const uncategorizedProjects = projects.filter(p => !p.purposePillar && !categorizedProjectIds.has(p.id));
+        const uncategorizedRules = metaRules.filter(r => !r.purposePillar);
+        const uncategorizedSkills = specializations.filter(s => !s.purposePillar);
+        const uncategorizedProjects = projects.filter(p => !p.purposePillar);
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
-    }, [metaRules, coreSkills, projects, pillarEquations, specializations]);
+    }, [metaRules, specializations, projects]);
+
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -370,7 +366,7 @@ function PurposePageContent() {
                                     </div>
                                     <div className="space-y-2">
                                         {equationsForPillar.map(eq => {
-                                            const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter(Boolean);
+                                            const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter((r): r is MetaRule => !!r);
                                             return (
                                                 <div key={eq.id} className="group relative">
                                                     <div className="p-2 rounded-md border bg-muted/30">
@@ -626,6 +622,3 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
-
-
