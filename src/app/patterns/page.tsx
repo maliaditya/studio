@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -102,13 +103,19 @@ function PatternsPageContent() {
                 linkedMechanisms: linkedMechanisms.map(m => m.name) // Storing names for display
             });
         });
+        
+        const usedHabitCardIds = new Set(
+            patterns.flatMap(p => p.phrases)
+                    .filter(phrase => phrase.category === 'Habit Cards')
+                    .map(phrase => phrase.mechanismCardId)
+        );
 
         Object.keys(fields).forEach(key => {
             const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
             if (key !== 'Habit Cards') {
                 fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
-                 fields[key] = uniquePhrases;
+                 fields[key] = uniquePhrases.filter(phrase => !usedHabitCardIds.has(phrase.mechanismCardId));
             }
         });
 
@@ -445,7 +452,7 @@ function PatternsPageContent() {
                                                 <div className="flex flex-row items-center justify-between">
                                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                                         <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                        <div className="flex-grow">
+                                                        <div className="flex-grow cursor-pointer" onClick={() => handleStartEditPattern(p)}>
                                                             {editingPatternId === p.id ? (
                                                                 <Input 
                                                                     value={editingPatternName}
@@ -456,7 +463,7 @@ function PatternsPageContent() {
                                                                     autoFocus
                                                                 />
                                                             ) : (
-                                                                <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleStartEditPattern(p)}>
+                                                                <div className="flex items-center gap-2">
                                                                     <Badge variant={p.type === 'Positive' ? 'default' : 'destructive'}>{p.type}</Badge>
                                                                     <span className="font-semibold">{p.name}</span>
                                                                 </div>
@@ -590,3 +597,4 @@ export default function PatternsPage() {
     );
 }
     
+
