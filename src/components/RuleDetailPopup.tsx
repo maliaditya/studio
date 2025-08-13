@@ -7,20 +7,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow } from 'lucide-react';
 import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState } from '@/types/workout';
-import { DndContext, type DragEndEvent, useDraggable } from '@dnd-kit/core';
+import { useDraggable } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format, subDays, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
-import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 
 
 interface LogicDiagramPopupState {
@@ -197,47 +194,47 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base">Manage Resistance</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
-                    </div>
-                     <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
-                    <div>
-                        <Label htmlFor="management-strategy">How will you manage this?</Label>
-                        <Textarea 
-                            id="management-strategy" 
-                            value={managementStrategy}
-                            onChange={(e) => setManagementStrategy(e.target.value)}
-                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                        <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                            <SelectTrigger id="linked-resource">
-                                <SelectValue placeholder="Select a resource..." />
-                            </SelectTrigger>
-                            <SelectContent side="right" align="start" sideOffset={5}>
-                                <SelectItem value="none">-- None --</SelectItem>
-                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-                <CardFooter className="p-3 flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                </CardFooter>
-            </Card>
-        </div>
+            <div ref={setNodeRef} style={style} {...attributes}>
+                <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                    <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base">Manage Resistance</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
+                        </div>
+                        <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-4">
+                        <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
+                        <div>
+                            <Label htmlFor="management-strategy">How will you manage this?</Label>
+                            <Textarea 
+                                id="management-strategy" 
+                                value={managementStrategy}
+                                onChange={(e) => setManagementStrategy(e.target.value)}
+                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                            <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                                <SelectTrigger id="linked-resource">
+                                    <SelectValue placeholder="Select a resource..." />
+                                </SelectTrigger>
+                                <SelectContent side="right" align="start" sideOffset={5}>
+                                    <SelectItem value="none">-- None --</SelectItem>
+                                    {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                        <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="p-3 flex justify-end gap-2">
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                    </CardFooter>
+                </Card>
+            </div>
     );
 };
 
@@ -558,7 +555,7 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
                                                         </p>
                                                     </div>
                                                     <div className="pt-2 mt-2">
-                                                    <Tabs defaultValue="resistance" className="w-full">
+                                                    <Tabs defaultValue="truth" className="w-full">
                                                         <TabsList className="grid w-full grid-cols-2">
                                                             <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
                                                             <TabsTrigger value="truth">Truth</TabsTrigger>
