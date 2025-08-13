@@ -784,6 +784,10 @@ function UpskillPageContent() {
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'mechanism'>('link');
+  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
+
+
   const handleOpenNewSubtopicModal = () => {
     if (!selectedMicroSkill) {
         toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
@@ -1100,27 +1104,12 @@ function UpskillPageContent() {
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
-    
-    const parentCategory = parent.category;
-    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === parentCategory);
-    if (microSkill) {
-        const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
-        if (coreSkill) {
-            const spec = coreSkills.find(s => s.id === coreSkill.id && s.type === 'Specialization');
-            if(spec) {
-                setSelectedSpecializationId(spec.id);
-            } else {
-                // Find parent specialization if it's not the core skill itself
-                const parentDomain = skillDomains.find(sd => sd.id === coreSkill.domainId);
-                const firstSpecInDomain = coreSkills.find(cs => cs.domainId === parentDomain?.id && cs.type === 'Specialization');
-                setSelectedSpecializationId(firstSpecInDomain?.id || null);
-            }
-        }
-    } else {
-        setSelectedSpecializationId(null);
-    }
-    
     setNewLinkedItemTopic(parent.category);
+    
+    // Set default specialization based on parent's category
+    const parentSpecId = getSpecializationForCategory(parent.category);
+    setSelectedSpecializationId(parentSpecId);
+
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
     setNewLinkedItemLink(''); 
@@ -1141,38 +1130,54 @@ function UpskillPageContent() {
     let updatedParent: ExerciseDefinition;
 
     if (type === 'resource') {
-        if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
-        if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
-        
-        setIsCreatingLink(true);
-        try {
-            let fullLink = newLinkedItemLink.trim();
-            if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
-                fullLink = 'https://' + fullLink;
+        if (addResourceType === 'link') {
+            if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
+            if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
+            
+            setIsCreatingLink(true);
+            try {
+                let fullLink = newLinkedItemLink.trim();
+                if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
+                    fullLink = 'https://' + fullLink;
+                }
+                const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
+                const newResource: Resource = {
+                    id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
+                    description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
+                };
+                newId = newResource.id;
+                setResources(prev => [...prev, newResource]);
+            } catch (error) {
+                toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
+                return;
+            } finally { 
+                setIsCreatingLink(false);
             }
-            const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
-            const result = await response.json();
-            if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
+        } else { // Card, Habit, Mechanism
+            if (!newLinkedItemFolderId || !newLinkedItemName.trim()) { toast({ title: "Error", description: "Folder and name are required.", variant: "destructive" }); return; }
             const newResource: Resource = {
-                id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
-                description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
+                id: `res_${Date.now()}`,
+                name: newLinkedItemName.trim(),
+                folderId: newLinkedItemFolderId,
+                type: addResourceType,
+                points: [],
+                icon: 'Library',
+                createdAt: new Date().toISOString(),
+                mechanismFramework: addResourceType === 'mechanism' ? mechanismFramework : undefined,
             };
             newId = newResource.id;
             setResources(prev => [...prev, newResource]);
-            
-            updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
-            setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-            if (selectedUpskillTask?.id === parent.id) {
-                setSelectedUpskillTask(updatedParent);
-            }
-            toast({ title: "Resource Added", description: `"${newResource.name}" has been saved and linked.`});
-
-        } catch (error) {
-            toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
-        } finally { 
-            setIsCreatingLink(false);
-            setIsManageLinksModalOpen(false); 
         }
+        
+        updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
+        setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
+        if (selectedUpskillTask?.id === parent.id) {
+            setSelectedUpskillTask(updatedParent);
+        }
+        toast({ title: "Resource Added", description: `New resource has been saved and linked.`});
+        setIsManageLinksModalOpen(false);
         return;
     }
     
@@ -1244,10 +1249,6 @@ function UpskillPageContent() {
     }
     return visualizations;
   }, [upskillDefinitions]);
-
-  const availableSpecializations = useMemo(() => {
-    return coreSkills.filter(s => s.type === 'Specialization');
-  }, [coreSkills]);
 
   const microSkillsForSpecialization = useMemo(() => {
     if (!selectedSpecializationId) return [];
@@ -1668,30 +1669,52 @@ function UpskillPageContent() {
                               </DialogFooter>
                           </div>
                       </TabsContent>
-                      <TabsContent value="create" className="flex-grow">
+                      <TabsContent value="create" className="flex-grow min-h-0">
                           <ScrollArea className="h-full pr-4">
-                              <div className="space-y-4">
-                                  {manageLinksConfig.type !== 'resource' ? (
-                                      <>
-                                          <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
-                                          <div className="grid grid-cols-2 gap-4">
-                                              <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
-                                              <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
-                                          </div>
-                                      </>
-                                  ) : (
-                                      <>
-                                          <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
-                                          <div className="space-y-1"><Label>Link</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
-                                      </>
-                                  )}
-                                  <DialogFooter className="pt-4">
-                                      <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
-                                  </DialogFooter>
-                              </div>
+                                {manageLinksConfig.type === 'resource' ? (
+                                    <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as any)} className="w-full">
+                                        <TabsList className="grid w-full grid-cols-4">
+                                            <TabsTrigger value="link">Link</TabsTrigger>
+                                            <TabsTrigger value="card">Card</TabsTrigger>
+                                            <TabsTrigger value="habit">Habit</TabsTrigger>
+                                            <TabsTrigger value="mechanism">Mechanism</TabsTrigger>
+                                        </TabsList>
+                                        <TabsContent value="link" className="pt-4 space-y-4">
+                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
+                                            <div className="space-y-1"><Label>Link URL</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                        </TabsContent>
+                                        <TabsContent value="card" className="pt-4 space-y-4">
+                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
+                                            <div className="space-y-1"><Label>Card Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                        </TabsContent>
+                                        <TabsContent value="habit" className="pt-4 space-y-4">
+                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
+                                            <div className="space-y-1"><Label>Habit Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                        </TabsContent>
+                                        <TabsContent value="mechanism" className="pt-4 space-y-4">
+                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
+                                            <div className="space-y-1"><Label>Mechanism Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                            <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
+                                                <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id="r-negative-modal" /><Label htmlFor="r-negative-modal">Negative</Label></div>
+                                                <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-positive-modal" /><Label htmlFor="r-positive-modal">Positive</Label></div>
+                                            </RadioGroup>
+                                        </TabsContent>
+                                    </Tabs>
+                                ) : ( // Upskill
+                                    <div className="space-y-4">
+                                        <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
+                                        <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
+                                        <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
+                                        <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
+                                            <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
+                                        </div>
+                                    </div>
+                                )}
+                              <DialogFooter className="pt-4">
+                                  <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
+                              </DialogFooter>
                           </ScrollArea>
                       </TabsContent>
                   </Tabs>
@@ -1714,3 +1737,5 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
+
