@@ -59,36 +59,40 @@ function PatternsPageContent() {
     
     const aggregatedFields = useMemo(() => {
         // 1. Gather all possible phrases from all mechanisms
-        const allMechanismPhrases: Record<string, PatternPhrase[]> = { Benefits: [], Costs: [], 'Positive Laws': [], 'Negative Laws': [] };
+        const allMechanismPhrasesMap = new Map<string, PatternPhrase[]>();
+        const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
+        categories.forEach(cat => allMechanismPhrasesMap.set(cat, []));
+
         mechanismCards.forEach(card => {
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) allMechanismPhrases.Benefits.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.reward) allMechanismPhrases.Benefits.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.law?.premise && card.law?.outcome) allMechanismPhrases['Positive Laws'].push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
-            } else {
-                if (card.trigger?.feeling && card.benefit) allMechanismPhrases.Costs.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.reward) allMechanismPhrases.Costs.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.law?.premise && card.law?.outcome) allMechanismPhrases['Negative Laws'].push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.benefit) allMechanismPhrasesMap.get('Benefits')!.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allMechanismPhrasesMap.get('Benefits')!.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Positive Laws')!.push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+            } else { // negative
+                if (card.trigger?.feeling && card.benefit) allMechanismPhrasesMap.get('Costs')!.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allMechanismPhrasesMap.get('Costs')!.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Negative Laws')!.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             }
         });
-        const allPhrasesFromAllMechanisms = Object.values(allMechanismPhrases).flat();
+        const allPhrasesFromAllMechanisms = Array.from(allMechanismPhrasesMap.values()).flat();
 
-        // 2. Identify which habits are already used in other patterns
-        const habitIdsInOtherPatterns = new Set<string>();
-        patterns.forEach(p => {
-            if (p.id !== selectedPatternToUpdate) {
-                p.phrases.forEach(phrase => {
-                    if (phrase.category === 'Habit Cards') habitIdsInOtherPatterns.add(phrase.mechanismCardId);
-                });
-            }
-        });
-
-        // 3. Determine which habits to display
-        let habitsToDisplay = habitCards;
-        if (!selectedPatternToUpdate) { // Create New mode
-            habitsToDisplay = habitCards.filter(h => !habitIdsInOtherPatterns.has(h.id));
-        }
+        // 2. Determine which habits to display based on the mode (create vs. edit)
+        const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
         
+        let habitsToDisplay: Resource[] = [];
+        if (selectedPatternToUpdate) { // Edit mode
+            const currentPatternHabitIds = new Set(
+                patterns.find(p => p.id === selectedPatternToUpdate)?.phrases
+                    .filter(ph => ph.category === 'Habit Cards')
+                    .map(ph => ph.mechanismCardId) || []
+            );
+            habitsToDisplay = habitCards.filter(h => 
+                currentPatternHabitIds.has(h.id) || !allHabitIdsInAnyPattern.has(h.id)
+            );
+        } else { // Create mode
+            habitsToDisplay = habitCards.filter(h => !allHabitIdsInAnyPattern.has(h.id));
+        }
+
         const allHabitCardPhrases = habitsToDisplay.map(habit => {
             const linkedMechanisms = [
                 habit.response?.resourceId,
@@ -96,15 +100,12 @@ function PatternsPageContent() {
             ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
             return { category: 'Habit Cards' as const, text: habit.name, mechanismCardId: habit.id, linkedMechanisms: linkedMechanisms as string[] };
         });
-        
-        // 4. Determine which mechanism phrases to display
-        let phrasesToDisplay = allPhrasesFromAllMechanisms;
-        if (!selectedPatternToUpdate) { // Create New mode
-            const unlinkedHabitMechanismIds = new Set(
-                habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean)
-            );
-            phrasesToDisplay = allPhrasesFromAllMechanisms.filter(p => unlinkedHabitMechanismIds.has(p.mechanismCardId));
-        }
+
+        // 3. Determine which mechanism phrases to display
+        const visibleHabitMechanismIds = new Set(
+            habitsToDisplay.flatMap(h => [h.response?.resourceId, h.newResponse?.resourceId]).filter(Boolean)
+        );
+        const phrasesToDisplay = allPhrasesFromAllMechanisms.filter(p => visibleHabitMechanismIds.has(p.mechanismCardId));
 
         const phrasesByCategory: Record<string, PatternPhrase[]> = { 'Habit Cards': allHabitCardPhrases };
         phrasesToDisplay.forEach(p => {
@@ -131,6 +132,7 @@ function PatternsPageContent() {
             const allPhrasesToToggle = [phrase, ...relatedPhrases];
     
             if (!isSelected) {
+                // Add the habit card and all its related phrases.
                 setSelectedPhrases(prev => {
                     const newSelectionMap = new Map(prev.map(p => [p.text, p]));
                     allPhrasesToToggle.forEach(pToAdd => {
@@ -141,6 +143,7 @@ function PatternsPageContent() {
                     return Array.from(newSelectionMap.values());
                 });
             } else {
+                 // Remove the habit card and its related phrases, but only if they aren't part of another selected habit.
                 const phrasesToRemoveTexts = new Set(allPhrasesToToggle.map(p => p.text));
     
                 const otherSelectedHabitMechanisms = new Set<string>();
@@ -155,16 +158,17 @@ function PatternsPageContent() {
                 });
     
                 setSelectedPhrases(prev => prev.filter(p => {
-                    if (!phrasesToRemoveTexts.has(p.text)) return true;
-                    if (p.mechanismCardId === phrase.mechanismCardId && p.category === 'Habit Cards') return false;
+                    if (!phrasesToRemoveTexts.has(p.text)) return true; // Keep if not part of the deselected habit's phrase set.
                     
+                    // Specific logic for mechanism phrases: keep if linked to ANOTHER selected habit
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
                         return true;
                     }
+                    // If we reach here, it's either the habit card itself or an unshared mechanism phrase, so remove it.
                     return false;
                 }));
             }
-        } else {
+        } else { // It's a mechanism phrase
              if (!isSelected) {
                 setSelectedPhrases(prev => [...prev, phrase]);
             } else {
@@ -291,13 +295,30 @@ function PatternsPageContent() {
     };
 
     const handlePhraseToggleInModal = (phrase: PatternPhrase) => {
-        setEditedPatternPhrases(prev => {
-            const isSelected = prev.some(p => p.text === phrase.text);
-            if (isSelected) {
-                return prev.filter(p => p.text !== phrase.text);
+        const isSelected = editedPatternPhrases.some(p => p.text === phrase.text);
+    
+        if (phrase.category === 'Habit Cards') {
+            const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
+            if (!habitCard) return; 
+
+            const allPhrasesFromAllMechanisms = Object.values(aggregatedFields).flat();
+            const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
+            const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
+            const allPhrasesToToggle = [phrase, ...relatedPhrases];
+            
+            if (!isSelected) {
+                setEditedPatternPhrases(prev => [...prev, ...allPhrasesToToggle]);
+            } else {
+                const phrasesToRemoveTexts = new Set(allPhrasesToToggle.map(p => p.text));
+                setEditedPatternPhrases(prev => prev.filter(p => !phrasesToRemoveTexts.has(p.text)));
             }
-            return [...prev, phrase];
-        });
+        } else {
+            if (isSelected) {
+                setEditedPatternPhrases(prev => prev.filter(p => p.text !== phrase.text));
+            } else {
+                setEditedPatternPhrases(prev => [...prev, phrase]);
+            }
+        }
     };
     
     const handleSaveChangesInModal = () => {
@@ -693,6 +714,7 @@ export default function PatternsPage() {
     
 
     
+
 
 
 
