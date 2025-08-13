@@ -4,7 +4,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,11 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit, Save } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 
 function PatternsPageContent() {
@@ -35,6 +36,9 @@ function PatternsPageContent() {
     
     const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
     const [editingPatternName, setEditingPatternName] = useState('');
+
+    const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
+    const [editedPatternPhrases, setEditedPatternPhrases] = useState<PatternPhrase[]>([]);
 
 
     const mechanismCards = useMemo(() => {
@@ -112,7 +116,7 @@ function PatternsPageContent() {
 
         Object.keys(fields).forEach(key => {
             const uniquePhrases = Array.from(new Map(fields[key].map(item => [item.text, item])).values());
-            if (key !== 'Habit Cards') {
+             if (key !== 'Habit Cards') {
                 fields[key] = uniquePhrases.filter(phrase => !usedPhrases.has(phrase.text));
             } else {
                  fields[key] = uniquePhrases.filter(phrase => !usedHabitCardIds.has(phrase.mechanismCardId));
@@ -301,6 +305,44 @@ function PatternsPageContent() {
         setEditingPatternId(null);
     };
 
+    const openEditModal = (pattern: Pattern) => {
+        setEditingPattern(pattern);
+        setEditedPatternPhrases(pattern.phrases);
+    };
+
+    const handlePhraseToggleInModal = (phrase: PatternPhrase) => {
+        setEditedPatternPhrases(prev => {
+            const isSelected = prev.some(p => p.text === phrase.text);
+            if (isSelected) {
+                return prev.filter(p => p.text !== phrase.text);
+            }
+            return [...prev, phrase];
+        });
+    };
+    
+    const handleSaveChangesInModal = () => {
+        if (!editingPattern) return;
+
+        setPatterns(prev => prev.map(p => {
+            if (p.id === editingPattern.id) {
+                return { ...p, name: editingPattern.name, phrases: editedPatternPhrases };
+            }
+            return p;
+        }));
+
+        setEditingPattern(null);
+        toast({ title: 'Pattern Updated!', description: 'Your changes have been saved.' });
+    };
+
+    const allAvailablePhrases = useMemo(() => {
+        const allPhrasesMap = new Map<string, PatternPhrase>();
+        Object.values(aggregatedFields).flat().forEach(p => allPhrasesMap.set(p.text, p));
+        if (editingPattern) {
+            editingPattern.phrases.forEach(p => allPhrasesMap.set(p.text, p));
+        }
+        return Array.from(allPhrasesMap.values());
+    }, [aggregatedFields, editingPattern]);
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
             <div className="text-center">
@@ -452,7 +494,7 @@ function PatternsPageContent() {
                                                 <div className="flex flex-row items-center justify-between">
                                                     <div className="flex items-center gap-2 flex-grow min-w-0">
                                                         <RadioGroupItem value={p.id} id={`rule-pattern-${p.id}`} />
-                                                        <div className="flex-grow cursor-pointer" onClick={(e) => { e.stopPropagation(); handleStartEditPattern(p); }}>
+                                                        <div className="flex-grow cursor-pointer" onClick={() => handleStartEditPattern(p)}>
                                                             {editingPatternId === p.id ? (
                                                                 <Input 
                                                                     value={editingPatternName}
@@ -470,9 +512,14 @@ function PatternsPageContent() {
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
+                                                     <div className="flex items-center">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditModal(p); }}>
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                                 </CardHeader>
                                                 {isSelected && (
@@ -585,6 +632,62 @@ function PatternsPageContent() {
                     </ScrollArea>
                 </CardContent>
             </Card>
+
+            {editingPattern && (
+                <Dialog open={!!editingPattern} onOpenChange={() => setEditingPattern(null)}>
+                    <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
+                        <DialogHeader>
+                            <DialogTitle>Edit Pattern: {editingPattern.name}</DialogTitle>
+                            <DialogDescription>Add or remove phrases to refine this pattern.</DialogDescription>
+                        </DialogHeader>
+                        <div className="flex-grow min-h-0 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex flex-col">
+                                <Label className="font-semibold mb-2">Available Phrases</Label>
+                                <ScrollArea className="h-full border rounded-md p-2">
+                                    {Object.entries(aggregatedFields).map(([title, phrases]) => (
+                                        <div key={title} className="mb-4">
+                                            <h3 className="font-semibold mb-2 text-sm">{title}</h3>
+                                            <div className="space-y-2">
+                                                {(phrases || []).map((phrase, i) => (
+                                                    <div key={`avail-${i}`} className="flex items-start space-x-2">
+                                                        <Checkbox
+                                                            id={`avail-phrase-${title}-${i}`}
+                                                            checked={editedPatternPhrases.some(p => p.text === phrase.text)}
+                                                            onCheckedChange={() => handlePhraseToggleInModal(phrase)}
+                                                        />
+                                                        <Label htmlFor={`avail-phrase-${title}-${i}`} className="font-normal w-full flex-grow cursor-pointer">{phrase.text}</Label>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </ScrollArea>
+                            </div>
+                             <div className="flex flex-col">
+                                <Label className="font-semibold mb-2">Selected Phrases ({editedPatternPhrases.length})</Label>
+                                <ScrollArea className="h-full border rounded-md p-2">
+                                    <div className="space-y-2">
+                                        {editedPatternPhrases.map((phrase, i) => (
+                                            <div key={`sel-${i}`} className="flex items-start space-x-2">
+                                                <Checkbox
+                                                    id={`sel-phrase-${i}`}
+                                                    checked={true}
+                                                    onCheckedChange={() => handlePhraseToggleInModal(phrase)}
+                                                />
+                                                <Label htmlFor={`sel-phrase-${i}`} className="font-normal w-full flex-grow cursor-pointer">{phrase.text}</Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setEditingPattern(null)}>Cancel</Button>
+                            <Button onClick={handleSaveChangesInModal}>Save Changes</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }
@@ -597,5 +700,6 @@ export default function PatternsPage() {
     );
 }
     
+
 
 
