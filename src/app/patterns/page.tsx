@@ -60,24 +60,22 @@ function PatternsPageContent() {
     
     const aggregatedFields = useMemo(() => {
         // First, gather all possible phrases from all mechanisms
-        const allMechanismPhrasesMap = new Map<string, PatternPhrase[]>();
+        const allPhrasesFromAllMechanisms: PatternPhrase[] = [];
         const categories = ['Benefits', 'Costs', 'Positive Laws', 'Negative Laws'];
-        categories.forEach(cat => allMechanismPhrasesMap.set(cat, []));
-
+        
         mechanismCards.forEach(card => {
             if (card.mechanismFramework === 'positive') {
-                if (card.benefit) allMechanismPhrasesMap.get('Benefits')!.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.reward) allMechanismPhrasesMap.get('Benefits')!.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Positive Laws')!.push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.benefit) allPhrasesFromAllMechanisms.push({ category: 'Benefits', text: card.benefit, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allPhrasesFromAllMechanisms.push({ category: 'Benefits', text: card.reward, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allPhrasesFromAllMechanisms.push({ category: 'Positive Laws', text: `${card.law.premise} can only happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             } else { // negative
-                if (card.trigger?.feeling && card.benefit) allMechanismPhrasesMap.get('Costs')!.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.reward) allMechanismPhrasesMap.get('Costs')!.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
-                if (card.law?.premise && card.law?.outcome) allMechanismPhrasesMap.get('Negative Laws')!.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.trigger?.feeling && card.benefit) allPhrasesFromAllMechanisms.push({ category: 'Costs', text: `That one ${card.trigger.feeling} costs me ${card.benefit}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.reward) allPhrasesFromAllMechanisms.push({ category: 'Costs', text: `This blocks ${card.reward}.`, mechanismCardId: card.id, mechanismCardName: card.name });
+                if (card.law?.premise && card.law?.outcome) allPhrasesFromAllMechanisms.push({ category: 'Negative Laws', text: `${card.law.premise} cannot happen when ${card.law.outcome}`, mechanismCardId: card.id, mechanismCardName: card.name });
             }
         });
-        const allPhrasesFromAllMechanisms = Array.from(allMechanismPhrasesMap.values()).flat();
 
-        // Then, determine which habits and their associated phrases to display based on the mode
+        // Determine which habits to display
         const allHabitIdsInAnyPattern = new Set(patterns.flatMap(p => p.phrases.filter(ph => ph.category === 'Habit Cards').map(ph => ph.mechanismCardId)));
         
         let habitsToDisplay: Resource[] = [];
@@ -122,7 +120,7 @@ function PatternsPageContent() {
         if (phrase.category === 'Habit Cards') {
             const habitCard = habitCards.find(h => h.id === phrase.mechanismCardId);
             if (!habitCard) return; 
-    
+
             const allPhrasesFromAllMechanisms = Object.values(aggregatedFields).flat();
             const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
             const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
@@ -439,7 +437,7 @@ function PatternsPageContent() {
                                     <Input id="pattern-cause" value={newPatternCause} onChange={e => setNewPatternCause(e.target.value)} placeholder="e.g., Lowered Cortisol" />
                                 </div>
                                 <div>
-                                    <Label htmlFor="pattern-outcome">→ Outcome</Label>
+                                    <Label htmlFor="pattern-outcome">Outcome</Label>
                                     <Input id="pattern-outcome" value={newPatternOutcome} onChange={e => setNewPatternOutcome(e.target.value)} placeholder="e.g., Low Energy" />
                                 </div>
                                 <div>
@@ -717,3 +715,4 @@ export default function PatternsPage() {
 
 
     
+
