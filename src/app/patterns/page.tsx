@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -50,12 +51,10 @@ function PatternsPageContent() {
         }
     }, [selectedPatternToUpdate, patterns]);
 
-    const habitCards = useMemo(() => {
-        return resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
-    }, [resources]);
-
-    const mechanismCards = useMemo(() => {
-        return resources.filter(r => r.type === 'mechanism');
+    const { habitCards, mechanismCards } = useMemo(() => {
+        const habits = resources.filter(r => r.type === 'habit' && (r.response?.resourceId || r.newResponse?.resourceId));
+        const mechanisms = resources.filter(r => r.type === 'mechanism');
+        return { habitCards: habits, mechanismCards: mechanisms };
     }, [resources]);
     
     const allMechanismPhrases = useMemo(() => {
@@ -86,54 +85,27 @@ function PatternsPageContent() {
     }, [mechanismCards]);
     
     const aggregatedFields = useMemo(() => {
-        // Phrases used in other patterns that are NOT being edited
-        const allUsedPhraseTextsInOtherPatterns = new Set(
-            patterns
-                .filter(p => p.id !== selectedPatternToUpdate)
-                .flatMap(p => p.phrases.filter(phrase => phrase.category !== 'Habit Cards'))
-                .map(p => p.text)
-        );
-
-        // Habit Card IDs used in other patterns that are NOT being edited
-        const allUsedHabitCardIdsInOtherPatterns = new Set(
-            patterns
-                .filter(p => p.id !== selectedPatternToUpdate)
-                .flatMap(p => p.phrases.filter(phrase => phrase.category === 'Habit Cards'))
-                .map(phrase => phrase.mechanismCardId)
-        );
+        const allPhrasesFromAllMechanisms = Object.values(allMechanismPhrases).flat();
         
-        // Filter mechanism phrases
-        const filteredMechanismPhrases: Record<string, PatternPhrase[]> = {};
-        for (const category in allMechanismPhrases) {
-            filteredMechanismPhrases[category] = allMechanismPhrases[category].filter(phrase => 
-                !allUsedPhraseTextsInOtherPatterns.has(phrase.text) || 
-                selectedPhrases.some(p => p.text === phrase.text)
-            );
-        }
+        const allHabitCardPhrases = habitCards.map(habit => {
+            const linkedMechanisms = [
+                habit.response?.resourceId,
+                habit.newResponse?.resourceId
+            ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
+
+            return {
+                category: 'Habit Cards' as const,
+                text: habit.name,
+                mechanismCardId: habit.id,
+                linkedMechanisms: linkedMechanisms as string[]
+            };
+        });
         
-        // Filter habit cards
-        const filteredHabitCards = habitCards
-            .filter(habit => {
-                const isUsedElsewhere = allUsedHabitCardIdsInOtherPatterns.has(habit.id);
-                const isCurrentlySelected = selectedPhrases.some(p => p.category === 'Habit Cards' && p.mechanismCardId === habit.id);
-                return !isUsedElsewhere || isCurrentlySelected;
-            })
-            .map(habit => {
-                const linkedMechanisms = [
-                    habit.response?.resourceId,
-                    habit.newResponse?.resourceId
-                ].filter(Boolean).map(id => mechanismCards.find(m => m.id === id)?.name).filter(Boolean);
-
-                return {
-                    category: 'Habit Cards' as const,
-                    text: habit.name,
-                    mechanismCardId: habit.id,
-                    linkedMechanisms: linkedMechanisms as string[]
-                };
-            });
-
-        return { ...filteredMechanismPhrases, 'Habit Cards': filteredHabitCards };
-    }, [patterns, selectedPatternToUpdate, allMechanismPhrases, habitCards, mechanismCards, selectedPhrases]);
+        return {
+            ...allMechanismPhrases,
+            'Habit Cards': allHabitCardPhrases,
+        };
+    }, [habitCards, allMechanismPhrases, mechanismCards]);
 
 
     const handlePhraseToggle = (phrase: PatternPhrase) => {
@@ -144,10 +116,9 @@ function PatternsPageContent() {
             if (!habitCard) return; 
     
             const relatedMechanismIds = new Set([habitCard.response?.resourceId, habitCard.newResponse?.resourceId].filter(Boolean));
-            const relatedPhrases = Object.values(allMechanismPhrases)
-                .flat()
-                .filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
-    
+            const allPhrasesFromAllMechanisms = Object.values(allMechanismPhrases).flat();
+            const relatedPhrases = allPhrasesFromAllMechanisms.filter(p => p.mechanismCardId && relatedMechanismIds.has(p.mechanismCardId));
+            
             const allPhrasesToToggle = [phrase, ...relatedPhrases];
     
             if (!isSelected) {
@@ -167,7 +138,7 @@ function PatternsPageContent() {
     
                 const otherSelectedHabitMechanisms = new Set<string>();
                 selectedPhrases.forEach(p => {
-                    if (p.category === 'Habit Cards' && p.text !== phrase.text) {
+                    if (p.category === 'Habit Cards' && p.mechanismCardId !== phrase.mechanismCardId) {
                         const otherHabitCard = habitCards.find(h => h.id === p.mechanismCardId);
                         if (otherHabitCard) {
                             if (otherHabitCard.response?.resourceId) otherSelectedHabitMechanisms.add(otherHabitCard.response.resourceId);
@@ -178,7 +149,7 @@ function PatternsPageContent() {
     
                 setSelectedPhrases(prev => prev.filter(p => {
                     if (!phrasesToRemoveTexts.has(p.text)) return true; // Keep if not part of the toggled group
-                    if (p.text === phrase.text) return false; // Remove the habit card itself
+                    if (p.mechanismCardId === phrase.mechanismCardId && p.category === 'Habit Cards') return false; // Remove the habit card itself
                     
                     // For mechanism phrases, check if they are needed by another selected habit
                     if (p.mechanismCardId && otherSelectedHabitMechanisms.has(p.mechanismCardId)) {
@@ -717,4 +688,5 @@ export default function PatternsPage() {
     
 
     
+
 
