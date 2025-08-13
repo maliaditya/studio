@@ -214,20 +214,16 @@ function PurposePageContent() {
     
     const uncategorizedItems = useMemo(() => {
         const assignedRuleIds = new Set(Object.values(pillarEquations).flat().flatMap(eq => eq.metaRuleIds));
-        pillars.forEach(pillar => {
-          const allPillarNames = [pillar.name, ...pillar.attributes];
-          metaRules.forEach(rule => {
-              if (rule.purposePillar && allPillarNames.includes(rule.purposePillar)) {
-                  assignedRuleIds.add(rule.id);
-              }
-          });
-        });
-
         const assignedSkillIds = new Set<string>();
         const assignedProjectIds = new Set<string>();
     
         pillars.forEach(pillar => {
             const allPillarNames = [pillar.name, ...pillar.attributes];
+            metaRules.forEach(rule => {
+                if (rule.purposePillar && allPillarNames.includes(rule.purposePillar)) {
+                    assignedRuleIds.add(rule.id);
+                }
+            });
             specializations.forEach(skill => {
                 if (skill.purposePillar && allPillarNames.includes(skill.purposePillar)) {
                     assignedSkillIds.add(skill.id);
@@ -400,11 +396,8 @@ function PurposePageContent() {
                                                             {rulesInEquation.map(rule => {
                                                                 if (!rule) return null;
                                                                 const pattern = patterns.find(p => p.id === rule.patternId);
-                                                                const linkedHabit = pattern ? habitCards.find(h => pattern.phrases.some(p => p.category === 'Habit Cards' && p.mechanismCardId === h.id)) : null;
+                                                                const linkedHabits = pattern ? habitCards.filter(h => pattern.phrases.some(p => p.category === 'Habit Cards' && p.mechanismCardId === h.id)) : [];
                                                                 
-                                                                const negativeMechanism = linkedHabit ? mechanismCards.find(m => m.id === linkedHabit.response?.resourceId) : null;
-                                                                const positiveMechanism = linkedHabit ? mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId) : null;
-
                                                                 return (
                                                                     <Card key={rule.id} className="bg-card">
                                                                         <CardContent className="p-2 text-xs space-y-2">
@@ -414,13 +407,23 @@ function PurposePageContent() {
                                                                                     <FormattedPatternName name={pattern.name} type={pattern.type} />
                                                                                 </p>
                                                                             )}
-                                                                             {linkedHabit && (
+                                                                             {linkedHabits.length > 0 && (
                                                                                 <div className="pt-2 border-t mt-2">
-                                                                                    <p className="font-semibold text-foreground">Habit: {linkedHabit.name}</p>
-                                                                                    <ul className="list-disc list-inside pl-2 text-muted-foreground">
-                                                                                        {negativeMechanism && <li>Negative: {negativeMechanism.response?.visualize || '...'}</li>}
-                                                                                        {positiveMechanism && <li>Positive: {positiveMechanism.newResponse?.action || '...'}</li>}
-                                                                                    </ul>
+                                                                                    <p className="font-semibold text-foreground">Habit: {
+                                                                                        linkedHabits.length > 1 ? (
+                                                                                            <ul className="list-disc list-inside font-normal text-muted-foreground">
+                                                                                                {linkedHabits.map(h => <li key={h.id}>{h.name}</li>)}
+                                                                                            </ul>
+                                                                                        ) : (
+                                                                                            <span className="font-normal">{linkedHabits[0].name}</span>
+                                                                                        )
+                                                                                    }</p>
+                                                                                    {linkedHabits.length === 1 && (
+                                                                                        <ul className="list-disc list-inside pl-2 text-muted-foreground">
+                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId) && <li>Negative: {mechanismCards.find(m => m.id === linkedHabits[0].response?.resourceId)?.response?.visualize || '...'}</li>}
+                                                                                            {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId) && <li>Positive: {mechanismCards.find(m => m.id === linkedHabits[0].newResponse?.resourceId)?.newResponse?.action || '...'}</li>}
+                                                                                        </ul>
+                                                                                    )}
                                                                                 </div>
                                                                             )}
                                                                         </CardContent>
@@ -648,4 +651,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
