@@ -314,6 +314,9 @@ function UpskillPageContent() {
   } = useAuth();
   const router = useRouter();
   
+  const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
+  const currentTask = navigationStack[navigationStack.length - 1] || null;
+
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
   
@@ -366,11 +369,11 @@ function UpskillPageContent() {
   }, [microSkillMap, coreSkills, skillDomains]);
 
   const projectsInDomain = useMemo(() => {
-    if (!selectedUpskillTask || !selectedUpskillTask.category) return [];
-    const domain = getDomainForCategory(selectedUpskillTask.category);
+    if (!currentTask || !currentTask.category) return [];
+    const domain = getDomainForCategory(currentTask.category);
     if (!domain) return [];
     return projects.filter(p => p.domainId === domain.id);
-  }, [selectedUpskillTask, getDomainForCategory, projects]);
+  }, [currentTask, getDomainForCategory, projects]);
 
   const permanentlyLoggedVisualizationIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -493,9 +496,9 @@ function UpskillPageContent() {
   }, [allUpskillLogs, upskillDefinitions]);
 
   const totalLoggedTime = useMemo(() => {
-    if (!selectedUpskillTask) return 0;
-    return getUpskillLoggedMinutesRecursive(selectedUpskillTask);
-  }, [selectedUpskillTask, getUpskillLoggedMinutesRecursive]);
+    if (!currentTask) return 0;
+    return getUpskillLoggedMinutesRecursive(currentTask);
+  }, [currentTask, getUpskillLoggedMinutesRecursive]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -505,9 +508,9 @@ function UpskillPageContent() {
   }
 
   const totalEstimatedDuration = useMemo(() => {
-    if (!selectedUpskillTask) return 0;
-    return calculateTotalEstimate(selectedUpskillTask);
-  }, [selectedUpskillTask, calculateTotalEstimate]);
+    if (!currentTask) return 0;
+    return calculateTotalEstimate(currentTask);
+  }, [currentTask, calculateTotalEstimate]);
   
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -623,7 +626,9 @@ function UpskillPageContent() {
         }));
     });
     setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
-    if (selectedUpskillTask?.id === id) { setSelectedUpskillTask(null); setViewMode('session'); }
+    if (navigationStack.some(item => item.id === id)) {
+        setNavigationStack(prev => prev.filter(item => item.id !== id));
+    }
     toast({ title: "Success", description: `Task "${defToDelete.name}" removed.` });
   };
 
@@ -655,7 +660,7 @@ function UpskillPageContent() {
     
     setUpskillDefinitions(prev => prev.map(def => def.id === editingSubtopic.id ? { ...def, ...finalData } as ExerciseDefinition : def));
     setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.map(ex => ex.definitionId === editingSubtopic.id ? { ...ex, name: finalData.name! } : ex)})));
-    if(selectedUpskillTask?.id === editingSubtopic.id) setSelectedUpskillTask({ ...selectedUpskillTask, ...finalData } as ExerciseDefinition);
+    setNavigationStack(prev => prev.map(item => item.id === editingSubtopic.id ? { ...item, ...finalData } as ExerciseDefinition : item));
     toast({ title: "Success", description: `Task updated to "${finalData.name}".` });
     setEditingSubtopic(null);
   };
@@ -796,9 +801,7 @@ function UpskillPageContent() {
         
         updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
         setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        if (selectedUpskillTask?.id === parent.id) {
-            setSelectedUpskillTask(updatedParent);
-        }
+        setNavigationStack(prev => prev.map(item => item.id === parent.id ? updatedParent : item));
         toast({ title: "Resource Added", description: `New resource has been saved and linked.`});
         setIsManageLinksModalOpen(false);
         return;
@@ -839,9 +842,7 @@ function UpskillPageContent() {
     }
     
     setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? finalParent : def));
-    if (selectedUpskillTask?.id === parent.id) {
-        setSelectedUpskillTask(finalParent);
-    }
+    setNavigationStack(prev => prev.map(item => item.id === parent.id ? finalParent : item));
     
     toast({ title: "Success", description: "New item created and linked." });
     setIsManageLinksModalOpen(false);
@@ -855,9 +856,7 @@ function UpskillPageContent() {
     const updatedParent = { ...parent, [key]: tempLinkedIds };
     
     setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedUpskillTask?.id === parent.id) {
-        setSelectedUpskillTask(updatedParent);
-    }
+    setNavigationStack(prev => prev.map(item => item.id === parent.id ? updatedParent : item));
     toast({ title: "Success", description: "Links have been updated." });
     setIsManageLinksModalOpen(false);
   };
@@ -926,30 +925,30 @@ function UpskillPageContent() {
 
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
-                    <Checkbox
-                        id={`cb-link-${item.id}`}
-                        checked={tempLinkedIds.includes(item.id)}
-                        onCheckedChange={() => {
-                            setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mr-2"
-                    />
-                    <AccordionTrigger
-                      asChild
-                      className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                          <div className="flex items-center space-x-2">
-                              <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                  {getIcon()}
-                                  {item.name}
-                              </Label>
-                          </div>
-                          {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                      </div>
-                    </AccordionTrigger>
+                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+                        <Checkbox
+                            id={`cb-link-${item.id}`}
+                            checked={tempLinkedIds.includes(item.id)}
+                            onCheckedChange={(checked) => {
+                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mr-2"
+                        />
+                        <AccordionTrigger
+                            asChild
+                            className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+                        >
+                            <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                        {getIcon()}
+                                        {item.name}
+                                    </Label>
+                                </div>
+                                {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                            </div>
+                        </AccordionTrigger>
                 </div>
                 {hasChildren && (
                     <AccordionContent className="pl-4">
@@ -963,13 +962,13 @@ function UpskillPageContent() {
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
-    if (!selectedUpskillTask) return;
+    if (!currentTask) return;
     let updatedParent: ExerciseDefinition;
     let key: 'linkedUpskillIds' | 'linkedResourceIds' = type === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-    updatedParent = { ...selectedUpskillTask, [key]: (selectedUpskillTask[key] || []).filter((id: string) => id !== idToUnlink) };
+    updatedParent = { ...currentTask, [key]: (currentTask[key] || []).filter((id: string) => id !== idToUnlink) };
     
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
-    setSelectedUpskillTask(updatedParent);
+    setUpskillDefinitions(prev => prev.map(def => def.id === currentTask!.id ? updatedParent : def));
+    setNavigationStack(prev => prev.map(item => item.id === currentTask!.id ? updatedParent : item));
     toast({ title: "Unlinked", description: "The item has been unlinked." });
   };
   
@@ -980,7 +979,7 @@ function UpskillPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
   
-    if (!over || active.id === over.id) return;
+    if (!over || active.id === over.id || !currentTask) return;
   
     const draggedId = active.id as string;
     const targetId = over.id as string;
@@ -989,14 +988,14 @@ function UpskillPageContent() {
     const draggedDef = allDefs.find(d => d.id === draggedId);
     const targetDef = allDefs.find(d => d.id === targetId);
   
-    if (!draggedDef || !targetDef || !selectedUpskillTask) {
+    if (!draggedDef || !targetDef) {
         toast({ title: "Error", description: "Could not find items to link.", variant: "destructive" });
         return;
     }
     
     const parentChildrenIds = new Set([
-        ...(selectedUpskillTask.linkedUpskillIds || []),
-        ...(selectedUpskillTask.linkedResourceIds || []),
+        ...(currentTask.linkedUpskillIds || []),
+        ...(currentTask.linkedResourceIds || []),
     ]);
 
     if (!parentChildrenIds.has(draggedId) || !parentChildrenIds.has(targetId)) {
@@ -1020,20 +1019,20 @@ function UpskillPageContent() {
     }));
     
     const updatedParent = {
-        ...selectedUpskillTask,
-        linkedUpskillIds: (selectedUpskillTask.linkedUpskillIds || []).filter(id => id !== draggedId),
-        linkedResourceIds: (selectedUpskillTask.linkedResourceIds || []).filter(id => id !== draggedId),
+        ...currentTask,
+        linkedUpskillIds: (currentTask.linkedUpskillIds || []).filter(id => id !== draggedId),
+        linkedResourceIds: (currentTask.linkedResourceIds || []).filter(id => id !== draggedId),
     };
     
-    setUpskillDefinitions(prev => prev.map(def => def.id === selectedUpskillTask.id ? updatedParent : def));
-    setSelectedUpskillTask(updatedParent);
+    setUpskillDefinitions(prev => prev.map(def => def.id === currentTask!.id ? updatedParent : def));
+    setNavigationStack(prev => prev.map(item => item.id === currentTask!.id ? updatedParent : item));
   
     toast({ title: "Re-linked!", description: `"${draggedDef.name}" is now a sub-task of "${targetDef.name}".` });
   };
 
   const handleProjectSelect = (project: Project | null) => {
     setSelectedProject(project);
-    setSelectedUpskillTask(null);
+    setNavigationStack([]);
     setSelectedMicroSkill(null);
   };
 
@@ -1053,7 +1052,7 @@ function UpskillPageContent() {
     return 'Library';
   }
   
-  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getUpskillNodeType(selectedUpskillTask) === 'Curiosity');
+  const currentTaskIsCuriosity = currentTask && (getUpskillNodeType(currentTask) === 'Curiosity');
   
   const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
     let nodes: React.ReactNode[] = [];
@@ -1070,6 +1069,25 @@ function UpskillPageContent() {
     return nodes;
   };
 
+  const handleCardClick = (def: ExerciseDefinition) => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    if (isParent) {
+      setNavigationStack(prev => [...prev, def]);
+    }
+  };
+
+  const handleSelectFocusArea = (def: ExerciseDefinition | null) => {
+    if (def) {
+      setNavigationStack([def]);
+    } else {
+      setNavigationStack([]);
+    }
+  };
+
+  const handleBreadcrumbClick = (index: number) => {
+    setNavigationStack(prev => prev.slice(0, index + 1));
+  };
+  
   useEffect(() => {
     setIsLoadingPage(false);
   }, []);
@@ -1077,6 +1095,90 @@ function UpskillPageContent() {
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your learning data...</p></div>;
   }
+  
+  const libraryContent = () => {
+    if (currentTask) {
+        return (
+            <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {navigationStack.map((task, index) => (
+                        <React.Fragment key={task.id}>
+                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary">
+                                {task.name}
+                            </Button>
+                            {index < navigationStack.length - 1 && <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />}
+                        </React.Fragment>
+                    ))}
+                </div>
+                <div className="space-y-1">
+                    <h3 className="text-xl font-bold">{currentTask.name}</h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', currentTask)}>
+                            <LinkIcon className="mr-2 h-4 w-4" /> Link Sub-task
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask)}>
+                            <Folder className="mr-2 h-4 w-4" /> Link Resource
+                        </Button>
+                        {currentTaskIsCuriosity && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline">
+                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem onSelect={() => handleLinkProject(currentTask.id, null)}>None</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    {projectsInDomain.map(proj => (
+                                        <DropdownMenuCheckboxItem key={proj.id} checked={currentTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(currentTask.id, currentTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                                    ))}
+                                    {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {(currentTask.linkedUpskillIds || []).map(id => {
+                        const def = upskillDefinitions.find(d => d.id === id);
+                        if (!def) return null;
+                        const domain = getDomainForCategory(def.category);
+                        const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
+                        return <LinkedUpskillCard key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: (d) => handleCardClick(d!), setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject, onEdit: setEditingSubtopic }} />;
+                    })}
+                    {(currentTask.linkedResourceIds || []).map(id => {
+                        const resource = resources.find(r => r.id === id);
+                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
+                    })}
+                </div>
+            </div>
+        )
+    }
+
+    if (selectedProject) {
+        return (
+            <div className="space-y-4">
+                {selectedProject.features.map(feature => (
+                    <Card key={feature.id}>
+                        <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
+                        <CardContent>
+                            <p className="text-sm font-medium mb-1">Required Skills:</p>
+                            <ul className="list-disc list-inside text-sm text-muted-foreground">
+                                {feature.linkedSkills.map(link => {
+                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillId === link.microSkillId);
+                                    return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
+                                })}
+                            </ul>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        )
+    }
+    
+    return <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
+  }
+
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1089,7 +1191,7 @@ function UpskillPageContent() {
                     selectedMicroSkill={selectedMicroSkill}
                     onSelectMicroSkill={setSelectedMicroSkill}
                     definitions={upskillDefinitions}
-                    onSelectFocusArea={setSelectedUpskillTask}
+                    onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewSubtopicModal}
                     selectedProject={selectedProject}
                     onSelectProject={handleProjectSelect}
@@ -1101,11 +1203,11 @@ function UpskillPageContent() {
                     }}
                     onEditFocusArea={setEditingSubtopic}
                 />
-              {selectedUpskillTask && (
+              {currentTask && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
-                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{selectedUpskillTask.name}"</CardDescription></div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(selectedUpskillTask)}><TrendingUp className="h-4 w-4"/></Button>
+                          <div><CardTitle className="text-lg flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" /> Subtopic Stats</CardTitle><CardDescription className="text-xs">Aggregated progress for "{currentTask.name}"</CardDescription></div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewProgress(currentTask)}><TrendingUp className="h-4 w-4"/></Button>
                       </CardHeader>
                       <CardContent className="space-y-4 pt-4">
                           <div className="space-y-2">
@@ -1135,7 +1237,7 @@ function UpskillPageContent() {
                         </div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('library')}>Library</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); setNavigationStack([]); }}>Library</Button>
                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
                         </div>
                     </CardHeader>
@@ -1160,70 +1262,7 @@ function UpskillPageContent() {
                                   </div>
                                 )}
                             </div>
-                        ) : selectedUpskillTask ? (
-                             <div className="space-y-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-xl font-bold">{selectedUpskillTask.name}</h3>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', selectedUpskillTask)}>
-                                            <LinkIcon className="mr-2 h-4 w-4" /> Link Sub-task
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', selectedUpskillTask)}>
-                                            <Folder className="mr-2 h-4 w-4" /> Link Resource
-                                        </Button>
-                                        {selectedUpskillTaskIsCuriosity && (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button size="sm" variant="outline">
-                                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent>
-                                                    <DropdownMenuItem onSelect={() => handleLinkProject(selectedUpskillTask.id, null)}>None</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    {projectsInDomain.map(proj => (
-                                                        <DropdownMenuCheckboxItem key={proj.id} checked={selectedUpskillTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(selectedUpskillTask.id, selectedUpskillTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
-                                                    ))}
-                                                    {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                    {(selectedUpskillTask.linkedUpskillIds || []).map(id => {
-                                        const def = upskillDefinitions.find(d => d.id === id);
-                                        if (!def) return null;
-                                        const domain = getDomainForCategory(def.category);
-                                        const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedUpskillCard key={id} upskillDef={def} {...{ handleAddTaskToSession, setSelectedSubtopic: setSelectedUpskillTask, setViewMode, handleUnlinkItem: (type, id) => handleUnlinkItem(type, id), handleDeleteSubtopic, handleViewProgress, isComplete: isUpskillObjectiveComplete(def.id), getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate: calculateTotalEstimate(def), setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName: handleUpdateSubtopicName, projectsInDomain: projectsInDomainForChild, onLinkProject: handleLinkProject, onEdit: setEditingSubtopic }} />;
-                                    })}
-                                    {(selectedUpskillTask.linkedResourceIds || []).map(id => {
-                                        const resource = resources.find(r => r.id === id);
-                                        return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
-                                    })}
-                                </div>
-                            </div>
-                        ) : selectedProject ? (
-                            <div className="space-y-4">
-                                {selectedProject.features.map(feature => (
-                                    <Card key={feature.id}>
-                                        <CardHeader className="pb-3"><CardTitle className="text-base">{feature.name}</CardTitle></CardHeader>
-                                        <CardContent>
-                                            <p className="text-sm font-medium mb-1">Required Skills:</p>
-                                            <ul className="list-disc list-inside text-sm text-muted-foreground">
-                                                {feature.linkedSkills.map(link => {
-                                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillId === link.microSkillId);
-                                                    return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
-                                                })}
-                                            </ul>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
-                        )}
+                        ) : libraryContent()}
                     </CardContent>
                 </Card>
             </section>
@@ -1324,12 +1363,12 @@ function UpskillPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
                                               <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                  <div className="flex items-center w-full group/item">
+                                                  <div className="flex items-center w-full group/item" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
                                                         <Checkbox
                                                             id={`cb-link-${item.id}`}
                                                             checked={tempLinkedIds.includes(item.id)}
-                                                            onCheckedChange={() => {
-                                                                setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                                                            onCheckedChange={(checked) => {
+                                                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
                                                             }}
                                                             onClick={(e) => e.stopPropagation()}
                                                             className="mr-2"
