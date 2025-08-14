@@ -1117,30 +1117,30 @@ function DeepWorkPageContent() {
 
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
-                    <Checkbox
-                        id={`cb-${item.id}`}
-                        checked={tempLinkedIds.includes(item.id)}
-                        onCheckedChange={() => {
-                            setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mr-2"
-                    />
-                    <AccordionTrigger
-                        asChild
-                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-                    >
-                        <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center space-x-2">
-                                <Label htmlFor={`cb-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                    {getIcon()}
-                                    {item.name}
-                                </Label>
+                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+                        <Checkbox
+                            id={`cb-link-${item.id}`}
+                            checked={tempLinkedIds.includes(item.id)}
+                            onCheckedChange={(checked) => {
+                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="mr-2"
+                        />
+                        <AccordionTrigger
+                            asChild
+                            className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+                        >
+                            <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                        {getIcon()}
+                                        {item.name}
+                                    </Label>
+                                </div>
+                                {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
                             </div>
-                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                        </div>
-                    </AccordionTrigger>
+                        </AccordionTrigger>
                 </div>
                 {hasChildren && (
                     <AccordionContent className="pl-4">
@@ -1307,6 +1307,8 @@ function DeepWorkPageContent() {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     if (isParent) {
       setNavigationStack(prev => [...prev, def]);
+    } else {
+        setViewMode('session');
     }
   };
 
@@ -1331,12 +1333,15 @@ function DeepWorkPageContent() {
         return (
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Button variant="link" onClick={() => handleSelectFocusArea(null)} className="p-0 h-auto text-muted-foreground hover:text-primary">
+                        Library
+                    </Button>
                     {navigationStack.map((task, index) => (
                         <React.Fragment key={task.id}>
-                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary">
+                           <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary" disabled={index === navigationStack.length - 1}>
                                 {task.name}
                             </Button>
-                            {index < navigationStack.length - 1 && <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />}
                         </React.Fragment>
                     ))}
                 </div>
@@ -1375,7 +1380,7 @@ function DeepWorkPageContent() {
                     {(currentTask.linkedDeepWorkIds || []).map(id => {
                         const def = deepWorkDefinitions.find(d => d.id === id);
                         if (!def) return null;
-                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, handleCardClick, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => {}, onOpenMindMap: (id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}, onUpdateName: handleUpdateFocusAreaName, projectsInDomain, handleLinkProject }}/>;
+                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, handleCardClick, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => {}, onOpenMindMap: (id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}, onUpdateName: handleUpdateFocusAreaName, projectsInDomain, handleLinkProject }}/>;
                     })}
                      {(currentTask.linkedUpskillIds || []).map(id => {
                         const def = upskillDefinitions.find(d => d.id === id);
