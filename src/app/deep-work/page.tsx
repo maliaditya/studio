@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, Frame } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -270,7 +270,7 @@ function LinkedDeepWorkCard({
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
-    const getIcon = (): React.ReactNode => {
+    const getIcon = () => {
       switch (nodeType) {
         case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
         case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
@@ -547,8 +547,6 @@ function DeepWorkPageContent() {
 
   // State for hierarchical linking
   const [folderPath, setFolderPath] = useState<string[]>([]);
-  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
-
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', description: '', hours: '', minutes: '' });
 
@@ -861,6 +859,13 @@ function DeepWorkPageContent() {
     return grouped;
   }, [coreSkills]);
 
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = upskillDefinitions.some(parentDef => parentDef.linkedUpskillIds?.includes(def.id));
+    if (isParent) return isChild ? 'Objective' : 'Curiosity';
+    return isChild ? 'Visualization' : 'Standalone';
+  }, [upskillDefinitions]);
+
   const getMicroSkillIdFromCategory = useCallback((category: string) => {
     const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
     if (!microSkill) return null;
@@ -1036,12 +1041,7 @@ function DeepWorkPageContent() {
     setIsManageLinksModalOpen(false);
   };
   
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = upskillDefinitions.some(parentDef => parentDef.linkedUpskillIds?.includes(def.id));
-    if (isParent) return isChild ? 'Objective' : 'Curiosity';
-    return isChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions]);
+  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
   
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
@@ -1197,16 +1197,6 @@ function DeepWorkPageContent() {
     );
   }, [setDeepWorkDefinitions]);
 
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
-  }
-
-  const getLibraryTitle = () => {
-    if (selectedProject) return selectedProject.name;
-    if (selectedMicroSkill) return selectedMicroSkill.name;
-    return 'Library';
-  }
-
   const selectedDeepWorkTaskIsIntention = selectedDeepWorkTask && getDeepWorkNodeType(selectedDeepWorkTask) === 'Intention';
 
   const curiositiesForLinking = useMemo(() => {
@@ -1224,6 +1214,16 @@ function DeepWorkPageContent() {
         )
     }));
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
+
+  if (isLoadingPage) {
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
+  }
+
+  const getLibraryTitle = () => {
+    if (selectedProject) return selectedProject.name;
+    if (selectedMicroSkill) return selectedMicroSkill.name;
+    return 'Library';
+  }
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
