@@ -519,7 +519,7 @@ function DeepWorkPageContent() {
   const router = useRouter();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
-  const currentTask = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
+  const currentTask = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : selectedDeepWorkTask;
 
   const [editingFocusArea, setEditingFocusArea] = useState<ExerciseDefinition | null>(null);
   const [editedFocusAreaData, setEditedFocusAreaData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
@@ -1305,11 +1305,7 @@ function DeepWorkPageContent() {
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null) => {
-    if (def) {
-      setNavigationStack([def]);
-    } else {
-      setNavigationStack([]);
-    }
+    setSelectedDeepWorkTask(def);
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -1319,6 +1315,14 @@ function DeepWorkPageContent() {
   useEffect(() => {
     setIsLoadingPage(false);
   }, []);
+  
+  useEffect(() => {
+    if (selectedDeepWorkTask) {
+        setNavigationStack([selectedDeepWorkTask]);
+    } else {
+        setNavigationStack([]);
+    }
+}, [selectedDeepWorkTask]);
   
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
@@ -1474,7 +1478,7 @@ function DeepWorkPageContent() {
                         </div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); setNavigationStack([]); }}>Library</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); handleSelectFocusArea(null); }}>Library</Button>
                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
                         </div>
                     </CardHeader>

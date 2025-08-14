@@ -315,7 +315,7 @@ function UpskillPageContent() {
   const router = useRouter();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
-  const currentTask = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
+  const currentTask = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : selectedUpskillTask;
 
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
@@ -952,7 +952,7 @@ function UpskillPageContent() {
                 </div>
                 {hasChildren && (
                     <AccordionContent className="pl-4">
-                        {renderHierarchy(item.id, level + 1)}
+                        {renderHierarchy(item.id, 1)}
                     </AccordionContent>
                 )}
             </AccordionItem>
@@ -1074,11 +1074,7 @@ function UpskillPageContent() {
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null) => {
-    if (def) {
-      setNavigationStack([def]);
-    } else {
-      setNavigationStack([]);
-    }
+    setSelectedUpskillTask(def);
   };
 
   const handleBreadcrumbClick = (index: number) => {
@@ -1088,6 +1084,14 @@ function UpskillPageContent() {
   useEffect(() => {
     setIsLoadingPage(false);
   }, []);
+  
+  useEffect(() => {
+    if (selectedUpskillTask) {
+        setNavigationStack([selectedUpskillTask]);
+    } else {
+        setNavigationStack([]);
+    }
+}, [selectedUpskillTask]);
 
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your learning data...</p></div>;
@@ -1237,7 +1241,7 @@ function UpskillPageContent() {
                         </div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
                           <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); setNavigationStack([]); }}>Library</Button>
+                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); handleSelectFocusArea(null); }}>Library</Button>
                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
                         </div>
                     </CardHeader>
