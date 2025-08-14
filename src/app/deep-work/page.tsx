@@ -1484,55 +1484,58 @@ function DeepWorkPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
                                               const nodeType = getUpskillNodeType(item);
-                                              const isCuriosity = nodeType === 'Curiosity';
-                                              const children = isCuriosity ? (item.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d) : [];
+                                              const hasChildren = item.linkedUpskillIds && item.linkedUpskillIds.length > 0;
+                                              const isSelectable = nodeType === 'Curiosity' || nodeType === 'Visualization';
 
-                                              if (!isCuriosity && nodeType !== 'Visualization') return null; // Only show curiosities and visualizations
+                                              const renderHierarchy = (parentId: string, level = 0): React.ReactNode[] => {
+                                                const children = upskillDefinitions.filter(def => upskillDefinitions.some(parent => parent.id === parentId && parent.linkedUpskillIds?.includes(def.id))).sort((a,b) => a.name.localeCompare(b.name));
+                                                return children.map(childItem => {
+                                                  const childNodeType = getUpskillNodeType(childItem);
+                                                  const hasGrandchildren = childItem.linkedUpskillIds && childItem.linkedUpskillIds.length > 0;
+                                                  return (
+                                                      <AccordionItem value={childItem.id} key={childItem.id} className="border-b-0">
+                                                          <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" disabled={!hasGrandchildren} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(childItem.id) ? prev.filter(id => id !== childItem.id) : [...prev, childItem.id])}>
+                                                              <div className="flex items-center space-x-2 w-full" style={{ paddingLeft: `${level * 1}rem` }}>
+                                                                  <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(childItem.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(childItem.id) && <Check className="h-3 w-3" />}</div>
+                                                                  <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                      {childNodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
+                                                                      {childItem.name}
+                                                                  </Label>
+                                                              </div>
+                                                          </AccordionTrigger>
+                                                          {hasGrandchildren && <AccordionContent className="pl-4">{renderHierarchy(childItem.id, level + 1)}</AccordionContent>}
+                                                      </AccordionItem>
+                                                  )
+                                                });
+                                              };
 
-                                              return isCuriosity ? (
+                                              if (!isSelectable) return null;
+
+                                              return (
                                                   <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                      <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50">
+                                                      <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" disabled={!hasChildren} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
                                                           <div className="flex items-center space-x-2">
-                                                            <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
-                                                            <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                            <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(item.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(item.id) && <Check className="h-3 w-3" />}</div>
+                                                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                {nodeType === 'Curiosity' ? <Flashlight className="h-4 w-4 text-amber-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
                                                                 {item.name}
                                                             </Label>
                                                           </div>
                                                       </AccordionTrigger>
-                                                      <AccordionContent className="pl-8">
-                                                          {children.map(child => (
-                                                              <div key={child.id} className="flex items-center space-x-2 p-1">
-                                                                  <Checkbox id={`link-${child.id}`} checked={tempLinkedIds.includes(child.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, child.id] : prev.filter(id => id !== child.id))}/>
-                                                                  <Label htmlFor={`link-${child.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                      <Frame className="h-4 w-4 text-blue-500"/>
-                                                                      {child.name}
-                                                                  </Label>
-                                                              </div>
-                                                          ))}
-                                                      </AccordionContent>
+                                                      {hasChildren && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
                                                   </AccordionItem>
-                                              ) : (
-                                                <div className="flex items-center space-x-2 p-1 ml-4">
-                                                    <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
-                                                    <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                        <Frame className="h-4 w-4 text-blue-500"/>
-                                                        {item.name}
-                                                    </Label>
-                                                </div>
-                                              );
+                                              )
                                           })}
                                         </Accordion>
                                       ) : (
                                         (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
                                             const isFolder = 'parentId' in item;
                                             return (
-                                              <div key={item.id} className="flex items-center space-x-2 p-1">
+                                              <div key={item.id} className="flex items-center space-x-2 p-1" onDoubleClick={!isFolder ? () => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]) : undefined}>
                                                   {!isFolder && (
-                                                    <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                     <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(item.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(item.id) && <Check className="h-3 w-3" />}</div>
                                                   )}
                                                   <Label 
-                                                      htmlFor={isFolder ? undefined : `link-${item.id}`} 
                                                       className="font-normal w-full flex items-center gap-2 cursor-pointer"
                                                       onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
                                                   >
@@ -1601,21 +1604,28 @@ function DeepWorkPageContent() {
                                       </div>
                                       {manageLinksConfig.type === 'upskill' && newLinkedItemMicroSkillId && (
                                           <div className="space-y-1">
-                                              <Label>Parent Curiosity (Optional)</Label>
-                                              <Select value={newLinkedItemCuriosityId || ''} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
-                                                  <SelectTrigger><SelectValue placeholder="Link to existing curiosity..."/></SelectTrigger>
-                                                  <SelectContent>
-                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
-                                                        {curiositiesForLinking.map(c => (
-                                                            <React.Fragment key={c.id}>
-                                                                <SelectItem value={c.id}>{c.name}</SelectItem>
-                                                                {c.visualizations.map(v => (
-                                                                    <SelectItem key={v.id} value={v.id} className="pl-8 text-muted-foreground">{v.name}</SelectItem>
-                                                                ))}
-                                                            </React.Fragment>
-                                                        ))}
-                                                  </SelectContent>
-                                              </Select>
+                                              <Label>Parent Task (Optional)</Label>
+                                                <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
+                                                    <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
+                                                    <SelectContent>
+                                                          <SelectItem value="none">None (create as new Curiosity)</SelectItem>
+                                                          {curiositiesForLinking.map(c => {
+                                                              const renderHierarchy = (item: any, level = 0): React.ReactNode[] => {
+                                                                const children = upskillDefinitions.filter(def => item.linkedUpskillIds?.includes(def.id));
+                                                                let nodes: React.ReactNode[] = [
+                                                                    <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
+                                                                        {item.name}
+                                                                    </SelectItem>
+                                                                ];
+                                                                children.forEach(child => {
+                                                                    nodes = [...nodes, ...renderHierarchy(child, level + 1)];
+                                                                });
+                                                                return nodes;
+                                                              };
+                                                              return renderHierarchy(c);
+                                                          })}
+                                                    </SelectContent>
+                                                </Select>
                                           </div>
                                       )}
                                       <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
