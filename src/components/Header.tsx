@@ -58,20 +58,22 @@ export function Header() {
             </Link>
           </div>
           
-          <nav className={cn("hidden md:flex items-center gap-4", !currentUser && "hidden")}>
-              {navLinks.map(link => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={cn(
-                    "text-sm font-medium transition-colors hover:text-primary",
-                    (isClient && pathname === link.href) ? "text-primary" : "text-muted-foreground"
-                  )}
-                >
-                  {link.label}
-                </Link>
-              ))}
-          </nav>
+          <div className="flex-grow flex items-center justify-center">
+            <nav className={cn("hidden md:flex items-center gap-4", !currentUser && "hidden")}>
+                {navLinks.map(link => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={cn(
+                      "text-sm font-medium transition-colors hover:text-primary",
+                      (isClient && pathname === link.href) ? "text-primary" : "text-muted-foreground"
+                    )}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+            </nav>
+          </div>
           
           <div className="flex items-center gap-4">
             <Button
