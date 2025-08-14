@@ -566,10 +566,6 @@ function UpskillPageContent() {
     }
   }, [editingSubtopic]);
   
-  useEffect(() => {
-    setIsLoadingPage(false);
-  }, []);
-
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
     setAllUpskillLogs(prevLogs => {
       const index = prevLogs.findIndex(log => log.id === updatedWorkout.id);
@@ -1074,6 +1070,10 @@ function UpskillPageContent() {
     return nodes;
   };
 
+  useEffect(() => {
+    setIsLoadingPage(false);
+  }, []);
+
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your learning data...</p></div>;
   }
@@ -1087,7 +1087,7 @@ function UpskillPageContent() {
                  <SkillLibrary
                     pageType="upskill"
                     selectedMicroSkill={selectedMicroSkill}
-                    onSelectMicroSkill={setSelectedUpskillTask}
+                    onSelectMicroSkill={setSelectedMicroSkill}
                     definitions={upskillDefinitions}
                     onSelectFocusArea={setSelectedUpskillTask}
                     onOpenNewFocusArea={handleOpenNewSubtopicModal}
@@ -1324,7 +1324,7 @@ function UpskillPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
                                               <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                    <div className="flex items-center w-full group/item">
+                                                  <div className="flex items-center w-full group/item">
                                                         <Checkbox
                                                             id={`cb-link-${item.id}`}
                                                             checked={tempLinkedIds.includes(item.id)}
