@@ -521,7 +521,8 @@ function UpskillPageContent() {
   }, [editingSubtopic]);
   
   useEffect(() => {
-    setIsLoadingPage(false);
+    // This hook should run after the initial render and once data is loaded.
+    // The conditional check for isLoadingPage is now moved to after all hook calls.
   }, []);
 
   const currentDatedWorkout = useMemo(() => {
@@ -876,26 +877,33 @@ function UpskillPageContent() {
 
   const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
     const children = upskillDefinitions
-      .filter((def) => def.id !== manageLinksConfig?.parent.id && upskillDefinitions.some(parent => parent.linkedUpskillIds?.includes(def.id) && parent.id === parentId))
+      .filter((def) => {
+        const parentDef = upskillDefinitions.find(p => p.id === parentId);
+        return parentDef?.linkedUpskillIds?.includes(def.id);
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-
+  
     return children.map((item) => {
         const nodeType = getUpskillNodeType(item);
         const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-
+  
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <AccordionTrigger 
-                  className="p-1 hover:no-underline rounded-md hover:bg-muted/50" 
-                  disabled={!hasChildren}
-                  onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                <AccordionTrigger
+                    asChild
+                    className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
+                    onDoubleClick={() => {
+                        setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                    }}
                 >
-                    <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem`}}>
-                        <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0" />
-                        <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                            {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
-                            {item.name}
-                        </Label>
+                    <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem` }}>
+                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500" /> : <Frame className="h-4 w-4 text-blue-500" />}
+                                {item.name}
+                            </Label>
+                        </div>
+                        {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
                     </div>
                 </AccordionTrigger>
                 {hasChildren && (
@@ -906,7 +914,7 @@ function UpskillPageContent() {
             </AccordionItem>
         );
     });
-  }, [upskillDefinitions, getUpskillNodeType, manageLinksConfig?.parent.id, tempLinkedIds]);
+  }, [upskillDefinitions, getUpskillNodeType, tempLinkedIds]);
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
@@ -1301,18 +1309,22 @@ function UpskillPageContent() {
                                               const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
                                               return (
                                                   <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                      <AccordionTrigger 
-                                                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
-                                                        disabled={!hasChildren}
-                                                        onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                                                      <AccordionTrigger
+                                                        asChild
+                                                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
+                                                        onDoubleClick={() => {
+                                                            setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                                                        }}
                                                       >
-                                                          <div className="flex items-center space-x-2">
-                                                            <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0" />
-                                                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
-                                                                {item.name}
-                                                            </Label>
-                                                          </div>
+                                                        <div className="flex items-center justify-between w-full">
+                                                            <div className="flex items-center space-x-2">
+                                                                <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                    <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                                    {item.name}
+                                                                </Label>
+                                                            </div>
+                                                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                                        </div>
                                                       </AccordionTrigger>
                                                       {hasChildren && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
                                                   </AccordionItem>
@@ -1324,9 +1336,6 @@ function UpskillPageContent() {
                                             const isFolder = 'parentId' in item;
                                             return (
                                               <div key={item.id} className="flex items-center space-x-2 p-1" onDoubleClick={!isFolder ? () => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]) : undefined}>
-                                                  {!isFolder && (
-                                                     <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(item.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(item.id) && <Check className="h-3 w-3" />}</div>
-                                                  )}
                                                   <Label 
                                                       className="font-normal w-full flex items-center gap-2 cursor-pointer"
                                                       onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
