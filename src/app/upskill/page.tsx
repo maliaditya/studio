@@ -507,6 +507,51 @@ function UpskillPageContent() {
     if (!selectedUpskillTask) return 0;
     return calculateTotalEstimate(selectedUpskillTask);
   }, [selectedUpskillTask, calculateTotalEstimate]);
+  
+  const currentDatedWorkout = useMemo(() => {
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    return allUpskillLogs.find(log => log.id === dateKey);
+  }, [selectedDate, allUpskillLogs]);
+
+  const currentWorkoutExercises = useMemo(() => currentDatedWorkout?.exercises || [], [currentDatedWorkout]);
+  
+  const allMicroSkillsGrouped = useMemo(() => {
+    const grouped: Record<string, MicroSkill[]> = {};
+    coreSkills.forEach(core => {
+        if(core.type === 'Specialization') {
+            core.skillAreas.forEach(area => {
+                const groupName = `${core.name} > ${area.name}`;
+                if(!grouped[groupName]) grouped[groupName] = [];
+                grouped[groupName].push(...area.microSkills);
+            });
+        }
+    });
+    return grouped;
+  }, [coreSkills]);
+
+  const curiositiesForLinking = useMemo(() => {
+    if (manageLinksConfig?.type !== 'upskill') return [];
+    
+    const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
+    if (!microSkillName) return [];
+  
+    const allCuriosities = upskillDefinitions.filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity');
+  
+    return allCuriosities.map(curiosity => {
+        return {
+            ...curiosity,
+            children: (curiosity.linkedUpskillIds || [])
+                .map(id => upskillDefinitions.find(d => d.id === id))
+                .filter(d => d && getUpskillNodeType(d) === 'Objective')
+                .map(objective => ({
+                    ...objective,
+                    children: (objective!.linkedUpskillIds || [])
+                        .map(id => upskillDefinitions.find(d => d.id === id))
+                        .filter(d => d && getUpskillNodeType(d) === 'Visualization')
+                }))
+        };
+    });
+  }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
   useEffect(() => {
     if (editingSubtopic) {
@@ -521,16 +566,8 @@ function UpskillPageContent() {
   }, [editingSubtopic]);
   
   useEffect(() => {
-    // This hook should run after the initial render and once data is loaded.
-    // The conditional check for isLoadingPage is now moved to after all hook calls.
+    setIsLoadingPage(false);
   }, []);
-
-  const currentDatedWorkout = useMemo(() => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allUpskillLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allUpskillLogs]);
-
-  const currentWorkoutExercises = useMemo(() => currentDatedWorkout?.exercises || [], [currentDatedWorkout]);
 
   const updateOrAddWorkoutLog = (updatedWorkout: DatedWorkout) => {
     setAllUpskillLogs(prevLogs => {
@@ -677,10 +714,6 @@ function UpskillPageContent() {
 
   const handleViewProgress = (definition: ExerciseDefinition) => { setProgressModalConfig({ isOpen: true, exercise: definition }); };
   
-  const availableSpecializations = useMemo(() => {
-    return coreSkills.filter(s => s.type === 'Specialization');
-  }, [coreSkills]);
-
   const getMicroSkillIdFromCategory = useCallback((category: string) => {
     const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
     if (microSkillInfo) {
@@ -876,30 +909,42 @@ function UpskillPageContent() {
   }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
 
   const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
-    const children = upskillDefinitions
-      .filter((def) => {
-        const parentDef = upskillDefinitions.find(p => p.id === parentId);
-        return parentDef?.linkedUpskillIds?.includes(def.id);
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  
+    const parentDef = upskillDefinitions.find(p => p.id === parentId);
+    if (!parentDef) return [];
+
+    const children = (parentDef.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((item): item is ExerciseDefinition => !!item)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
     return children.map((item) => {
         const nodeType = getUpskillNodeType(item);
         const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-  
+        
+        const getIcon = () => {
+            switch (nodeType) {
+                case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
+                default: return <Flashlight className="h-4 w-4 text-amber-500" />;
+            }
+        };
+
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
                 <AccordionTrigger
                     asChild
                     className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
                     onDoubleClick={() => {
-                        setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                        setTempLinkedIds(prev => {
+                          const isSelected = prev.includes(item.id);
+                          return isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id];
+                        });
                     }}
                 >
                     <div className="flex items-center justify-between w-full">
                         <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem` }}>
                             <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500" /> : <Frame className="h-4 w-4 text-blue-500" />}
+                                {getIcon()}
                                 {item.name}
                             </Label>
                         </div>
@@ -1002,20 +1047,6 @@ function UpskillPageContent() {
     );
   }, [setUpskillDefinitions]);
 
-  const allMicroSkillsGrouped = useMemo(() => {
-    const grouped: Record<string, MicroSkill[]> = {};
-    coreSkills.forEach(core => {
-        if(core.type === 'Specialization') {
-            core.skillAreas.forEach(area => {
-                const groupName = `${core.name} > ${area.name}`;
-                if(!grouped[groupName]) grouped[groupName] = [];
-                grouped[groupName].push(...area.microSkills);
-            });
-        }
-    });
-    return grouped;
-  }, [coreSkills]);
-
   const getLibraryTitle = () => {
     if (selectedProject) return selectedProject.name;
     if (selectedMicroSkill) return selectedMicroSkill.name;
@@ -1023,41 +1054,21 @@ function UpskillPageContent() {
   }
   
   const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getUpskillNodeType(selectedUpskillTask) === 'Curiosity');
-
-  const curiositiesForLinking = useMemo(() => {
-    if (manageLinksConfig?.type !== 'upskill') return [];
-    
-    const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
-    if (!microSkillName) return [];
   
-    const allCuriosities = upskillDefinitions.filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity');
-  
-    const buildHierarchy = (parentId: string): any[] => {
-      return (upskillDefinitions || [])
-        .filter(d => (d.linkedUpskillIds || []).includes(parentId)) // This logic is reversed - find parents of item
-        .map(child => ({
-          ...child,
-          children: buildHierarchy(child.id)
-        }));
-    };
-
-    return allCuriosities.map(curiosity => ({
-        ...curiosity,
-        children: (curiosity.linkedUpskillIds || [])
-            .map(id => upskillDefinitions.find(def => def.id === id))
-            .filter((c): c is ExerciseDefinition => !!c)
-            .map(child => ({
-                ...child,
-                children: (child.linkedUpskillIds || [])
-                    .map(id => upskillDefinitions.find(def => def.id === id))
-                    .filter((gc): gc is ExerciseDefinition => !!gc)
-            }))
-    }));
-  }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
-
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
-  }
+  const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
+    let nodes: React.ReactNode[] = [];
+    items.forEach(item => {
+        nodes.push(
+            <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5 + 1}rem` }}>
+                {item.name}
+            </SelectItem>
+        );
+        if (item.children && item.children.length > 0) {
+            nodes = [...nodes, ...renderUpskillHierarchySelect(item.children, level + 1)];
+        }
+    });
+    return nodes;
+  };
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1194,7 +1205,7 @@ function UpskillPageContent() {
                                             <p className="text-sm font-medium mb-1">Required Skills:</p>
                                             <ul className="list-disc list-inside text-sm text-muted-foreground">
                                                 {feature.linkedSkills.map(link => {
-                                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === link.microSkillId);
+                                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillId === link.microSkillId);
                                                     return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
                                                 })}
                                             </ul>
@@ -1303,33 +1314,28 @@ function UpskillPageContent() {
                                   {filteredItemsForLinking.length > 0 ? (
                                       manageLinksConfig.type === 'upskill' ? (
                                         <Accordion type="multiple" className="w-full">
-                                          {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
-                                              const nodeType = getUpskillNodeType(item);
-                                              if (nodeType !== 'Curiosity') return null;
-                                              const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-                                              return (
-                                                  <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                      <AccordionTrigger
-                                                        asChild
-                                                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
-                                                        onDoubleClick={() => {
-                                                            setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
-                                                        }}
-                                                      >
-                                                        <div className="flex items-center justify-between w-full">
-                                                            <div className="flex items-center space-x-2">
-                                                                <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                    <Flashlight className="h-4 w-4 text-amber-500"/>
-                                                                    {item.name}
-                                                                </Label>
-                                                            </div>
-                                                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                          {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
+                                              <AccordionItem value={item.id} key={item.id} className="border-b-0">
+                                                  <AccordionTrigger 
+                                                    className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
+                                                    onDoubleClick={() => {
+                                                      setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                                                    }}
+                                                    asChild
+                                                  >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <div className="flex items-center space-x-2">
+                                                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                                {item.name}
+                                                            </Label>
                                                         </div>
-                                                      </AccordionTrigger>
-                                                      {hasChildren && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
-                                                  </AccordionItem>
-                                              )
-                                          })}
+                                                        {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                                    </div>
+                                                  </AccordionTrigger>
+                                                  {((item.linkedUpskillIds || []).length > 0) && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
+                                              </AccordionItem>
+                                          ))}
                                         </Accordion>
                                       ) : (
                                         (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
@@ -1409,22 +1415,8 @@ function UpskillPageContent() {
                                                 <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
                                                     <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
                                                     <SelectContent>
-                                                          <SelectItem value="none">None (create as new Curiosity)</SelectItem>
-                                                          {curiositiesForLinking.map(c => {
-                                                                const renderHierarchySelect = (item: any, level = 0): React.ReactNode[] => {
-                                                                    const children = item.children || [];
-                                                                    let nodes: React.ReactNode[] = [
-                                                                        <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
-                                                                            {item.name}
-                                                                        </SelectItem>
-                                                                    ];
-                                                                    children.forEach((child:any) => {
-                                                                        nodes = [...nodes, ...renderHierarchySelect(child, level + 1)];
-                                                                    });
-                                                                    return nodes;
-                                                                };
-                                                                return renderHierarchySelect(c);
-                                                            })}
+                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
+                                                        {renderUpskillHierarchySelect(curiositiesForLinking)}
                                                     </SelectContent>
                                                 </Select>
                                             </div>

@@ -1097,30 +1097,44 @@ function DeepWorkPageContent() {
   }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
 
   const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
-    const children = upskillDefinitions
-      .filter((def) => {
-        const parentDef = upskillDefinitions.find(p => p.id === parentId);
-        return parentDef?.linkedUpskillIds?.includes(def.id);
-      })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  
+    const parentDef = upskillDefinitions.find(p => p.id === parentId);
+    if (!parentDef) return [];
+
+    const children = (parentDef.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((item): item is ExerciseDefinition => !!item)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
     return children.map((item) => {
         const nodeType = getUpskillNodeType(item);
         const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-  
+        
+        const getIcon = () => {
+            switch (nodeType) {
+                case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
+                default: return <Flashlight className="h-4 w-4 text-amber-500" />;
+            }
+        };
+
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
                 <AccordionTrigger
                     asChild
                     className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
                     onDoubleClick={() => {
-                        setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                        const isSelected = tempLinkedIds.includes(item.id);
+                        if (isSelected) {
+                            setTempLinkedIds(prev => prev.filter(id => id !== item.id));
+                        } else {
+                            setTempLinkedIds(prev => [...prev, item.id]);
+                        }
                     }}
                 >
                     <div className="flex items-center justify-between w-full">
                         <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem` }}>
                             <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500" /> : <Frame className="h-4 w-4 text-blue-500" />}
+                                {getIcon()}
                                 {item.name}
                             </Label>
                         </div>
@@ -1135,7 +1149,8 @@ function DeepWorkPageContent() {
             </AccordionItem>
         );
     });
-  }, [upskillDefinitions, getUpskillNodeType, manageLinksConfig?.parent.id, tempLinkedIds]);
+  }, [upskillDefinitions, getUpskillNodeType, tempLinkedIds]);
+
 
   const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
     if (!selectedDeepWorkTask) return;
@@ -1265,15 +1280,32 @@ function DeepWorkPageContent() {
     });
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
-  }
-
+  
   const getLibraryTitle = () => {
     if (selectedProject) return selectedProject.name;
     if (selectedMicroSkill) return selectedMicroSkill.name;
     return 'Library';
   }
+
+  if (isLoadingPage) {
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
+  }
+
+
+  const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
+    let nodes: React.ReactNode[] = [];
+    items.forEach(item => {
+        nodes.push(
+            <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5 + 1}rem` }}>
+                {item.name}
+            </SelectItem>
+        );
+        if (item.children && item.children.length > 0) {
+            nodes = [...nodes, ...renderUpskillHierarchySelect(item.children, level + 1)];
+        }
+    });
+    return nodes;
+  };
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1401,7 +1433,7 @@ function DeepWorkPageContent() {
                                         if (!def) return null;
                                         const domain = getDomainForCategory(def.category);
                                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={handleAddTaskToSession} setSelectedSubtopic={setSelectedDeepWorkTask} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={false} getUpskillLoggedMinutesRecursive={getDeepWorkLoggedMinutes} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={0} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set()} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={handleLinkProject} onEdit={setEditingFocusArea}  />;
+                                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={setSelectedDeepWorkTask} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={false} getUpskillLoggedMinutesRecursive={getDeepWorkLoggedMinutes} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={0} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={handleLinkProject} onEdit={setEditingFocusArea}  />;
                                     })}
                                     {(selectedDeepWorkTask.linkedResourceIds || []).map(id => {
                                         const resource = resources.find(r => r.id === id);
@@ -1418,7 +1450,7 @@ function DeepWorkPageContent() {
                                             <p className="text-sm font-medium mb-1">Required Skills:</p>
                                             <ul className="list-disc list-inside text-sm text-muted-foreground">
                                                 {feature.linkedSkills.map(link => {
-                                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === link.microSkillId);
+                                                    const skill = Array.from(microSkillMap.values()).find(ms => ms.microSkillId === link.microSkillId);
                                                     return <li key={link.microSkillId}>{skill?.microSkillName || 'Unknown Skill'}</li>;
                                                 })}
                                             </ul>
@@ -1532,31 +1564,30 @@ function DeepWorkPageContent() {
                                   {filteredItemsForLinking.length > 0 ? (
                                       manageLinksConfig.type === 'upskill' ? (
                                         <Accordion type="multiple" className="w-full">
-                                          {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
-                                              const nodeType = getUpskillNodeType(item);
-                                              if (nodeType !== 'Curiosity') return null;
-                                              const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-                                              return (
-                                                  <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                      <AccordionTrigger 
-                                                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
-                                                        onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
-                                                        asChild
-                                                      >
-                                                        <div className="flex items-center justify-between w-full">
-                                                            <div className="flex items-center space-x-2">
-                                                                <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                    <Flashlight className="h-4 w-4 text-amber-500"/>
-                                                                    {item.name}
-                                                                </Label>
-                                                            </div>
-                                                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                          {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
+                                              <AccordionItem value={item.id} key={item.id} className="border-b-0">
+                                                  <AccordionTrigger 
+                                                    className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
+                                                    onDoubleClick={() => {
+                                                      const isSelected = tempLinkedIds.includes(item.id);
+                                                      if (isSelected) setTempLinkedIds(prev => prev.filter(id => id !== item.id));
+                                                      else setTempLinkedIds(prev => [...prev, item.id]);
+                                                    }}
+                                                    asChild
+                                                  >
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <div className="flex items-center space-x-2">
+                                                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                                {item.name}
+                                                            </Label>
                                                         </div>
-                                                      </AccordionTrigger>
-                                                      {hasChildren && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
-                                                  </AccordionItem>
-                                              )
-                                          })}
+                                                        {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                                    </div>
+                                                  </AccordionTrigger>
+                                                  {((item.linkedUpskillIds || []).length > 0) && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
+                                              </AccordionItem>
+                                          ))}
                                         </Accordion>
                                       ) : (
                                         (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
@@ -1636,22 +1667,8 @@ function DeepWorkPageContent() {
                                                 <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
                                                     <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
                                                     <SelectContent>
-                                                          <SelectItem value="none">None (create as new Curiosity)</SelectItem>
-                                                          {curiositiesForLinking.map(c => {
-                                                                const renderHierarchySelect = (item: any, level = 0): React.ReactNode[] => {
-                                                                    const children = item.children || [];
-                                                                    let nodes: React.ReactNode[] = [
-                                                                        <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
-                                                                            {item.name}
-                                                                        </SelectItem>
-                                                                    ];
-                                                                    children.forEach((child:any) => {
-                                                                        nodes = [...nodes, ...renderHierarchySelect(child, level + 1)];
-                                                                    });
-                                                                    return nodes;
-                                                                };
-                                                                return renderHierarchySelect(c);
-                                                            })}
+                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
+                                                        {renderUpskillHierarchySelect(curiositiesForLinking)}
                                                     </SelectContent>
                                                 </Select>
                                           </div>
