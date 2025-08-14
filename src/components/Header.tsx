@@ -40,14 +40,9 @@ export function Header() {
     { href: '/purpose', label: 'Purpose' },
     { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
-    { href: '/monetization-engine', label: 'Monetization' },
+    { href: '/strategic-planning', label: 'Strategy' },
     { href: '/personal-branding', label: 'Branding' },
     { href: '/resources', label: 'Resources' },
-    { href: '/productization', label: 'Productization' },
-    { href: '/offerization', label: 'Offerization' },
-    { href: '/offer-system', label: 'Offers' },
-    { href: '/matrix', label: 'Matrix' },
-    { href: '/patterns', label: 'Patterns' },
     { href: '/timesheet', label: 'Timesheet' },
   ];
 
