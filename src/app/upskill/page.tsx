@@ -907,53 +907,52 @@ function UpskillPageContent() {
     if (!parentDef) return [];
 
     const children = (parentDef.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((item): item is ExerciseDefinition => !!item)
-        .sort((a, b) => a.name.localeCompare(b.name));
+      .map(id => upskillDefinitions.find(d => d.id === id))
+      .filter((item): item is ExerciseDefinition => !!item)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     return children.map((item) => {
-        const nodeType = getUpskillNodeType(item);
-        const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-        
-        const getIcon = () => {
-            switch (nodeType) {
-                case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
-                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
-                default: return <Flashlight className="h-4 w-4 text-amber-500" />;
-            }
-        };
+      const nodeType = getUpskillNodeType(item);
+      const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
+      
+      const getIcon = () => {
+        switch (nodeType) {
+          case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+          case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
+          default: return <Flashlight className="h-4 w-4 text-amber-500" />;
+        }
+      };
 
-        return (
-            <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
-                    <Checkbox
-                        id={`cb-link-${item.id}`}
-                        checked={tempLinkedIds.includes(item.id)}
-                        onCheckedChange={(checked) => {
-                            setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="mr-2"
-                    />
-                    <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
-                        <div className="flex items-center justify-between w-full">
-                            <div className="flex items-center space-x-2">
-                                <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                    {getIcon()}
-                                    {item.name}
-                                </Label>
-                            </div>
-                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                        </div>
-                    </AccordionTrigger>
-                </div>
-                {hasChildren && (
-                    <AccordionContent className="pl-4">
-                        {renderHierarchy(item.id, 1)}
-                    </AccordionContent>
-                )}
-            </AccordionItem>
-        );
+      return (
+        <AccordionItem value={item.id} key={item.id} className="border-b-0">
+          <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+              <Checkbox
+                  id={`cb-link-${item.id}`}
+                  checked={tempLinkedIds.includes(item.id)}
+                  onCheckedChange={(checked) => {
+                      setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mr-2"
+              />
+              <AccordionTrigger
+                className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+              >
+                  <div className="flex items-center space-x-2">
+                      <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                          {getIcon()}
+                          {item.name}
+                      </Label>
+                  </div>
+              </AccordionTrigger>
+          </div>
+          {hasChildren && (
+              <AccordionContent className="pl-4">
+                  {renderHierarchy(item.id, level + 1)}
+              </AccordionContent>
+          )}
+        </AccordionItem>
+      );
     });
   }, [upskillDefinitions, getUpskillNodeType, tempLinkedIds]);
 
@@ -1511,4 +1510,5 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
