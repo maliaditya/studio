@@ -275,8 +275,9 @@ function LinkedDeepWorkCard({
         case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
         case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
         case 'Action': return <Bolt className="h-5 w-5 text-blue-500" />;
-        case 'Standalone': return <Focus className="h-5 w-5 text-purple-500" />;
-        default: return <Briefcase className="h-5 w-5" />;
+        case 'Standalone': 
+        default:
+            return <Focus className="h-5 w-5 text-purple-500" />;
       }
     };
 
@@ -1095,6 +1096,40 @@ function DeepWorkPageContent() {
 
   }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
 
+  const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
+    const children = upskillDefinitions
+      .filter((def) => def.id !== manageLinksConfig?.parent.id && upskillDefinitions.some(parent => parent.linkedUpskillIds?.includes(def.id) && parent.id === parentId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return children.map((item) => {
+        const nodeType = getUpskillNodeType(item);
+        const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
+
+        return (
+            <AccordionItem value={item.id} key={item.id} className="border-b-0">
+                <AccordionTrigger 
+                  className="p-1 hover:no-underline rounded-md hover:bg-muted/50"
+                  disabled={!hasChildren}
+                  onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                >
+                    <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem`}}>
+                        <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0"/>
+                        <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                            {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
+                            {item.name}
+                        </Label>
+                    </div>
+                </AccordionTrigger>
+                {hasChildren && (
+                    <AccordionContent className="pl-4">
+                        {renderHierarchy(item.id, level + 1)}
+                    </AccordionContent>
+                )}
+            </AccordionItem>
+        );
+    });
+  }, [upskillDefinitions, getUpskillNodeType, manageLinksConfig?.parent.id, tempLinkedIds]);
+
   const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
     if (!selectedDeepWorkTask) return;
     let updatedParent: ExerciseDefinition;
@@ -1196,7 +1231,7 @@ function DeepWorkPageContent() {
         )
     );
   }, [setDeepWorkDefinitions]);
-
+  
   const selectedDeepWorkTaskIsIntention = selectedDeepWorkTask && getDeepWorkNodeType(selectedDeepWorkTask) === 'Intention';
 
   const curiositiesForLinking = useMemo(() => {
@@ -1207,12 +1242,20 @@ function DeepWorkPageContent() {
   
     const allCuriosities = upskillDefinitions.filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity');
   
-    return allCuriosities.map(curiosity => ({
-        ...curiosity,
-        visualizations: upskillDefinitions.filter(v => 
-            curiosity.linkedUpskillIds?.includes(v.id) && getUpskillNodeType(v) === 'Visualization'
-        )
-    }));
+    return allCuriosities.map(curiosity => {
+        return {
+            ...curiosity,
+            children: (curiosity.linkedUpskillIds || [])
+                .map(id => upskillDefinitions.find(d => d.id === id))
+                .filter(d => d && getUpskillNodeType(d) === 'Objective')
+                .map(objective => ({
+                    ...objective,
+                    children: (objective!.linkedUpskillIds || [])
+                        .map(id => upskillDefinitions.find(d => d.id === id))
+                        .filter(d => d && getUpskillNodeType(d) === 'Visualization')
+                }))
+        };
+    });
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
   if (isLoadingPage) {
@@ -1484,40 +1527,19 @@ function DeepWorkPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
                                               const nodeType = getUpskillNodeType(item);
-                                              const hasChildren = item.linkedUpskillIds && item.linkedUpskillIds.length > 0;
-                                              const isSelectable = nodeType === 'Curiosity' || nodeType === 'Visualization';
-
-                                              const renderHierarchy = (parentId: string, level = 0): React.ReactNode[] => {
-                                                const children = upskillDefinitions.filter(def => upskillDefinitions.some(parent => parent.id === parentId && parent.linkedUpskillIds?.includes(def.id))).sort((a,b) => a.name.localeCompare(b.name));
-                                                return children.map(childItem => {
-                                                  const childNodeType = getUpskillNodeType(childItem);
-                                                  const hasGrandchildren = childItem.linkedUpskillIds && childItem.linkedUpskillIds.length > 0;
-                                                  return (
-                                                      <AccordionItem value={childItem.id} key={childItem.id} className="border-b-0">
-                                                          <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" disabled={!hasGrandchildren} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(childItem.id) ? prev.filter(id => id !== childItem.id) : [...prev, childItem.id])}>
-                                                              <div className="flex items-center space-x-2 w-full" style={{ paddingLeft: `${level * 1}rem` }}>
-                                                                  <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(childItem.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(childItem.id) && <Check className="h-3 w-3" />}</div>
-                                                                  <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                      {childNodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
-                                                                      {childItem.name}
-                                                                  </Label>
-                                                              </div>
-                                                          </AccordionTrigger>
-                                                          {hasGrandchildren && <AccordionContent className="pl-4">{renderHierarchy(childItem.id, level + 1)}</AccordionContent>}
-                                                      </AccordionItem>
-                                                  )
-                                                });
-                                              };
-
-                                              if (!isSelectable) return null;
-
+                                              if (nodeType !== 'Curiosity' && nodeType !== 'Objective') return null;
+                                              const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
                                               return (
                                                   <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                      <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" disabled={!hasChildren} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+                                                      <AccordionTrigger 
+                                                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
+                                                        disabled={!hasChildren}
+                                                        onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                                                      >
                                                           <div className="flex items-center space-x-2">
-                                                            <div className={cn("w-4 h-4 rounded-sm border flex items-center justify-center flex-shrink-0", tempLinkedIds.includes(item.id) ? "bg-primary text-primary-foreground" : "bg-background")}>{tempLinkedIds.includes(item.id) && <Check className="h-3 w-3" />}</div>
+                                                            <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0" />
                                                             <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                {nodeType === 'Curiosity' ? <Flashlight className="h-4 w-4 text-amber-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
+                                                                {nodeType === 'Curiosity' ? <Flashlight className="h-4 w-4 text-amber-500"/> : <Flag className="h-4 w-4 text-green-500"/>}
                                                                 {item.name}
                                                             </Label>
                                                           </div>
@@ -1610,20 +1632,20 @@ function DeepWorkPageContent() {
                                                     <SelectContent>
                                                           <SelectItem value="none">None (create as new Curiosity)</SelectItem>
                                                           {curiositiesForLinking.map(c => {
-                                                              const renderHierarchy = (item: any, level = 0): React.ReactNode[] => {
-                                                                const children = upskillDefinitions.filter(def => item.linkedUpskillIds?.includes(def.id));
-                                                                let nodes: React.ReactNode[] = [
-                                                                    <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
-                                                                        {item.name}
-                                                                    </SelectItem>
-                                                                ];
-                                                                children.forEach(child => {
-                                                                    nodes = [...nodes, ...renderHierarchy(child, level + 1)];
-                                                                });
-                                                                return nodes;
-                                                              };
-                                                              return renderHierarchy(c);
-                                                          })}
+                                                                const renderHierarchySelect = (item: any, level = 0): React.ReactNode[] => {
+                                                                    const children = item.children || [];
+                                                                    let nodes: React.ReactNode[] = [
+                                                                        <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5}rem` }}>
+                                                                            {item.name}
+                                                                        </SelectItem>
+                                                                    ];
+                                                                    children.forEach((child:any) => {
+                                                                        nodes = [...nodes, ...renderHierarchySelect(child, level + 1)];
+                                                                    });
+                                                                    return nodes;
+                                                                };
+                                                                return renderHierarchySelect(c);
+                                                            })}
                                                     </SelectContent>
                                                 </Select>
                                           </div>
