@@ -101,6 +101,15 @@ function PlanningContent() {
     });
     setIsSkillPlanModalOpen(false);
   };
+
+  const handleDeleteSkillPlan = (specializationId: string) => {
+    setSkillAcquisitionPlans(prev => prev.filter(p => p.specializationId !== specializationId));
+    toast({
+      title: 'Plan Deleted',
+      description: 'The skill acquisition plan has been removed.',
+      variant: 'destructive',
+    });
+  };
   
   const handleSkillPlanFieldChange = (field: keyof Omit<SkillAcquisitionPlan, 'specializationId'>, value: any) => {
     setCurrentSkillPlan(prev => ({...prev, [field]: value}));
@@ -120,6 +129,17 @@ function PlanningContent() {
     setSelectedProjectId(project.id);
     setCurrentProductPlan(project.productPlan || { linkedRuleEquationIds: [] });
     setIsProductPlanModalOpen(true);
+  };
+  
+  const handleDeleteProductPlan = (projectId: string) => {
+    setProjects(prev => prev.map(p =>
+      p.id === projectId ? { ...p, productPlan: undefined } : p
+    ));
+    toast({
+      title: 'Plan Deleted',
+      description: 'The product plan has been removed.',
+      variant: 'destructive',
+    });
   };
 
   const handleProductPlanFieldChange = (field: keyof ProjectPlan, value: any) => {
@@ -148,16 +168,18 @@ function PlanningContent() {
         <Card>
             <CardHeader>
                 <div className="flex justify-between items-center">
-                  <CardTitle className="flex items-center gap-3 text-xl">
-                    <Book className="h-6 w-6 text-primary" />
-                    Skill Acquisition Plan
-                  </CardTitle>
+                  <div className='flex-grow'>
+                    <CardTitle className="flex items-center gap-3 text-xl">
+                      <Book className="h-6 w-6 text-primary" />
+                      Skill Acquisition Plan
+                    </CardTitle>
+                    <CardDescription>Define the state and resources required to acquire a new specialization.</CardDescription>
+                  </div>
                   <Button onClick={() => handleOpenSkillPlanModal()}>
                       <PlusCircle className="mr-2 h-4 w-4" />
                       Add/Edit Plan
                   </Button>
                 </div>
-                <CardDescription>Define the state and resources required to acquire a new specialization.</CardDescription>
             </CardHeader>
             <CardContent>
                 {skillAcquisitionPlans.length > 0 ? (
@@ -175,12 +197,31 @@ function PlanningContent() {
                       }).filter((eq): eq is HabitEquation => !!eq);
 
                       return (
-                          <Card key={plan.specializationId} className="cursor-pointer hover:bg-muted/50" onClick={() => handleOpenSkillPlanModal(plan)}>
+                          <Card key={plan.specializationId}>
                               <CardHeader>
-                                  <CardTitle>{spec.name}</CardTitle>
-                                  <CardDescription>Acquisition Plan</CardDescription>
+                                  <div className="flex justify-between items-start">
+                                      <div className='flex-grow cursor-pointer' onClick={() => handleOpenSkillPlanModal(plan)}>
+                                          <CardTitle>{spec.name}</CardTitle>
+                                          <CardDescription>Acquisition Plan</CardDescription>
+                                      </div>
+                                      <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                  <AlertDialogTitleComponent>Delete Plan?</AlertDialogTitleComponent>
+                                                  <AlertDialogDescriptionComponent>Are you sure you want to delete the plan for "{spec.name}"?</AlertDialogDescriptionComponent>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                  <AlertDialogAction onClick={() => handleDeleteSkillPlan(plan.specializationId)}>Delete</AlertDialogAction>
+                                              </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                      </AlertDialog>
+                                  </div>
                               </CardHeader>
-                              <CardContent className="space-y-4">
+                              <CardContent className="space-y-4 cursor-pointer" onClick={() => handleOpenSkillPlanModal(plan)}>
                                   <div>
                                       <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Target/> Required State</h4>
                                       {linkedEquations.length > 0 ? (
@@ -213,23 +254,46 @@ function PlanningContent() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-4">No skill acquisition plans defined yet. Click "Add Plan" to get started.</p>
+                  <p className="text-center text-muted-foreground py-4">No skill acquisition plans defined yet. Click "Add/Edit Plan" to get started.</p>
                 )}
             </CardContent>
         </Card>
         
          <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-3 text-xl">
-                  <Briefcase className="h-6 w-6 text-primary" />
-                  Product Plans
-                </CardTitle>
-                <CardDescription>Define the state and resources required to build a product.</CardDescription>
+                <div className="flex justify-between items-center">
+                    <div className='flex-grow'>
+                        <CardTitle className="flex items-center gap-3 text-xl">
+                        <Briefcase className="h-6 w-6 text-primary" />
+                        Product Plans
+                        </CardTitle>
+                        <CardDescription>Define the state and resources required to build a product.</CardDescription>
+                    </div>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button><PlusCircle className="mr-2 h-4 w-4" /> Add/Edit Plan</Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <div className="grid gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="font-medium leading-none">Select a Project</h4>
+                                </div>
+                                <div className="grid gap-2">
+                                    {projects.map(project => (
+                                        <Button key={project.id} variant="ghost" className="justify-start" onClick={() => handleOpenProductPlanModal(project)}>
+                                            {project.name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                </div>
             </CardHeader>
             <CardContent>
-                {projects.length > 0 ? (
+                {projects.filter(p => p.productPlan).length > 0 ? (
                   <div className="grid grid-cols-1 gap-6">
-                    {projects.map(project => {
+                    {projects.filter(p => p.productPlan).map(project => {
                       const plan = project.productPlan;
                       if (!plan) return null;
                       
@@ -242,12 +306,31 @@ function PlanningContent() {
                       }).filter((eq): eq is HabitEquation => !!eq);
 
                       return (
-                          <Card key={project.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleOpenProductPlanModal(project)}>
+                          <Card key={project.id}>
                               <CardHeader>
-                                  <CardTitle>{project.name}</CardTitle>
-                                  <CardDescription>Product Plan</CardDescription>
+                                  <div className="flex justify-between items-start">
+                                      <div className='flex-grow cursor-pointer' onClick={() => handleOpenProductPlanModal(project)}>
+                                          <CardTitle>{project.name}</CardTitle>
+                                          <CardDescription>Product Plan</CardDescription>
+                                      </div>
+                                       <AlertDialog>
+                                          <AlertDialogTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                          </AlertDialogTrigger>
+                                          <AlertDialogContent>
+                                              <AlertDialogHeader>
+                                                  <AlertDialogTitleComponent>Delete Plan?</AlertDialogTitleComponent>
+                                                  <AlertDialogDescriptionComponent>Are you sure you want to delete the plan for "{project.name}"?</AlertDialogDescriptionComponent>
+                                              </AlertDialogHeader>
+                                              <AlertDialogFooter>
+                                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                  <AlertDialogAction onClick={() => handleDeleteProductPlan(project.id)}>Delete</AlertDialogAction>
+                                              </AlertDialogFooter>
+                                          </AlertDialogContent>
+                                      </AlertDialog>
+                                  </div>
                               </CardHeader>
-                              <CardContent className="space-y-4">
+                              <CardContent className="space-y-4 cursor-pointer" onClick={() => handleOpenProductPlanModal(project)}>
                                   <div>
                                       <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Target/> Required State</h4>
                                       {linkedEquations.length > 0 ? (
@@ -278,32 +361,10 @@ function PlanningContent() {
                           </Card>
                       )
                     })}
-                    {projects.every(p => !p.productPlan) && (
-                       <p className="text-center text-muted-foreground py-4">Select a project to create a plan.</p>
-                    )}
                   </div>
                 ) : (
-                  <p className="text-center text-muted-foreground py-4">No projects exist. Create a project on the 'Skill' page to start a plan.</p>
+                  <p className="text-center text-muted-foreground py-4">No product plans defined yet. Select a project to create one.</p>
                 )}
-                 <Popover>
-                      <PopoverTrigger asChild>
-                          <Button className="w-full mt-4"><PlusCircle className="mr-2 h-4 w-4" /> Add/Edit Product Plan</Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80">
-                          <div className="grid gap-4">
-                              <div className="space-y-2">
-                                  <h4 className="font-medium leading-none">Select a Project</h4>
-                              </div>
-                              <div className="grid gap-2">
-                                  {projects.map(project => (
-                                      <Button key={project.id} variant="ghost" className="justify-start" onClick={() => handleOpenProductPlanModal(project)}>
-                                          {project.name}
-                                      </Button>
-                                  ))}
-                              </div>
-                          </div>
-                      </PopoverContent>
-                  </Popover>
             </CardContent>
           </Card>
       </div>
@@ -1995,7 +2056,6 @@ function StrategicPlanningPageContent() {
   ];
   
   useEffect(() => {
-    // This effect is not ideal for Next.js App Router, but works for this client-side page
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
     if (tab && tabs.some(t => t.value === tab)) {
