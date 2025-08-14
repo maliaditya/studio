@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -358,7 +359,7 @@ function PlanningContent() {
             </ul>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={() => router.push('/offerization')}>
+            <Button className="w-full" onClick={() => router.push('/strategic-planning?tab=offerization')}>
               Define Your Offers <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -1543,10 +1544,11 @@ function OffersContent() {
 
   const allOffers = useMemo(() => {
     return Object.entries(offerizationPlans || {})
-      .flatMap(([topic, plan]) => 
-        (plan.offers || []).map(offer => ({ ...offer, topic }))
-      );
-  }, [offerizationPlans]);
+      .flatMap(([topicId, plan]) => {
+          const spec = useAuth().coreSkills.find(cs => cs.id === topicId);
+          return (plan.offers || []).map(offer => ({ ...offer, topic: spec?.name || topicId }))
+      });
+  }, [offerizationPlans, useAuth().coreSkills]);
 
   const renderTextAsList = (text: string) => {
     if (!text || text.trim() === '') {
@@ -1828,7 +1830,7 @@ Format / Delivery: ${offer.format || '-'}
 }
 
 function MatrixContent() {
-  const { projects, offerizationPlans } = useAuth();
+  const { projects, offerizationPlans, coreSkills } = useAuth();
 
   interface MatrixRow {
       topic: string;
@@ -1865,7 +1867,8 @@ function MatrixContent() {
       }
     });
 
-    Object.entries(offerizationPlans || {}).forEach(([topic, plan]) => {
+    Object.entries(offerizationPlans || {}).forEach(([specId, plan]) => {
+      const spec = coreSkills.find(s => s.id === specId);
       if (plan && plan.gapAnalysis) {
         const isDefined = !!(plan.offerTypes && plan.offerTypes.length > 0);
         const status: MatrixRow['status'] = (plan.releases && plan.releases.length > 0)
@@ -1873,7 +1876,7 @@ function MatrixContent() {
           : isDefined ? 'Defined' : 'Planning';
 
         data.push({
-          topic: topic,
+          topic: spec?.name || specId,
           classification: 'service',
           gapTypes: plan.gapAnalysis.gapTypes || [],
           whatYouCanFill: plan.gapAnalysis.whatYouCanFill || '-',
@@ -1886,7 +1889,7 @@ function MatrixContent() {
     });
 
     return data;
-  }, [projects, offerizationPlans]);
+  }, [projects, offerizationPlans, coreSkills]);
   
   const renderTextAsList = (text: string, className?: string) => {
     if (!text || text.trim() === '-' || text.trim() === '') {
@@ -1980,6 +1983,32 @@ function MatrixContent() {
 }
 
 function StrategicPlanningPageContent() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState('planning');
+
+  const tabs = [
+    { value: 'planning', label: 'Planning' },
+    { value: 'productization', label: 'Productization' },
+    { value: 'offerization', label: 'Offerization' },
+    { value: 'offers', label: 'Offers' },
+    { value: 'matrix', label: 'Matrix' },
+  ];
+  
+  useEffect(() => {
+    // This effect is not ideal for Next.js App Router, but works for this client-side page
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab && tabs.some(t => t.value === tab)) {
+      setActiveTab(tab);
+    }
+  }, []);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    router.push(`/strategic-planning?tab=${value}`, { scroll: false });
+  };
+
+
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
       <div className="text-center">
@@ -1987,13 +2016,9 @@ function StrategicPlanningPageContent() {
         <p className="mt-4 text-lg text-muted-foreground">A unified dashboard for your entire monetization strategy, from planning to execution.</p>
       </div>
 
-      <Tabs defaultValue="planning" className="w-full">
+       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
-          <TabsTrigger value="planning">Planning</TabsTrigger>
-          <TabsTrigger value="productization">Productization</TabsTrigger>
-          <TabsTrigger value="offerization">Offerization</TabsTrigger>
-          <TabsTrigger value="offers">Offers</TabsTrigger>
-          <TabsTrigger value="matrix">Matrix</TabsTrigger>
+            {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="planning" className="mt-6">
           <PlanningContent />
