@@ -925,30 +925,27 @@ function UpskillPageContent() {
 
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
-                        <Checkbox
-                            id={`cb-link-${item.id}`}
-                            checked={tempLinkedIds.includes(item.id)}
-                            onCheckedChange={(checked) => {
-                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mr-2"
-                        />
-                        <AccordionTrigger
-                          asChild
-                          className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-                        >
-                          <div className="flex items-center justify-between w-full">
-                              <div className="flex items-center space-x-2">
-                                  <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                      {getIcon()}
-                                      {item.name}
-                                  </Label>
-                              </div>
-                              {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                          </div>
-                        </AccordionTrigger>
+                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
+                    <Checkbox
+                        id={`cb-link-${item.id}`}
+                        checked={tempLinkedIds.includes(item.id)}
+                        onCheckedChange={(checked) => {
+                            setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mr-2"
+                    />
+                    <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                    {getIcon()}
+                                    {item.name}
+                                </Label>
+                            </div>
+                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                        </div>
+                    </AccordionTrigger>
                 </div>
                 {hasChildren && (
                     <AccordionContent className="pl-4">
@@ -1378,7 +1375,6 @@ function UpskillPageContent() {
                                                             className="mr-2"
                                                         />
                                                         <AccordionTrigger
-                                                          asChild
                                                           className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
                                                         >
                                                           <div className="flex items-center justify-between w-full">
@@ -1388,7 +1384,6 @@ function UpskillPageContent() {
                                                                       {item.name}
                                                                   </Label>
                                                               </div>
-                                                              {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
                                                           </div>
                                                         </AccordionTrigger>
                                                   </div>
@@ -1516,3 +1511,4 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
