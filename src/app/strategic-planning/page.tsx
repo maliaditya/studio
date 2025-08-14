@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2 } from 'lucide-react';
@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -56,11 +57,11 @@ function PlanningContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
-  const salesSystemItems = [
+  const salesSystemItems = useMemo(() => [
     "Auto-reply template for inbound DMs",
     "Pricing sheet or calendar link",
     "Portfolio/demo breakdown to convert leads",
-  ];
+  ], []);
 
   const definedOffers = React.useMemo(() => {
     return Object.values(offerizationPlans || {}).flatMap(plan => plan.offers || []).slice(0, 3);
@@ -305,7 +306,6 @@ function PlanningContent() {
             </CardContent>
           </Card>
       </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
         <Card className="flex flex-col">
           <CardHeader>
