@@ -853,10 +853,6 @@ function UpskillPageContent() {
     
     let filteredDefs = upskillDefinitions.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
-        
-        const nodeType = getUpskillNodeType(def);
-        if (nodeType === 'Objective') return false; 
-
         return true;
     });
 
@@ -872,7 +868,42 @@ function UpskillPageContent() {
     }
     return filteredDefs;
 
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
+  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap]);
+
+  const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
+    const children = upskillDefinitions
+      .filter((def) => def.id !== manageLinksConfig?.parent.id && upskillDefinitions.some(parent => parent.linkedUpskillIds?.includes(def.id) && parent.id === parentId))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return children.map((item) => {
+        const nodeType = getUpskillNodeType(item);
+        const hasChildren = item.linkedUpskillIds && item.linkedUpskillIds.length > 0;
+
+        return (
+            <AccordionItem value={item.id} key={item.id} className="border-b-0">
+                <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50" disabled={!hasChildren}>
+                    <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem`}}>
+                        <Checkbox 
+                            id={`link-${item.id}`} 
+                            checked={tempLinkedIds.includes(item.id)} 
+                            onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                            {nodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
+                            {item.name}
+                        </Label>
+                    </div>
+                </AccordionTrigger>
+                {hasChildren && (
+                    <AccordionContent className="pl-4">
+                        {renderHierarchy(item.id, level + 1)}
+                    </AccordionContent>
+                )}
+            </AccordionItem>
+        );
+    });
+  }, [upskillDefinitions, getUpskillNodeType, tempLinkedIds, manageLinksConfig?.parent.id]);
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
@@ -988,14 +1019,17 @@ function UpskillPageContent() {
     const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
     if (!microSkillName) return [];
   
-    const allCuriosities = upskillDefinitions.filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity');
-  
-    return allCuriosities.map(curiosity => ({
+    return upskillDefinitions
+      .filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity')
+      .map(curiosity => ({
         ...curiosity,
-        visualizations: upskillDefinitions.filter(v => 
-            curiosity.linkedUpskillIds?.includes(v.id) && getUpskillNodeType(v) === 'Visualization'
-        )
-    }));
+        children: upskillDefinitions
+          .filter(d => (curiosity.linkedUpskillIds || []).includes(d.id))
+          .map(child => ({
+            ...child,
+            children: upskillDefinitions.filter(grandchild => (child.linkedUpskillIds || []).includes(grandchild.id))
+          }))
+      }));
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
   if (isLoadingPage) {
@@ -1248,43 +1282,52 @@ function UpskillPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
                                               const nodeType = getUpskillNodeType(item);
-                                              const isCuriosity = nodeType === 'Curiosity';
-                                              const children = isCuriosity ? (item.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d) : [];
+                                              if (nodeType !== 'Curiosity') return null;
 
-                                              if (!isCuriosity && nodeType !== 'Visualization') return null; // Only show curiosities and visualizations
+                                              const renderHierarchy = (parentId: string, level = 0): React.ReactNode[] => {
+                                                const children = upskillDefinitions
+                                                  .filter(def => upskillDefinitions.some(parent => parent.id === parentId && parent.linkedUpskillIds?.includes(def.id)))
+                                                  .sort((a,b) => a.name.localeCompare(b.name));
+                                                return children.map(childItem => {
+                                                  const childNodeType = getUpskillNodeType(childItem);
+                                                  const hasGrandchildren = childItem.linkedUpskillIds && childItem.linkedUpskillIds.length > 0;
+                                                  return (
+                                                    <AccordionItem value={childItem.id} key={childItem.id} className="border-b-0">
+                                                        <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50" disabled={!hasGrandchildren}>
+                                                            <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem`}}>
+                                                                <Checkbox id={`link-${childItem.id}`} checked={tempLinkedIds.includes(childItem.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, childItem.id] : prev.filter(id => id !== childItem.id))} onClick={(e) => e.stopPropagation()} />
+                                                                <Label htmlFor={`link-${childItem.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                    {childNodeType === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/>}
+                                                                    {childItem.name}
+                                                                </Label>
+                                                            </div>
+                                                        </AccordionTrigger>
+                                                        {hasGrandchildren && (
+                                                            <AccordionContent className="pl-4">
+                                                                {renderHierarchy(childItem.id, level + 1)}
+                                                            </AccordionContent>
+                                                        )}
+                                                    </AccordionItem>
+                                                  )
+                                                });
+                                              };
 
-                                              return isCuriosity ? (
+                                              return (
                                                   <AccordionItem value={item.id} key={item.id} className="border-b-0">
                                                       <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50">
                                                           <div className="flex items-center space-x-2">
-                                                            <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                            <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))} onClick={(e) => e.stopPropagation()} />
                                                             <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
                                                                 <Flashlight className="h-4 w-4 text-amber-500"/>
                                                                 {item.name}
                                                             </Label>
                                                           </div>
                                                       </AccordionTrigger>
-                                                      <AccordionContent className="pl-8">
-                                                          {children.map(child => (
-                                                              <div key={child.id} className="flex items-center space-x-2 p-1">
-                                                                  <Checkbox id={`link-${child.id}`} checked={tempLinkedIds.includes(child.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, child.id] : prev.filter(id => id !== child.id))}/>
-                                                                  <Label htmlFor={`link-${child.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                      <Frame className="h-4 w-4 text-blue-500"/>
-                                                                      {child.name}
-                                                                  </Label>
-                                                              </div>
-                                                          ))}
+                                                      <AccordionContent className="pl-4">
+                                                          {renderHierarchy(item.id, 1)}
                                                       </AccordionContent>
                                                   </AccordionItem>
-                                              ) : (
-                                                <div className="flex items-center space-x-2 p-1 ml-4">
-                                                    <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
-                                                    <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                        <Frame className="h-4 w-4 text-blue-500"/>
-                                                        {item.name}
-                                                    </Label>
-                                                </div>
-                                              );
+                                              )
                                           })}
                                         </Accordion>
                                       ) : (
@@ -1365,16 +1408,21 @@ function UpskillPageContent() {
                                         </div>
                                         {newLinkedItemMicroSkillId && (
                                             <div className="space-y-1">
-                                                <Label>Parent Curiosity (Optional)</Label>
-                                                <Select value={newLinkedItemCuriosityId || ''} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
-                                                    <SelectTrigger><SelectValue placeholder="Link to existing curiosity..."/></SelectTrigger>
+                                                <Label>Parent Task (Optional)</Label>
+                                                <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
+                                                    <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
                                                     <SelectContent>
                                                           <SelectItem value="none">None (create as new Curiosity)</SelectItem>
                                                           {curiositiesForLinking.map(c => (
                                                               <React.Fragment key={c.id}>
                                                                   <SelectItem value={c.id}>{c.name}</SelectItem>
-                                                                  {c.visualizations.map(v => (
-                                                                      <SelectItem key={v.id} value={v.id} className="pl-8 text-muted-foreground">{v.name}</SelectItem>
+                                                                  {c.children.map(child => (
+                                                                    <SelectItem key={child.id} value={child.id} className="pl-8">
+                                                                      {child.name}
+                                                                      {child.children.length > 0 && child.children.map(grandchild => (
+                                                                          <div key={grandchild.id} className="pl-4 text-muted-foreground">↳ {grandchild.name}</div>
+                                                                      ))}
+                                                                    </SelectItem>
                                                                   ))}
                                                               </React.Fragment>
                                                           ))}
@@ -1416,3 +1464,4 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
