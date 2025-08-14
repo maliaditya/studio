@@ -13,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill, Project, DailySchedule } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, TopicGoal, SkillDomain, CoreSkill, MicroSkill, Project, DailySchedule, Activity } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -738,7 +738,7 @@ function UpskillPageContent() {
                 if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
                 const newResource: Resource = {
                     id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
-                    description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink),
+                    description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink), createdAt: new Date().toISOString(),
                 };
                 newId = newResource.id;
                 setResources(prev => [...prev, newResource]);
@@ -798,15 +798,13 @@ function UpskillPageContent() {
     
     let finalParent: ExerciseDefinition;
     if (newLinkedItemCuriosityId) {
-        // Link the new visualization to the selected curiosity
         setUpskillDefinitions(prev => prev.map(def => 
             def.id === newLinkedItemCuriosityId 
                 ? { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), newUpskillDef.id] } 
                 : def
         ));
-        finalParent = parent; // The original parent remains unchanged
+        finalParent = parent;
     } else {
-        // Link the new curiosity to the original parent
         finalParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
     }
     
@@ -858,7 +856,7 @@ function UpskillPageContent() {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
         
         const nodeType = getUpskillNodeType(def);
-        if (nodeType === 'Objective') return false; // Exclude objectives
+        if (nodeType === 'Objective') return false; 
 
         return true;
     });
@@ -988,6 +986,22 @@ function UpskillPageContent() {
     });
     return grouped;
   }, [coreSkills]);
+
+  const curiositiesForLinking = useMemo(() => {
+    if (manageLinksConfig?.type !== 'upskill') return [];
+    
+    const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
+    if (!microSkillName) return [];
+  
+    const allCuriosities = upskillDefinitions.filter(d => d.category === microSkillName && getUpskillNodeType(d) === 'Curiosity');
+  
+    return allCuriosities.map(curiosity => ({
+        ...curiosity,
+        visualizations: upskillDefinitions.filter(v => 
+            curiosity.linkedUpskillIds?.includes(v.id) && getUpskillNodeType(v) === 'Visualization'
+        )
+    }));
+  }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1220,37 +1234,80 @@ function UpskillPageContent() {
                                     </SelectContent>
                                 </Select>
                               </div>
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
-                                {manageLinksConfig.type === 'resource' && (
-                                  <>
-                                    <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
-                                    {folderPath.map((folderId, index) => {
-                                        const folder = resourceFolders.find(f => f.id === folderId);
-                                        return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
-                                    })}
-                                  </>
-                                )}
-                              </div>
+                              {manageLinksConfig.type === 'resource' && (
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
+                                  <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
+                                  {folderPath.map((folderId, index) => {
+                                      const folder = resourceFolders.find(f => f.id === folderId);
+                                      return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
+                                  })}
+                                </div>
+                              )}
                               <ScrollArea className="flex-grow border rounded-md p-2">
                                   {filteredItemsForLinking.length > 0 ? (
-                                      filteredItemsForLinking.map(item => {
-                                          const isFolder = 'parentId' in item;
-                                          return (
-                                            <div key={item.id} className="flex items-center space-x-2 p-1">
-                                                {!isFolder && (
-                                                  <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
-                                                )}
-                                                <Label 
-                                                    htmlFor={isFolder ? undefined : `link-${item.id}`} 
-                                                    className="font-normal w-full flex items-center gap-2 cursor-pointer"
-                                                    onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
-                                                >
-                                                    {isFolder ? <Folder className="h-4 w-4 text-primary" /> : manageLinksConfig.type === 'resource' ? <Library className="h-4 w-4" /> : <BookCopy className="h-4 w-4"/>}
-                                                    {item.name}
-                                                </Label>
-                                            </div>
-                                          )
-                                      })
+                                      manageLinksConfig.type === 'upskill' ? (
+                                        <Accordion type="multiple" className="w-full">
+                                          {(filteredItemsForLinking as ExerciseDefinition[]).map(item => {
+                                              const nodeType = getUpskillNodeType(item);
+                                              const isCuriosity = nodeType === 'Curiosity';
+                                              const children = isCuriosity ? (item.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d) : [];
+
+                                              if (!isCuriosity && nodeType !== 'Visualization') return null; // Only show curiosities and visualizations
+
+                                              return isCuriosity ? (
+                                                  <AccordionItem value={item.id} key={item.id} className="border-b-0">
+                                                      <AccordionTrigger className="p-1 hover:no-underline rounded-md hover:bg-muted/50">
+                                                          <div className="flex items-center space-x-2">
+                                                            <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                            <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                                {item.name}
+                                                            </Label>
+                                                          </div>
+                                                      </AccordionTrigger>
+                                                      <AccordionContent className="pl-8">
+                                                          {children.map(child => (
+                                                              <div key={child.id} className="flex items-center space-x-2 p-1">
+                                                                  <Checkbox id={`link-${child.id}`} checked={tempLinkedIds.includes(child.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, child.id] : prev.filter(id => id !== child.id))}/>
+                                                                  <Label htmlFor={`link-${child.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                      <Frame className="h-4 w-4 text-blue-500"/>
+                                                                      {child.name}
+                                                                  </Label>
+                                                              </div>
+                                                          ))}
+                                                      </AccordionContent>
+                                                  </AccordionItem>
+                                              ) : (
+                                                <div className="flex items-center space-x-2 p-1 ml-4">
+                                                    <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                    <Label htmlFor={`link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                        <Frame className="h-4 w-4 text-blue-500"/>
+                                                        {item.name}
+                                                    </Label>
+                                                </div>
+                                              );
+                                          })}
+                                        </Accordion>
+                                      ) : (
+                                        (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
+                                            const isFolder = 'parentId' in item;
+                                            return (
+                                              <div key={item.id} className="flex items-center space-x-2 p-1">
+                                                  {!isFolder && (
+                                                    <Checkbox id={`link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={(checked) => setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id))}/>
+                                                  )}
+                                                  <Label 
+                                                      htmlFor={isFolder ? undefined : `link-${item.id}`} 
+                                                      className="font-normal w-full flex items-center gap-2 cursor-pointer"
+                                                      onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
+                                                  >
+                                                      {isFolder ? <Folder className="h-4 w-4 text-primary" /> : <Library className="h-4 w-4"/>}
+                                                      {item.name}
+                                                  </Label>
+                                              </div>
+                                            )
+                                        })
+                                      )
                                   ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
                               </ScrollArea>
                               <DialogFooter className="pt-4">
@@ -1314,8 +1371,13 @@ function UpskillPageContent() {
                                                     <SelectTrigger><SelectValue placeholder="Link to existing curiosity..."/></SelectTrigger>
                                                     <SelectContent>
                                                           <SelectItem value="none">None (create as new Curiosity)</SelectItem>
-                                                          {upskillDefinitions.filter(d => d.category === microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName && getUpskillNodeType(d) === 'Curiosity').map(c => (
-                                                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                          {curiositiesForLinking.map(c => (
+                                                              <React.Fragment key={c.id}>
+                                                                  <SelectItem value={c.id}>{c.name}</SelectItem>
+                                                                  {c.visualizations.map(v => (
+                                                                      <SelectItem key={v.id} value={v.id} className="pl-8 text-muted-foreground">{v.name}</SelectItem>
+                                                                  ))}
+                                                              </React.Fragment>
                                                           ))}
                                                     </SelectContent>
                                                 </Select>
