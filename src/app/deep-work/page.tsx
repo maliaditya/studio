@@ -548,6 +548,7 @@ function DeepWorkPageContent() {
 
   // State for hierarchical linking
   const [folderPath, setFolderPath] = useState<string[]>([]);
+  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', description: '', hours: '', minutes: '' });
 
@@ -1042,8 +1043,6 @@ function DeepWorkPageContent() {
     setIsManageLinksModalOpen(false);
   };
   
-  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
-  
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
@@ -1119,28 +1118,31 @@ function DeepWorkPageContent() {
 
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <AccordionTrigger
-                    asChild
-                    className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50"
-                    onDoubleClick={() => {
-                        const isSelected = tempLinkedIds.includes(item.id);
-                        if (isSelected) {
-                            setTempLinkedIds(prev => prev.filter(id => id !== item.id));
-                        } else {
-                            setTempLinkedIds(prev => [...prev, item.id]);
-                        }
-                    }}
-                >
-                    <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center space-x-2" style={{ paddingLeft: `${level * 1}rem` }}>
-                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                {getIcon()}
-                                {item.name}
-                            </Label>
+                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
+                    <Checkbox
+                        id={`cb-${item.id}`}
+                        checked={tempLinkedIds.includes(item.id)}
+                        onCheckedChange={() => {
+                            setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="mr-2"
+                    />
+                    <AccordionTrigger
+                        asChild
+                        className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+                    >
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor={`cb-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                    {getIcon()}
+                                    {item.name}
+                                </Label>
+                            </div>
+                            {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
                         </div>
-                        {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                    </div>
-                </AccordionTrigger>
+                    </AccordionTrigger>
+                </div>
                 {hasChildren && (
                     <AccordionContent className="pl-4">
                         {renderHierarchy(item.id, level + 1)}
@@ -1287,11 +1289,6 @@ function DeepWorkPageContent() {
     return 'Library';
   }
 
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
-  }
-
-
   const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
     let nodes: React.ReactNode[] = [];
     items.forEach(item => {
@@ -1306,6 +1303,10 @@ function DeepWorkPageContent() {
     });
     return nodes;
   };
+
+  if (isLoadingPage) {
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
+  }
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1566,25 +1567,31 @@ function DeepWorkPageContent() {
                                         <Accordion type="multiple" className="w-full">
                                           {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
                                               <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                  <AccordionTrigger 
-                                                    className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50" 
-                                                    onDoubleClick={() => {
-                                                      const isSelected = tempLinkedIds.includes(item.id);
-                                                      if (isSelected) setTempLinkedIds(prev => prev.filter(id => id !== item.id));
-                                                      else setTempLinkedIds(prev => [...prev, item.id]);
-                                                    }}
-                                                    asChild
-                                                  >
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <div className="flex items-center space-x-2">
-                                                            <Label className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                <Flashlight className="h-4 w-4 text-amber-500"/>
-                                                                {item.name}
-                                                            </Label>
-                                                        </div>
-                                                        {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                                                    </div>
-                                                  </AccordionTrigger>
+                                                  <div className="flex items-center w-full group/item">
+                                                        <Checkbox
+                                                            id={`cb-link-${item.id}`}
+                                                            checked={tempLinkedIds.includes(item.id)}
+                                                            onCheckedChange={() => {
+                                                                setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]);
+                                                            }}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="mr-2"
+                                                        />
+                                                        <AccordionTrigger
+                                                          asChild
+                                                          className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+                                                        >
+                                                          <div className="flex items-center justify-between w-full">
+                                                              <div className="flex items-center space-x-2">
+                                                                  <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                                      <Flashlight className="h-4 w-4 text-amber-500"/>
+                                                                      {item.name}
+                                                                  </Label>
+                                                              </div>
+                                                              {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                                                          </div>
+                                                        </AccordionTrigger>
+                                                  </div>
                                                   {((item.linkedUpskillIds || []).length > 0) && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
                                               </AccordionItem>
                                           ))}
@@ -1593,8 +1600,10 @@ function DeepWorkPageContent() {
                                         (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
                                             const isFolder = 'parentId' in item;
                                             return (
-                                              <div key={item.id} className="flex items-center space-x-2 p-1" onDoubleClick={!isFolder ? () => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id]) : undefined}>
+                                              <div key={item.id} className="flex items-center space-x-2 p-1">
+                                                  <Checkbox id={`cb-link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])} disabled={isFolder}/>
                                                   <Label 
+                                                      htmlFor={`cb-link-${item.id}`}
                                                       className="font-normal w-full flex items-center gap-2 cursor-pointer"
                                                       onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
                                                   >
