@@ -24,9 +24,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 
 
 function PlanningContent() {
@@ -386,10 +387,7 @@ function PlanningContent() {
       
       <Dialog open={isSkillPlanModalOpen} onOpenChange={setIsSkillPlanModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitleComponent>Skill Acquisition Plan</DialogTitleComponent>
-            <DialogDescriptionComponent>Define the state and resources required to acquire a new specialization.</DialogDescriptionComponent>
-          </DialogHeader>
+          <DialogHeader><DialogTitleComponent>Skill Acquisition Plan</DialogTitleComponent><DialogDescriptionComponent>Define the state and resources required to acquire a new specialization.</DialogDescriptionComponent></DialogHeader>
           <div className="flex-grow min-h-0 py-4">
               <ScrollArea className="h-full pr-4">
                   <div className="space-y-6">
