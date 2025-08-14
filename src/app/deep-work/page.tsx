@@ -547,6 +547,7 @@ function DeepWorkPageContent() {
 
   // State for hierarchical linking
   const [folderPath, setFolderPath] = useState<string[]>([]);
+  const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
 
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', description: '', hours: '', minutes: '' });
