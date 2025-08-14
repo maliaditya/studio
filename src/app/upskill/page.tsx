@@ -1310,10 +1310,10 @@ function UpskillPageContent() {
                                         {newLinkedItemMicroSkillId && (
                                             <div className="space-y-1">
                                                 <Label>Parent Curiosity (Optional)</Label>
-                                                <Select value={newLinkedItemCuriosityId || ''} onValueChange={id => setNewLinkedItemCuriosityId(id || null)}>
+                                                <Select value={newLinkedItemCuriosityId || ''} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
                                                     <SelectTrigger><SelectValue placeholder="Link to existing curiosity..."/></SelectTrigger>
                                                     <SelectContent>
-                                                          <SelectItem value="">None (create as new Curiosity)</SelectItem>
+                                                          <SelectItem value="none">None (create as new Curiosity)</SelectItem>
                                                           {upskillDefinitions.filter(d => d.category === microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName && getUpskillNodeType(d) === 'Curiosity').map(c => (
                                                               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                                           ))}
