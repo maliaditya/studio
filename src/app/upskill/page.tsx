@@ -297,6 +297,7 @@ function UpskillPageContent() {
   const { 
     currentUser, 
     allUpskillLogs, setAllUpskillLogs,
+    allDeepWorkLogs,
     upskillDefinitions, setUpskillDefinitions,
     topicGoals, 
     resources, setResources, resourceFolders,
@@ -309,6 +310,7 @@ function UpskillPageContent() {
     microSkillMap,
     handleOpenNestedPopup,
     scheduleTaskFromMindMap,
+    deepWorkDefinitions
   } = useAuth();
   const router = useRouter();
   
@@ -326,7 +328,6 @@ function UpskillPageContent() {
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);
   const [newLinkedItemName, setNewLinkedItemName] = useState('');
-  const [newLinkedItemTopic, setNewLinkedItemTopic] = useState('');
   const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
   const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
   const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
@@ -338,10 +339,9 @@ function UpskillPageContent() {
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
 
   // State for hierarchical linking
-  const [skillSelectionStep, setSkillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
-  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState<string | null>(null);
-  const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
   const [folderPath, setFolderPath] = useState<string[]>([]);
+  const [newLinkedItemMicroSkillId, setNewLinkedItemMicroSkillId] = useState<string>('');
+  const [newLinkedItemCuriosityId, setNewLinkedItemCuriosityId] = useState<string | null>(null);
 
   const [isNewSubtopicModalOpen, setIsNewSubtopicModalOpen] = useState(false);
   const [newSubtopicData, setNewSubtopicData] = useState({ name: '', description: '', link: '', hours: '', minutes: '' });
@@ -402,6 +402,13 @@ function UpskillPageContent() {
   const linkedUpskillChildIds = useMemo(() => 
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
+  
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = upskillDefinitions.some(parentDef => parentDef.linkedUpskillIds?.includes(def.id));
+    if (isParent) return isChild ? 'Objective' : 'Curiosity';
+    return isChild ? 'Visualization' : 'Standalone';
+  }, [upskillDefinitions]);
 
   const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
     const visited = new Set<string>();
@@ -674,27 +681,29 @@ function UpskillPageContent() {
     return coreSkills.filter(s => s.type === 'Specialization');
   }, [coreSkills]);
 
-  const getSpecializationForCategory = useCallback((category: string) => {
+  const getMicroSkillIdFromCategory = useCallback((category: string) => {
     const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
     if (microSkillInfo) {
       const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-      if (coreSkill) {
-        const spec = availableSpecializations.find(s => s.id === coreSkill.id);
-        if (spec) return spec.id;
-      }
+      if (!coreSkill) return null;
+      const skillArea = coreSkill.skillAreas.find(sa => sa.microSkills.some(ms => ms.name === microSkillInfo.microSkillName));
+      if (!skillArea) return null;
+      const finalMicroSkill = skillArea.microSkills.find(ms => ms.name === microSkillInfo.microSkillName);
+      return finalMicroSkill?.id || null;
     }
     return null;
-  }, [microSkillMap, coreSkills, availableSpecializations]);
+  }, [microSkillMap, coreSkills]);
 
   const handleOpenManageLinksModal = (type: 'upskill' | 'resource', parent: ExerciseDefinition) => {
     setManageLinksConfig({ type, parent });
     setTempLinkedIds(type === 'upskill' ? (parent.linkedUpskillIds || []) : (parent.linkedResourceIds || []));
-    setNewLinkedItemTopic(parent.category);
     
-    // Set default specialization based on parent's category
-    const parentSpecId = getSpecializationForCategory(parent.category);
-    setSelectedSpecializationId(parentSpecId);
-
+    const parentMicroSkillId = getMicroSkillIdFromCategory(parent.category);
+    if (parentMicroSkillId) {
+        setNewLinkedItemMicroSkillId(parentMicroSkillId);
+    }
+    
+    setNewLinkedItemCuriosityId(null);
     setNewLinkedItemName(''); 
     setNewLinkedItemDescription(''); 
     setNewLinkedItemLink(''); 
@@ -702,7 +711,6 @@ function UpskillPageContent() {
     setNewLinkedItemMinutes(''); 
     setNewLinkedItemFolderId('');
     setLinkSearchTerm(''); 
-    setSkillSelectionStep('topic');
     setFolderPath([]);
     setIsManageLinksModalOpen(true);
   };
@@ -767,25 +775,46 @@ function UpskillPageContent() {
     }
     
     // For type 'upskill'
-    if (!newLinkedItemName.trim() || !newLinkedItemTopic.trim()) {
-        toast({ title: "Error", description: "Name and topic are required.", variant: "destructive" }); return;
+    const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
+    if (!newLinkedItemName.trim() || !microSkillName) {
+        toast({ title: "Error", description: "Name and micro-skill are required.", variant: "destructive" });
+        return;
     }
+
     const hours = parseInt(newLinkedItemHours, 10) || 0;
     const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
     const totalMinutes = hours * 60 + minutes;
     const link = newLinkedItemLink.trim();
     const newUpskillDef: ExerciseDefinition = {
-        id: `def_${Date.now()}_upskill_${Math.random()}`, name: newLinkedItemName.trim(), category: newLinkedItemTopic.trim() as ExerciseCategory,
-        description: newLinkedItemDescription.trim(), link: link, iconUrl: getFaviconUrl(link),
+        id: `def_upskill_${Date.now()}`, 
+        name: newLinkedItemName.trim(), 
+        category: microSkillName as ExerciseCategory,
+        description: newLinkedItemDescription.trim(), 
+        link: link, 
+        iconUrl: getFaviconUrl(link),
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
     };
-    newId = newUpskillDef.id;
     setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-    updatedParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newId] };
-    setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-    if (selectedUpskillTask?.id === parent.id) {
-        setSelectedUpskillTask(updatedParent);
+    
+    let finalParent: ExerciseDefinition;
+    if (newLinkedItemCuriosityId) {
+        // Link the new visualization to the selected curiosity
+        setUpskillDefinitions(prev => prev.map(def => 
+            def.id === newLinkedItemCuriosityId 
+                ? { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), newUpskillDef.id] } 
+                : def
+        ));
+        finalParent = parent; // The original parent remains unchanged
+    } else {
+        // Link the new curiosity to the original parent
+        finalParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
     }
+    
+    setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? finalParent : def));
+    if (selectedUpskillTask?.id === parent.id) {
+        setSelectedUpskillTask(finalParent);
+    }
+    
     toast({ title: "Success", description: "New item created and linked." });
     setIsManageLinksModalOpen(false);
   };
@@ -807,41 +836,6 @@ function UpskillPageContent() {
   
   const currentFolderIdForLinking = folderPath[folderPath.length - 1] || null;
 
-  const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
-    const visited = new Set<string>();
-    const visualizations: ExerciseDefinition[] = [];
-    const queue: string[] = [nodeId];
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-
-        const node = upskillDefinitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-
-        if (!isParent) { // It's a Visualization
-            visualizations.push(node);
-        } else { // It's a Curiosity or Objective, so recurse
-            (node.linkedUpskillIds || []).forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    return visualizations;
-  }, [upskillDefinitions]);
-
-  const microSkillsForSpecialization = useMemo(() => {
-    if (!selectedSpecializationId) return [];
-    const spec = coreSkills.find(s => s.id === selectedSpecializationId);
-    if (!spec) return [];
-    return spec.skillAreas.flatMap(area => area.microSkills.map(ms => ms.name));
-  }, [coreSkills, selectedSpecializationId]);
-
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
@@ -862,11 +856,18 @@ function UpskillPageContent() {
     
     let filteredDefs = upskillDefinitions.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
+        
+        const nodeType = getUpskillNodeType(def);
+        if (nodeType === 'Objective') return false; // Exclude objectives
+
         return true;
     });
 
-    if (selectedSpecializationId && selectedSpecializationId !== 'all') {
-        filteredDefs = filteredDefs.filter(def => microSkillsForSpecialization.includes(def.category));
+    if (newLinkedItemMicroSkillId) {
+        const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
+        if(microSkillName) {
+            filteredDefs = filteredDefs.filter(def => def.category === microSkillName);
+        }
     }
     
     if (linkSearchTerm) {
@@ -874,7 +875,7 @@ function UpskillPageContent() {
     }
     return filteredDefs;
 
-  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, selectedSpecializationId, microSkillsForSpecialization]);
+  }, [manageLinksConfig, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
 
 
   const handleUnlinkItem = (type: 'upskill' | 'resource', idToUnlink: string) => {
@@ -972,7 +973,21 @@ function UpskillPageContent() {
     return 'Library';
   }
   
-  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getDomainForCategory(selectedUpskillTask.category) !== null);
+  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getUpskillNodeType(selectedUpskillTask) === 'Curiosity');
+
+  const allMicroSkillsGrouped = useMemo(() => {
+    const grouped: Record<string, MicroSkill[]> = {};
+    coreSkills.forEach(core => {
+        if(core.type === 'Specialization') {
+            core.skillAreas.forEach(area => {
+                const groupName = `${core.name} > ${area.name}`;
+                if(!grouped[groupName]) grouped[groupName] = [];
+                grouped[groupName].push(...area.microSkills);
+            });
+        }
+    });
+    return grouped;
+  }, [coreSkills]);
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1204,17 +1219,6 @@ function UpskillPageContent() {
                                         <SelectItem value="resource">Resource</SelectItem>
                                     </SelectContent>
                                 </Select>
-                                <Select value={selectedSpecializationId || 'all'} onValueChange={setSelectedSpecializationId}>
-                                    <SelectTrigger className="w-[240px]">
-                                        <SelectValue placeholder="Filter by Specialization..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value='all'>All Specializations</SelectItem>
-                                        {availableSpecializations.map(spec => (
-                                            <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
                               </div>
                               <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
                                 {manageLinksConfig.type === 'resource' && (
@@ -1287,7 +1291,36 @@ function UpskillPageContent() {
                                     </Tabs>
                                 ) : ( // Upskill
                                     <div className="space-y-4">
-                                        <div className="space-y-1"><Label>Topic</Label><Input value={newLinkedItemTopic} onChange={e => setNewLinkedItemTopic(e.target.value)} /></div>
+                                        <div className="space-y-1">
+                                            <Label>Micro-Skill</Label>
+                                            <Select value={newLinkedItemMicroSkillId} onValueChange={setNewLinkedItemMicroSkillId}>
+                                                <SelectTrigger><SelectValue placeholder="Select a micro-skill..."/></SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(allMicroSkillsGrouped).map(([group, skills]) => (
+                                                        <React.Fragment key={group}>
+                                                            <Label className="px-2 py-1.5 text-xs font-semibold">{group}</Label>
+                                                            {skills.map(skill => (
+                                                                <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>
+                                                            ))}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {newLinkedItemMicroSkillId && (
+                                            <div className="space-y-1">
+                                                <Label>Parent Curiosity (Optional)</Label>
+                                                <Select value={newLinkedItemCuriosityId || ''} onValueChange={id => setNewLinkedItemCuriosityId(id || null)}>
+                                                    <SelectTrigger><SelectValue placeholder="Link to existing curiosity..."/></SelectTrigger>
+                                                    <SelectContent>
+                                                          <SelectItem value="">None (create as new Curiosity)</SelectItem>
+                                                          {upskillDefinitions.filter(d => d.category === microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName && getUpskillNodeType(d) === 'Curiosity').map(c => (
+                                                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                                          ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
                                         <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
                                         <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
                                         <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
@@ -1322,5 +1355,3 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
-
-
