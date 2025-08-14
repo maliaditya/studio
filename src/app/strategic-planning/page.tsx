@@ -28,7 +28,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuGroup, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 
 function PlanningContent() {
@@ -198,11 +198,11 @@ function PlanningContent() {
                                           </li>
                                           <li className="flex justify-between">
                                               <span className="text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4"/> Money Needed:</span>
-                                              <span className="font-medium">{plan.requiredMoney != null ? `$${'${plan.requiredMoney}'}` : 'Not set'}</span>
+                                              <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
                                           </li>
                                           <li className="flex justify-between">
                                               <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4"/> Energy Needed:</span>
-                                              <span className="font-medium">{plan.requiredHours != null ? `${'${plan.requiredHours}'} hrs` : 'Not set'}</span>
+                                              <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
                                           </li>
                                       </ul>
                                   </div>
@@ -265,11 +265,11 @@ function PlanningContent() {
                                           </li>
                                           <li className="flex justify-between">
                                               <span className="text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4"/> Money Needed:</span>
-                                              <span className="font-medium">{plan.requiredMoney != null ? `$${'${plan.requiredMoney}'}` : 'Not set'}</span>
+                                              <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
                                           </li>
                                           <li className="flex justify-between">
                                               <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4"/> Energy Needed:</span>
-                                              <span className="font-medium">{plan.requiredHours != null ? `${'${plan.requiredHours}'} hrs` : 'Not set'}</span>
+                                              <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
                                           </li>
                                       </ul>
                                   </div>
@@ -418,11 +418,11 @@ function PlanningContent() {
                                                   {Object.values(pillarEquations).flat().map(eq => (
                                                       <div key={eq.id} className="flex items-center space-x-2 p-1">
                                                           <Checkbox 
-                                                              id={`eq-${'${eq.id}'}`}
+                                                              id={`eq-${eq.id}`}
                                                               checked={(currentSkillPlan.linkedRuleEquationIds || []).includes(eq.id)}
                                                               onCheckedChange={() => handleSkillRuleLinkToggle(eq.id)}
                                                           />
-                                                          <Label htmlFor={`eq-${'${eq.id}'}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                                          <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
                                                       </div>
                                                   ))}
                                               </div>
@@ -494,11 +494,11 @@ function PlanningContent() {
                                           {Object.values(pillarEquations).flat().map(eq => (
                                               <div key={eq.id} className="flex items-center space-x-2 p-1">
                                                   <Checkbox 
-                                                      id={`prod-eq-${'${eq.id}'}`}
+                                                      id={`prod-eq-${eq.id}`}
                                                       checked={(currentProductPlan.linkedRuleEquationIds || []).includes(eq.id)}
                                                       onCheckedChange={() => handleProductRuleLinkToggle(eq.id)}
                                                   />
-                                                  <Label htmlFor={`prod-eq-${'${eq.id}'}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                                  <Label htmlFor={`prod-eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
                                               </div>
                                           ))}
                                       </div>
@@ -764,11 +764,11 @@ function ProductizationContent() {
               {project.features.map(fa => (
                 <div key={fa.id} className="flex items-center space-x-2">
                   <Checkbox 
-                    id={`fa-${'${fa.id}'}`} 
+                    id={`fa-${fa.id}`} 
                     checked={(release.focusAreaIds || []).includes(fa.id)}
                     onCheckedChange={() => handleToggleFocusAreaInRelease(fa.id)}
                   />
-                  <Label htmlFor={`fa-${'${fa.id}'}`} className="font-normal">{fa.name}</Label>
+                  <Label htmlFor={`fa-${fa.id}`} className="font-normal">{fa.name}</Label>
                 </div>
               ))}
             </div>
@@ -831,12 +831,12 @@ function ProductizationContent() {
                        <AccordionContent className="space-y-4">
                           <p className="text-xs text-muted-foreground">Answer these questions to define your product strategy.</p>
                           <div>
-                              <Label htmlFor={`gapType-${'${project.id}'}`} className="text-sm">Gap Type</Label>
+                              <Label htmlFor={`gapType-${project.id}`} className="text-sm">Gap Type</Label>
                               <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                       <Button variant="outline" className="w-full justify-start text-left font-normal">
                                           {(gapAnalysis?.gapTypes && gapAnalysis.gapTypes.length > 0)
-                                              ? `${'${gapAnalysis.gapTypes.length}'} selected`
+                                              ? `${gapAnalysis.gapTypes.length} selected`
                                               : "Select gap types..."}
                                       </Button>
                                   </DropdownMenuTrigger>
@@ -859,20 +859,20 @@ function ProductizationContent() {
                               </DropdownMenu>
                           </div>
                            <div>
-                              <Label htmlFor={`strain-${'${project.id}'}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
-                              <Textarea id={`strain-${'${project.id}'}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
+                              <Label htmlFor={`strain-${project.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
+                              <Textarea id={`strain-${project.id}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
                           </div>
                           <div>
-                              <Label htmlFor={`fill-${'${project.id}'}`} className="text-sm">What You Can Fill</Label>
-                              <Textarea id={`fill-${'${project.id}'}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
+                              <Label htmlFor={`fill-${project.id}`} className="text-sm">What You Can Fill</Label>
+                              <Textarea id={`fill-${project.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
                           </div>
                           <div>
-                              <Label htmlFor={`solution-${'${project.id}'}`} className="text-sm">Core Solution / Offer</Label>
-                              <Textarea id={`solution-${'${project.id}'}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'coreSolution', e.target.value)} placeholder="What is the core product or service?" />
+                              <Label htmlFor={`solution-${project.id}`} className="text-sm">Core Solution / Offer</Label>
+                              <Textarea id={`solution-${project.id}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'coreSolution', e.target.value)} placeholder="What is the core product or service?" />
                           </div>
                           <div>
-                              <Label htmlFor={`goal-${'${project.id}'}`} className="text-sm">Outcome Goal</Label>
-                              <Textarea id={`goal-${'${project.id}'}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
+                              <Label htmlFor={`goal-${project.id}`} className="text-sm">Outcome Goal</Label>
+                              <Textarea id={`goal-${project.id}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(project.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
                           </div>
                        </AccordionContent>
                     </AccordionItem>
@@ -896,7 +896,7 @@ function ProductizationContent() {
                                       <AlertDialogContent>
                                         <AlertDialogHeader>
                                           <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                          <AlertDialogDescription>This will permanently delete the release "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                          <AlertDialogDescriptionComponent>This will permanently delete the release "{release.name}". This action cannot be undone.</AlertDialogDescriptionComponent>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -913,7 +913,7 @@ function ProductizationContent() {
                                 <ul className="list-disc list-inside text-muted-foreground">
                                   {(release.focusAreaIds || []).map((id, index) => {
                                     const feature = project.features.find(f => f.id === id);
-                                    return <li key={`${'${id}'}-${'${index}'}`}>{feature?.name || 'Unknown Feature'}</li>;
+                                    return <li key={`${id}-${index}`}>{feature?.name || 'Unknown Feature'}</li>;
                                   })}
                                 </ul>
                               </CardContent>
@@ -988,7 +988,7 @@ function OfferizationContent() {
                 ...s,
                 skillAreas: s.skillAreas.map(area => {
                     if (area.id === areaId) {
-                        return { ...area, microSkills: [...area.microSkills, { id: `ms_${'${Date.now()}'}`, name }] };
+                        return { ...area, microSkills: [...area.microSkills, { id: `ms_${Date.now()}`, name }] };
                     }
                     return area;
                 })
@@ -1039,7 +1039,7 @@ function OfferizationContent() {
   const handleStartEditingRelease = (specializationId: string, release?: Release) => {
     setEditingRelease({
         specializationId,
-        release: release ? { ...release } : { id: `release_${'${Date.now()}'}_${'${Math.random()}'}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
+        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
     });
   };
 
@@ -1117,7 +1117,7 @@ function OfferizationContent() {
     setEditingOffer({
         specializationId,
         offer: offer ? { ...offer } : { 
-            id: `offer_${'${Date.now()}'}_${'${Math.random()}'}`, 
+            id: `offer_${Date.now()}_${Math.random()}`, 
             name: '', 
             outcome: '',
             audience: '',
@@ -1226,11 +1226,11 @@ function OfferizationContent() {
               {allMicroSkills.map(ms => (
                 <div key={ms.id} className="flex items-center space-x-2">
                   <Checkbox 
-                    id={`ms-${'${ms.id}'}`} 
+                    id={`ms-${ms.id}`} 
                     checked={(release.focusAreaIds || []).includes(ms.id)}
                     onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
                   />
-                  <Label htmlFor={`ms-${'${ms.id}'}`} className="font-normal">{ms.name}</Label>
+                  <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
                 </div>
               ))}
             </div>
@@ -1291,7 +1291,7 @@ function OfferizationContent() {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                    {selectedOfferTypes.length > 0 ? `${'${selectedOfferTypes.length}'} selected` : "Select offer types..."}
+                                    {selectedOfferTypes.length > 0 ? `${selectedOfferTypes.length} selected` : "Select offer types..."}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
@@ -1334,12 +1334,12 @@ function OfferizationContent() {
                          <AccordionContent className="space-y-4">
                             <p className="text-xs text-muted-foreground">Answer these questions to define your offer strategy.</p>
                             <div>
-                                <Label htmlFor={`gapType-${'${spec.id}'}`} className="text-sm">Gap Type</Label>
+                                <Label htmlFor={`gapType-${spec.id}`} className="text-sm">Gap Type</Label>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" className="w-full justify-start text-left font-normal">
                                             {(gapAnalysis?.gapTypes && gapAnalysis.gapTypes.length > 0)
-                                                ? `${'${gapAnalysis.gapTypes.length}'} selected`
+                                                ? `${gapAnalysis.gapTypes.length} selected`
                                                 : "Select gap types..."}
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -1362,20 +1362,20 @@ function OfferizationContent() {
                                 </DropdownMenu>
                             </div>
                             <div>
-                                <Label htmlFor={`strain-${'${spec.id}'}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
-                                <Textarea id={`strain-${'${spec.id}'}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
+                                <Label htmlFor={`strain-${spec.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
+                                <Textarea id={`strain-${spec.id}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
                             </div>
                             <div>
-                                <Label htmlFor={`fill-${'${spec.id}'}`} className="text-sm">What You Can Fill</Label>
-                                <Textarea id={`fill-${'${spec.id}'}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
+                                <Label htmlFor={`fill-${spec.id}`} className="text-sm">What You Can Fill</Label>
+                                <Textarea id={`fill-${spec.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
                             </div>
                             <div>
-                                <Label htmlFor={`solution-${'${spec.id}'}`} className="text-sm">Core Solution / Offer</Label>
-                                <Textarea id={`solution-${'${spec.id}'}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'coreSolution', e.target.value)} placeholder="What is the core service or offer?" />
+                                <Label htmlFor={`solution-${spec.id}`} className="text-sm">Core Solution / Offer</Label>
+                                <Textarea id={`solution-${spec.id}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'coreSolution', e.target.value)} placeholder="What is the core service or offer?" />
                             </div>
                             <div>
-                                <Label htmlFor={`goal-${'${spec.id}'}`} className="text-sm">Outcome Goal</Label>
-                                <Textarea id={`goal-${'${spec.id}'}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
+                                <Label htmlFor={`goal-${spec.id}`} className="text-sm">Outcome Goal</Label>
+                                <Textarea id={`goal-${spec.id}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
                             </div>
                          </AccordionContent>
                       </AccordionItem>
@@ -1399,7 +1399,7 @@ function OfferizationContent() {
                                       <AlertDialogContent>
                                           <AlertDialogHeader>
                                           <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                          <AlertDialogDescription>This will permanently delete the project "{release.name}". This action cannot be undone.</AlertDialogDescription>
+                                          <AlertDialogDescriptionComponent>This will permanently delete the project "{release.name}". This action cannot be undone.</AlertDialogDescriptionComponent>
                                           </AlertDialogHeader>
                                           <AlertDialogFooter>
                                           <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1415,7 +1415,7 @@ function OfferizationContent() {
                                   <p className="font-medium text-foreground">Micro-Skills:</p>
                                   <ul className="list-disc list-inside text-muted-foreground">
                                   {(release.focusAreaIds || []).map((id, index) => (
-                                      <li key={`${'${id}'}-${'${index}'}`}>{microSkillMap.get(id) || 'Unknown Micro-Skill'}</li>
+                                      <li key={`${id}-${index}`}>{microSkillMap.get(id) || 'Unknown Micro-Skill'}</li>
                                   ))}
                                   </ul>
                               </CardContent>
@@ -1449,7 +1449,7 @@ function OfferizationContent() {
                                                       <AlertDialogContent>
                                                           <AlertDialogHeader>
                                                               <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                                              <AlertDialogDescription>This will permanently delete the offer "{offer.name}".</AlertDialogDescription>
+                                                              <AlertDialogDescriptionComponent>This will permanently delete the offer "{offer.name}".</AlertDialogDescriptionComponent>
                                                           </AlertDialogHeader>
                                                           <AlertDialogFooter>
                                                               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1568,28 +1568,28 @@ function OffersContent() {
   const handleCopyToClipboard = (offer: any) => {
     const formatForClipboard = (text: string) => {
       if (!text || text.trim() === '') return '  - Not specified';
-      return text.split('\n').filter(line => line.trim()).map(item => `  - ${'${item.trim()}'}`).join('\n');
+      return text.split('\n').filter(line => line.trim()).map(item => `  - ${item.trim()}`).join('\n');
     };
 
     const textToCopy = `
-Offer: ${'${offer.name}'}
-Topic: ${'${offer.topic}'}
+Offer: ${offer.name}
+Topic: ${offer.topic}
 
 Outcome / Promise:
-${'${offer.outcome || '-'}'}
+${offer.outcome || '-'}
 
 Audience:
-${'${offer.audience || '-'}'}
+${offer.audience || '-'}
 
 Core Deliverables:
-${'${formatForClipboard(offer.deliverables)}'}
+${formatForClipboard(offer.deliverables)}
 
 Value Stack:
-${'${formatForClipboard(offer.valueStack)}'}
+${formatForClipboard(offer.valueStack)}
 
-Timeline: ${'${offer.timeline || '-'}'}
-Price: ${'${offer.price || '-'}'}
-Format / Delivery: ${'${offer.format || '-'}'}
+Timeline: ${offer.timeline || '-'}
+Price: ${offer.price || '-'}
+Format / Delivery: ${offer.format || '-'}
     `.trim().replace(/^\s+/gm, '');
 
     navigator.clipboard.writeText(textToCopy).then(() => {
@@ -1724,7 +1724,7 @@ Format / Delivery: ${'${offer.format || '-'}'}
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>LifeOS - Defined Offers</title>
         <style>
-          ${'${inlineStyles}'}
+          ${inlineStyles}
         </style>
       </head>
       <body>
@@ -1734,7 +1734,7 @@ Format / Delivery: ${'${offer.format || '-'}'}
             <p style="font-size: 1.125rem; color: #6b7280; margin-top: 0.5rem;">A complete overview of all your tangible service offerings.</p>
           </header>
           <div class="grid">
-            ${'${pageHtml}'}
+            ${pageHtml}
           </div>
         </div>
       </body>
@@ -1936,7 +1936,7 @@ function MatrixContent() {
                             {Array.isArray(row.format) ? (
                                 row.format.length > 0 ? (
                                     <div className="flex flex-wrap gap-1 mt-1">
-                                        {row.format.map((f, i) => <Badge key={`${'${f}'}-${'${i}'}`} variant="secondary" className="text-xs">{f}</Badge>)}
+                                        {row.format.map((f, i) => <Badge key={`${f}-${i}`} variant="secondary" className="text-xs">{f}</Badge>)}
                                     </div>
                                 ) : (
                                     <p className="text-sm font-medium mt-1">-</p>
@@ -1950,7 +1950,7 @@ function MatrixContent() {
                             <h4 className="font-semibold text-sm mb-2">Gap Analysis</h4>
                             {row.gapTypes.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mb-3">
-                                    {row.gapTypes.map((gt, i) => <Badge key={`${'${gt}'}-${'${i}'}`} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
+                                    {row.gapTypes.map((gt, i) => <Badge key={`${gt}-${i}`} variant="outline" className="text-xs whitespace-nowrap">{gt}</Badge>)}
                                 </div>
                             )}
                             <h5 className="font-medium text-xs text-muted-foreground">What You Can Fill</h5>
