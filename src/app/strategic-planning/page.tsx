@@ -45,6 +45,7 @@ function PlanningContent() {
     metaRules,
   } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [isSkillPlanModalOpen, setIsSkillPlanModalOpen] = useState(false);
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
@@ -58,7 +59,7 @@ function PlanningContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
-  const salesSystemItems = useMemo(() => [
+  const salesSystemItems = React.useMemo(() => [
     "Auto-reply template for inbound DMs",
     "Pricing sheet or calendar link",
     "Portfolio/demo breakdown to convert leads",
@@ -632,7 +633,7 @@ function ProductizationContent() {
     toast({ title: "Product Type Set!", description: `Set to "${productType}" for the project.` });
   };
   
-  const handleGapAnalysisChange = (projectId: string, field: keyof Omit<GapAnalysis, 'gapTypes' | 'strainReduction'>, value: string) => {
+  const handleGapAnalysisChange = (projectId: string, field: keyof Omit<GapAnalysis, 'gapTypes'>, value: string) => {
     setProjects(prev => prev.map(p => {
         if (p.id === projectId) {
             return {
@@ -862,7 +863,7 @@ function ProductizationContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="flex-grow space-y-4">
-                  <Accordion type="multiple" collapsible className="w-full" defaultValue={['item-1']}>
+                  <Accordion type="multiple" defaultValue={['item-1']} className="w-full">
                     <AccordionItem value="item-1">
                        <AccordionTrigger>Product Type</AccordionTrigger>
                        <AccordionContent>
