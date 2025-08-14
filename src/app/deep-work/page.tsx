@@ -702,10 +702,6 @@ function DeepWorkPageContent() {
     }
   }, [editingFocusArea]);
   
-  useEffect(() => {
-    setIsLoadingPage(false);
-  }, []);
-
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     return allDeepWorkLogs.find(log => log.id === dateKey);
@@ -1117,7 +1113,7 @@ function DeepWorkPageContent() {
 
         return (
             <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
                         <Checkbox
                             id={`cb-link-${item.id}`}
                             checked={tempLinkedIds.includes(item.id)}
@@ -1128,10 +1124,11 @@ function DeepWorkPageContent() {
                             className="mr-2"
                         />
                         <AccordionTrigger
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
                             asChild
                             className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
                         >
-                            <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center justify-between w-full" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
                                 <div className="flex items-center space-x-2">
                                     <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
                                         {getIcon()}
@@ -1304,12 +1301,7 @@ function DeepWorkPageContent() {
   };
 
   const handleCardClick = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    if (isParent) {
-      setNavigationStack(prev => [...prev, def]);
-    } else {
-        setViewMode('session');
-    }
+    setNavigationStack(prev => [...prev, def]);
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null) => {
@@ -1323,6 +1315,10 @@ function DeepWorkPageContent() {
   const handleBreadcrumbClick = (index: number) => {
     setNavigationStack(prev => prev.slice(0, index + 1));
   };
+  
+  useEffect(() => {
+    setIsLoadingPage(false);
+  }, []);
   
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
@@ -1760,3 +1756,4 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
