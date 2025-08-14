@@ -315,7 +315,7 @@ function UpskillPageContent() {
   const router = useRouter();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
-  const currentTask = navigationStack[navigationStack.length - 1] || null;
+  const currentTask = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
 
   const [editingSubtopic, setEditingSubtopic] = useState<ExerciseDefinition | null>(null);
   const [editedSubtopicData, setEditedSubtopicData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
@@ -936,18 +936,18 @@ function UpskillPageContent() {
                             className="mr-2"
                         />
                         <AccordionTrigger
-                            asChild
-                            className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
+                          asChild
+                          className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
                         >
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center space-x-2">
-                                    <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                        {getIcon()}
-                                        {item.name}
-                                    </Label>
-                                </div>
-                                {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                            </div>
+                          <div className="flex items-center justify-between w-full">
+                              <div className="flex items-center space-x-2">
+                                  <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                      {getIcon()}
+                                      {item.name}
+                                  </Label>
+                              </div>
+                              {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
+                          </div>
                         </AccordionTrigger>
                 </div>
                 {hasChildren && (
