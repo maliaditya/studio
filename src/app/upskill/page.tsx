@@ -905,12 +905,12 @@ function UpskillPageContent() {
   const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
     const parentDef = upskillDefinitions.find(p => p.id === parentId);
     if (!parentDef) return [];
-
+  
     const children = (parentDef.linkedUpskillIds || [])
       .map(id => upskillDefinitions.find(d => d.id === id))
       .filter((item): item is ExerciseDefinition => !!item)
       .sort((a, b) => a.name.localeCompare(b.name));
-
+  
     return children.map((item) => {
       const nodeType = getUpskillNodeType(item);
       const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
@@ -922,34 +922,34 @@ function UpskillPageContent() {
           default: return <Flashlight className="h-4 w-4 text-amber-500" />;
         }
       };
-
+  
       return (
-        <AccordionItem value={item.id} key={item.id} className="border-b-0">
-          <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }} onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
-              <Checkbox
-                  id={`cb-link-${item.id}`}
-                  checked={tempLinkedIds.includes(item.id)}
-                  onCheckedChange={(checked) => {
-                      setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                  }}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mr-2"
-              />
-              <AccordionTrigger
-                className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-              >
-                  <div className="flex items-center space-x-2">
-                      <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                          {getIcon()}
-                          {item.name}
-                      </Label>
-                  </div>
+        <AccordionItem value={item.id} key={item.id} className="border-b-0" style={{ paddingLeft: `${level * 1}rem` }}>
+          <div className="flex items-center w-full group/item" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
+            <Checkbox
+              id={`cb-link-${item.id}`}
+              checked={tempLinkedIds.includes(item.id)}
+              onCheckedChange={(checked) => {
+                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
+              }}
+              className="mr-2"
+            />
+            <Label htmlFor={`cb-link-${item.id}`} className="font-normal flex-grow cursor-pointer p-1 rounded-md hover:bg-muted/50 w-full flex items-center gap-2">
+              {getIcon()}
+              {item.name}
+            </Label>
+            {hasChildren && (
+              <AccordionTrigger className="p-1">
+                <span className="sr-only">Toggle</span>
               </AccordionTrigger>
+            )}
           </div>
           {hasChildren && (
-              <AccordionContent className="pl-4">
-                  {renderHierarchy(item.id, level + 1)}
-              </AccordionContent>
+            <AccordionContent className="pl-4">
+              <Accordion type="multiple" className="w-full">
+                {renderHierarchy(item.id, level + 1)}
+              </Accordion>
+            </AccordionContent>
           )}
         </AccordionItem>
       );
@@ -1510,5 +1510,6 @@ function UpskillPageContent() {
 export default function UpskillPage() {
   return ( <AuthGuard> <UpskillPageContent /> </AuthGuard> );
 }
+
 
 
