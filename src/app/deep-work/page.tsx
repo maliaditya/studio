@@ -270,8 +270,8 @@ function LinkedDeepWorkCard({
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
-    const getIcon = (type: string) => {
-        switch (type) {
+    const getIcon = () => {
+        switch (nodeType) {
             case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
             case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
             case 'Action': return <Bolt className="h-5 w-5 text-blue-500" />;
@@ -317,7 +317,7 @@ function LinkedDeepWorkCard({
                 </div>
                 <CardHeader className="pb-3 flex-grow">
                     <div className="flex items-center gap-2">
-                        {getIcon(nodeType)}
+                        {getIcon()}
                         {isEditingName ? (
                             <Input value={currentName} onChange={(e) => setCurrentName(e.target.value)} onBlur={handleNameSave} onKeyDown={(e) => e.key === 'Enter' && handleNameSave()} autoFocus className="text-base font-semibold h-8" />
                         ) : (
@@ -1181,18 +1181,7 @@ function DeepWorkPageContent() {
         )
     );
   }, [setDeepWorkDefinitions]);
-
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
-  }
-
-  const getLibraryTitle = () => {
-    if (selectedProject) return selectedProject.name;
-    if (selectedMicroSkill) return selectedMicroSkill.name;
-    return 'Library';
-  }
-
-  const selectedDeepWorkTaskIsIntention = selectedDeepWorkTask && getDeepWorkNodeType(selectedDeepWorkTask) === 'Intention';
+  
   const allMicroSkillsGrouped = useMemo(() => {
     const grouped: Record<string, MicroSkill[]> = {};
     coreSkills.forEach(core => {
@@ -1206,6 +1195,18 @@ function DeepWorkPageContent() {
     });
     return grouped;
   }, [coreSkills]);
+
+  if (isLoadingPage) {
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
+  }
+
+  const getLibraryTitle = () => {
+    if (selectedProject) return selectedProject.name;
+    if (selectedMicroSkill) return selectedMicroSkill.name;
+    return 'Library';
+  }
+
+  const selectedDeepWorkTaskIsIntention = selectedDeepWorkTask && getDeepWorkNodeType(selectedDeepWorkTask) === 'Intention';
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
