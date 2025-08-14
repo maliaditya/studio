@@ -557,6 +557,14 @@ function UpskillPageContent() {
     });
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
 
+  const handleOpenNewSubtopicModal = () => {
+    if (!selectedMicroSkill) {
+      toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+      return;
+    }
+    setIsNewSubtopicModalOpen(true);
+  };
+  
   useEffect(() => {
     if (editingSubtopic) {
         const hours = Math.floor((editingSubtopic.estimatedDuration || 0) / 60);
@@ -579,14 +587,6 @@ function UpskillPageContent() {
     });
   };
 
-  const handleOpenNewSubtopicModal = () => {
-    if (!selectedMicroSkill) {
-        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
-        return;
-    }
-    setIsNewSubtopicModalOpen(true);
-  };
-  
   const handleCreateSubtopic = () => {
     if (!selectedMicroSkill || !newSubtopicData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
@@ -1070,10 +1070,7 @@ function UpskillPageContent() {
   };
 
   const handleCardClick = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    if (isParent) {
-      setNavigationStack(prev => [...prev, def]);
-    }
+    setNavigationStack(prev => [...prev, def]);
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null) => {
@@ -1101,12 +1098,15 @@ function UpskillPageContent() {
         return (
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Button variant="link" onClick={() => handleSelectFocusArea(null)} className="p-0 h-auto text-muted-foreground hover:text-primary">
+                        Library
+                    </Button>
                     {navigationStack.map((task, index) => (
                         <React.Fragment key={task.id}>
-                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary">
+                           <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
+                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary" disabled={index === navigationStack.length - 1}>
                                 {task.name}
                             </Button>
-                            {index < navigationStack.length - 1 && <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />}
                         </React.Fragment>
                     ))}
                 </div>
