@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -220,7 +219,7 @@ function LinkedDeepWorkCard({
     setViewMode,
     handleToggleReadyForBranding,
     handleUnlinkItem,
-    handleDeleteExerciseDefinition,
+    handleDeleteFocusArea,
     handleViewProgress,
     deepWorkDefinitions,
     formatDuration,
@@ -243,7 +242,7 @@ function LinkedDeepWorkCard({
     setViewMode: (mode: 'session' | 'library') => void;
     handleToggleReadyForBranding: (id: string) => void;
     handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
-    handleDeleteExerciseDefinition: (id: string) => void;
+    handleDeleteFocusArea: (id: string) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
     deepWorkDefinitions: ExerciseDefinition[];
     formatDuration: (minutes: number) => string;
@@ -314,7 +313,7 @@ function LinkedDeepWorkCard({
                             {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleDeleteExerciseDefinition(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleDeleteFocusArea(id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
@@ -1271,7 +1270,7 @@ function DeepWorkPageContent() {
                                     {(selectedDeepWorkTask.linkedDeepWorkIds || []).map(id => {
                                         const def = deepWorkDefinitions.find(d => d.id === id);
                                         if (!def) return null;
-                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedDeepWorkTask, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteExerciseDefinition, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => {}, onOpenMindMap: (id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}, onUpdateName: handleUpdateFocusAreaName, projectsInDomain, onLinkProject }}/>;
+                                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, setSelectedDeepWorkTask, setViewMode, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (def) => {}, onOpenMindMap: (id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}, onUpdateName: handleUpdateFocusAreaName, projectsInDomain, onLinkProject }}/>;
                                     })}
                                      {(selectedDeepWorkTask.linkedUpskillIds || []).map(id => {
                                         const def = upskillDefinitions.find(d => d.id === id);
@@ -1512,4 +1511,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
