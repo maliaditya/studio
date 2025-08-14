@@ -356,15 +356,6 @@ function UpskillPageContent() {
   const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'mechanism'>('link');
   const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
 
-
-  const handleOpenNewSubtopicModal = () => {
-    if (!selectedMicroSkill) {
-        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
-        return;
-    }
-    setIsNewSubtopicModalOpen(true);
-  };
-  
   const getDomainForCategory = useCallback((category: string) => {
     const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
     if (!microSkill) return null;
@@ -550,6 +541,14 @@ function UpskillPageContent() {
     });
   };
 
+  const handleOpenNewSubtopicModal = () => {
+    if (!selectedMicroSkill) {
+        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+        return;
+    }
+    setIsNewSubtopicModalOpen(true);
+  };
+  
   const handleCreateSubtopic = () => {
     if (!selectedMicroSkill || !newSubtopicData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
@@ -961,18 +960,6 @@ function UpskillPageContent() {
     );
   }, [setUpskillDefinitions]);
 
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
-  }
-
-  const getLibraryTitle = () => {
-    if (selectedProject) return selectedProject.name;
-    if (selectedMicroSkill) return selectedMicroSkill.name;
-    return 'Library';
-  }
-  
-  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getUpskillNodeType(selectedUpskillTask) === 'Curiosity');
-
   const allMicroSkillsGrouped = useMemo(() => {
     const grouped: Record<string, MicroSkill[]> = {};
     coreSkills.forEach(core => {
@@ -986,6 +973,14 @@ function UpskillPageContent() {
     });
     return grouped;
   }, [coreSkills]);
+
+  const getLibraryTitle = () => {
+    if (selectedProject) return selectedProject.name;
+    if (selectedMicroSkill) return selectedMicroSkill.name;
+    return 'Library';
+  }
+  
+  const selectedUpskillTaskIsCuriosity = selectedUpskillTask && (getUpskillNodeType(selectedUpskillTask) === 'Curiosity');
 
   const curiositiesForLinking = useMemo(() => {
     if (manageLinksConfig?.type !== 'upskill') return [];
@@ -1002,6 +997,10 @@ function UpskillPageContent() {
         )
     }));
   }, [manageLinksConfig, upskillDefinitions, getUpskillNodeType, newLinkedItemMicroSkillId, microSkillMap]);
+
+  if (isLoadingPage) {
+    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your upskill data...</p></div>;
+  }
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
