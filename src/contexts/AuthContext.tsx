@@ -1827,7 +1827,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newPopups = new Map(prev);
         const CONTEXT_POPUP_WIDTH = 600;
         const MARGIN = 16;
-        let x, y, level, parentId;
+        let x: number, y: number, level: number, parentId: string | undefined;
 
         if (parentPopupState) {
             level = parentPopupState.level + 1;
@@ -1845,14 +1845,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             level = 0;
             parentId = undefined;
-            x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
-            y = window.innerHeight / 2 - 250;
+            // Fallback for server-side or if rect is not available
+            x = typeof window !== 'undefined' ? window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2 : 0;
+            y = typeof window !== 'undefined' ? window.innerHeight / 2 - 250 : 0;
         }
 
         newPopups.set(activityId, { activityId, x, y, parentId, level });
         return newPopups;
     });
-};
+  };
 
   const closeTaskContextPopup = (taskId: string) => {
     setTaskContextPopups(prev => {
@@ -2016,3 +2017,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+
+    
