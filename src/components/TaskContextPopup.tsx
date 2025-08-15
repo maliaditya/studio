@@ -102,7 +102,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     }, [activityInfo, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
     const attentionSpanInfo = useMemo(() => {
-        const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession.activity : activityInfo;
+        const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession?.activity : activityInfo;
         
         if (!activityForSpan || !activityForSpan.focusSessionStartTime) {
             return null;
