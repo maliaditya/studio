@@ -29,7 +29,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying } = useAuth();
   const totalSeconds = duration * 60;
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   const [isActive, setIsActive] = useState(false);
@@ -62,11 +62,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const handleStop = (completed: boolean) => {
     setIsActive(false);
+    setIsAudioPlaying(false);
     const elapsedSeconds = totalSeconds - secondsLeft;
     if (elapsedSeconds > 0 && activity) {
       onLogTime(activity, Math.floor(elapsedSeconds / 60));
     }
     onClose();
+  };
+  
+  const togglePlayPause = () => {
+    const newIsActive = !isActive;
+    setIsActive(newIsActive);
+    setIsAudioPlaying(newIsActive); // Sync audio with timer state
   };
 
   const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;
@@ -123,7 +130,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
           </div>
           
           <div className="flex justify-center items-center gap-4 mt-4">
-             <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={() => setIsActive(!isActive)}>
+             <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
               {isActive ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
             </Button>
              <Popover>

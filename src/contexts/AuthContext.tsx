@@ -285,7 +285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [globalVolume, setGlobalVolume] = useState(0.05);
+  const [globalVolume, setGlobalVolume] = useState(0.2);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -790,7 +790,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
+      setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
       toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
 
