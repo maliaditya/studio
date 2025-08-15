@@ -10,6 +10,7 @@ import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, Ta
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { useDraggable } from '@dnd-kit/core';
 import { format, formatDistanceStrict } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
@@ -128,7 +129,8 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
             return null;
         }
 
-        const { focusSessionInitialStartTime, focusSessionEndTime, focusSessionPauses = [] } = activityForSpan;
+        const { focusSessionInitialStartTime, focusSessionEndTime } = activityForSpan;
+        const focusSessionPauses = Array.isArray(activityForSpan.focusSessionPauses) ? activityForSpan.focusSessionPauses : [];
 
         if (focusSessionEndTime) {
             const totalSpanMs = focusSessionEndTime - focusSessionInitialStartTime;
