@@ -90,8 +90,8 @@ interface AuthContextType {
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
 
   // Focus Timer
-  activeFocusSession: { activity: Activity; duration: number } | null;
-  setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number } | null>>;
+  activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
+  setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number } | null>>;
 
 
   // Global Logs State
@@ -354,7 +354,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
   // Focus Session
-  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number } | null>(null);
+  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
 
 
   useEffect(() => {
@@ -414,15 +414,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
 
   const microSkillMap = useMemo(() => {
-    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; microSkillId: string; }>();
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
     coreSkills.forEach(coreSkill => {
       coreSkill.skillAreas.forEach(skillArea => {
         skillArea.microSkills.forEach(microSkill => {
           map.set(microSkill.id, {
             coreSkillName: coreSkill.name,
             skillAreaName: skillArea.name,
-            microSkillName: microSkill.name,
-            microSkillId: microSkill.id,
+            microSkillName: microSkill.name
           });
         });
       });
@@ -563,6 +562,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
 
+      // Load active focus session from localStorage
+      const savedSession = localStorage.getItem(`focus_session_${username}`);
+      if (savedSession) {
+          try {
+              const parsedSession = JSON.parse(savedSession);
+              setActiveFocusSession(parsedSession);
+          } catch (error) {
+              console.error("Failed to parse saved focus session", error);
+              localStorage.removeItem(`focus_session_${username}`);
+          }
+      }
     } else {
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({}); setDailyPurposes({});
@@ -656,6 +666,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
 
       localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
+
+      // Persist active focus session
+      if (activeFocusSession) {
+          localStorage.setItem(`focus_session_${username}`, JSON.stringify(activeFocusSession));
+      } else {
+          localStorage.removeItem(`focus_session_${username}`);
+      }
     }
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
@@ -671,7 +688,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    autoSuggestions
+    autoSuggestions, activeFocusSession
   ]);
 
 

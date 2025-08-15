@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -17,18 +18,27 @@ import {
   RadialBar,
   PolarAngleAxis,
 } from "recharts"
+import { useAuth } from '@/contexts/AuthContext';
 
 interface FocusTimerPopupProps {
-  activity: Activity | null;
+  activity: Activity;
   duration: number; // in minutes
+  initialSecondsLeft: number;
   onClose: () => void;
   onLogTime: (activity: Activity, minutes: number) => void;
 }
 
-export function FocusTimerPopup({ activity, duration, onClose, onLogTime }: FocusTimerPopupProps) {
+export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
+  const { setActiveFocusSession } = useAuth();
   const totalSeconds = duration * 60;
-  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
-  const [isActive, setIsActive] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
+  const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    // When the component mounts with a persisted session, it should be paused.
+    // The user has to click play to resume.
+    setIsActive(false);
+  }, []);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -38,6 +48,11 @@ export function FocusTimerPopup({ activity, duration, onClose, onLogTime }: Focu
       }, 1000);
     } else if (secondsLeft === 0) {
       handleStop(true);
+    }
+    
+    // Persist state on every second change if active
+    if (isActive) {
+        setActiveFocusSession({ activity, duration, secondsLeft });
     }
 
     return () => {

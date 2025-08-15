@@ -98,6 +98,9 @@ function MyPlatePageContent() {
     productizationPlans,
     offerizationPlans,
     openIntentionPopup,
+    activeFocusSession,
+    setActiveFocusSession,
+    setIsAudioPlaying,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -121,7 +124,6 @@ function MyPlatePageContent() {
   // Focus Session State
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
   const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
-  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity; duration: number } | null>(null);
 
 
   // State for Modal content
@@ -401,7 +403,8 @@ function MyPlatePageContent() {
   };
 
   const handleStartFocusSession = (activity: Activity, duration: number) => {
-    setActiveFocusSession({ activity, duration });
+    setActiveFocusSession({ activity, duration, secondsLeft: duration * 60 });
+    setIsAudioPlaying(true);
   };
   
   const handleLogFocusTime = (activity: Activity, minutes: number) => {
@@ -1121,6 +1124,7 @@ function MyPlatePageContent() {
           <FocusTimerPopup
             activity={activeFocusSession.activity}
             duration={activeFocusSession.duration}
+            initialSecondsLeft={activeFocusSession.secondsLeft}
             onClose={() => setActiveFocusSession(null)}
             onLogTime={handleLogFocusTime}
           />

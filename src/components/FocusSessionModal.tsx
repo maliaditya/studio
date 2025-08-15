@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -42,7 +43,7 @@ export function FocusSessionModal({
   activity,
   onStartSession,
 }: FocusSessionModalProps) {
-  const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule } = useAuth();
+  const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession } = useAuth();
   const [duration, setDuration] = useState(45);
   const [skipBreaks, setSkipBreaks] = useState(false);
   
@@ -171,34 +172,36 @@ export function FocusSessionModal({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-8">
         <DialogHeader>
-            <DialogTitle>Start Focus Session</DialogTitle>
+          <DialogTitle>Start Focus Session</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
-            <Card className="lg:col-span-1 shadow-lg">
-                <CardHeader>
-                    <CardTitle>Get ready to focus</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center space-y-4">
-                    <div className="flex items-center justify-center bg-muted/50 rounded-lg p-2 w-40">
-                        <div className="text-6xl font-bold w-2/3 text-center">{duration}</div>
-                        <div className="flex flex-col items-center w-1/3">
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDurationChange(5)}><ChevronUp /></Button>
-                             <span className="text-sm text-muted-foreground -my-1">mins</span>
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDurationChange(-5)}><ChevronDown /></Button>
+            <Card className="lg:col-span-1 shadow-lg" disabled={!!activeFocusSession}>
+                <fieldset disabled={!!activeFocusSession} className="group">
+                    <CardHeader>
+                        <CardTitle>Get ready to focus</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center justify-center space-y-4">
+                        <div className="flex items-center justify-center bg-muted/50 rounded-lg p-2 w-40">
+                            <div className="text-6xl font-bold w-2/3 text-center">{duration}</div>
+                            <div className="flex flex-col items-center w-1/3">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDurationChange(5)}><ChevronUp /></Button>
+                                <span className="text-sm text-muted-foreground -my-1">mins</span>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDurationChange(-5)}><ChevronDown /></Button>
+                            </div>
                         </div>
-                    </div>
-                     <p className="text-sm text-muted-foreground">You'll have {breaks} break{breaks !== 1 && 's'}.</p>
-                    <div className="flex items-center space-x-2">
-                        <Checkbox id="skip-breaks" checked={skipBreaks} onCheckedChange={(checked) => setSkipBreaks(!!checked)} />
-                        <Label htmlFor="skip-breaks">Skip breaks</Label>
-                    </div>
-                </CardContent>
-                <CardFooter>
-                     <Button className="w-full" onClick={handleStartClick}>
-                        <Play className="mr-2 h-4 w-4" /> Start focus session
-                    </Button>
-                </CardFooter>
+                        <p className="text-sm text-muted-foreground">You'll have {breaks} break{breaks !== 1 && 's'}.</p>
+                        <div className="flex items-center space-x-2">
+                            <Checkbox id="skip-breaks" checked={skipBreaks} onCheckedChange={(checked) => setSkipBreaks(!!checked)} />
+                            <Label htmlFor="skip-breaks">Skip breaks</Label>
+                        </div>
+                    </CardContent>
+                    <CardFooter>
+                        <Button className="w-full" onClick={handleStartClick}>
+                            <Play className="mr-2 h-4 w-4" /> Start focus session
+                        </Button>
+                    </CardFooter>
+                </fieldset>
             </Card>
 
             <Card className="lg:col-span-1 shadow-lg">
