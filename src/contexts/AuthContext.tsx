@@ -179,7 +179,7 @@ interface AuthContextType {
 
   // Task Context Popup
   taskContextPopup: TaskContextPopupState | null;
-  openTaskContextPopup: (taskId: string, triggerRect: DOMRect, timerRect: DOMRect) => void;
+  openTaskContextPopup: (taskId: string, timerRect: DOMRect) => void;
   closeTaskContextPopup: () => void;
   handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
 
@@ -1815,7 +1815,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openTaskContextPopup = (taskId: string, triggerRect: DOMRect, timerRect: DOMRect) => {
+  const openTaskContextPopup = (taskId: string, timerRect: DOMRect) => {
+    if (!timerRect) return;
     const CONTEXT_POPUP_WIDTH = 384; // w-96
     const MARGIN = 16;
     
@@ -1950,5 +1951,6 @@ export const useAuth = (): AuthContextType => {
 
 
     
+
 
 

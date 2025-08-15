@@ -36,6 +36,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const totalSeconds = duration * 60;
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [isActive, setIsActive] = React.useState(false);
+  const popupRef = React.useRef<HTMLDivElement>(null);
   
   const [position, setPosition] = React.useState({ x: window.innerWidth - 256 - 24, y: 24 }); // top right
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -91,8 +92,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const handleOpenContext = (e: React.MouseEvent) => {
-      if (activity.taskIds && activity.taskIds.length > 0) {
-          openTaskContextPopup(activity.taskIds[0], e);
+      if (activity.taskIds && activity.taskIds.length > 0 && popupRef.current) {
+          const timerRect = popupRef.current.getBoundingClientRect();
+          openTaskContextPopup(activity.taskIds[0], timerRect);
       }
   };
 
@@ -115,7 +117,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         }));
     }}>
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
-        <Card className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
+        <Card ref={popupRef} className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
             <CardContent className="p-4">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
