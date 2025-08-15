@@ -5,13 +5,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow } from 'lucide-react';
+import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow, PlusCircle, Library, Database } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, AutoSuggestionEntry } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry as AutoSuggestionEntry, RuleDetailPopupState, HabitEquation } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,8 @@ import { format } from 'date-fns';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogDescription as DialogDescriptionComponent, DialogTitle as DialogTitleComponent } from '@/components/ui/dialog';
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Gratitude': <HeartPulse className="h-5 w-5 text-pink-500" />,
@@ -29,56 +30,21 @@ const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Truth Seeking': <Lightbulb className="h-5 w-5 text-yellow-500" />,
 };
 
-const EMOTIONAL_STATES = {
-    'Doubt': { imbalance: '🔻 Dopamine, 🔺 Cortisol', message: '“I don’t trust my next move.”' },
-    'Fear': { imbalance: '🔺 Adrenaline, Norepinephrine, Cortisol', message: '“Something might hurt me.”' },
-    'Shame': { imbalance: '🔻 Serotonin, Oxytocin', message: '“I’m not worthy to connect or try again.”' },
-    'Regret': { imbalance: '🔺 Cortisol, 🔻 Dopamine', message: '“The past stole my future.”' },
-    'Overwhelm': { imbalance: '🔺 Norepinephrine, Cortisol, Adrenaline', message: '“Too much. Can’t handle.”' },
-    'Hopelessness': { imbalance: '🔻 Dopamine, Serotonin', message: '“Nothing will change.”' },
-    'Loneliness': { imbalance: '🔻 Oxytocin, Serotonin', message: '“I don’t matter to anyone.”' },
-    'Imposter Syndrome': { imbalance: '🔻 Serotonin, 🔺 Cortisol', message: '“I’ll be exposed. I don’t belong.”' },
-    'Resentment / Envy': { imbalance: '🔻 Dopamine, 🔺 Cortisol', message: '“They have what I should.”' }
-};
-
-type EmotionalState = keyof typeof EMOTIONAL_STATES;
-
-const FANTASY_STATES = {
-    'Excitement': { imbalance: '🔺 Dopamine, Norepinephrine', message: '“This is going to be amazing.”' },
-    'Anticipation': { imbalance: '🔺 Dopamine', message: '“I can’t wait for this to happen.”' },
-    'Euphoria': { imbalance: '🔺 Dopamine, Endorphins', message: '“This feels incredible.”' },
-    'Pride': { imbalance: '🔺 Serotonin, Dopamine', message: '“I accomplished something great.”' },
-    'Desire': { imbalance: '🔺 Dopamine', message: '“I want this intensely.”' },
-    'Longing': { imbalance: '🔺 Dopamine, 🔻 Serotonin', message: '“If only I had this.”' },
-    'Curiosity': { imbalance: '🔺 Dopamine, Acetylcholine', message: '“I need to know more.”' },
-    'Hope': { imbalance: '🔺 Dopamine, Serotonin', message: '“Things can get better.”' },
-    'Satisfaction': { imbalance: '🔺 Serotonin, Oxytocin', message: '“This is complete and good.”' }
-};
-
-type FantasyState = keyof typeof FANTASY_STATES;
-
 
 export function PistonsHead() {
   const { 
     isPistonsHeadOpen, setIsPistonsHeadOpen, 
-    pistons, setPistons, 
     pistonsInitialState,
-    autoSuggestions, setAutoSuggestions,
   } = useAuth();
-  const [currentView, setCurrentView] = useState<'main' | 'desires' | 'thoughts' | 'negative-thoughts' | 'positive-thoughts' | 'autosuggestion' | 'starred'>('main');
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [currentView, setCurrentView] = useState<'main' | 'quick-access' | 'rule-equations' | 'autosuggestion' | 'starred'>('main');
   
   const [position, setPosition] = useState({ x: 50, y: 50 });
   
   useEffect(() => {
     if (isPistonsHeadOpen && pistonsInitialState) {
         setCurrentView(pistonsInitialState.view as any);
-        if (pistonsInitialState.topicId && pistonsInitialState.topicName) {
-            setSelectedTopicId(pistonsInitialState.topicId);
-        }
     } else if (!isPistonsHeadOpen) {
         setCurrentView('main');
-        setSelectedTopicId(null);
     }
   }, [isPistonsHeadOpen, pistonsInitialState]);
 
@@ -99,45 +65,20 @@ export function PistonsHead() {
     setIsPistonsHeadOpen(false);
     setTimeout(() => {
         setCurrentView('main');
-        setSelectedTopicId(null);
     }, 300);
   };
   
-  const handleViewChange = (newView: 'desires' | 'thoughts' | 'autosuggestion' | 'starred' | PistonType) => {
-    if (Object.keys(PISTON_ICONS).includes(newView)) {
-        setCurrentView('desires');
-        setSelectedTopicId(newView);
-    } else {
-        setCurrentView(newView);
-        setSelectedTopicId(null);
-    }
-  };
-
   const onBack = () => {
-    if ((currentView === 'negative-thoughts' || currentView === 'positive-thoughts') && selectedTopicId) {
-        setSelectedTopicId(null);
-    } else if (currentView === 'negative-thoughts' || currentView === 'positive-thoughts') {
-        setCurrentView('thoughts');
-    } else if (selectedTopicId) {
-        setSelectedTopicId(null);
-    } else {
-        setCurrentView('main');
-    }
+    setCurrentView('main');
   };
 
   const renderContent = () => {
-    const commonProps = { onBack };
-    if (currentView === 'desires' && selectedTopicId) {
-        return <DesireDetailView type={selectedTopicId as PistonType} {...commonProps} />;
-    }
     switch (currentView) {
-      case 'desires': return <DesiresView onSelect={(type) => handleViewChange(type)} />;
-      case 'thoughts': return <ThoughtsView onSelect={(type) => setCurrentView(type === 'Fantasy' ? 'positive-thoughts' : 'negative-thoughts')} />;
-      case 'negative-thoughts': return <NegativeThoughtsView onSelect={(state) => { /* handle selection */ }} onSchedule={() => {}} />;
-      case 'positive-thoughts': return <PositiveThoughtsView onSelect={(state) => { /* handle selection */ }} onSchedule={() => {}} />;
+      case 'quick-access': return <QuickAccessView />;
+      case 'rule-equations': return <RuleEquationsView />;
       case 'autosuggestion': return <AutoSuggestionView />;
       case 'starred': return <StarredView />;
-      default: return <MainPistonView onSelect={handleViewChange} />;
+      default: return <MainPistonView onSelect={setCurrentView} />;
     }
   };
   
@@ -194,150 +135,169 @@ export function PistonsHead() {
   );
 }
 
-const MainPistonView = ({ onSelect }: { onSelect: (view: 'desires' | 'thoughts' | 'autosuggestion' | 'starred') => void }) => (
+const MainPistonView = ({ onSelect }: { onSelect: (view: 'quick-access' | 'rule-equations' | 'autosuggestion' | 'starred') => void }) => (
     <CardContent className="p-4">
-        <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define your core motivations.</p>
+        <p className="text-muted-foreground text-center mb-4 text-sm">Select a category to define or review your core motivations.</p>
         <div className="grid grid-cols-2 gap-4">
-            <Button onClick={() => onSelect('desires')} variant="outline" className="flex-col h-20"><Target className="h-6 w-6 text-purple-500 mb-1"/>Desires</Button>
-            <Button onClick={() => onSelect('thoughts')} variant="outline" className="flex-col h-20"><MessageSquare className="h-6 w-6 text-orange-500 mb-1"/>Thoughts</Button>
+            <Button onClick={() => onSelect('quick-access')} variant="outline" className="flex-col h-20"><Database className="h-6 w-6 text-purple-500 mb-1"/>Quick Access</Button>
+            <Button onClick={() => onSelect('rule-equations')} variant="outline" className="flex-col h-20"><Workflow className="h-6 w-6 text-orange-500 mb-1"/>Rule Equations</Button>
             <Button onClick={() => onSelect('autosuggestion')} variant="outline" className="flex-col h-20"><Lightbulb className="h-6 w-6 text-yellow-500 mb-1"/>Auto Suggestion</Button>
             <Button onClick={() => onSelect('starred')} variant="outline" className="flex-col h-20"><Star className="h-6 w-6 text-primary mb-1"/>Starred</Button>
         </div>
     </CardContent>
 );
 
-const DesiresView = ({ onSelect }: { onSelect: (type: PistonType) => void }) => {
-    return (
-        <CardContent className="p-4">
-            <div className="grid grid-cols-1 gap-2">
-                <Button onClick={() => onSelect('Gratitude')} variant="outline" className="justify-start h-12 text-base"><HeartPulse className="h-5 w-5 mr-3 text-pink-500"/>Gratitude</Button>
-                <Button onClick={() => onSelect('Curiosity')} variant="outline" className="justify-start h-12 text-base"><Search className="h-5 w-5 mr-3 text-sky-500"/>Curiosity</Button>
-                <Button onClick={() => onSelect('Inspiration')} variant="outline" className="justify-start h-12 text-base"><Flame className="h-5 w-5 mr-3 text-red-500"/>Inspiration</Button>
-                <Button onClick={() => onSelect('Compassion')} variant="outline" className="justify-start h-12 text-base"><HeartPulse className="h-5 w-5 mr-3 text-green-500"/>Compassion</Button>
-                <Button onClick={() => onSelect('Truth Seeking')} variant="outline" className="justify-start h-12 text-base"><Lightbulb className="h-5 w-5 mr-3 text-yellow-500"/>Truth Seeking</Button>
-            </div>
-        </CardContent>
-    )
-}
+const QuickAccessView = () => {
+    const { resources, setResources, openGeneralPopup, lastSelectedHabitFolder, setLastSelectedHabitFolder } = useAuth();
+    const { toast } = useToast();
+    const [newCardName, setNewCardName] = useState('');
+    const [isAddCardOpen, setIsAddCardOpen] = useState(false);
 
-const DesireDetailView = ({ type, onBack }: { type: PistonType; onBack: () => void; }) => {
-    const { pistons, setPistons, resources, setResources } = useAuth();
-    const [newDesire, setNewDesire] = useState('');
+    const quickAccessFolder = useMemo(() => resources.find(r => r.name === 'Quick Access' && r.type === 'card' && !r.folderId), [resources]);
 
-    const currentPistonState = pistons[type] || [];
-    
-    const handleAddDesire = () => {
-        if (!newDesire.trim()) return;
-        const newEntry: PistonEntry = {
-            id: `piston_${Date.now()}`,
-            text: newDesire.trim(),
-            timestamp: Date.now()
-        };
-        setPistons(prev => ({
-            ...prev,
-            [type]: [...(prev[type] || []), newEntry]
-        }));
-        setNewDesire('');
-    };
-    
-    const handleDeleteDesire = (id: string) => {
-        setPistons(prev => ({
-            ...prev,
-            [type]: (prev[type] || []).filter(d => d.id !== id)
-        }));
-    };
+    const quickAccessCards = useMemo(() => {
+        if (!quickAccessFolder) return [];
+        return resources.filter(r => r.folderId === quickAccessFolder.id);
+    }, [resources, quickAccessFolder]);
 
-    const handleConvertToMechanism = (desire: PistonEntry) => {
-        const newMechanism: Resource = {
-            id: `res_mech_${Date.now()}`,
-            name: desire.text,
-            folderId: '', // User will need to assign this later
-            type: 'mechanism',
-            mechanismFramework: 'positive',
-            trigger: { action: desire.text },
+    const handleAddCard = () => {
+        if (!newCardName.trim() || !quickAccessFolder) return;
+        const newCard: Resource = {
+            id: `res_card_${Date.now()}`,
+            name: newCardName.trim(),
+            folderId: quickAccessFolder.id,
+            type: 'card',
             createdAt: new Date().toISOString(),
         };
-        setResources(prev => [...prev, newMechanism]);
-        handleDeleteDesire(desire.id);
+        setResources(prev => [...prev, newCard]);
+        setNewCardName('');
+        setIsAddCardOpen(false);
+        toast({ title: 'Card Added', description: `"${newCard.name}" added to Quick Access.` });
     };
 
     return (
         <CardContent className="p-4">
-            <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2 font-semibold">
-                    {PISTON_ICONS[type]}
-                    {type}
-                </div>
-                <div className="flex gap-2">
-                    <Input value={newDesire} onChange={e => setNewDesire(e.target.value)} placeholder="What do you want?" onKeyDown={e => e.key === 'Enter' && handleAddDesire()} />
-                    <Button onClick={handleAddDesire} size="icon"><Plus/></Button>
-                </div>
-                <ScrollArea className="h-60">
-                    <ul className="space-y-2 pr-2">
-                        {currentPistonState.map(desire => (
-                            <li key={desire.id} className="flex items-center justify-between group p-2 rounded-md border bg-muted/30">
-                                <span className="text-sm">{desire.text}</span>
-                                <div className="flex items-center">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleConvertToMechanism(desire)}>
-                                        <Workflow className="h-4 w-4"/>
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteDesire(desire.id)}>
-                                        <Trash2 className="h-4 w-4 text-destructive"/>
-                                    </Button>
-                                </div>
-                            </li>
-                        ))}
-                         {currentPistonState.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No desires logged for this category.</p>}
-                    </ul>
-                </ScrollArea>
+             <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Quick Access</h3>
+                <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add New Quick Access Card</DialogTitle>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Label htmlFor="new-card-name">Card Name</Label>
+                            <Input id="new-card-name" value={newCardName} onChange={(e) => setNewCardName(e.target.value)} />
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={handleAddCard}>Add Card</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
-        </CardContent>
-    )
-};
-
-
-const ThoughtsView = ({ onSelect }: { onSelect: (type: 'Fantasy' | 'Disruptive') => void }) => (
-    <CardContent className="p-4">
-        <div className="grid grid-cols-2 gap-4">
-            <Button onClick={() => onSelect('Fantasy')} variant="outline" className="flex-col h-20"><ThumbsUp className="h-6 w-6 text-green-500 mb-1"/>Fantasy</Button>
-            <Button onClick={() => onSelect('Disruptive')} variant="outline" className="flex-col h-20"><Shield className="h-6 w-6 text-red-500 mb-1"/>Disruptive</Button>
-        </div>
-    </CardContent>
-);
-
-const NegativeThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: EmotionalState) => void; onSchedule: () => void; }) => {
-    return (
-        <CardContent className="p-4">
             <ScrollArea className="h-80">
                 <ul className="space-y-2 pr-2">
-                    {Object.keys(EMOTIONAL_STATES).map(state => (
-                        <li key={state}>
-                             <div className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
-                                <span className="font-medium group-hover:text-primary transition-colors">{state}</span>
-                                <p className='text-xs text-muted-foreground'>{EMOTIONAL_STATES[state as EmotionalState].message}</p>
-                            </div>
+                    {quickAccessCards.map(card => (
+                        <li key={card.id} className="p-2 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors">
+                            <button className="text-sm font-medium w-full text-left" onClick={(e) => openGeneralPopup(card.id, e)}>
+                                {card.name}
+                            </button>
                         </li>
                     ))}
+                    {quickAccessCards.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No quick access cards found.</p>}
                 </ul>
             </ScrollArea>
         </CardContent>
     );
 };
 
-const PositiveThoughtsView = ({ onSelect, onSchedule }: { onSelect: (state: FantasyState) => void; onSchedule: () => void; }) => {
+const RuleEquationsView = () => {
+    const { pillarEquations, setPillarEquations, metaRules } = useAuth();
+    const [isAddEquationOpen, setIsAddEquationOpen] = useState(false);
+    const [selectedPillar, setSelectedPillar] = useState('');
+    const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+    const [outcome, setOutcome] = useState('');
+
+    const handleSaveEquation = () => {
+        if (!selectedPillar || selectedRuleIds.length === 0 || !outcome.trim()) {
+            alert('Please select a pillar, at least one rule, and provide an outcome.');
+            return;
+        }
+        const newEquation: HabitEquation = {
+            id: `eq_${Date.now()}`,
+            metaRuleIds: selectedRuleIds,
+            outcome: outcome.trim(),
+        };
+        setPillarEquations(prev => ({
+            ...prev,
+            [selectedPillar]: [...(prev[selectedPillar] || []), newEquation]
+        }));
+        setIsAddEquationOpen(false);
+        setSelectedPillar('');
+        setSelectedRuleIds([]);
+        setOutcome('');
+    };
+
     return (
         <CardContent className="p-4">
-            <ScrollArea className="h-80">
-                <ul className="space-y-2 pr-2">
-                    {Object.keys(FANTASY_STATES).map(state => (
-                        <li key={state}>
-                             <div className="flex items-center justify-between group p-2 rounded-md border bg-muted/20">
-                                <span className="font-medium group-hover:text-primary transition-colors">{state}</span>
-                                <p className='text-xs text-muted-foreground'>{FANTASY_STATES[state as FantasyState].message}</p>
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold">Rule Equations</h3>
+                <Dialog open={isAddEquationOpen} onOpenChange={setIsAddEquationOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader><DialogTitle>Create New Rule Equation</DialogTitle></DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <Select value={selectedPillar} onValueChange={setSelectedPillar}>
+                                <SelectTrigger><SelectValue placeholder="Select Pillar..." /></SelectTrigger>
+                                <SelectContent>
+                                    {['Mind', 'Body', 'Heart', 'Spirit'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                {metaRules.map(rule => (
+                                    <div key={rule.id} className="flex items-center space-x-2 p-1">
+                                        <Checkbox 
+                                            id={`rule-${rule.id}`} 
+                                            checked={selectedRuleIds.includes(rule.id)}
+                                            onCheckedChange={() => setSelectedRuleIds(prev => prev.includes(rule.id) ? prev.filter(id => id !== rule.id) : [...prev, rule.id])}
+                                        />
+                                        <Label htmlFor={`rule-${rule.id}`} className="font-normal w-full cursor-pointer">{rule.text}</Label>
+                                    </div>
+                                ))}
+                            </ScrollArea>
+                            <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="Expected Outcome..." />
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={handleSaveEquation}>Save Equation</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+            <ScrollArea className="h-80 pr-2">
+                <div className="space-y-4">
+                    {Object.entries(pillarEquations).map(([pillar, equations]) => (
+                        <div key={pillar}>
+                            <h4 className="font-medium text-sm mb-1">{pillar}</h4>
+                            <div className="space-y-2">
+                                {equations.map(eq => (
+                                    <Card key={eq.id} className="bg-muted/30 p-3">
+                                        <ul className="list-disc list-inside text-xs space-y-1">
+                                            {(eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)?.text).filter(Boolean).map(text => <li key={text}>{text}</li>)}
+                                        </ul>
+                                        <p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold">
+                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                            <span>{eq.outcome}</span>
+                                        </p>
+                                    </Card>
+                                ))}
                             </div>
-                        </li>
+                        </div>
                     ))}
-                </ul>
+                </div>
             </ScrollArea>
         </CardContent>
     );
