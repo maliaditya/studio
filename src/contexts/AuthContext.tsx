@@ -84,7 +84,7 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  handleToggleComplete: (slotName: string, activity: Activity, isCompleted: boolean) => void;
+  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
@@ -365,24 +365,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Focus Session
   const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
 
-
-  useEffect(() => {
-    const audioEl = audioRef.current;
-    if (!audioEl) return;
-
-    if (playingAudio?.isPlaying) {
-      const resourceToPlay = resources.find(r => r.id === playingAudio.id);
-      if (resourceToPlay?.audioUrl) {
-        if (audioEl.src !== resourceToPlay.audioUrl) {
-          audioEl.src = resourceToPlay.audioUrl;
-        }
-        audioEl.volume = globalVolume; // Use global volume
-        audioEl.play().catch(e => console.error("Audio play failed:", e));
-      }
-    } else {
-      audioEl.pause();
-    }
-  }, [playingAudio, resources, globalVolume]);
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
@@ -840,7 +822,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDateOfBirth(data.dateOfBirth || null);
     setGender(data.gender || null);
     
-    setResourceFolders(data.resourceFolders || []);
+    const storedFolders = data.resourceFolders;
+    let currentFolders: ResourceFolder[] = [];
+    if (storedFolders) {
+      currentFolders = storedFolders;
+    }
+    const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
+    if (!hasQuickAccess) {
+      const quickAccessFolder: ResourceFolder = {
+        id: `folder_quick_access_${Date.now()}`,
+        name: 'Quick Access',
+        parentId: null,
+        icon: 'Zap'
+      };
+      currentFolders.push(quickAccessFolder);
+    }
+    setResourceFolders(currentFolders);
     setResources(data.resources || []);
     setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
     setActiveResourceTabIds(data.activeResourceTabIds || []);
@@ -1840,9 +1837,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (timerRect) {
             level = 0;
             parentId = undefined;
-            // Position to the left of the timer, accounting for its width
             x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-            // If that puts it off-screen, position it to the right
             if (x < MARGIN) {
                 x = timerRect.right + MARGIN;
             }
@@ -1851,7 +1846,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             level = 0;
             parentId = undefined;
             x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
-            y = window.innerHeight / 2 - 250; // default height approx
+            y = window.innerHeight / 2 - 250;
         }
 
         newPopups.set(activityId, { activityId, x, y, parentId, level });
@@ -2021,4 +2016,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

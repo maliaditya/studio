@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -102,15 +103,15 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     }, [activityInfo, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
     const attentionSpanInfo = useMemo(() => {
-        const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession?.activity : activityInfo;
+        const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession.activity : activityInfo;
         
         if (!activityForSpan || !activityForSpan.focusSessionStartTime) {
             return null;
         }
         
-        if (activityForSpan.focusSessionEndTime) {
-             const elapsedMs = activityForSpan.focusSessionEndTime - activityForSpan.focusSessionStartTime;
-             const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs));
+        if (activityForSpan.focusSessionEndTime && activityForSpan.focusSessionInitialStartTime) {
+             const elapsedMs = activityForSpan.focusSessionEndTime - activityForSpan.focusSessionInitialStartTime;
+             const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs), { unit: 'minute' });
              return {
                 title: "Attention Span",
                 value: elapsed,

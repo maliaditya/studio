@@ -32,7 +32,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete, activeFocusSession } = useAuth();
+  const { activeFocusSession, setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
   const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
@@ -69,7 +69,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       interval = setInterval(() => {
         setSecondsLeft(s => s - 1);
       }, 1000);
-    } else if (sessionState === 'running' && secondsLeft === 0) {
+    } else if (sessionState === 'running' && secondsLeft <= 0) {
       setSessionState('finished');
       setIsAudioPlaying(false);
     }
@@ -94,15 +94,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const elapsedSeconds = totalSeconds - secondsLeft;
     
     if (activity) {
+      const updatedActivity = {
+        ...activity,
+        focusSessionEndTime: Date.now(),
+      };
+      updateActivity(updatedActivity);
+
       if (completed) {
-        const endTime = Date.now();
-        const startTime = activity.focusSessionInitialStartTime || activity.focusSessionStartTime || endTime;
-        const totalDurationMinutes = Math.round((endTime - startTime) / 60000);
-        
-        onLogTime(activity, totalDurationMinutes);
+        onLogTime(updatedActivity, duration); // Log the full intended duration
         handleToggleComplete(activity.slot, activity.id, true);
       } else if (elapsedSeconds > 0) {
-        onLogTime(activity, Math.floor(elapsedSeconds / 60));
+        onLogTime(updatedActivity, Math.floor(elapsedSeconds / 60));
       }
     }
     onClose();
@@ -111,7 +113,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const togglePlayPause = () => {
     const newSessionState = sessionState === 'running' ? 'paused' : 'running';
     if (newSessionState === 'paused') {
-        const updatedActivity = { ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1 };
+        const updatedActivity = { ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1, focusSessionStartTime: Date.now() };
+        updateActivity(updatedActivity);
+        setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
+    } else { // Resuming
+        const updatedActivity = { ...activity, focusSessionStartTime: Date.now() };
         updateActivity(updatedActivity);
         setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
     }

@@ -43,7 +43,7 @@ export function FocusSessionModal({
   activity,
   onStartSession,
 }: FocusSessionModalProps) {
-  const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession } = useAuth();
+  const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession, updateActivity } = useAuth();
   const [duration, setDuration] = useState(45);
   const [skipBreaks, setSkipBreaks] = useState(false);
   
@@ -105,7 +105,16 @@ export function FocusSessionModal({
 
   const handleStartClick = () => {
     if (activity) {
-      onStartSession(activity, duration);
+      const now = Date.now();
+      const updatedActivity: Activity = {
+        ...activity,
+        focusSessionInitialStartTime: now,
+        focusSessionStartTime: now,
+        focusSessionEndTime: undefined,
+        focusSessionPauses: 0,
+      };
+      updateActivity(updatedActivity); // Persist the initial start time immediately
+      onStartSession(updatedActivity, duration);
       onOpenChange(false);
     }
   };
