@@ -168,6 +168,9 @@ export function FocusSessionModal({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-8">
+        <DialogHeader>
+            <DialogTitle>Start Focus Session</DialogTitle>
+        </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             <Card className="lg:col-span-1 shadow-lg">
