@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -20,7 +19,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 
@@ -151,10 +150,10 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'quick-access' | 'rule-
 );
 
 const QuickAccessView = () => {
-    const { resources, setResources, openGeneralPopup, lastSelectedHabitFolder, setLastSelectedHabitFolder } = useAuth();
+    const { resources, setResources, openGeneralPopup } = useAuth();
     const { toast } = useToast();
-    const [newCardName, setNewCardName] = useState('');
-    const [isAddCardOpen, setIsAddCardOpen] = useState(false);
+    const [editingCardId, setEditingCardId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     const quickAccessFolder = useMemo(() => resources.find(r => r.name === 'Quick Access' && r.type === 'card' && !r.folderId), [resources]);
 
@@ -164,49 +163,62 @@ const QuickAccessView = () => {
     }, [resources, quickAccessFolder]);
 
     const handleAddCard = () => {
-        if (!newCardName.trim() || !quickAccessFolder) return;
+        if (!quickAccessFolder) {
+            toast({ title: 'Error', description: 'Quick Access folder not found.', variant: 'destructive'});
+            return;
+        }
         const newCard: Resource = {
             id: `res_card_${Date.now()}`,
-            name: newCardName.trim(),
+            name: "New Card",
             folderId: quickAccessFolder.id,
             type: 'card',
             createdAt: new Date().toISOString(),
         };
         setResources(prev => [...prev, newCard]);
-        setNewCardName('');
-        setIsAddCardOpen(false);
-        toast({ title: 'Card Added', description: `"${newCard.name}" added to Quick Access.` });
+        setEditingCardId(newCard.id);
+        setEditingName("New Card");
+    };
+
+    const handleNameSave = () => {
+        if (!editingCardId) return;
+
+        if (editingName.trim() === '') {
+            setResources(prev => prev.filter(r => r.id !== editingCardId));
+            toast({ title: 'Card Discarded', description: 'Empty card was not saved.' });
+        } else {
+            setResources(prev => prev.map(r => r.id === editingCardId ? { ...r, name: editingName } : r));
+        }
+
+        setEditingCardId(null);
+        setEditingName('');
     };
 
     return (
         <CardContent className="p-4">
              <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">Quick Access</h3>
-                <Dialog open={isAddCardOpen} onOpenChange={setIsAddCardOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Add New Quick Access Card</DialogTitle>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <Label htmlFor="new-card-name">Card Name</Label>
-                            <Input id="new-card-name" value={newCardName} onChange={(e) => setNewCardName(e.target.value)} />
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleAddCard}>Add Card</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleAddCard}>
+                    <PlusCircle className="h-4 w-4 text-green-500"/>
+                </Button>
             </div>
             <ScrollArea className="h-80">
                 <ul className="space-y-2 pr-2">
                     {quickAccessCards.map(card => (
                         <li key={card.id} className="p-2 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors">
-                            <button className="text-sm font-medium w-full text-left" onClick={(e) => openGeneralPopup(card.id, e)}>
-                                {card.name}
-                            </button>
+                            {editingCardId === card.id ? (
+                                <Input
+                                    value={editingName}
+                                    onChange={(e) => setEditingName(e.target.value)}
+                                    onBlur={handleNameSave}
+                                    onKeyDown={e => e.key === 'Enter' && handleNameSave()}
+                                    autoFocus
+                                    className="h-8 text-sm"
+                                />
+                            ) : (
+                                <button className="text-sm font-medium w-full text-left" onClick={(e) => openGeneralPopup(card.id, e)}>
+                                    {card.name}
+                                </button>
+                            )}
                         </li>
                     ))}
                     {quickAccessCards.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No quick access cards found.</p>}
