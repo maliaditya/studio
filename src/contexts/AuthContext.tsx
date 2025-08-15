@@ -1777,9 +1777,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openRuleDetailPopup = (ruleId: string, event: React.MouseEvent) => {
     const popupWidth = 600;
     const popupHeight = 500;
-    const x = window.innerWidth / 2 - popupWidth / 2;
-    const y = window.innerHeight / 2 - popupHeight / 2;
-    setRuleDetailPopup({ ruleId, x: Math.max(20, x), y: Math.max(20, y) });
+    
+    let x, y;
+    const targetRect = (event.target as HTMLElement).getBoundingClientRect();
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    
+    // Position to the right if there's space, otherwise to the left
+    if (targetRect.right + popupWidth < screenWidth) {
+      x = targetRect.right + 10;
+    } else {
+      x = targetRect.left - popupWidth - 10;
+    }
+    
+    y = targetRect.top;
+    
+    // Ensure it doesn't go off-screen
+    if (x < 10) x = 10;
+    if (x + popupWidth > screenWidth - 10) x = screenWidth - popupWidth - 10;
+    if (y < 10) y = 10;
+    if (y + popupHeight > screenHeight - 10) y = screenHeight - popupHeight - 10;
+
+    setRuleDetailPopup({ ruleId, x, y });
   };
   
   const closeRuleDetailPopup = () => {
@@ -1801,18 +1820,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const popupWidth = 416; // 26rem
     const popupHeight = 400; // Estimated height
     
-    // Position to the right of the click, with boundaries
     let x = event.clientX + 20;
     let y = event.clientY - 20;
 
     if (x + popupWidth > window.innerWidth - 20) {
       x = event.clientX - popupWidth - 20;
     }
+    if (y < 20) {
+      y = 20;
+    }
     if (y + popupHeight > window.innerHeight - 20) {
       y = window.innerHeight - popupHeight - 20;
     }
     
-    setTaskContextPopup({ taskId, x: Math.max(10, x), y: Math.max(10, y) });
+    setTaskContextPopup({ taskId, x, y });
   };
 
   const closeTaskContextPopup = () => {
