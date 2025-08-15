@@ -32,22 +32,30 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { activeFocusSession, setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete, activeFocusSession } = useAuth();
   const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
   const popupRef = React.useRef<HTMLDivElement>(null);
   
-  const [position, setPosition] = React.useState({ x: window.innerWidth - 256 - 24, y: 24 }); // top right
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
+
+  React.useEffect(() => {
+    // Set initial position only on the client-side
+    setPosition({
+      x: window.innerWidth - 256 - 24,
+      y: 24,
+    });
+  }, []);
 
   const style: React.CSSProperties = {
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : `translate3d(0px, 0px, 0)`,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
 
@@ -69,14 +77,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [sessionState, secondsLeft]);
+  }, [sessionState, secondsLeft, setIsAudioPlaying]);
 
   React.useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
         const currentActivity = activeFocusSession?.activity?.id === activity.id ? activeFocusSession.activity : activity;
         setActiveFocusSession({ activity: currentActivity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
     }
-  }, [secondsLeft, sessionState, totalSeconds, activity, setActiveFocusSession]);
+  }, [secondsLeft, sessionState, totalSeconds, activity, setActiveFocusSession, activeFocusSession?.activity]);
 
 
   const handleStop = (completed: boolean) => {
