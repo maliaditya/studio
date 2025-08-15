@@ -14,10 +14,9 @@ import { formatDistanceStrict } from 'date-fns';
 
 interface TaskContextPopupProps {
     popupState: TaskContextPopupState;
-    onClose: () => void;
 }
 
-export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps) {
+export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     const { 
         deepWorkDefinitions, 
         upskillDefinitions, 
@@ -25,7 +24,9 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
         coreSkills, 
         skillDomains,
         microSkillMap,
-        schedule
+        schedule,
+        openTaskContextPopup,
+        closeTaskContextPopup,
     } = useAuth();
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -38,7 +39,7 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
         left: popupState.x,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
-        zIndex: 101, // Above the focus timer
+        zIndex: 101 + popupState.level,
     };
     
     const taskInfo = useMemo(() => {
@@ -115,6 +116,11 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
         };
     }, [schedule, taskInfo]);
 
+    const handleOpenParentContext = (e: React.MouseEvent) => {
+        if (!taskInfo?.parent) return;
+        openTaskContextPopup(taskInfo.parent.id, undefined, popupState);
+    };
+
     const getCoreSkillIcon = (type?: string) => {
       switch(type) {
         case 'Foundation': return <Blocks className="h-4 w-4" />;
@@ -148,7 +154,9 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
                             {parent && (
                                 <div className="flex items-center gap-3">
                                     <Badge variant="outline" className="flex-shrink-0">Parent</Badge>
-                                    <p className="font-medium truncate">{parent.name}</p>
+                                    <Button variant="link" className="p-0 h-auto font-medium truncate" onClick={handleOpenParentContext}>
+                                        {parent.name}
+                                    </Button>
                                 </div>
                             )}
                             {project && (

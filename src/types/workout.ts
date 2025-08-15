@@ -565,4 +565,6 @@ export interface TaskContextPopupState {
   taskId: string;
   x: number;
   y: number;
+  level: number;
+  parentId?: string;
 }

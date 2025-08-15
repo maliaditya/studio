@@ -37,7 +37,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    taskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
 
@@ -65,13 +65,15 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup]);
+  
+  const handleDragEnd = (event: DragEndEvent) => {
+    handlePopupDragEnd(event);
+    handleRulePopupDragEnd(event);
+    handleTaskContextPopupDragEnd(event);
+  };
 
   return (
-    <DndContext onDragEnd={(e) => {
-        handlePopupDragEnd(e);
-        handleRulePopupDragEnd(e);
-        handleTaskContextPopupDragEnd(e);
-    }}>
+    <DndContext onDragEnd={handleDragEnd}>
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
@@ -105,12 +107,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     onClose={closeRuleDetailPopup}
                 />
             )}
-            {taskContextPopup && (
+            {Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
-                    popupState={taskContextPopup}
-                    onClose={closeTaskContextPopup}
+                    key={popupState.taskId}
+                    popupState={popupState}
                 />
-            )}
+            ))}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {
                   if (!popup.parentId) return null;

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -179,9 +178,9 @@ interface AuthContextType {
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
 
   // Task Context Popup
-  taskContextPopup: TaskContextPopupState | null;
-  openTaskContextPopup: (taskId: string, timerRect: DOMRect) => void;
-  closeTaskContextPopup: () => void;
+  taskContextPopups: Map<string, TaskContextPopupState>;
+  openTaskContextPopup: (taskId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => void;
+  closeTaskContextPopup: (taskId: string) => void;
   handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
 
 
@@ -353,7 +352,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
   // Task Context Popup
-  const [taskContextPopup, setTaskContextPopup] = useState<TaskContextPopupState | null>(null);
+  const [taskContextPopups, setTaskContextPopups] = useState<Map<string, TaskContextPopupState>>(new Map());
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -1825,39 +1824,76 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openTaskContextPopup = (taskId: string, timerRect: DOMRect) => {
-    const CONTEXT_POPUP_WIDTH = 600;
-    const MARGIN = 16;
-    
-    if (!timerRect) {
-        console.error("Timer rect not available for positioning task context popup.");
-        return;
-    }
-    
-    let x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-    
-    if (x < MARGIN) {
-      x = timerRect.right + MARGIN;
-    }
+  const openTaskContextPopup = (taskId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => {
+    setTaskContextPopups(prev => {
+        const newPopups = new Map(prev);
+        const CONTEXT_POPUP_WIDTH = 600;
+        const MARGIN = 16;
+        let x, y, level, parentId;
 
-    setTaskContextPopup({ 
-        taskId, 
-        x: x,
-        y: timerRect.top,
+        if (parentPopupState) {
+            level = parentPopupState.level + 1;
+            parentId = parentPopupState.taskId;
+            x = parentPopupState.x + 30;
+            y = parentPopupState.y + 30;
+        } else if (timerRect) {
+            level = 0;
+            parentId = undefined;
+            x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+            if (x < MARGIN) {
+                x = timerRect.right + MARGIN;
+            }
+            y = timerRect.top;
+        } else {
+            level = 0;
+            parentId = undefined;
+            x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
+            y = window.innerHeight / 2 - 250; // default height approx
+        }
+
+        newPopups.set(taskId, { taskId, x, y, parentId, level });
+        return newPopups;
     });
   };
 
-  const closeTaskContextPopup = () => {
-    setTaskContextPopup(null);
+  const closeTaskContextPopup = (taskId: string) => {
+    setTaskContextPopups(prev => {
+        const newPopups = new Map(prev);
+        const popupsToDelete = new Set<string>([taskId]);
+        const queue = [taskId];
+        
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            for (const [id, popup] of newPopups.entries()) {
+                if (popup.parentId === currentId) {
+                    popupsToDelete.add(id);
+                    queue.push(id);
+                }
+            }
+        }
+        
+        for (const idToDelete of popupsToDelete) {
+            newPopups.delete(idToDelete);
+        }
+        return newPopups;
+    });
   };
 
   const handleTaskContextPopupDragEnd = (event: DragEndEvent) => {
-    if (taskContextPopup && event.active.id === `task-context-popup-${taskContextPopup.taskId}`) {
-      setTaskContextPopup(prev => prev ? {
-        ...prev,
-        x: prev.x + event.delta.x,
-        y: prev.y + event.delta.y,
-      } : null);
+    if (event.active.id.toString().startsWith('task-context-popup-')) {
+        const taskId = event.active.id.toString().replace('task-context-popup-', '');
+        setTaskContextPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(taskId);
+            if (popup) {
+                newPopups.set(taskId, {
+                    ...popup,
+                    x: popup.x + event.delta.x,
+                    y: popup.y + event.delta.y,
+                });
+            }
+            return newPopups;
+        });
     }
   };
 
@@ -1931,7 +1967,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    taskContextPopup, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
@@ -1982,12 +2018,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-
-    
-
-
-
-
-
-
