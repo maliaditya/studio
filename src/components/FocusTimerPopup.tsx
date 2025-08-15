@@ -32,7 +32,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextModal } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup } = useAuth();
   const totalSeconds = duration * 60;
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [isActive, setIsActive] = React.useState(false);
@@ -91,9 +91,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const handleOpenContext = (e: React.MouseEvent) => {
-    if (activity.taskIds && activity.taskIds.length > 0) {
-        openTaskContextModal(activity.taskIds[0]);
-    }
+      if (activity.taskIds && activity.taskIds.length > 0) {
+          openTaskContextPopup(activity.taskIds[0], e);
+      }
   };
 
   const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;

@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, TaskContextPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -177,10 +177,11 @@ interface AuthContextType {
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
 
-  // Task Context Modal
-  taskContextModalId: string | null;
-  setTaskContextModalId: React.Dispatch<React.SetStateAction<string | null>>;
-  openTaskContextModal: (taskId: string) => void;
+  // Task Context Popup
+  taskContextPopup: TaskContextPopupState | null;
+  openTaskContextPopup: (taskId: string, event: React.MouseEvent) => void;
+  closeTaskContextPopup: () => void;
+  handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
 
 
   // Workout Log Handlers
@@ -350,9 +351,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Meta Rule Popup
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
-  // Task Context Modal
-  const [taskContextModalId, setTaskContextModalId] = useState<string | null>(null);
-
+  // Task Context Popup
+  const [taskContextPopup, setTaskContextPopup] = useState<TaskContextPopupState | null>(null);
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -1815,8 +1815,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openTaskContextModal = (taskId: string) => {
-    setTaskContextModalId(taskId);
+  const openTaskContextPopup = (taskId: string, event: React.MouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setTaskContextPopup({ 
+        taskId, 
+        x: rect.right + 10, // Position to the right of the click
+        y: rect.top 
+    });
+  };
+
+  const closeTaskContextPopup = () => {
+    setTaskContextPopup(null);
+  };
+
+  const handleTaskContextPopupDragEnd = (event: DragEndEvent) => {
+    if (taskContextPopup && event.active.id === `task-context-popup-${taskContextPopup.taskId}`) {
+      setTaskContextPopup(prev => prev ? {
+        ...prev,
+        x: prev.x + event.delta.x,
+        y: prev.y + event.delta.y,
+      } : null);
+    }
   };
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
@@ -1867,7 +1886,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    taskContextModalId, setTaskContextModalId, openTaskContextModal,
+    taskContextPopup, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
@@ -1921,3 +1940,4 @@ export const useAuth = (): AuthContextType => {
 
 
     
+

@@ -30,7 +30,7 @@ import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucid
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
-import { TaskContextModal } from '@/components/TaskContextModal';
+import { TaskContextPopup } from '@/components/TaskContextPopup';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
@@ -102,8 +102,8 @@ function MyPlatePageContent() {
     activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
-    taskContextModalId, 
-    setTaskContextModalId
+    taskContextPopup,
+    closeTaskContextPopup
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -1070,7 +1070,7 @@ function MyPlatePageContent() {
                   if (!isOpen) setEditingActivity(null);
                   setIsLearningModalOpen(isOpen);
               }}
-              availableTasks={activityType === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : activityType === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
+              availableTasks={activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
               initialSelectedIds={editingActivity.activity.taskIds || []}
               onSave={handleSaveTaskSelection}
               pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
@@ -1138,11 +1138,10 @@ function MyPlatePageContent() {
           />
         )}
 
-        {taskContextModalId && (
-            <TaskContextModal
-                isOpen={!!taskContextModalId}
-                onOpenChange={(open) => !open && setTaskContextModalId(null)}
-                taskId={taskContextModalId}
+        {taskContextPopup && (
+            <TaskContextPopup
+                popupState={taskContextPopup}
+                onClose={closeTaskContextPopup}
             />
         )}
       </div>
