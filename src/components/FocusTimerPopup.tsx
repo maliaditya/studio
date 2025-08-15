@@ -4,7 +4,7 @@
 import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, GitBranch } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, GitBranch } from 'lucide-react';
 import type { Activity } from '@/types/workout';
 import {
   Popover,
@@ -158,12 +158,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
           <div className="mt-4 pt-4 border-t border-border/20 text-center">
             {isContextAvailable ? (
-                 <button className="flex items-center justify-center gap-1.5 w-full bg-muted/50 py-1.5 px-3 rounded-md hover:bg-muted" title={activity.details} onClick={handleOpenContext}>
-                    <p className="text-sm font-semibold truncate">Task: {activity.details}</p>
-                    <GitBranch className="h-4 w-4 text-primary flex-shrink-0" />
-                 </button>
+                 <Button variant="outline" className="w-full" onClick={handleOpenContext} title={activity.details}>
+                    <span className="truncate">Task: {activity.details}</span>
+                    <LinkIcon className="h-4 w-4 ml-2 text-primary flex-shrink-0" />
+                 </Button>
             ) : (
-                <p className="text-sm font-semibold truncate bg-muted/50 py-1.5 px-3 rounded-md" title={activity.details}>
+                <p className="text-sm font-semibold truncate bg-muted/50 py-2 px-3 rounded-md" title={activity.details}>
                     Task: {activity.details}
                 </p>
             )}
