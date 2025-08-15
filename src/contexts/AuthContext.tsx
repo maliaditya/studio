@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -476,11 +477,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       // Resources Data Migration & Loading
       const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
+      let currentFolders: ResourceFolder[] = [];
       if (storedFolders) {
-        setResourceFolders(JSON.parse(storedFolders));
-      } else {
-        setResourceFolders([]);
+        currentFolders = JSON.parse(storedFolders);
       }
+      // Auto-create Quick Access folder if it doesn't exist
+      const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
+      if (!hasQuickAccess) {
+        const quickAccessFolder: ResourceFolder = {
+          id: `folder_quick_access_${Date.now()}`,
+          name: 'Quick Access',
+          parentId: null,
+          icon: 'Zap'
+        };
+        currentFolders.push(quickAccessFolder);
+      }
+      setResourceFolders(currentFolders);
+
       
       const storedResources = localStorage.getItem(`resources_${username}`);
       if (storedResources) {

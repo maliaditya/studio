@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -150,12 +151,12 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'quick-access' | 'rule-
 );
 
 const QuickAccessView = () => {
-    const { resources, setResources, openGeneralPopup } = useAuth();
+    const { resources, resourceFolders, setResources, openGeneralPopup } = useAuth();
     const { toast } = useToast();
     const [editingCardId, setEditingCardId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
 
-    const quickAccessFolder = useMemo(() => resources.find(r => r.name === 'Quick Access' && r.type === 'card' && !r.folderId), [resources]);
+    const quickAccessFolder = useMemo(() => resourceFolders.find(f => f.name === 'Quick Access' && !f.parentId), [resourceFolders]);
 
     const quickAccessCards = useMemo(() => {
         if (!quickAccessFolder) return [];
