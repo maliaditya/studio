@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -262,21 +263,22 @@ export function FocusSessionModal({
                     {selectedRules.length > 0 ? (
                         <div className="space-y-2">
                             {selectedRules.map(rule => (
-                                <Card key={rule.id} className="group/rule">
-                                    <CardContent className="p-2 text-sm space-y-2">
+                                <Card key={rule.id}>
+                                    <CardContent className="p-3 text-sm">
                                         <p 
-                                            className="font-medium cursor-pointer hover:text-primary"
+                                            className="font-medium cursor-pointer hover:text-primary mb-2"
                                             onClick={(e) => openRuleDetailPopup(rule.id, e)}
                                         >
                                             {rule.outcome}
                                         </p>
-                                        <div className="flex justify-end items-center gap-1 opacity-0 group-hover/rule:opacity-100 transition-opacity">
+                                        <div className="flex justify-end items-center gap-1">
                                             <Popover onOpenChange={(open) => {
                                                 if(open) {
                                                     setLinkingToEquationId(rule.id);
                                                     setSelectedResourceId(rule.linkedResourceId || '');
                                                 }
-                                                setIsLinkResourceOpen(open);
+                                                // This is a bit of a hack to control multiple popovers
+                                                if (!open) setLinkingToEquationId(null);
                                             }}>
                                                 <PopoverTrigger asChild>
                                                     <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-3 w-3"/></Button>
