@@ -20,7 +20,10 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogPortal, DialogOverlay, DialogClose, DialogTrigger, DialogDescription as DialogDescriptionComponent, DialogTitle as DialogTitleComponent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Checkbox } from './ui/checkbox';
+
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
     'Gratitude': <HeartPulse className="h-5 w-5 text-pink-500" />,
