@@ -34,7 +34,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [isActive, setIsActive] = React.useState(false);
 
   React.useEffect(() => {
-    setIsActive(false);
+    setIsActive(true);
+    setIsAudioPlaying(true);
   }, []);
 
   React.useEffect(() => {
