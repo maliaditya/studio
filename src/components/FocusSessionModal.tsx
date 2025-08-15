@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -14,8 +15,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { Play, SkipForward, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Activity } from '@/types/workout';
+import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle } from 'lucide-react';
+import type { Activity, HabitEquation, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ResponsiveContainer,
@@ -23,6 +24,10 @@ import {
   RadialBar,
   PolarAngleAxis,
 } from 'recharts';
+import { ScrollArea } from './ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
 
 interface FocusSessionModalProps {
   isOpen: boolean;
@@ -37,9 +42,24 @@ export function FocusSessionModal({
   activity,
   onStartSession,
 }: FocusSessionModalProps) {
-  const { allDeepWorkLogs, allUpskillLogs } = useAuth();
+  const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule } = useAuth();
   const [duration, setDuration] = useState(45);
   const [skipBreaks, setSkipBreaks] = useState(false);
+  
+  const [isSelectRulesOpen, setIsSelectRulesOpen] = useState(false);
+  const [tempSelectedRuleIds, setTempSelectedRuleIds] = useState<string[]>([]);
+  
+  const [isLinkResourceOpen, setIsLinkResourceOpen] = useState(false);
+  const [linkingToEquationId, setLinkingToEquationId] = useState<string | null>(null);
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('');
+
+  useEffect(() => {
+    if (activity?.habitEquationIds) {
+      setTempSelectedRuleIds(activity.habitEquationIds);
+    } else {
+      setTempSelectedRuleIds([]);
+    }
+  }, [activity]);
   
   // These are placeholders for future functionality.
   const [breakMinutes, setBreakMinutes] = useState(5);
@@ -93,6 +113,46 @@ export function FocusSessionModal({
   
   const breaks = Math.floor(duration / (breakAfterMinutes + breakMinutes));
 
+  const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
+  
+  const handleSaveRuleSelection = () => {
+    if (!activity) return;
+    setSchedule(prevSchedule => {
+        const newSchedule = { ...prevSchedule };
+        const daySchedule = { ...newSchedule[activity.slot] };
+        if (daySchedule[activity.slot]) {
+            daySchedule[activity.slot] = (daySchedule[activity.slot] as Activity[]).map(act => 
+                act.id === activity.id ? { ...act, habitEquationIds: tempSelectedRuleIds } : act
+            );
+            newSchedule[activity.slot] = daySchedule[activity.slot];
+        }
+        return newSchedule;
+    });
+    setIsSelectRulesOpen(false);
+  };
+  
+  const handleLinkResourceSave = () => {
+    if (!linkingToEquationId || !selectedResourceId) return;
+
+    setPillarEquations(prevPillars => {
+        const newPillars = { ...prevPillars };
+        for (const pillar in newPillars) {
+            newPillars[pillar] = (newPillars[pillar] || []).map(eq =>
+                eq.id === linkingToEquationId ? { ...eq, linkedResourceId: selectedResourceId } : eq
+            );
+        }
+        return newPillars;
+    });
+    setIsLinkResourceOpen(false);
+    setLinkingToEquationId(null);
+    setSelectedResourceId('');
+  };
+  
+  const selectedRules = useMemo(() => {
+    if (!activity?.habitEquationIds) return [];
+    return allEquations.filter(eq => activity.habitEquationIds!.includes(eq.id));
+  }, [activity, allEquations]);
+
   if (!activity) return null;
 
   return (
@@ -100,7 +160,6 @@ export function FocusSessionModal({
       <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
-            {/* Column 1: Get Ready to Focus */}
             <Card className="lg:col-span-1 shadow-lg">
                 <CardHeader>
                     <CardTitle>Get ready to focus</CardTitle>
@@ -128,7 +187,6 @@ export function FocusSessionModal({
                 </CardFooter>
             </Card>
 
-            {/* Column 2: Daily Progress */}
             <Card className="lg:col-span-1 shadow-lg">
                 <CardHeader>
                     <CardTitle>Daily progress</CardTitle>
@@ -178,18 +236,99 @@ export function FocusSessionModal({
                 </CardContent>
             </Card>
             
-            {/* Column 3: Task Selection */}
-            <Card className="lg:col-span-1 shadow-lg">
+            <Card className="lg:col-span-1 shadow-lg flex flex-col">
                 <CardHeader>
-                    <CardTitle className="truncate" title={activity.details}>{activity.details}</CardTitle>
-                    <CardDescription>This is your selected task for the session.</CardDescription>
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="truncate" title={activity.details}>Rules for this Session</CardTitle>
+                      <Button variant="outline" size="sm" onClick={() => setIsSelectRulesOpen(true)}>Select</Button>
+                    </div>
+                    <CardDescription>Relevant rules for "{activity.details}"</CardDescription>
                 </CardHeader>
-                 <CardContent>
-                    <p className="text-sm text-muted-foreground">Focusing on this task will contribute to your daily goals. Stay on track!</p>
+                <CardContent className="flex-grow min-h-0">
+                  <ScrollArea className="h-full -mr-4 pr-4">
+                    {selectedRules.length > 0 ? (
+                        <div className="space-y-2">
+                            {selectedRules.map(rule => (
+                                <Card key={rule.id} className="group/rule">
+                                    <CardContent className="p-2 text-sm space-y-2">
+                                        <p 
+                                            className="font-medium cursor-pointer hover:text-primary"
+                                            onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                                        >
+                                            {rule.outcome}
+                                        </p>
+                                        <div className="flex justify-end items-center gap-1 opacity-0 group-hover/rule:opacity-100 transition-opacity">
+                                            <Popover onOpenChange={(open) => {
+                                                if(open) {
+                                                    setLinkingToEquationId(rule.id);
+                                                    setSelectedResourceId(rule.linkedResourceId || '');
+                                                }
+                                                setIsLinkResourceOpen(open);
+                                            }}>
+                                                <PopoverTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-3 w-3"/></Button>
+                                                </PopoverTrigger>
+                                                <PopoverContent className="w-64 p-2">
+                                                    <div className="space-y-2">
+                                                        <Label>Link Resource Card</Label>
+                                                        <Select value={selectedResourceId} onValueChange={setSelectedResourceId}>
+                                                            <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                                            <SelectContent>
+                                                                {resources.filter(r => r.type === 'card' || r.type === 'habit' || r.type === 'mechanism').map(r => (
+                                                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                        <Button onClick={handleLinkResourceSave} size="sm" className="w-full">Save Link</Button>
+                                                    </div>
+                                                </PopoverContent>
+                                            </Popover>
+                                            
+                                            {rule.linkedResourceId && (
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openGeneralPopup(rule.linkedResourceId!, e)}>
+                                                    <Eye className="h-3 w-3" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-muted-foreground h-full flex items-center justify-center">
+                            <p>No rules selected for this session.</p>
+                        </div>
+                    )}
+                  </ScrollArea>
                 </CardContent>
             </Card>
-
         </div>
+         <Dialog open={isSelectRulesOpen} onOpenChange={setIsSelectRulesOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Select Rule Equations for Session</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-80 my-4 pr-4">
+                    <div className="space-y-2">
+                        {allEquations.map(eq => (
+                            <div key={eq.id} className="flex items-center space-x-2 p-2 border rounded-md">
+                                <Checkbox
+                                    id={`rule-eq-${eq.id}`}
+                                    checked={tempSelectedRuleIds.includes(eq.id)}
+                                    onCheckedChange={() => {
+                                        setTempSelectedRuleIds(prev => prev.includes(eq.id) ? prev.filter(id => id !== eq.id) : [...prev, eq.id])
+                                    }}
+                                />
+                                <Label htmlFor={`rule-eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                            </div>
+                        ))}
+                    </div>
+                </ScrollArea>
+                <DialogFooter>
+                    <Button onClick={handleSaveRuleSelection}>Save Selection</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

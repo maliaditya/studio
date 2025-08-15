@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -152,6 +153,7 @@ export interface Activity {
   completed: boolean;
   taskIds?: string[];
   slot: string;
+  habitEquationIds?: string[]; // New field to link rule equations
 };
 
 export interface DailySchedule {
@@ -384,6 +386,7 @@ export interface HabitEquation {
   id: string;
   metaRuleIds: string[];
   outcome: string;
+  linkedResourceId?: string;
 }
 
 export interface PurposeData {
@@ -411,4 +414,106 @@ export interface MetaRule {
   text: string;
   patternId: string;
   purposePillar?: string;
+}
+
+export interface PistonsInitialState {
+  view: 'quick-access' | 'rule-equations' | 'autosuggestion' | 'starred';
+  context?: any;
+}
+
+export type AutoSuggestionEntry = PistonEntry;
+
+export interface Stopper {
+    id: string;
+    text: string;
+    status: 'none' | 'manageable' | 'unmanageable';
+    managementStrategy?: string;
+    linkedResourceId?: string;
+}
+
+export interface Strength {
+    id: string;
+    text: string;
+}
+
+// Update Resource type for habits/mechanisms
+export interface Resource {
+  id: string;
+  name: string;
+  folderId: string;
+  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d';
+  createdAt: string;
+
+  // For 'link' type
+  link?: string;
+  description?: string;
+  iconUrl?: string;
+  githubLink?: string;
+  demoLink?: string;
+  linkedResourceId?: string;
+
+  // For 'card' type
+  points?: ResourcePoint[];
+  icon?: string;
+  audioUrl?: string;
+  
+  // For 'habit' type
+  trigger?: {
+    action?: string;
+    feeling?: string;
+  };
+  response?: {
+    text?: string;
+    resourceId?: string;
+    visualize?: string;
+  };
+  reward?: string;
+  newResponse?: {
+    text?: string;
+    resourceId?: string;
+    action?: string;
+    visualize?: string;
+  };
+  stoppers?: Stopper[];
+  strengths?: Strength[];
+  
+  // For 'mechanism' type
+  mechanismFramework?: 'positive' | 'negative';
+  benefit?: string;
+  law?: {
+    premise?: string;
+    outcome?: string;
+  };
+  
+  // For 3D Model
+  modelUrl?: string;
+}
+
+// Extending ResourcePoint for more complex links
+export interface ResourcePoint {
+  id: string;
+  text: string;
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';
+  url?: string;
+  resourceId?: string; // ID of the linked Resource card
+  displayText?: string;
+}
+
+
+// Extending Popups
+export interface PopupState {
+    resourceId: string;
+    level: number;
+    x: number;
+    y: number;
+    parentId?: string;
+    width?: number;
+    height?: number;
+    z?: number;
+}
+
+export interface RuleDetailPopupState {
+  ruleId: string;
+  x: number;
+  y: number;
 }
