@@ -10,12 +10,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight } from 'lucide-react';
+import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus } from 'lucide-react';
 import type { Activity, HabitEquation, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -53,6 +53,8 @@ export function FocusSessionModal({
   const [linkingToEquationId, setLinkingToEquationId] = useState<string | null>(null);
   const [selectedResourceId, setSelectedResourceId] = useState<string>('');
 
+  const [dailyGoalHours, setDailyGoalHours] = useState(8);
+
   useEffect(() => {
     if (activity?.habitEquationIds) {
       setTempSelectedRuleIds(activity.habitEquationIds);
@@ -86,11 +88,11 @@ export function FocusSessionModal({
     
     return {
       yesterday: yesterdayCompleted,
-      goal: 8 * 60, // 8 hours in minutes
+      goal: dailyGoalHours * 60,
       completed: completed,
       streak: 0, // Placeholder
     };
-  }, [allDeepWorkLogs, allUpskillLogs, isOpen]);
+  }, [allDeepWorkLogs, allUpskillLogs, isOpen, dailyGoalHours]);
   
   const chartData = [
     {
@@ -176,7 +178,6 @@ export function FocusSessionModal({
             <Card className="lg:col-span-1 shadow-lg">
                 <CardHeader>
                     <CardTitle>Get ready to focus</CardTitle>
-                    <CardDescription>We'll turn off notifications and app alerts during each session. For longer sessions, we'll add a short break so you can recharge.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center space-y-4">
                     <div className="flex items-center justify-center bg-muted/50 rounded-lg p-2 w-40">
@@ -225,7 +226,11 @@ export function FocusSessionModal({
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <p className="text-muted-foreground text-sm">Daily goal</p>
-                            <p className="text-4xl font-bold">{dailyProgress.goal / 60}</p>
+                            <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setDailyGoalHours(h => Math.max(1, h-1))}><Minus className="h-4 w-4" /></Button>
+                                <p className="text-4xl font-bold w-16 text-center">{dailyGoalHours}</p>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setDailyGoalHours(h => h+1)}><PlusCircle className="h-4 w-4" /></Button>
+                            </div>
                             <p className="text-muted-foreground">hours</p>
                         </div>
                     </div>
@@ -252,10 +257,9 @@ export function FocusSessionModal({
             <Card className="lg:col-span-1 shadow-lg flex flex-col">
                 <CardHeader>
                     <div className="flex justify-between items-center">
-                      <CardTitle className="truncate" title={activity.details}>Rules for this Session</CardTitle>
+                      <CardTitle>Rules for this Session</CardTitle>
                       <Button variant="outline" size="sm" onClick={() => setIsSelectRulesOpen(true)}>Select</Button>
                     </div>
-                    <CardDescription>Relevant rules for "{activity.details}"</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow min-h-0">
                   <ScrollArea className="h-full -mr-4 pr-4">
