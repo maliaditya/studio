@@ -1798,21 +1798,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const openTaskContextPopup = (taskId: string, event: React.MouseEvent) => {
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const popupWidth = 416;
-    const popupHeight = 400; // A guess, might need adjustment
+    const popupWidth = 416; // 26rem
+    const popupHeight = 400; // Estimated height
     
-    // Position it to the right of the triggering element, if possible.
-    let x = rect.right + 10;
-    let y = rect.top;
-    
-    if (x + popupWidth > window.innerWidth) {
-      x = rect.left - popupWidth - 10;
-    }
-    if (y + popupHeight > window.innerHeight) {
-      y = window.innerHeight - popupHeight - 10;
-    }
+    // Position to the right of the click, with boundaries
+    let x = event.clientX + 20;
+    let y = event.clientY - 20;
 
+    if (x + popupWidth > window.innerWidth - 20) {
+      x = event.clientX - popupWidth - 20;
+    }
+    if (y + popupHeight > window.innerHeight - 20) {
+      y = window.innerHeight - popupHeight - 20;
+    }
+    
     setTaskContextPopup({ taskId, x: Math.max(10, x), y: Math.max(10, y) });
   };
 
@@ -1931,3 +1930,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+
+    
