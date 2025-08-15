@@ -109,7 +109,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             )}
             {Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
-                    key={popupState.taskId}
+                    key={popupState.activityId}
                     popupState={popupState}
                 />
             ))}
