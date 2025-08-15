@@ -66,15 +66,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setIsAudioPlaying(false);
     }
     
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [sessionState, secondsLeft]);
+
+  React.useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
         const currentActivity = activeFocusSession?.activity?.id === activity.id ? activeFocusSession.activity : activity;
         setActiveFocusSession({ activity: currentActivity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
     }
+  }, [secondsLeft, sessionState, totalSeconds, activity, setActiveFocusSession]);
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [sessionState, secondsLeft, totalSeconds, activity, activeFocusSession, setActiveFocusSession]);
 
   const handleStop = (completed: boolean) => {
     setSessionState('paused');
