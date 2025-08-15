@@ -63,7 +63,7 @@ export function FocusTimerPopup({ activity, duration, onClose, onLogTime }: Focu
   if (!activity) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100]">
+    <div className="fixed top-6 right-6 z-[100]">
       <Card className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
         <CardContent className="p-4">
           <div className="flex justify-between items-center mb-4">
