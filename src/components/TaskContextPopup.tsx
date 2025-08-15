@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock } from 'lucide-react';
@@ -35,10 +35,24 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         id: `task-context-popup-${popupState.activityId}`,
     });
 
+    const [position, setPosition] = useState({ x: popupState.x, y: popupState.y });
+
+    useEffect(() => {
+        // This effect ensures that if the initial state from the server is NaN,
+        // we set a default client-side position to avoid errors.
+        if (isNaN(popupState.x) || isNaN(popupState.y)) {
+            const CONTEXT_POPUP_WIDTH = 600;
+            const x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
+            const y = window.innerHeight / 2 - 250;
+            setPosition({ x, y });
+        }
+    }, [popupState.x, popupState.y]);
+
+
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
+        top: position.y,
+        left: position.x,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
         zIndex: 101 + popupState.level,
