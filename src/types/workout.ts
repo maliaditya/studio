@@ -562,7 +562,7 @@ export interface RuleDetailPopupState {
 }
 
 export interface TaskContextPopupState {
-  taskId: string;
+  activityId: string;
   x: number;
   y: number;
   level: number;

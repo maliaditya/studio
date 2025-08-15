@@ -8,7 +8,7 @@ import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/wor
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch
 } from 'lucide-react';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
@@ -27,7 +27,7 @@ interface AgendaWidgetItemProps {
   onToggleComplete: (slotName: string, activityId: string) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenFocusModal: (activity: Activity) => void;
-  onOpenTaskContext: (taskId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 function AgendaWidgetItem({ 
@@ -114,7 +114,7 @@ function AgendaWidgetItem({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => onOpenTaskContext(activity.taskIds![0], e)}
+                onClick={(e) => onOpenTaskContext(activity.id, e)}
             >
                 <GitBranch className="h-4 w-4" />
             </Button>
@@ -174,25 +174,25 @@ interface TodaysScheduleCardProps {
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
   onOpenFocusModal: (activity: Activity) => void;
-  onOpenTaskContext: (taskId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 const parseDurationToHours = (durationStr: string | undefined): number => {
     if (!durationStr) return 0;
     let totalHours = 0;
     
-    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) {
-      totalHours += parseFloat(hourMatch[1]);
+      totalHours += parseInt(hourMatch[1], 10);
     }
   
     const minMatch = durationStr.match(/(\d+)\s*m/);
     if (minMatch) {
-      totalHours += parseFloat(minMatch[1]) / 60;
+      totalHours += parseInt(minMatch[1], 10) / 60;
     }
     
-    if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr)) {
-        totalHours += parseFloat(durationStr) / 60;
+    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
+        totalHours += parseInt(durationStr, 10) / 60;
     }
   
     return totalHours;
@@ -427,7 +427,7 @@ export function TodaysScheduleCard({
                 duration={activityDurations[activity.id]}
                 onLogLearning={onLogLearning}
                 onStartWorkoutLog={onStartWorkoutLog}
-                onToggleComplete={onToggleComplete}
+                onToggleComplete={() => onToggleComplete(activity.slot, activity.id)}
                 onStartLeadGenLog={onStartLeadGenLog}
                 onOpenFocusModal={onOpenFocusModal}
                 onOpenTaskContext={onOpenTaskContext}

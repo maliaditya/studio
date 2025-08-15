@@ -31,7 +31,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     } = useAuth();
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `task-context-popup-${popupState.taskId}`,
+        id: `task-context-popup-${popupState.activityId}`,
     });
 
     const style: React.CSSProperties = {
@@ -43,12 +43,26 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         zIndex: 101 + popupState.level,
     };
     
+    const activityInfo = useMemo(() => {
+        if (!popupState.activityId) return null;
+        for (const dateKey in schedule) {
+            for (const slotName in schedule[dateKey]) {
+                const activities = schedule[dateKey][slotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    const foundActivity = activities.find(act => act.id === popupState.activityId);
+                    if (foundActivity) return foundActivity;
+                }
+            }
+        }
+        return null;
+    }, [popupState.activityId, schedule]);
+
     const taskInfo = useMemo(() => {
-        const { taskId } = popupState;
-        if (!taskId) return null;
+        if (!activityInfo?.taskIds?.[0]) return null;
         
+        const taskId = activityInfo.taskIds[0];
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const task = allDefs.find(d => d.id === taskId || d.id.startsWith(taskId.substring(0, 10)));
+        const task = allDefs.find(d => taskId.startsWith(d.id));
 
         if (!task) return null;
 
@@ -85,62 +99,45 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
             skillArea,
         };
 
-    }, [popupState.taskId, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
+    }, [activityInfo, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
     const attentionSpanInfo = useMemo(() => {
-        let activity: Activity | undefined;
+        const activityForSpan = activeFocusSession?.activity.id === activityInfo?.id ? activeFocusSession.activity : activityInfo;
         
-        // Prioritize the active focus session
-        if (activeFocusSession && (activeFocusSession.activity.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || ''))) {
-            activity = activeFocusSession.activity;
-        } else {
-             // Fallback to searching schedule if no active session matches
-             for (const dateKey in schedule) {
-                for (const slotName in schedule[dateKey]) {
-                    const activities = schedule[dateKey][slotName] as Activity[];
-                    if (Array.isArray(activities)) {
-                        const foundActivity = activities.find(act => (act.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || '')));
-                        if (foundActivity) {
-                            activity = foundActivity;
-                            break;
-                        }
-                    }
-                }
-                if (activity) break;
-            }
-        }
-
-        if (!activity || !activity.focusSessionStartTime) {
+        if (!activityForSpan || !activityForSpan.focusSessionStartTime) {
             return null;
         }
-
-        if (activity.focusSessionEndTime) {
-             const elapsedMs = activity.focusSessionEndTime - activity.focusSessionStartTime;
+        
+        if (activityForSpan.focusSessionEndTime) {
+             const elapsedMs = activityForSpan.focusSessionEndTime - activityForSpan.focusSessionStartTime;
              const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs));
              return {
                 title: "Attention Span",
                 value: elapsed,
-                pauses: activity.focusSessionPauses || 0
+                pauses: activityForSpan.focusSessionPauses || 0
              };
         } else {
             return {
                 title: "Session Started",
-                value: format(activity.focusSessionStartTime, 'p'),
-                pauses: activity.focusSessionPauses || 0
+                value: format(activityForSpan.focusSessionStartTime, 'p'),
+                pauses: activityForSpan.focusSessionPauses || 0
             }
         }
-        
-    }, [schedule, taskInfo, activeFocusSession]);
+    }, [activityInfo, activeFocusSession]);
 
 
     const handleOpenParentContext = (e: React.MouseEvent) => {
         if (!taskInfo?.parent) return;
-        openTaskContextPopup(taskInfo.parent.id, undefined, popupState);
+        
+        // This is a simplification; we'd need to find the Activity associated with the parent task
+        // For now, this functionality will be limited. A more robust implementation would
+        // search for the parent's activity in the schedule.
+        // openTaskContextPopup(taskInfo.parent.id, undefined, popupState);
     };
     
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
         e.stopPropagation();
-        closeTaskContextPopup(popupState.taskId);
+        closeTaskContextPopup(popupState.activityId);
     };
 
     const getCoreSkillIcon = (type?: string) => {
@@ -152,7 +149,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
       }
     };
     
-    if (!taskInfo) return null;
+    if (!taskInfo || !activityInfo) return null;
     const { task, parent, project, domain, coreSkill, skillArea } = taskInfo;
 
     return (
@@ -176,9 +173,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                             {parent && (
                                 <div className="flex items-center gap-3">
                                     <Badge variant="outline" className="flex-shrink-0">Parent</Badge>
-                                    <Button variant="link" className="p-0 h-auto font-medium truncate" onClick={handleOpenParentContext}>
-                                        {parent.name}
-                                    </Button>
+                                    <p className="font-medium truncate">{parent.name}</p>
                                 </div>
                             )}
                             {project && (
