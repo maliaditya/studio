@@ -29,7 +29,6 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         microSkillMap,
         schedule,
         activeFocusSession,
-        openTaskContextPopup,
         closeTaskContextPopup,
     } = useAuth();
     
@@ -37,18 +36,34 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         id: `task-context-popup-${popupState.activityId}`,
     });
 
-    const [position, setPosition] = useState({ x: popupState.x, y: popupState.y });
+    const [position, setPosition] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const defaultX = window.innerWidth / 2 - 300;
-            const defaultY = window.innerHeight / 2 - 250;
-            setPosition({
-                x: isNaN(popupState.x) ? defaultX : popupState.x,
-                y: isNaN(popupState.y) ? defaultY : popupState.y,
-            });
+            const CONTEXT_POPUP_WIDTH = 600;
+            const MARGIN = 16;
+
+            // This logic assumes a reference element might not exist, providing a fallback.
+            // In a real scenario, you'd want a more robust way to get the reference point.
+            const timerRect = document.querySelector(`[data-activity-id="${popupState.activityId}"]`)?.getBoundingClientRect();
+            
+            let x: number, y: number;
+
+            if (timerRect) {
+                x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+                if (x < MARGIN) {
+                    x = timerRect.right + MARGIN;
+                }
+                y = timerRect.top;
+            } else {
+                // Fallback position if the timer element isn't found
+                x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
+                y = window.innerHeight / 2 - 250; // Approximate half height
+            }
+
+            setPosition({ x, y });
         }
-    }, [popupState.x, popupState.y]);
+    }, [popupState.activityId]);
 
 
     const style: React.CSSProperties = {

@@ -1827,7 +1827,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newPopups = new Map(prev);
         const CONTEXT_POPUP_WIDTH = 600;
         const MARGIN = 16;
-        let x: number, y: number, level: number, parentId: string | undefined;
+        let x = 0;
+        let y = 0;
+        let level = 0;
+        let parentId: string | undefined;
 
         if (parentPopupState) {
             level = parentPopupState.level + 1;
@@ -1835,25 +1838,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             x = parentPopupState.x + 30;
             y = parentPopupState.y + 30;
         } else if (timerRect) {
-            level = 0;
-            parentId = undefined;
-            if (typeof window !== "undefined") {
-              x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-              if (x < MARGIN) {
-                  x = timerRect.right + MARGIN;
-              }
-              y = timerRect.top;
-            } else {
-              x = 0;
-              y = 0;
+            x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+            if (x < MARGIN) {
+                x = timerRect.right + MARGIN;
             }
-        } else {
-            level = 0;
-            parentId = undefined;
-            x = 0;
-            y = 0;
+            y = timerRect.top;
         }
-
+        
         newPopups.set(activityId, { activityId, x, y, parentId, level });
         return newPopups;
     });
@@ -2026,3 +2017,4 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
