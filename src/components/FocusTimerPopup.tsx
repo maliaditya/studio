@@ -67,7 +67,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     
     if (sessionState === 'running' || sessionState === 'paused') {
-        setActiveFocusSession({ activity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
+        const currentActivity = activeFocusSession?.activity?.id === activity.id ? activeFocusSession.activity : activity;
+        setActiveFocusSession({ activity: currentActivity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
     }
 
     return () => {
@@ -82,9 +83,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const elapsedSeconds = totalSeconds - secondsLeft;
     
     if (activity) {
-      if (elapsedSeconds > 0) {
-        onLogTime(activity, Math.floor(elapsedSeconds / 60));
-      }
       if (completed) {
         const endTime = Date.now();
         const startTime = activity.focusSessionInitialStartTime || activity.focusSessionStartTime || endTime;
@@ -92,6 +90,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         
         onLogTime(activity, totalDurationMinutes);
         handleToggleComplete(activity.slot, activity.id, true);
+      } else if (elapsedSeconds > 0) {
+        onLogTime(activity, Math.floor(elapsedSeconds / 60));
       }
     }
     onClose();
@@ -100,7 +100,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const togglePlayPause = () => {
     const newSessionState = sessionState === 'running' ? 'paused' : 'running';
     if (newSessionState === 'paused') {
-        updateActivity({ ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1 });
+        const updatedActivity = { ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1 };
+        updateActivity(updatedActivity);
+        setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
     }
     setSessionState(newSessionState);
     setIsAudioPlaying(newSessionState === 'running');
@@ -117,7 +119,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const handleOpenContext = (e: React.MouseEvent) => {
       if (activity.taskIds && activity.taskIds.length > 0 && popupRef.current) {
           const timerRect = popupRef.current.getBoundingClientRect();
-          openTaskContextPopup(activity.taskIds[0], timerRect);
+          openTaskContextPopup(activity.id, timerRect);
       }
   };
 
