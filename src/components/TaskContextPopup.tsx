@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout } from 'lucide-react';
 import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDraggable } from '@dnd-kit/core';
-import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -108,14 +106,14 @@ export function TaskContextModal({ isOpen, onOpenChange, taskId }: TaskContextMo
                             <div className="flex items-center gap-3">
                                 <div className="w-px h-6 bg-border ml-3"></div>
                                 <Badge variant="outline" className="flex-shrink-0">Parent</Badge>
-                                <p className="text-sm font-medium">{parent.name}</p>
+                                <p className="text-sm font-medium truncate">{parent.name}</p>
                             </div>
                         )}
                         {project && (
                                 <div className="flex items-center gap-3">
                                 <div className="w-px h-6 bg-border ml-3"></div>
                                 <Badge variant="outline" className="flex-shrink-0">Project</Badge>
-                                <p className="text-sm font-medium">{project.name}</p>
+                                <p className="text-sm font-medium truncate">{project.name}</p>
                             </div>
                         )}
                     </div>
