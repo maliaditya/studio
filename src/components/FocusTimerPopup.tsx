@@ -32,7 +32,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity } = useAuth();
   const totalSeconds = duration * 60;
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [isActive, setIsActive] = React.useState(false);
@@ -62,7 +62,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       interval = setInterval(() => {
         setSecondsLeft(s => s - 1);
       }, 1000);
-    } else if (secondsLeft === 0) {
+    } else if (isActive && secondsLeft === 0) {
       handleStop(true);
     }
     
@@ -81,12 +81,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const elapsedSeconds = totalSeconds - secondsLeft;
     if (elapsedSeconds > 0 && activity) {
       onLogTime(activity, Math.floor(elapsedSeconds / 60));
+      if (completed) {
+        updateActivity({ ...activity, focusSessionEndTime: Date.now() });
+      }
     }
     onClose();
   };
   
   const togglePlayPause = () => {
     const newIsActive = !isActive;
+    if (!newIsActive) { // If we are pausing
+        updateActivity({ ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1 });
+    }
     setIsActive(newIsActive);
     setIsAudioPlaying(newIsActive);
   };

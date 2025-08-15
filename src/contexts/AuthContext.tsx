@@ -88,6 +88,7 @@ interface AuthContextType {
   handleLogLearning: (dateKey: string, activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
+  updateActivity: (updatedActivity: Activity) => void;
 
   // Focus Timer
   activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
@@ -1782,7 +1783,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
     
-    // Position to the right if there's space, otherwise to the left
     if (targetRect.right + popupWidth < screenWidth) {
       x = targetRect.right + 10;
     } else {
@@ -1791,7 +1791,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     y = targetRect.top;
     
-    // Ensure it doesn't go off-screen
     if (x < 10) x = 10;
     if (x + popupWidth > screenWidth - 10) x = screenWidth - popupWidth - 10;
     if (y < 10) y = 10;
@@ -1821,9 +1820,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const MARGIN = 16;
     
     let x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-    
-    // If positioning it to the left would push it off-screen,
-    // position it to the right of the timer instead.
     if (x < MARGIN) {
       x = timerRect.right + MARGIN;
     }
@@ -1860,6 +1856,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     setResources(prev => [...prev, newHabit]);
   };
+  
+  const updateActivity = (updatedActivity: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        let found = false;
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+                    if (activityIndex > -1) {
+                        activities[activityIndex] = updatedActivity;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found) break;
+        }
+        return newSchedule;
+    });
+  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -1871,7 +1889,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     globalVolume, setGlobalVolume,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
-    handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
+    handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
@@ -1951,6 +1969,7 @@ export const useAuth = (): AuthContextType => {
 
 
     
+
 
 
 
