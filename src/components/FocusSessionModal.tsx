@@ -111,7 +111,8 @@ export function FocusSessionModal({
         focusSessionInitialStartTime: now,
         focusSessionStartTime: now,
         focusSessionEndTime: undefined,
-        focusSessionPauses: 0,
+        focusSessionPauses: [],
+        focusSessionInitialDuration: duration,
       };
       updateActivity(updatedActivity); // Persist the initial start time immediately
       onStartSession(updatedActivity, duration);

@@ -5,7 +5,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock } from 'lucide-react';
+import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock, Plus, Minus } from 'lucide-react';
 import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, FullSchedule, PauseEvent } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
@@ -37,20 +37,16 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         id: `task-context-popup-${popupState.activityId}`,
     });
 
-    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [position, setPosition] = useState({ x: popupState.x, y: popupState.y });
 
     useEffect(() => {
-        // This effect ensures that if the initial state from the server is NaN,
-        // we set a default client-side position to avoid errors.
         if (typeof window !== 'undefined') {
-            if (isNaN(popupState.x) || isNaN(popupState.y)) {
-                const CONTEXT_POPUP_WIDTH = 600;
-                const x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
-                const y = window.innerHeight / 2 - 250;
-                setPosition({ x, y });
-            } else {
-                setPosition({ x: popupState.x, y: popupState.y });
-            }
+            const defaultX = window.innerWidth / 2 - 300;
+            const defaultY = window.innerHeight / 2 - 250;
+            setPosition({
+                x: isNaN(popupState.x) ? defaultX : popupState.x,
+                y: isNaN(popupState.y) ? defaultY : popupState.y,
+            });
         }
     }, [popupState.x, popupState.y]);
 
@@ -129,12 +125,11 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
             return null;
         }
 
-        const { focusSessionInitialStartTime, focusSessionEndTime } = activityForSpan;
+        const { focusSessionInitialStartTime, focusSessionEndTime, focusSessionInitialDuration } = activityForSpan;
         const focusSessionPauses = Array.isArray(activityForSpan.focusSessionPauses) ? activityForSpan.focusSessionPauses : [];
 
         if (focusSessionEndTime) {
             const totalSpanMs = focusSessionEndTime - focusSessionInitialStartTime;
-            const totalSpan = formatDistanceStrict(new Date(0), new Date(totalSpanMs), { unit: 'minute' });
             
             const workIntervals: number[] = [];
             let lastStartTime = focusSessionInitialStartTime;
@@ -145,47 +140,49 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                     lastStartTime = p.resumeTime;
                 }
             });
-            // Add the final leg of work after the last resume
+
             if (focusSessionPauses.length > 0) {
                  const lastPause = focusSessionPauses[focusSessionPauses.length - 1];
                  if(lastPause.resumeTime) {
                     workIntervals.push(focusSessionEndTime - lastPause.resumeTime);
                  }
-            } else { // No pauses, just one interval
+            } else { 
                 workIntervals.push(focusSessionEndTime - focusSessionInitialStartTime);
             }
 
             const validIntervals = workIntervals.filter(i => i > 0);
+            const totalWorkTimeMs = validIntervals.reduce((sum, i) => sum + i, 0);
+
             const averageAttentionSpanMs = validIntervals.length > 0
-                ? validIntervals.reduce((sum, i) => sum + i, 0) / validIntervals.length
-                : totalSpanMs;
+                ? totalWorkTimeMs / validIntervals.length
+                : totalWorkTimeMs;
             
-            const averageAttentionSpan = formatDistanceStrict(new Date(0), new Date(averageAttentionSpanMs), { unit: 'minute' });
+            const totalDurationMinutes = Math.ceil(totalSpanMs / 60000);
+            const extendedTime = focusSessionInitialDuration ? totalDurationMinutes - focusSessionInitialDuration : 0;
             
             return {
-                title: "Attention Span",
-                totalSpan: totalSpan,
-                averageSpan: averageAttentionSpan,
-                intervals: workIntervals.map(ms => formatDistanceStrict(new Date(0), new Date(ms), { unit: 'minute'})),
+                title: "Session Completed",
+                totalSpan: formatDistanceStrict(new Date(0), new Date(totalSpanMs), { unit: 'minute' }),
+                averageSpan: formatDistanceStrict(new Date(0), new Date(averageAttentionSpanMs), { unit: 'minute' }),
+                attentionSpan: formatDistanceStrict(new Date(0), new Date(totalWorkTimeMs), { unit: 'minute'}),
+                intervals: validIntervals.map(ms => formatDistanceStrict(new Date(0), new Date(ms), { unit: 'minute'})),
                 pauses: focusSessionPauses.length,
+                extendedBy: extendedTime > 0 ? `${extendedTime} minutes` : null,
             };
         } else {
             return {
                 title: "Session Started",
                 totalSpan: format(focusSessionInitialStartTime, 'p'),
                 averageSpan: '-',
+                attentionSpan: '-',
                 intervals: [],
                 pauses: focusSessionPauses.length,
+                extendedBy: null,
             };
         }
     }, [activityInfo, activeFocusSession]);
 
 
-    const handleOpenParentContext = (e: React.MouseEvent) => {
-        if (!taskInfo?.parent) return;
-        // This functionality needs a more robust way to find the parent activity
-    };
-    
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         closeTaskContextPopup(popupState.activityId);
@@ -253,21 +250,29 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                             <span className="truncate">Attention</span>
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-0 flex-grow flex flex-col items-center justify-center text-center">
+                    <CardContent className="p-4 pt-0 flex-grow flex flex-col justify-center text-center">
                         {attentionSpanInfo ? (
-                            <div className="space-y-3 w-full">
+                            <div className="space-y-4 w-full">
                                 <div>
                                     <p className="text-xs text-muted-foreground">{attentionSpanInfo.title}</p>
-                                    <p className="text-xl font-bold">{attentionSpanInfo.totalSpan}</p>
+                                    <p className="text-2xl font-bold">{attentionSpanInfo.totalSpan}</p>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="text-center">
+                                <div className="grid grid-cols-2 gap-3 text-center">
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Attention Span</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.attentionSpan}</p>
+                                    </div>
+                                    <div>
                                         <p className="text-xs text-muted-foreground">Avg. Span</p>
                                         <p className="text-lg font-bold">{attentionSpanInfo.averageSpan}</p>
                                     </div>
-                                    <div className="text-center">
+                                     <div>
                                         <p className="text-xs text-muted-foreground">Pauses</p>
                                         <p className="text-lg font-bold">{attentionSpanInfo.pauses}</p>
+                                    </div>
+                                     <div>
+                                        <p className="text-xs text-muted-foreground">Extended By</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.extendedBy || '-'}</p>
                                     </div>
                                 </div>
                                 {attentionSpanInfo.intervals.length > 0 && (

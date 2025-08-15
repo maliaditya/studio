@@ -163,6 +163,7 @@ export interface Activity {
   focusSessionStartTime?: number; // Tracks start of current segment (or initial start)
   focusSessionEndTime?: number;
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
+  focusSessionInitialDuration?: number; // The originally intended duration
 };
 
 export interface DailySchedule {
