@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { useDraggable } from '@dnd-kit/core';
-import { formatDistanceStrict } from 'date-fns';
+import { format, formatDistanceStrict } from 'date-fns';
 
 interface TaskContextPopupProps {
     popupState: TaskContextPopupState;
@@ -25,6 +25,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         skillDomains,
         microSkillMap,
         schedule,
+        activeFocusSession,
         openTaskContextPopup,
         closeTaskContextPopup,
     } = useAuth();
@@ -48,6 +49,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
         const task = allDefs.find(d => d.id === taskId || d.id.startsWith(taskId.substring(0, 10)));
+
         if (!task) return null;
 
         const parent = allDefs.find(p => 
@@ -88,37 +90,57 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     const attentionSpanInfo = useMemo(() => {
         let activity: Activity | undefined;
         
-        // Find the activity associated with the task in the schedule
-        for (const dateKey in schedule) {
-            for (const slotName in schedule[dateKey]) {
-                const activities = schedule[dateKey][slotName] as Activity[];
-                if (Array.isArray(activities)) {
-                    const foundActivity = activities.find(act => (act.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || '')));
-                    if (foundActivity) {
-                        activity = foundActivity;
-                        break;
+        // Prioritize the active focus session
+        if (activeFocusSession && (activeFocusSession.activity.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || ''))) {
+            activity = activeFocusSession.activity;
+        } else {
+             // Fallback to searching schedule if no active session matches
+             for (const dateKey in schedule) {
+                for (const slotName in schedule[dateKey]) {
+                    const activities = schedule[dateKey][slotName] as Activity[];
+                    if (Array.isArray(activities)) {
+                        const foundActivity = activities.find(act => (act.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || '')));
+                        if (foundActivity) {
+                            activity = foundActivity;
+                            break;
+                        }
                     }
                 }
+                if (activity) break;
             }
-            if (activity) break;
         }
 
-        if (!activity || !activity.focusSessionStartTime || !activity.focusSessionEndTime) {
+        if (!activity || !activity.focusSessionStartTime) {
             return null;
         }
 
-        const elapsedMs = activity.focusSessionEndTime - activity.focusSessionStartTime;
-        const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs), { unit: 'minute' });
+        if (activity.focusSessionEndTime) {
+             const elapsedMs = activity.focusSessionEndTime - activity.focusSessionStartTime;
+             const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs));
+             return {
+                title: "Attention Span",
+                value: elapsed,
+                pauses: activity.focusSessionPauses || 0
+             };
+        } else {
+            return {
+                title: "Session Started",
+                value: format(activity.focusSessionStartTime, 'p'),
+                pauses: activity.focusSessionPauses || 0
+            }
+        }
         
-        return {
-            elapsed,
-            pauses: activity.focusSessionPauses || 0
-        };
-    }, [schedule, taskInfo]);
+    }, [schedule, taskInfo, activeFocusSession]);
+
 
     const handleOpenParentContext = (e: React.MouseEvent) => {
         if (!taskInfo?.parent) return;
         openTaskContextPopup(taskInfo.parent.id, undefined, popupState);
+    };
+    
+    const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        closeTaskContextPopup(popupState.taskId);
     };
 
     const getCoreSkillIcon = (type?: string) => {
@@ -189,8 +211,8 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                         {attentionSpanInfo ? (
                             <div className="space-y-3">
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Time</p>
-                                    <p className="text-xl font-bold">{attentionSpanInfo.elapsed}</p>
+                                    <p className="text-xs text-muted-foreground">{attentionSpanInfo.title}</p>
+                                    <p className="text-xl font-bold">{attentionSpanInfo.value}</p>
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">Pauses</p>
@@ -198,11 +220,11 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                                 </div>
                             </div>
                         ) : (
-                            <p className="text-xs text-muted-foreground">No completed focus session data for this task yet.</p>
+                            <p className="text-xs text-muted-foreground">No active or completed focus session data for this task.</p>
                         )}
                     </CardContent>
                     <div className="absolute top-2 right-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={handleClose}><X className="h-4 w-4" /></Button>
                     </div>
                 </div>
             </Card>
