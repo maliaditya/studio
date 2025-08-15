@@ -1,11 +1,10 @@
 
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, GitBranch } from 'lucide-react';
 import type { Activity } from '@/types/workout';
 import {
   Popover,
@@ -29,18 +28,16 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup } = useAuth();
   const totalSeconds = duration * 60;
-  const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
-  const [isActive, setIsActive] = useState(false);
+  const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
+  const [isActive, setIsActive] = React.useState(false);
 
-  useEffect(() => {
-    // When the component mounts with a persisted session, it should be paused.
-    // The user has to click play to resume.
+  React.useEffect(() => {
     setIsActive(false);
   }, []);
 
-  useEffect(() => {
+  React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (isActive && secondsLeft > 0) {
       interval = setInterval(() => {
@@ -50,7 +47,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       handleStop(true);
     }
     
-    // Persist state on every second change if active
     if (isActive) {
         setActiveFocusSession({ activity, duration, secondsLeft });
     }
@@ -73,7 +69,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const togglePlayPause = () => {
     const newIsActive = !isActive;
     setIsActive(newIsActive);
-    setIsAudioPlaying(newIsActive); // Sync audio with timer state
+    setIsAudioPlaying(newIsActive);
   };
 
   const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;
@@ -81,8 +77,16 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const seconds = secondsLeft % 60;
   
   const chartData = [{ name: 'progress', value: progressPercentage, fill: 'hsl(var(--primary))' }];
+  
+  const handleOpenContext = (e: React.MouseEvent) => {
+      if (activity.taskIds && activity.taskIds.length > 0) {
+          openTaskContextPopup(activity.taskIds[0], e);
+      }
+  };
 
   if (!activity) return null;
+
+  const isContextAvailable = (activity.type === 'deepwork' || activity.type === 'upskill') && (activity.taskIds?.length ?? 0) > 0;
 
   return (
     <div className="fixed top-6 right-6 z-[100]">
@@ -152,9 +156,16 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
           </div>
 
           <div className="mt-4 pt-4 border-t border-border/20 text-center">
-            <p className="text-sm font-semibold truncate bg-muted/50 py-1.5 px-3 rounded-md" title={activity.details}>
-                Task: {activity.details}
-            </p>
+            {isContextAvailable ? (
+                 <button className="flex items-center justify-center gap-1.5 w-full bg-muted/50 py-1.5 px-3 rounded-md hover:bg-muted" title={activity.details} onClick={handleOpenContext}>
+                    <p className="text-sm font-semibold truncate">Task: {activity.details}</p>
+                    <GitBranch className="h-4 w-4 text-primary flex-shrink-0" />
+                 </button>
+            ) : (
+                <p className="text-sm font-semibold truncate bg-muted/50 py-1.5 px-3 rounded-md" title={activity.details}>
+                    Task: {activity.details}
+                </p>
+            )}
           </div>
         </CardContent>
       </Card>
