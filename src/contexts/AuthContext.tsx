@@ -1815,11 +1815,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const openTaskContextPopup = (taskId: string, timerRect: DOMRect) => {
-    if (!timerRect) return;
-    const CONTEXT_POPUP_WIDTH = 384; // w-96
+    const CONTEXT_POPUP_WIDTH = 600;
     const MARGIN = 16;
     
     let x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+    
     if (x < MARGIN) {
       x = timerRect.right + MARGIN;
     }
@@ -1969,6 +1969,7 @@ export const useAuth = (): AuthContextType => {
 
 
     
+
 
 
 
