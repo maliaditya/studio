@@ -84,7 +84,7 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
+  handleToggleComplete: (slotName: string, activity: Activity, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
@@ -180,7 +180,7 @@ interface AuthContextType {
 
   // Task Context Popup
   taskContextPopups: Map<string, TaskContextPopupState>;
-  openTaskContextPopup: (taskId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => void;
+  openTaskContextPopup: (activityId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => void;
   closeTaskContextPopup: (taskId: string) => void;
   handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
 
@@ -1825,7 +1825,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openTaskContextPopup = (taskId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => {
+  const openTaskContextPopup = (activityId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => {
     setTaskContextPopups(prev => {
         const newPopups = new Map(prev);
         const CONTEXT_POPUP_WIDTH = 600;
@@ -1834,13 +1834,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (parentPopupState) {
             level = parentPopupState.level + 1;
-            parentId = parentPopupState.taskId;
+            parentId = parentPopupState.activityId;
             x = parentPopupState.x + 30;
             y = parentPopupState.y + 30;
         } else if (timerRect) {
             level = 0;
             parentId = undefined;
+            // Position to the left of the timer, accounting for its width
             x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+            // If that puts it off-screen, position it to the right
             if (x < MARGIN) {
                 x = timerRect.right + MARGIN;
             }
@@ -1852,10 +1854,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             y = window.innerHeight / 2 - 250; // default height approx
         }
 
-        newPopups.set(taskId, { taskId, x, y, parentId, level });
+        newPopups.set(activityId, { activityId, x, y, parentId, level });
         return newPopups;
     });
-  };
+};
 
   const closeTaskContextPopup = (taskId: string) => {
     setTaskContextPopups(prev => {
@@ -2019,3 +2021,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
