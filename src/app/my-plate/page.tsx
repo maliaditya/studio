@@ -28,6 +28,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
 import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
+import { FocusSessionModal } from '@/components/FocusSessionModal';
+import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
@@ -115,6 +117,12 @@ function MyPlatePageContent() {
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
+
+  // Focus Session State
+  const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
+  const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
+  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity; duration: number } | null>(null);
+
 
   // State for Modal content
   const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
@@ -335,11 +343,8 @@ function MyPlatePageContent() {
       logSource = brandingLogs;
     }
     
-    // Get the state of the log for the selected day BEFORE any updates.
     const logForDay = logSource.find(log => log.date === selectedDateKey);
     const existingDefIdsForDay = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
-
-    // Determine which of the selected definitions need a new exercise instance created.
     const defIdsToCreate = finalSelectedDefIds.filter(id => !existingDefIdsForDay.has(id));
 
     const newExercises: WorkoutExercise[] = defIdsToCreate.map((defId) => {
@@ -355,11 +360,9 @@ function MyPlatePageContent() {
       };
     });
 
-    // Construct the final state of the exercises for the day's log.
     const finalExercisesForDay = [...(logForDay?.exercises || []), ...newExercises];
     const updatedLogForDay: DatedWorkout = { id: selectedDateKey, date: selectedDateKey, exercises: finalExercisesForDay };
     
-    // Update the main logs state.
     logsUpdater(prevLogs => {
       const logIndex = prevLogs.findIndex(log => log.date === selectedDateKey);
       if (logIndex > -1) {
@@ -370,7 +373,6 @@ function MyPlatePageContent() {
       return [...prevLogs, updatedLogForDay];
     });
 
-    // Now, using the final computed state, update the schedule.
     const finalInstanceIds = updatedLogForDay.exercises
       .filter(ex => finalSelectedDefIds.includes(ex.definitionId))
       .map(t => t.id);
@@ -391,6 +393,23 @@ function MyPlatePageContent() {
     });
 
     setEditingActivity(null);
+  };
+  
+  const handleOpenFocusModal = (activity: Activity) => {
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
+  };
+
+  const handleStartFocusSession = (activity: Activity, duration: number) => {
+    setActiveFocusSession({ activity, duration });
+  };
+  
+  const handleLogFocusTime = (activity: Activity, minutes: number) => {
+    if (activity.type === 'deepwork' || activity.type === 'upskill') {
+      handleLogLearning(selectedDateKey, activity, 0, minutes);
+    } else {
+      toast({ title: 'Focus time logged (simulation)', description: `${minutes} minutes logged for ${activity.details}` });
+    }
   };
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
@@ -801,7 +820,6 @@ function MyPlatePageContent() {
     return `${mins}m`;
   };
 
-  // Push calculated durations to the global context
   useEffect(() => {
     setActivityDurations(_activityDurations);
   }, [_activityDurations, setActivityDurations]);
@@ -876,94 +894,10 @@ function MyPlatePageContent() {
   };
 
 
-  // MODAL HANDLERS
   const handleDietModalOpenChange = (isOpen: boolean) => {
       setIsDietPlanModalOpen(isOpen);
   };
   
-  const learningModalProps = useMemo(() => {
-    if (!editingActivity) {
-      return { availableTasks: [], initialSelectedIds: [], pageType: 'upskill' as const, disabledTaskIds: [], upskillDefinitions: [] };
-    }
-
-    const { activity } = editingActivity;
-    const pageType = activity.type as 'upskill' | 'deepwork' | 'branding';
-
-    let logSource: DatedWorkout[];
-    let definitionSource: ExerciseDefinition[];
-
-    if (pageType === 'upskill') {
-      logSource = allUpskillLogs;
-      definitionSource = upskillDefinitions;
-    } else if (pageType === 'deepwork') {
-      logSource = allDeepWorkLogs;
-      definitionSource = deepWorkDefinitions;
-    } else { // branding
-      logSource = brandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
-    }
-    
-    // These are the WorkoutExercise objects already created for the selected day.
-    const allTasksForDay = logSource.find(log => log.date === selectedDateKey)?.exercises || [];
-    const definitionIdsForDay = new Set(allTasksForDay.map(task => task.definitionId));
-
-    // These are definitions from the library that have NOT been added to the selected day's log at all.
-    const libraryDefinitions = definitionSource.filter(def => !definitionIdsForDay.has(def.id));
-
-    // Convert library definitions to temporary WorkoutExercise objects for the modal.
-    const libraryTasks = libraryDefinitions.map(def => ({
-        id: `lib-${def.id}-${Math.random()}`,
-        definitionId: def.id,
-        name: def.name,
-        category: def.category,
-        loggedSets: [], targetSets: 0, targetReps: ''
-    }));
-
-    const availableTasks = [...allTasksForDay, ...libraryTasks];
-    
-    const initialSelectedDefIds = new Set<string>();
-    (activity.taskIds || []).forEach(taskId => {
-        const task = allTasksForDay.find(t => t.id === taskId);
-        if (task) {
-            initialSelectedDefIds.add(task.definitionId);
-        }
-    });
-    const initialSelectedIds = Array.from(initialSelectedDefIds);
-    
-    const todaysActivitiesForType = Object.values(schedule[selectedDateKey] || {}).flat();
-    const disabledDefIds = new Set<string>();
-    todaysActivitiesForType.forEach(act => {
-        if (act && act.type === pageType && act.id !== activity.id && act.taskIds) {
-            (act.taskIds || []).forEach(taskId => {
-                const task = allTasksForDay.find(t => t.id === taskId);
-                if (task) {
-                    disabledDefIds.add(task.definitionId);
-                }
-            });
-        }
-    });
-    const disabledTaskIds = Array.from(disabledDefIds);
-
-    return { 
-        availableTasks, 
-        initialSelectedIds, 
-        pageType, 
-        disabledTaskIds, 
-        upskillDefinitions,
-    };
-
-  }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, schedule, upskillDefinitions, deepWorkDefinitions]);
-
-  const timeAllocationData = useMemo(() => {
-    if (!productivityStats.todayHoursData) return [];
-    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
-    return [
-      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
-      { name: 'Ideal', time: 12, fill: 'hsl(var(--chart-2))' },
-      { name: 'Autopilot', time: Math.max(0, 24 - dailyTime), fill: 'hsl(var(--border))' },
-    ];
-  }, [productivityStats.todayHoursData]);
-
   const dashboardStats = useMemo(() => {
     const {
       latestConsistency,
@@ -979,7 +913,6 @@ function MyPlatePageContent() {
     const allCompleted = Object.values(todayActivities).flat().every(a => a.completed);
     const direction = hasPlannedOrCompleted && allCompleted;
     
-    // Find the next upcoming learning milestone
     const learningMilestones = Object.values(productivityStats.learningStats)
       .map(s => s.nextMilestone)
       .filter(m => m !== null)
@@ -999,6 +932,16 @@ function MyPlatePageContent() {
     };
   }, [productivityStats, schedule, todayKey]);
 
+
+  const timeAllocationData = useMemo(() => {
+    if (!productivityStats.todayHoursData) return [];
+    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
+    return [
+      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
+      { name: 'Ideal', time: 12, fill: 'hsl(var(--chart-2))' },
+      { name: 'Autopilot', time: Math.max(0, 24 - dailyTime), fill: 'hsl(var(--border))' },
+    ];
+  }, [productivityStats.todayHoursData]);
 
   return (
     <>
@@ -1043,6 +986,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+                        onOpenFocusModal={handleOpenFocusModal}
                     />
                 )}
                 <WeightGoalCard 
@@ -1089,6 +1033,7 @@ function MyPlatePageContent() {
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
                 onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+                onOpenFocusModal={handleOpenFocusModal}
             />
         )}
 
@@ -1119,14 +1064,8 @@ function MyPlatePageContent() {
                   if (!isOpen) setEditingActivity(null);
                   setIsLearningModalOpen(isOpen);
               }}
-              availableTasks={learningModalProps.availableTasks}
-              initialSelectedIds={learningModalProps.initialSelectedIds}
+              activity={editingActivity.activity}
               onSave={handleSaveTaskSelection}
-              pageType={learningModalProps.pageType}
-              disabledTaskIds={learningModalProps.disabledTaskIds}
-              deepWorkDefinitions={deepWorkDefinitions}
-              upskillDefinitions={learningModalProps.upskillDefinitions}
-              setDeepWorkDefinitions={setDeepWorkDefinitions}
           />
         )}
 
@@ -1171,6 +1110,21 @@ function MyPlatePageContent() {
           </DialogContent>
         </Dialog>
         
+         <FocusSessionModal
+          isOpen={focusSessionModalOpen}
+          onOpenChange={setFocusSessionModalOpen}
+          activity={focusActivity}
+          onStartSession={handleStartFocusSession}
+        />
+
+        {activeFocusSession && (
+          <FocusTimerPopup
+            activity={activeFocusSession.activity}
+            duration={activeFocusSession.duration}
+            onClose={() => setActiveFocusSession(null)}
+            onLogTime={handleLogFocusTime}
+          />
+        )}
       </div>
     </>
   );

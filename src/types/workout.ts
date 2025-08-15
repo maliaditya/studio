@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -78,11 +79,6 @@ export interface TopicGoal {
   goalValue: number;
 }
 
-// This is no longer used and will be removed.
-// export interface DeepWorkTopicMetadata {
-//   classification: 'product' | 'service';
-// }
-
 export interface TopicBrandingInfo {
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
@@ -117,7 +113,6 @@ export interface DatedWorkout {
   notes?: string; // Optional notes for the workout
 }
 
-// Updated to include more user profile data
 export interface LocalUser {
   username: string;
 }
@@ -125,7 +120,6 @@ export interface LocalUser {
 export type WorkoutMode = 'one-muscle' | 'two-muscle';
 export type Gender = 'male' | 'female';
 
-// Types for editable workout plans
 export type WorkoutPlan = Partial<Record<ExerciseCategory, string[]>>;
 export type AllWorkoutPlans = Record<string, WorkoutPlan>;
 
@@ -134,7 +128,6 @@ export interface WeightLog {
   weight: number;
 }
 
-// User-editable diet plan
 export interface EditableMealPlan {
   day: string;
   meal1: string;
@@ -150,8 +143,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-// Types for homepage schedule
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'thoughtwork';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
 
 export interface Activity {
   id: string;
@@ -169,7 +161,6 @@ export interface DailySchedule {
 
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
 
-// Productization Plan types
 export interface Release {
   id: string;
   name: string;
@@ -212,58 +203,25 @@ export interface GapAnalysis {
   strainReduction?: string;
 }
 
-// Resource Library Types
-export interface Stopper {
-  id: string;
-  text: string;
-  status: 'manageable' | 'unmanageable' | 'none';
-  managementStrategy?: string;
-  linkedResourceId?: string;
-}
-
-export interface Strength {
-  id: string;
-  text: string;
-}
-
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'code' | 'markdown' | 'link';
+  type?: 'text' | 'youtube' | 'obsidian' | 'card';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
-  displayText?: string; // Optional display text for links
 }
 export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card' | 'habit' | 'model3d' | 'mechanism';
-  createdAt?: string;
+  type: 'link' | 'card';
   // For 'link' type
   link?: string;
   description?: string;
   iconUrl?: string;
-  audioUrl?: string;
-  githubLink?: string;
-  demoLink?: string;
-  linkedResourceId?: string;
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
-  // For 'habit' or 'mechanism' type
-  mechanismFramework?: 'negative' | 'positive';
-  trigger?: { action?: string; feeling?: string; };
-  reward?: string;
-  benefit?: string;
-  law?: { premise?: string; outcome?: string; };
-  response?: { text?: string; resourceId?: string; visualize?: string; };
-  newResponse?: { text?: string; resourceId?: string; action?: string; visualize?: string; };
-  stoppers?: Stopper[];
-  strengths?: Strength[];
-  
-  // For 'model3d' type
-  modelUrl?: string;
 }
 
 export interface ResourceFolder {
@@ -281,7 +239,6 @@ export interface PopupState {
     parentId?: string;
     width?: number;
     height?: number;
-    z?: number;
 }
 
 // Canvas Types
@@ -322,7 +279,6 @@ export interface PistonEntry {
     id: string;
     text: string;
     timestamp: number;
-    mechanismCardId?: string;
 }
 
 export type PistonState = PistonEntry[];
@@ -391,13 +347,6 @@ export interface Feature {
   linkedSkills: ProjectSkillLink[];
 }
 
-export interface ProjectPlan {
-    targetDate: string;
-    requiredMoney: number | null;
-    requiredHours: number | null;
-    linkedRuleEquationIds: string[];
-}
-
 export interface Project {
   id: string;
   name: string;
@@ -408,7 +357,6 @@ export interface Project {
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
   purposePillar?: string;
-  productPlan?: ProjectPlan;
 }
 
 // Professional Experience Types
@@ -449,7 +397,6 @@ export interface PatternPhrase {
   text: string;
   mechanismCardId: string;
   mechanismCardName?: string;
-  linkedMechanisms?: string[];
 }
 
 export interface Pattern {
@@ -464,24 +411,4 @@ export interface MetaRule {
   text: string;
   patternId: string;
   purposePillar?: string;
-}
-
-export interface RuleDetailPopupState {
-    ruleId: string;
-    x: number;
-    y: number;
-}
-
-
-export type PistonsInitialState = {
-    view: 'health' | 'projects' | 'specializations' | 'desires' | 'mindset' | 'thoughts';
-    topicId?: string;
-    topicName?: string;
-}
-
-export interface AutoSuggestionEntry {
-    id: string;
-    text: string;
-    starred: boolean;
-    timestamp: number;
 }

@@ -1,12 +1,11 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -26,9 +25,10 @@ interface AgendaWidgetItemProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
   onStartLeadGenLog: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => void;
 }
 
-function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog }: AgendaWidgetItemProps) {
+function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog, onOpenFocusModal }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
   const [durationInput, setDurationInput] = useState('');
@@ -58,7 +58,6 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
       const progress = parseInt(progressInput);
       if(!isNaN(progress) && !isNaN(duration) && progress > 0 && duration > 0) {
         onLogLearning(activity, progress, duration);
-        // onToggleComplete is now called inside onLogLearning
         setOpenPopover(false);
         setProgressInput('');
         setDurationInput('');
@@ -66,7 +65,6 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
     } else { // deepwork or branding
       if(!isNaN(duration) && duration > 0) {
         onLogLearning(activity, 0, duration);
-        // onToggleComplete is now called inside onLogLearning
         setOpenPopover(false);
         setDurationInput('');
       }
@@ -74,8 +72,11 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
   };
 
   const itemContent = (
-    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full" onClick={handleItemClick}>
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
+      <div 
+        className={cn("flex items-center gap-3 min-w-0 flex-grow", !activity.completed && "cursor-pointer")}
+        onClick={handleItemClick}
+      >
         {activity.completed 
           ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
           : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -86,8 +87,18 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
           </p>
         </div>
       </div>
-      <div className="flex-shrink-0 text-muted-foreground text-right">
-          {duration && <p className="text-xs font-semibold mt-1 whitespace-nowrap">{duration}</p>}
+      <div className="flex-shrink-0 flex items-center text-right gap-1">
+        {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
+        {!activity.completed && (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => onOpenFocusModal(activity)}
+            >
+                <Timer className="h-4 w-4" />
+            </Button>
+        )}
       </div>
     </div>
   );
@@ -96,7 +107,7 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
     return (
       <Popover open={openPopover} onOpenChange={setOpenPopover}>
         <PopoverTrigger asChild>
-          <li className="cursor-pointer">
+          <li>
             {itemContent}
           </li>
         </PopoverTrigger>
@@ -128,7 +139,7 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
     );
   }
 
-  return <li className="cursor-pointer">{itemContent}</li>;
+  return <li>{itemContent}</li>;
 }
 
 
@@ -142,6 +153,7 @@ interface TodaysScheduleCardProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
+  onOpenFocusModal: (activity: Activity) => void;
 }
 
 const parseDurationToHours = (durationStr: string | undefined): number => {
@@ -158,7 +170,6 @@ const parseDurationToHours = (durationStr: string | undefined): number => {
       totalHours += parseFloat(minMatch[1]) / 60;
     }
     
-    // Handle case where it's just minutes as a number, e.g. "30"
     if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr)) {
         totalHours += parseFloat(durationStr) / 60;
     }
@@ -176,6 +187,7 @@ export function TodaysScheduleCard({
   onStartWorkoutLog,
   onStartLeadGenLog,
   onToggleComplete,
+  onOpenFocusModal,
 }: TodaysScheduleCardProps) {
   const { carryForwardTask, dailyPurposes, setDailyPurposes, metaRules, openRuleDetailPopup } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
@@ -395,6 +407,7 @@ export function TodaysScheduleCard({
                 onStartWorkoutLog={onStartWorkoutLog}
                 onToggleComplete={onToggleComplete}
                 onStartLeadGenLog={onStartLeadGenLog}
+                onOpenFocusModal={onOpenFocusModal}
               />
             ))}
           </ul>

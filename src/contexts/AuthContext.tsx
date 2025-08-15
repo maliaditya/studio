@@ -89,6 +89,11 @@ interface AuthContextType {
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
 
+  // Focus Timer
+  activeFocusSession: { activity: Activity; duration: number } | null;
+  setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number } | null>>;
+
+
   // Global Logs State
   allUpskillLogs: DatedWorkout[];
   setAllUpskillLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
@@ -240,6 +245,9 @@ interface AuthContextType {
   setSelectedUpskillTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedDeepWorkTask: ExerciseDefinition | null;
   setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+  selectedMicroSkill: MicroSkill | null;
+  setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
+
 
   // Sidebar persistence
   expandedItems: string[];
@@ -345,6 +353,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
+  // Focus Session
+  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number } | null>(null);
+
 
   useEffect(() => {
     const audioEl = audioRef.current;
@@ -396,19 +407,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Persisted task state
   const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
   const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
+  const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
+
 
   // Auto Suggestion State
   const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
 
   const microSkillMap = useMemo(() => {
-    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; microSkillId: string; }>();
     coreSkills.forEach(coreSkill => {
       coreSkill.skillAreas.forEach(skillArea => {
         skillArea.microSkills.forEach(microSkill => {
           map.set(microSkill.id, {
             coreSkillName: coreSkill.name,
             skillAreaName: skillArea.name,
-            microSkillName: microSkill.name
+            microSkillName: microSkill.name,
+            microSkillId: microSkill.id,
           });
         });
       });
@@ -429,9 +443,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTheme(savedTheme);
   }, []);
 
-  // This effect shows a toast ONLY when a user logs out.
   useEffect(() => {
-    // Defer the toast until after the current render cycle to avoid state update conflicts.
     if (prevUser && !currentUser) {
       setTimeout(() => {
         toast({ title: "Logged Out", description: "You have been successfully logged out." });
@@ -439,13 +451,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser, prevUser, toast]);
 
-  // Effect to load all user-specific data when currentUser changes
   useEffect(() => {
     if (currentUser?.username) {
       const username = currentUser.username;
       const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
       
-      // Health Data
       try { const d = loadItem(`weightLogs_${username}`); setWeightLogs(d ? JSON.parse(d) : []); } catch (e) { setWeightLogs([]); }
       try { const d = loadItem(`dietPlan_${username}`); setDietPlan(d ? JSON.parse(d) : []); } catch (e) { setDietPlan([]); }
       const storedGoal = loadItem(`goalWeight_${username}`, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal)); else setGoalWeight(null);
@@ -453,7 +463,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedDob = loadItem(`dateOfBirth_${username}`, false); if (storedDob) setDateOfBirth(storedDob); else setDateOfBirth(null);
       const storedGender = loadItem(`gender_${username}`, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender); else setGender(null);
 
-      // Schedule & Logs
       try { const d = localStorage.getItem(`lifeos_schedule_${username}`); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
       try { const d = localStorage.getItem(`lifeos_daily_purposes_${username}`); setDailyPurposes(d ? JSON.parse(d) : {}); } catch (e) { setDailyPurposes({}); }
       try { const d = localStorage.getItem(`upskill_logs_${username}`); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
@@ -462,7 +471,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
       try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
       
-      // Data Definitions & Plans
       const storedMode = loadItem(`workoutMode_${username}`, false);
       if (storedMode === 'one-muscle' || storedMode === 'two-muscle') setWorkoutMode(storedMode as WorkoutMode); else setWorkoutMode('two-muscle');
       const storedRotation = loadItem(`workoutPlanRotation_${username}`, false); setWorkoutPlanRotation(storedRotation === null ? true : storedRotation === 'true');
@@ -475,13 +483,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
       try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
 
-      // Resources Data Migration & Loading
       const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
       let currentFolders: ResourceFolder[] = [];
       if (storedFolders) {
         currentFolders = JSON.parse(storedFolders);
       }
-      // Auto-create Quick Access folder if it doesn't exist
       const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
       if (!hasQuickAccess) {
         const quickAccessFolder: ResourceFolder = {
@@ -494,7 +500,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       setResourceFolders(currentFolders);
 
-      
       const storedResources = localStorage.getItem(`resources_${username}`);
       if (storedResources) {
           setResources(JSON.parse(storedResources));
@@ -515,26 +520,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedLastHabitFolder = loadItem(`last_selected_habit_folder_${username}`, false);
       setLastSelectedHabitFolder(storedLastHabitFolder || null);
 
-      
-      // Canvas Data
       try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
-
-      // Mindset Data
       try { const d = localStorage.getItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
-      
-      // Pistons Data
       try { const d = localStorage.getItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
       
-      // Skill Page Data
       try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
       try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
 
-      // Professional Experience
       try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
       try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
       
-      // Purpose & Patterns Data
       const storedPurpose = loadItem(`purpose_data_${username}`);
       if (storedPurpose) {
           const purposeData: PurposeData = JSON.parse(storedPurpose);
@@ -549,30 +545,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
       try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
 
-
-      // Persisted task state
       try {
-        const upskillTask = loadItem(`selected_upskill_task_${username}`);
-        if (upskillTask) setSelectedUpskillTask(JSON.parse(upskillTask));
-        const deepWorkTask = loadItem(`selected_deepwork_task_${username}`);
-        if (deepWorkTask) setSelectedDeepWorkTask(JSON.parse(deepWorkTask));
+        const upskillTask = loadItem(`selected_upskill_task_${username}`); if (upskillTask) setSelectedUpskillTask(JSON.parse(upskillTask));
+        const deepWorkTask = loadItem(`selected_deepwork_task_${username}`); if (deepWorkTask) setSelectedDeepWorkTask(JSON.parse(deepWorkTask));
+        const microSkill = loadItem(`selected_micro_skill_${username}`); if (microSkill) setSelectedMicroSkill(JSON.parse(microSkill));
       } catch (e) {
         setSelectedUpskillTask(null);
         setSelectedDeepWorkTask(null);
+        setSelectedMicroSkill(null);
       }
       
-      // Sidebar Persistence
       try { const d = loadItem(`expanded_items_${username}`); setExpandedItems(d ? JSON.parse(d) : []); } catch (e) { setExpandedItems([]); }
       const storedDomain = loadItem(`selected_domain_${username}`, false); setSelectedDomainId(storedDomain || null);
       const storedSkill = loadItem(`selected_skill_${username}`, false); setSelectedSkillId(storedSkill || null);
       const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
       const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
-      // Auto Suggestion
       try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
 
     } else {
-      // Clear all data on logout
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({}); setDailyPurposes({});
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
@@ -595,17 +586,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSkillAcquisitionPlans([]);
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
+      setSelectedMicroSkill(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
       setAutoSuggestions({});
     }
   }, [currentUser]);
 
-  // Effect to save all data to localStorage whenever it changes
   useEffect(() => {
     if (currentUser?.username && !loading) {
       const username = currentUser.username;
       const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
-      // Health
       localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
       localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
       if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
@@ -613,7 +603,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
       if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
       
-      // Schedule & Logs
       localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
       localStorage.setItem(`lifeos_daily_purposes_${username}`, JSON.stringify(dailyPurposes));
       localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
@@ -622,7 +611,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
       localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
 
-      // Definitions, Plans, and Goals
       localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
       localStorage.setItem(`workoutMode_${username}`, workoutMode);
       localStorage.setItem(`workoutPlanRotation_${username}`, String(workoutPlanRotation));
@@ -634,7 +622,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
       localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
 
-      // Resources
       localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
       localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
       localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
@@ -642,44 +629,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedResourceFolderId) localStorage.setItem(`selectedResourceFolderId_${username}`, selectedResourceFolderId); else localStorage.removeItem(`selectedResourceFolderId_${username}`);
       if (lastSelectedHabitFolder) localStorage.setItem(`last_selected_habit_folder_${username}`, lastSelectedHabitFolder); else localStorage.removeItem(`last_selected_habit_folder_${username}`);
 
-      
-      // Canvas
       localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
-
-      // Mindset
       localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
-      
-      // Pistons
       localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
-
-      // Skill Page
       localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
       localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
       localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
 
-      // Professional Experience
       localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
       localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
 
-      // Purpose & Patterns Data
       localStorage.setItem(`purpose_data_${username}`, JSON.stringify({ statement: purposeStatement, specializationPurposes }));
       localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
       localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
       localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
       localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
       
-      // Persisted task state
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
       if (selectedDeepWorkTask) localStorage.setItem(`selected_deepwork_task_${username}`, JSON.stringify(selectedDeepWorkTask)); else localStorage.removeItem(`selected_deepwork_task_${username}`);
+      if (selectedMicroSkill) localStorage.setItem(`selected_micro_skill_${username}`, JSON.stringify(selectedMicroSkill)); else localStorage.removeItem(`selected_micro_skill_${username}`);
       
-      // Sidebar Persistence
       localStorage.setItem(`expanded_items_${username}`, JSON.stringify(expandedItems));
       if (selectedDomainId) localStorage.setItem(`selected_domain_${username}`, selectedDomainId); else localStorage.removeItem(`selected_domain_${username}`);
       if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
       if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
       if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
 
-      // Auto Suggestion
       localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
     }
   }, [
@@ -694,7 +669,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     skillDomains, coreSkills, projects,
     companies, positions,
     purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-    currentUser, loading, selectedUpskillTask, selectedDeepWorkTask,
+    currentUser, loading, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
     autoSuggestions
   ]);
@@ -717,7 +692,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
-  // Carry forward tasks logic
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
     
@@ -783,7 +757,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               newDetails = 'Lead Generation Session';
               break;
             default:
-              newDetails = activity.details; // Fallback
+              newDetails = activity.details;
           }
 
           return {
@@ -791,7 +765,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: `${activity.type}-${Date.now()}-${Math.random()}`,
             completed: false,
             details: newDetails,
-            taskIds: [], // Reset linked tasks
+            taskIds: [],
           };
         });
         carriedOver = true;
@@ -840,7 +814,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDateOfBirth(data.dateOfBirth || null);
     setGender(data.gender || null);
     
-    // Resources Data
     setResourceFolders(data.resourceFolders || []);
     setResources(data.resources || []);
     setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
@@ -860,7 +833,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCompanies(data.companies || []);
     setPositions(data.positions || []);
     
-    // Purpose & Patterns Data
     const purposeData = data.purposeData || {};
     setPurposeStatement(purposeData.statement || '');
     setSpecializationPurposes(purposeData.specializationPurposes || {});
@@ -869,7 +841,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPillarEquations(data.pillarEquations || {});
     setSkillAcquisitionPlans(data.skillAcquisitionPlans || []);
     
-    // Auto Suggestion
     setAutoSuggestions(data.autoSuggestions || {});
   };
   
@@ -933,9 +904,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       companies, positions,
       purposeData: { statement: purposeStatement, specializationPurposes },
       patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-      // Sidebar persistence
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-      selectedUpskillTask, selectedDeepWorkTask,
+      selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
       autoSuggestions
     };
   }
@@ -1349,40 +1319,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         category: topic as ExerciseCategory,
     };
 
-    // Add the new definition to the main list of deep work tasks.
     setDeepWorkDefinitions(prev => [...prev, newFeatureDef]);
 
-    // Choose the correct state updater based on whether it's a product or service.
     const plansUpdater = type === 'product' ? setProductizationPlans : setOfferizationPlans;
 
-    // Update the plans immutably.
     plansUpdater(prevPlans => {
-        // 1. Create a shallow copy of the plans object.
         const newPlans = { ...prevPlans };
         
-        // 2. Get the specific plan for the topic, or create a new one if it doesn't exist.
         const oldPlan = newPlans[topic] || { releases: [] };
         
-        // 3. Create a new array of releases, updating the one that matches.
         const updatedReleases = (oldPlan.releases || []).map(r => {
             if (r.id === release.id) {
-                // 4. If this is the correct release, return a new object for it with the new focus area ID.
                 return {
                     ...r,
                     focusAreaIds: [...(r.focusAreaIds || []), newFeatureDef.id]
                 };
             }
-            // Return other releases unchanged.
             return r;
         });
         
-        // 5. Create a new plan object for the topic with the updated releases.
         newPlans[topic] = {
             ...oldPlan,
             releases: updatedReleases
         };
 
-        // 6. Return the new top-level plans object.
         return newPlans;
     });
 
@@ -1835,6 +1795,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap,
+    activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
@@ -1885,6 +1846,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     skillAcquisitionPlans, setSkillAcquisitionPlans,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
+    selectedMicroSkill, setSelectedMicroSkill,
     microSkillMap,
     expandedItems, handleExpansionChange,
     selectedDomainId, setSelectedDomainId,
