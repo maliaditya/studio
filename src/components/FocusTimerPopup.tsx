@@ -45,7 +45,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     position: 'fixed',
     top: position.y,
     left: position.x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : `translate3d(0px, 0px, 0)`,
     willChange: 'transform',
   };
 
@@ -123,9 +123,16 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <BrainCircuit className="h-5 w-5 text-primary" />
                 <p className="text-sm font-medium">Focus period...</p>
                 </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
-                    <X className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center">
+                  {isContextAvailable && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenContext} title="View Task Context">
+                      <LinkIcon className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
+                      <X className="h-4 w-4" />
+                  </Button>
+                </div>
             </div>
             
             <div className="relative w-40 h-40 mx-auto">
@@ -182,16 +189,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             </div>
 
             <div className="mt-4 pt-4 border-t border-border/20 text-center">
-                {isContextAvailable ? (
-                    <Button variant="outline" className="w-full" onClick={handleOpenContext} title={activity.details}>
-                        <span className="truncate">Task: {activity.details}</span>
-                        <LinkIcon className="h-4 w-4 ml-2 text-primary flex-shrink-0" />
-                    </Button>
-                ) : (
-                    <p className="text-sm font-semibold truncate bg-muted/50 py-2 px-3 rounded-md" title={activity.details}>
-                        Task: {activity.details}
-                    </p>
-                )}
+                <p className="text-sm font-semibold truncate" title={activity.details}>
+                    Task: {activity.details}
+                </p>
             </div>
             </CardContent>
         </Card>
