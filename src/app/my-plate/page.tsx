@@ -30,6 +30,7 @@ import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucid
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
+import { TaskContextModal } from '@/components/TaskContextModal';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
@@ -101,6 +102,8 @@ function MyPlatePageContent() {
     activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
+    taskContextModalId, 
+    setTaskContextModalId
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -1128,6 +1131,14 @@ function MyPlatePageContent() {
             onClose={() => setActiveFocusSession(null)}
             onLogTime={handleLogFocusTime}
           />
+        )}
+
+        {taskContextModalId && (
+            <TaskContextModal
+                isOpen={!!taskContextModalId}
+                onOpenChange={(open) => !open && setTaskContextModalId(null)}
+                taskId={taskContextModalId}
+            />
         )}
       </div>
     </>

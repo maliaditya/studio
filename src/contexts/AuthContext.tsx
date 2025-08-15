@@ -177,11 +177,10 @@ interface AuthContextType {
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
 
-  // Task Context Popup
-  taskContextPopup: TaskContextPopupState | null;
-  openTaskContextPopup: (taskId: string, event: React.MouseEvent) => void;
-  closeTaskContextPopup: () => void;
-  handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
+  // Task Context Modal
+  taskContextModalId: string | null;
+  setTaskContextModalId: React.Dispatch<React.SetStateAction<string | null>>;
+  openTaskContextModal: (taskId: string) => void;
 
 
   // Workout Log Handlers
@@ -351,8 +350,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Meta Rule Popup
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
-  // Task Context Popup
-  const [taskContextPopup, setTaskContextPopup] = useState<TaskContextPopupState | null>(null);
+  // Task Context Modal
+  const [taskContextModalId, setTaskContextModalId] = useState<string | null>(null);
 
 
   // Sidebar State
@@ -1816,41 +1815,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openTaskContextPopup = (taskId: string, event: React.MouseEvent) => {
-    const popupWidth = 416; // 26rem
-    const popupHeight = 400; // Estimated height
-    
-    let x = event.clientX + 20;
-    let y = event.clientY - 20;
-
-    if (x + popupWidth > window.innerWidth - 20) {
-      x = event.clientX - popupWidth - 20;
-    }
-    if (y < 20) {
-      y = 20;
-    }
-    if (y + popupHeight > window.innerHeight - 20) {
-      y = window.innerHeight - popupHeight - 20;
-    }
-    
-    setTaskContextPopup({ taskId, x, y });
+  const openTaskContextModal = (taskId: string) => {
+    setTaskContextModalId(taskId);
   };
-
-  const closeTaskContextPopup = () => {
-    setTaskContextPopup(null);
-  };
-
-  const handleTaskContextPopupDragEnd = (event: DragEndEvent) => {
-    const { active, delta } = event;
-    if (taskContextPopup && active.id === `task-context-popup-${taskContextPopup.taskId}`) {
-      setTaskContextPopup(prev => prev ? {
-        ...prev,
-        x: prev.x + delta.x,
-        y: prev.y + delta.y,
-      } : null);
-    }
-  };
-
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
@@ -1900,7 +1867,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    taskContextPopup, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    taskContextModalId, setTaskContextModalId, openTaskContextModal,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { } from 'react';
@@ -31,7 +32,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup } = useAuth();
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextModal } = useAuth();
   const totalSeconds = duration * 60;
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [isActive, setIsActive] = React.useState(false);
@@ -88,13 +89,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setIsActive(newIsActive);
     setIsAudioPlaying(newIsActive);
   };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { delta } = event;
-    setPosition(prev => ({
-        x: prev.x + delta.x,
-        y: prev.y + delta.y,
-    }));
+  
+  const handleOpenContext = (e: React.MouseEvent) => {
+    if (activity.taskIds && activity.taskIds.length > 0) {
+        openTaskContextModal(activity.taskIds[0]);
+    }
   };
 
   const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;
@@ -103,18 +102,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const chartData = [{ name: 'progress', value: progressPercentage, fill: 'hsl(var(--primary))' }];
   
-  const handleOpenContext = (e: React.MouseEvent) => {
-      if (activity.taskIds && activity.taskIds.length > 0) {
-          openTaskContextPopup(activity.taskIds[0], e);
-      }
-  };
-
   if (!activity) return null;
 
   const isContextAvailable = (activity.type === 'deepwork' || activity.type === 'upskill') && (activity.taskIds?.length ?? 0) > 0;
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext onDragEnd={(e) => {
+        const { delta } = e;
+        setPosition(prev => ({
+            x: prev.x + delta.x,
+            y: prev.y + delta.y,
+        }));
+    }}>
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
         <Card className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
             <CardContent className="p-4">
