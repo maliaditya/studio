@@ -102,9 +102,7 @@ function MyPlatePageContent() {
     activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
-    isTaskContextModalOpen, 
-    setIsTaskContextModalOpen, 
-    taskContextModalId,
+    openTaskContextPopup,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -989,11 +987,12 @@ function MyPlatePageContent() {
                         activityDurations={_activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                        onLogLearning={(...args) => handleLogLearning(...args)}
+                        onLogLearning={handleLogLearning}
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
-                        onToggleComplete={(...args) => handleToggleComplete(...args)}
+                        onToggleComplete={handleToggleComplete}
                         onOpenFocusModal={handleOpenFocusModal}
+                        onOpenTaskContext={openTaskContextPopup}
                     />
                 )}
                 <WeightGoalCard 
@@ -1021,7 +1020,7 @@ function MyPlatePageContent() {
               remainingTime={remainingTime}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={(...args) => handleToggleComplete(...args)}
+              onToggleComplete={handleToggleComplete}
               onActivityClick={handleActivityClick}
             />
           </CardContent>
@@ -1036,11 +1035,12 @@ function MyPlatePageContent() {
                 activityDurations={_activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onLogLearning={(...args) => handleLogLearning(...args)}
+                onLogLearning={handleLogLearning}
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
-                onToggleComplete={(...args) => handleToggleComplete(...args)}
+                onToggleComplete={handleToggleComplete}
                 onOpenFocusModal={handleOpenFocusModal}
+                onOpenTaskContext={openTaskContextPopup}
             />
         )}
 
@@ -1051,7 +1051,7 @@ function MyPlatePageContent() {
               activityToLog={workoutActivityToLog}
               todaysExercises={todaysExercises}
               muscleGroupsForDay={todaysMuscleGroups}
-              onActivityComplete={(...args) => handleToggleComplete(...args)}
+              onActivityComplete={handleToggleComplete}
           />
         )}
 
@@ -1060,7 +1060,7 @@ function MyPlatePageContent() {
                 isOpen={isLeadGenModalOpen}
                 onOpenChange={setIsLeadGenModalOpen}
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(...args) => handleToggleComplete(...args)}
+                onActivityComplete={handleToggleComplete}
             />
         )}
         
@@ -1137,14 +1137,6 @@ function MyPlatePageContent() {
             onClose={() => setActiveFocusSession(null)}
             onLogTime={handleLogFocusTime}
           />
-        )}
-        
-        {isTaskContextModalOpen && (
-            <TaskContextModal
-                isOpen={isTaskContextModalOpen}
-                onOpenChange={setIsTaskContextModalOpen}
-                taskId={taskContextModalId}
-            />
         )}
       </div>
     </>

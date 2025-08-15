@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
@@ -26,9 +27,19 @@ interface AgendaWidgetItemProps {
   onToggleComplete: (slotName: string, activityId: string) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenFocusModal: (activity: Activity) => void;
+  onOpenTaskContext: (taskId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog, onToggleComplete, onStartLeadGenLog, onOpenFocusModal }: AgendaWidgetItemProps) {
+function AgendaWidgetItem({ 
+    activity, 
+    duration, 
+    onLogLearning, 
+    onStartWorkoutLog, 
+    onToggleComplete, 
+    onStartLeadGenLog, 
+    onOpenFocusModal,
+    onOpenTaskContext,
+}: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
   const [progressInput, setProgressInput] = useState('');
   const [durationInput, setDurationInput] = useState('');
@@ -56,7 +67,7 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
 
     if(activity.type === 'upskill') {
       const progress = parseInt(progressInput);
-      if(!isNaN(progress) && !isNaN(duration) && progress > 0 && duration > 0) {
+      if(!isNaN(progress) && progress > 0 && !isNaN(duration) && duration > 0) {
         onLogLearning(activity, progress, duration);
         setOpenPopover(false);
         setProgressInput('');
@@ -89,7 +100,7 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
-        {!activity.completed && (
+        {!activity.completed ? (
             <Button
                 variant="ghost"
                 size="icon"
@@ -98,7 +109,16 @@ function AgendaWidgetItem({ activity, duration, onLogLearning, onStartWorkoutLog
             >
                 <Timer className="h-4 w-4" />
             </Button>
-        )}
+        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => onOpenTaskContext(activity.taskIds![0], e)}
+            >
+                <GitBranch className="h-4 w-4" />
+            </Button>
+        ) : null}
       </div>
     </div>
   );
@@ -154,6 +174,7 @@ interface TodaysScheduleCardProps {
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string) => void;
   onOpenFocusModal: (activity: Activity) => void;
+  onOpenTaskContext: (taskId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 const parseDurationToHours = (durationStr: string | undefined): number => {
@@ -188,6 +209,7 @@ export function TodaysScheduleCard({
   onStartLeadGenLog,
   onToggleComplete,
   onOpenFocusModal,
+  onOpenTaskContext,
 }: TodaysScheduleCardProps) {
   const { carryForwardTask, dailyPurposes, setDailyPurposes, metaRules, openRuleDetailPopup } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
@@ -408,6 +430,7 @@ export function TodaysScheduleCard({
                 onToggleComplete={onToggleComplete}
                 onStartLeadGenLog={onStartLeadGenLog}
                 onOpenFocusModal={onOpenFocusModal}
+                onOpenTaskContext={onOpenTaskContext}
               />
             ))}
           </ul>
