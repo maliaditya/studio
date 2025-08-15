@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,12 +10,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle } from 'lucide-react';
+import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight } from 'lucide-react';
 import type { Activity, HabitEquation, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -262,52 +261,61 @@ export function FocusSessionModal({
                   <ScrollArea className="h-full -mr-4 pr-4">
                     {selectedRules.length > 0 ? (
                         <div className="space-y-2">
-                            {selectedRules.map(rule => (
-                                <Card key={rule.id}>
-                                    <CardContent className="p-3 text-sm">
-                                        <p 
-                                            className="font-medium cursor-pointer hover:text-primary mb-2"
-                                            onClick={(e) => openRuleDetailPopup(rule.id, e)}
-                                        >
-                                            {rule.outcome}
-                                        </p>
-                                        <div className="flex justify-end items-center gap-1">
-                                            <Popover onOpenChange={(open) => {
-                                                if(open) {
-                                                    setLinkingToEquationId(rule.id);
-                                                    setSelectedResourceId(rule.linkedResourceId || '');
-                                                }
-                                                // This is a bit of a hack to control multiple popovers
-                                                if (!open) setLinkingToEquationId(null);
-                                            }}>
-                                                <PopoverTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-3 w-3"/></Button>
-                                                </PopoverTrigger>
-                                                <PopoverContent className="w-64 p-2">
-                                                    <div className="space-y-2">
-                                                        <Label>Link Resource Card</Label>
-                                                        <Select value={selectedResourceId} onValueChange={setSelectedResourceId}>
-                                                            <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
-                                                            <SelectContent>
-                                                                {resources.filter(r => r.type === 'card' || r.type === 'habit' || r.type === 'mechanism').map(r => (
-                                                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button onClick={handleLinkResourceSave} size="sm" className="w-full">Save Link</Button>
-                                                    </div>
-                                                </PopoverContent>
-                                            </Popover>
-                                            
-                                            {rule.linkedResourceId && (
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openGeneralPopup(rule.linkedResourceId!, e)}>
-                                                    <Eye className="h-3 w-3" />
-                                                </Button>
-                                            )}
+                          {selectedRules.map(rule => {
+                            const linkedResource = rule.linkedResourceId ? resources.find(r => r.id === rule.linkedResourceId) : null;
+                            const relatedMetaRules = (rule.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter(Boolean);
+
+                            return (
+                              <Card key={rule.id}>
+                                <CardContent className="p-3 text-sm">
+                                  <ul className="space-y-1 text-muted-foreground list-disc list-inside">
+                                    {relatedMetaRules.map(metaRule => (
+                                      <li key={metaRule!.id} className="cursor-pointer hover:text-primary" onClick={(e) => openRuleDetailPopup(metaRule!.id, e)}>
+                                        {metaRule!.text}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                  <div className="flex items-center gap-1 mt-2 pt-2 border-t font-semibold">
+                                    <ArrowRight className="h-4 w-4 text-primary" />
+                                    <span>{rule.outcome}</span>
+                                  </div>
+                                  <div className="flex justify-end items-center gap-1 mt-2">
+                                    <Popover onOpenChange={(open) => {
+                                      if (open) {
+                                        setLinkingToEquationId(rule.id);
+                                        setSelectedResourceId(rule.linkedResourceId || '');
+                                      } else {
+                                        setLinkingToEquationId(null);
+                                      }
+                                    }}>
+                                      <PopoverTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6"><LinkIcon className="h-3 w-3"/></Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-64 p-2">
+                                        <div className="space-y-2">
+                                          <Label>Link Resource Card</Label>
+                                          <Select value={selectedResourceId} onValueChange={setSelectedResourceId}>
+                                            <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
+                                            <SelectContent>
+                                              {resources.filter(r => r.type === 'card' || r.type === 'habit' || r.type === 'mechanism').map(r => (
+                                                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                          <Button onClick={handleLinkResourceSave} size="sm" className="w-full">Save Link</Button>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                      </PopoverContent>
+                                    </Popover>
+                                    {rule.linkedResourceId && (
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => openGeneralPopup(rule.linkedResourceId!, e)}>
+                                        <Eye className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
                         </div>
                     ) : (
                         <div className="text-center text-muted-foreground h-full flex items-center justify-center">
