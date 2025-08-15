@@ -30,7 +30,7 @@ import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucid
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
-import { TaskContextPopup } from '@/components/TaskContextPopup';
+import { TaskContextModal } from '@/components/TaskContextModal';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
@@ -102,8 +102,9 @@ function MyPlatePageContent() {
     activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
-    taskContextPopup,
-    closeTaskContextPopup
+    isTaskContextModalOpen, 
+    setIsTaskContextModalOpen, 
+    taskContextModalId,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -412,7 +413,7 @@ function MyPlatePageContent() {
   
   const handleLogFocusTime = (activity: Activity, minutes: number) => {
     if (activity.type === 'deepwork' || activity.type === 'upskill') {
-      handleLogLearning(selectedDateKey, activity, 0, minutes);
+      handleLogLearning(activity, 0, minutes);
     } else {
       toast({ title: 'Focus time logged (simulation)', description: `${minutes} minutes logged for ${activity.details}` });
     }
@@ -988,10 +989,10 @@ function MyPlatePageContent() {
                         activityDurations={_activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                        onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
+                        onLogLearning={(...args) => handleLogLearning(...args)}
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
-                        onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+                        onToggleComplete={(...args) => handleToggleComplete(...args)}
                         onOpenFocusModal={handleOpenFocusModal}
                     />
                 )}
@@ -1020,7 +1021,7 @@ function MyPlatePageContent() {
               remainingTime={remainingTime}
               onAddActivity={handleAddActivity}
               onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+              onToggleComplete={(...args) => handleToggleComplete(...args)}
               onActivityClick={handleActivityClick}
             />
           </CardContent>
@@ -1035,10 +1036,10 @@ function MyPlatePageContent() {
                 activityDurations={_activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onLogLearning={(...args) => handleLogLearning(selectedDateKey, ...args)}
+                onLogLearning={(...args) => handleLogLearning(...args)}
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
-                onToggleComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+                onToggleComplete={(...args) => handleToggleComplete(...args)}
                 onOpenFocusModal={handleOpenFocusModal}
             />
         )}
@@ -1050,7 +1051,7 @@ function MyPlatePageContent() {
               activityToLog={workoutActivityToLog}
               todaysExercises={todaysExercises}
               muscleGroupsForDay={todaysMuscleGroups}
-              onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+              onActivityComplete={(...args) => handleToggleComplete(...args)}
           />
         )}
 
@@ -1059,7 +1060,7 @@ function MyPlatePageContent() {
                 isOpen={isLeadGenModalOpen}
                 onOpenChange={setIsLeadGenModalOpen}
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(...args) => handleToggleComplete(selectedDateKey, ...args)}
+                onActivityComplete={(...args) => handleToggleComplete(...args)}
             />
         )}
         
@@ -1070,7 +1071,7 @@ function MyPlatePageContent() {
                   if (!isOpen) setEditingActivity(null);
                   setIsLearningModalOpen(isOpen);
               }}
-              availableTasks={activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
+              availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
               initialSelectedIds={editingActivity.activity.taskIds || []}
               onSave={handleSaveTaskSelection}
               pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
@@ -1137,11 +1138,12 @@ function MyPlatePageContent() {
             onLogTime={handleLogFocusTime}
           />
         )}
-
-        {taskContextPopup && (
-            <TaskContextPopup
-                popupState={taskContextPopup}
-                onClose={closeTaskContextPopup}
+        
+        {isTaskContextModalOpen && (
+            <TaskContextModal
+                isOpen={isTaskContextModalOpen}
+                onOpenChange={setIsTaskContextModalOpen}
+                taskId={taskContextModalId}
             />
         )}
       </div>
