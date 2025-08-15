@@ -2,10 +2,10 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GripVertical, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout } from 'lucide-react';
-import type { ExerciseDefinition, CoreSkill, SkillArea, Project, TaskContextPopupState } from '@/types/workout';
+import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout } from 'lucide-react';
+import type { ExerciseDefinition, CoreSkill, SkillArea, Project, TaskContextPopupState, SkillDomain } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
@@ -161,3 +161,4 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
         </div>
     );
 }
+
