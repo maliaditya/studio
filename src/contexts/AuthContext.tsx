@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -83,7 +84,7 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  handleToggleComplete: (slotName: string, activityId: string) => void;
+  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
@@ -1136,14 +1137,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       input.click();
   };
 
-  const handleToggleComplete = (slotName: string, activityId: string) => {
+  const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
       const daySchedule = { ...(prev[todayKey] || {}) };
       const activities = daySchedule[slotName] || [];
       if (activities.length > 0) {
         daySchedule[slotName] = activities.map(act => 
-          act.id === activityId ? { ...act, completed: !act.completed } : act
+          act.id === activityId ? { ...act, completed: isCompleted } : act
         );
       }
       return { ...prev, [todayKey]: daySchedule };
@@ -1166,7 +1167,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       const exerciseId = activity.taskIds?.[0];
-      if (!exerciseId) return prevLogs;
+      if (!exerciseId) return prevLogs; // This could be a source of the problem if taskIds is empty
       
       const newSet: LoggedSet = {
         id: `${Date.now()}-${Math.random()}`,

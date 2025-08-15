@@ -91,7 +91,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         const totalDurationMinutes = Math.round((endTime - startTime) / 60000);
         
         onLogTime(activity, totalDurationMinutes);
-        handleToggleComplete(activity.slot, activity.id);
+        handleToggleComplete(activity.slot, activity.id, true);
       }
     }
     onClose();
