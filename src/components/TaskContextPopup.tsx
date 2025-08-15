@@ -6,12 +6,13 @@ import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock } from 'lucide-react';
-import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, FullSchedule } from '@/types/workout';
+import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, FullSchedule, PauseEvent } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { useDraggable } from '@dnd-kit/core';
 import { format, formatDistanceStrict } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
 
 interface TaskContextPopupProps {
     popupState: TaskContextPopupState;
@@ -35,16 +36,20 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         id: `task-context-popup-${popupState.activityId}`,
     });
 
-    const [position, setPosition] = useState({ x: popupState.x, y: popupState.y });
+    const [position, setPosition] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
         // This effect ensures that if the initial state from the server is NaN,
         // we set a default client-side position to avoid errors.
-        if (isNaN(popupState.x) || isNaN(popupState.y)) {
-            const CONTEXT_POPUP_WIDTH = 600;
-            const x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
-            const y = window.innerHeight / 2 - 250;
-            setPosition({ x, y });
+        if (typeof window !== 'undefined') {
+            if (isNaN(popupState.x) || isNaN(popupState.y)) {
+                const CONTEXT_POPUP_WIDTH = 600;
+                const x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
+                const y = window.innerHeight / 2 - 250;
+                setPosition({ x, y });
+            } else {
+                setPosition({ x: popupState.x, y: popupState.y });
+            }
         }
     }, [popupState.x, popupState.y]);
 
@@ -119,35 +124,64 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     const attentionSpanInfo = useMemo(() => {
         const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession.activity : activityInfo;
         
-        if (!activityForSpan || !activityForSpan.focusSessionStartTime) {
+        if (!activityForSpan || !activityForSpan.focusSessionInitialStartTime) {
             return null;
         }
-        
-        if (activityForSpan.focusSessionEndTime && activityForSpan.focusSessionInitialStartTime) {
-             const elapsedMs = activityForSpan.focusSessionEndTime - activityForSpan.focusSessionInitialStartTime;
-             const elapsed = formatDistanceStrict(new Date(0), new Date(elapsedMs), { unit: 'minute' });
-             return {
+
+        const { focusSessionInitialStartTime, focusSessionEndTime, focusSessionPauses = [] } = activityForSpan;
+
+        if (focusSessionEndTime) {
+            const totalSpanMs = focusSessionEndTime - focusSessionInitialStartTime;
+            const totalSpan = formatDistanceStrict(new Date(0), new Date(totalSpanMs), { unit: 'minute' });
+            
+            const workIntervals: number[] = [];
+            let lastStartTime = focusSessionInitialStartTime;
+
+            focusSessionPauses.forEach(p => {
+                workIntervals.push(p.pauseTime - lastStartTime);
+                if (p.resumeTime) {
+                    lastStartTime = p.resumeTime;
+                }
+            });
+            // Add the final leg of work after the last resume
+            if (focusSessionPauses.length > 0) {
+                 const lastPause = focusSessionPauses[focusSessionPauses.length - 1];
+                 if(lastPause.resumeTime) {
+                    workIntervals.push(focusSessionEndTime - lastPause.resumeTime);
+                 }
+            } else { // No pauses, just one interval
+                workIntervals.push(focusSessionEndTime - focusSessionInitialStartTime);
+            }
+
+            const validIntervals = workIntervals.filter(i => i > 0);
+            const averageAttentionSpanMs = validIntervals.length > 0
+                ? validIntervals.reduce((sum, i) => sum + i, 0) / validIntervals.length
+                : totalSpanMs;
+            
+            const averageAttentionSpan = formatDistanceStrict(new Date(0), new Date(averageAttentionSpanMs), { unit: 'minute' });
+            
+            return {
                 title: "Attention Span",
-                value: elapsed,
-                pauses: activityForSpan.focusSessionPauses || 0
-             };
+                totalSpan: totalSpan,
+                averageSpan: averageAttentionSpan,
+                intervals: workIntervals.map(ms => formatDistanceStrict(new Date(0), new Date(ms), { unit: 'minute'})),
+                pauses: focusSessionPauses.length,
+            };
         } else {
             return {
                 title: "Session Started",
-                value: format(activityForSpan.focusSessionStartTime, 'p'),
-                pauses: activityForSpan.focusSessionPauses || 0
-            }
+                totalSpan: format(focusSessionInitialStartTime, 'p'),
+                averageSpan: '-',
+                intervals: [],
+                pauses: focusSessionPauses.length,
+            };
         }
     }, [activityInfo, activeFocusSession]);
 
 
     const handleOpenParentContext = (e: React.MouseEvent) => {
         if (!taskInfo?.parent) return;
-        
-        // This is a simplification; we'd need to find the Activity associated with the parent task
-        // For now, this functionality will be limited. A more robust implementation would
-        // search for the parent's activity in the schedule.
-        // openTaskContextPopup(taskInfo.parent.id, undefined, popupState);
+        // This functionality needs a more robust way to find the parent activity
     };
     
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -219,15 +253,33 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                     </CardHeader>
                     <CardContent className="p-4 pt-0 flex-grow flex flex-col items-center justify-center text-center">
                         {attentionSpanInfo ? (
-                            <div className="space-y-3">
+                            <div className="space-y-3 w-full">
                                 <div>
                                     <p className="text-xs text-muted-foreground">{attentionSpanInfo.title}</p>
-                                    <p className="text-xl font-bold">{attentionSpanInfo.value}</p>
+                                    <p className="text-xl font-bold">{attentionSpanInfo.totalSpan}</p>
                                 </div>
-                                <div>
-                                    <p className="text-xs text-muted-foreground">Pauses</p>
-                                    <p className="text-xl font-bold">{attentionSpanInfo.pauses}</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="text-center">
+                                        <p className="text-xs text-muted-foreground">Avg. Span</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.averageSpan}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-xs text-muted-foreground">Pauses</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.pauses}</p>
+                                    </div>
                                 </div>
+                                {attentionSpanInfo.intervals.length > 0 && (
+                                    <div className="pt-2 border-t">
+                                        <p className="text-xs font-semibold text-muted-foreground mb-1">Work Intervals</p>
+                                        <ScrollArea className="h-20">
+                                            <ul className="text-xs text-center space-y-1">
+                                                {attentionSpanInfo.intervals.map((interval, i) => (
+                                                    <li key={i}>{i+1}. {interval}</li>
+                                                ))}
+                                            </ul>
+                                        </ScrollArea>
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             <p className="text-xs text-muted-foreground">No active or completed focus session data for this task.</p>

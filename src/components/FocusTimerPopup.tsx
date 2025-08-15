@@ -6,7 +6,7 @@ import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check } from 'lucide-react';
-import type { Activity } from '@/types/workout';
+import type { Activity, PauseEvent } from '@/types/workout';
 import {
   Popover,
   PopoverContent,
@@ -94,7 +94,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const elapsedSeconds = totalSeconds - secondsLeft;
     
     if (activity) {
-      const updatedActivity = {
+      const updatedActivity: Activity = {
         ...activity,
         focusSessionEndTime: Date.now(),
       };
@@ -111,16 +111,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const togglePlayPause = () => {
-    const newSessionState = sessionState === 'running' ? 'paused' : 'running';
-    if (newSessionState === 'paused') {
-        const updatedActivity = { ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1, focusSessionStartTime: Date.now() };
-        updateActivity(updatedActivity);
-        setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
-    } else { // Resuming
-        const updatedActivity = { ...activity, focusSessionStartTime: Date.now() };
-        updateActivity(updatedActivity);
-        setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
+    const now = Date.now();
+    let updatedActivity = { ...activity };
+    let newSessionState: 'running' | 'paused';
+  
+    if (sessionState === 'running') {
+      newSessionState = 'paused';
+      const newPause: PauseEvent = { pauseTime: now, resumeTime: null };
+      updatedActivity.focusSessionPauses = [...(updatedActivity.focusSessionPauses || []), newPause];
+    } else { // Resuming from pause
+      newSessionState = 'running';
+      const lastPauseIndex = (updatedActivity.focusSessionPauses || []).length - 1;
+      if (lastPauseIndex >= 0 && updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime === null) {
+        updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime = now;
+      }
     }
+    
+    updatedActivity.focusSessionStartTime = now;
+    updateActivity(updatedActivity);
+    setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
     setSessionState(newSessionState);
     setIsAudioPlaying(newSessionState === 'running');
   };

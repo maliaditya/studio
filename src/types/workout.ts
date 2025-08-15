@@ -146,6 +146,11 @@ export type UserDietPlan = EditableMealPlan[];
 
 export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
 
+export interface PauseEvent {
+  pauseTime: number;
+  resumeTime: number | null;
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;
@@ -155,9 +160,9 @@ export interface Activity {
   slot: string;
   habitEquationIds?: string[]; // New field to link rule equations
   focusSessionInitialStartTime?: number;
-  focusSessionStartTime?: number;
+  focusSessionStartTime?: number; // Tracks start of current segment (or initial start)
   focusSessionEndTime?: number;
-  focusSessionPauses?: number;
+  focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
 };
 
 export interface DailySchedule {
