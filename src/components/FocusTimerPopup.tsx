@@ -32,7 +32,7 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
+  const { activeFocusSession, setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
   const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
@@ -74,7 +74,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [sessionState, secondsLeft, totalSeconds]);
+  }, [sessionState, secondsLeft, totalSeconds, activity, activeFocusSession, setActiveFocusSession]);
 
   const handleStop = (completed: boolean) => {
     setSessionState('paused');
