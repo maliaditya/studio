@@ -310,12 +310,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [schedule, setSchedule] = useState<FullSchedule>({});
   const [dailyPurposes, setDailyPurposes] = useState<Record<string, string>>({});
   const [isAgendaDocked, setIsAgendaDocked] = useState(true);
+  const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
   const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
   const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
-  const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
   
   // Data Definitions & Plans
   const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
@@ -387,7 +387,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [positions, setPositions] = useState<Position[]>([]);
   
   // Purpose & Patterns Data
-  const [purposeStatement, setPurposeStatement] = useState('Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.');
+  const [purposeStatement, setPurposeStatement] = useState('Mind like a fort, Body like a steel, Heart like a garden, Spirit like the sun.');
   const [specializationPurposes, setSpecializationPurposes] = useState<Record<string, string>>({});
   const [patterns, setPatterns] = useState<Pattern[]>([]);
   const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
@@ -1837,17 +1837,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (timerRect) {
             level = 0;
             parentId = undefined;
-            x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-            if (x < MARGIN) {
-                x = timerRect.right + MARGIN;
+            if (typeof window !== "undefined") {
+              x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
+              if (x < MARGIN) {
+                  x = timerRect.right + MARGIN;
+              }
+              y = timerRect.top;
+            } else {
+              x = 0;
+              y = 0;
             }
-            y = timerRect.top;
         } else {
             level = 0;
             parentId = undefined;
-            // Fallback for server-side or if rect is not available
-            x = typeof window !== 'undefined' ? window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2 : 0;
-            y = typeof window !== 'undefined' ? window.innerHeight / 2 - 250 : 0;
+            x = 0;
+            y = 0;
         }
 
         newPopups.set(activityId, { activityId, x, y, parentId, level });
@@ -2018,5 +2022,7 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
+
+    
 
     
