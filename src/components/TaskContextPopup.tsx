@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -86,10 +85,22 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
     }, [popupState.taskId, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
     const attentionSpanInfo = useMemo(() => {
-        const activity = Object.values(schedule)
-            .flat()
-            .flatMap(daySchedule => Object.values(daySchedule).flat())
-            .find(act => (act.taskIds || []).includes(taskInfo?.task.id || ''));
+        let activity: Activity | undefined;
+        
+        // Find the activity associated with the task in the schedule
+        for (const dateKey in schedule) {
+            for (const slotName in schedule[dateKey]) {
+                const activities = schedule[dateKey][slotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    const foundActivity = activities.find(act => (act.taskIds || []).some(tid => tid.startsWith(taskInfo?.task.id.substring(0,10) || '')));
+                    if (foundActivity) {
+                        activity = foundActivity;
+                        break;
+                    }
+                }
+            }
+            if (activity) break;
+        }
 
         if (!activity || !activity.focusSessionStartTime || !activity.focusSessionEndTime) {
             return null;
@@ -118,7 +129,7 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card grid grid-cols-3">
+            <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card grid grid-cols-3">
                 <div className="col-span-2">
                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                         <div className="flex justify-between items-center">
