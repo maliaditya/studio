@@ -154,6 +154,7 @@ export interface Activity {
   taskIds?: string[];
   slot: string;
   habitEquationIds?: string[]; // New field to link rule equations
+  focusSessionInitialStartTime?: number;
   focusSessionStartTime?: number;
   focusSessionEndTime?: number;
   focusSessionPauses?: number;

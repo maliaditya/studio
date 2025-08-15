@@ -84,8 +84,8 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  handleToggleComplete: (dateKey: string, slotName: string, activityId: string) => void;
-  handleLogLearning: (dateKey: string, activity: Activity, progress: number, duration: number) => void;
+  handleToggleComplete: (slotName: string, activityId: string) => void;
+  handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
   updateActivity: (updatedActivity: Activity) => void;
@@ -338,7 +338,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [lastSelectedHabitFolder, setLastSelectedHabitFolder] = useState<string | null>(null);
 
 
-  // Resource Popups
+  // Resource Popups (Original system, kept for resources page)
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1137,76 +1137,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       input.click();
   };
 
-  const handleToggleComplete = (dateKey: string, slotName: string, activityId: string) => {
+  const handleToggleComplete = (slotName: string, activityId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
-      const daySchedule = { ...(prev[dateKey] || {}) };
+      const daySchedule = { ...(prev[todayKey] || {}) };
       const activities = daySchedule[slotName] || [];
       if (activities.length > 0) {
         daySchedule[slotName] = activities.map(act => 
           act.id === activityId ? { ...act, completed: !act.completed } : act
         );
       }
-      return { ...prev, [dateKey]: daySchedule };
+      return { ...prev, [todayKey]: daySchedule };
     });
   };
   
-  const handleLogLearning = (dateKey: string, activity: Activity, progress: number, duration: number) => {
+  const handleLogLearning = (activity: Activity, progress: number, duration: number) => {
     const isUpskill = activity.type === 'upskill';
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
 
     let updateSucceeded = false;
 
     logsUpdater(prevLogs => {
-      const logIndex = prevLogs.findIndex(log => log.date === dateKey);
+      const logIndex = prevLogs.findIndex(log => log.date === todayKey);
+      
+      let currentLog = prevLogs[logIndex];
       if (logIndex === -1) {
-        return prevLogs;
+          currentLog = { id: todayKey, date: todayKey, exercises: [] };
       }
-
+      
       const exerciseId = activity.taskIds?.[0];
-      if (!exerciseId) {
-        return prevLogs;
-      }
+      if (!exerciseId) return prevLogs;
       
       const newSet: LoggedSet = {
         id: `${Date.now()}-${Math.random()}`,
-        reps: isUpskill ? duration : 1, // Store duration in reps for upskill, 1 for deepwork
-        weight: isUpskill ? progress : duration, // Store progress in weight for upskill, duration for deepwork
+        reps: isUpskill ? duration : 1,
+        weight: isUpskill ? progress : duration,
         timestamp: Date.now(),
       };
 
       const newLogs = [...prevLogs];
-      const exerciseIndex = newLogs[logIndex].exercises.findIndex(ex => ex.id === exerciseId);
-
+      const exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseId);
+      
+      let updatedExercises;
       if (exerciseIndex > -1) {
-        updateSucceeded = true;
-        const updatedExercises = [...newLogs[logIndex].exercises];
+        updatedExercises = [...currentLog.exercises];
         updatedExercises[exerciseIndex] = {
           ...updatedExercises[exerciseIndex],
           loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
         };
-        newLogs[logIndex] = {
-          ...newLogs[logIndex],
-          exercises: updatedExercises
+      } else {
+        // This case should ideally not happen if tasks are added correctly, but as a fallback:
+        const def = (isUpskill ? upskillDefinitions : deepWorkDefinitions).find(d => d.id === activity.taskIds?.[0]?.split('-')[0]);
+        if (!def) return prevLogs;
+        const newExercise = {
+            id: activity.taskIds![0],
+            definitionId: def.id,
+            name: def.name,
+            category: def.category,
+            loggedSets: [newSet],
+            targetSets: 1,
+            targetReps: '25'
         };
-        return newLogs;
+        updatedExercises = [...currentLog.exercises, newExercise];
       }
+
+      const updatedLog = { ...currentLog, exercises: updatedExercises };
       
-      return prevLogs;
+      if (logIndex > -1) {
+          newLogs[logIndex] = updatedLog;
+      } else {
+          newLogs.push(updatedLog);
+      }
+      updateSucceeded = true;
+      return newLogs;
     });
     
     if (updateSucceeded) {
-      handleToggleComplete(dateKey, activity.slot, activity.id);
       toast({ title: "Progress Logged", description: "Your session has been saved." });
     } else {
-      const sourceLogs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
-      const logForToday = sourceLogs.find(log => log.date === dateKey);
-      if (!logForToday) {
-        toast({ title: "Error", description: `Could not find a session for ${dateKey}. Please add a task on the main page first.`, variant: "destructive" });
-      } else if (!activity.taskIds?.[0]) {
-        toast({ title: "Error", description: "No specific task linked to this agenda item.", variant: "destructive" });
-      } else {
-        toast({ title: "Error", description: "Could not find the specific task to log against.", variant: "destructive" });
-      }
+        // Fallback error message if something went wrong
+        toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
     }
   };
 
@@ -1818,6 +1829,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const CONTEXT_POPUP_WIDTH = 600;
     const MARGIN = 16;
     
+    if (!timerRect) {
+        console.error("Timer rect not available for positioning task context popup.");
+        return;
+    }
+    
     let x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
     
     if (x < MARGIN) {
@@ -1969,6 +1985,7 @@ export const useAuth = (): AuthContextType => {
 
 
     
+
 
 
 

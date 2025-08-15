@@ -5,7 +5,7 @@
 import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check } from 'lucide-react';
 import type { Activity } from '@/types/workout';
 import {
   Popover,
@@ -32,10 +32,10 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity } = useAuth();
-  const totalSeconds = duration * 60;
+  const { setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
+  const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
-  const [isActive, setIsActive] = React.useState(false);
+  const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
   const popupRef = React.useRef<HTMLDivElement>(null);
   
   const [position, setPosition] = React.useState({ x: window.innerWidth - 256 - 24, y: 24 }); // top right
@@ -52,49 +52,66 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
   React.useEffect(() => {
-    setIsActive(true);
     setIsAudioPlaying(true);
   }, [setIsAudioPlaying]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (isActive && secondsLeft > 0) {
+    if (sessionState === 'running' && secondsLeft > 0) {
       interval = setInterval(() => {
         setSecondsLeft(s => s - 1);
       }, 1000);
-    } else if (isActive && secondsLeft === 0) {
-      handleStop(true);
+    } else if (sessionState === 'running' && secondsLeft === 0) {
+      setSessionState('finished');
+      setIsAudioPlaying(false);
     }
     
-    if (isActive) {
-        setActiveFocusSession({ activity, duration, secondsLeft });
+    if (sessionState === 'running' || sessionState === 'paused') {
+        setActiveFocusSession({ activity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
     }
 
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isActive, secondsLeft]);
+  }, [sessionState, secondsLeft, totalSeconds]);
 
   const handleStop = (completed: boolean) => {
-    setIsActive(false);
+    setSessionState('paused');
     setIsAudioPlaying(false);
+    
     const elapsedSeconds = totalSeconds - secondsLeft;
-    if (elapsedSeconds > 0 && activity) {
-      onLogTime(activity, Math.floor(elapsedSeconds / 60));
+    
+    if (activity) {
+      if (elapsedSeconds > 0) {
+        onLogTime(activity, Math.floor(elapsedSeconds / 60));
+      }
       if (completed) {
-        updateActivity({ ...activity, focusSessionEndTime: Date.now() });
+        const endTime = Date.now();
+        const startTime = activity.focusSessionInitialStartTime || activity.focusSessionStartTime || endTime;
+        const totalDurationMinutes = Math.round((endTime - startTime) / 60000);
+        
+        onLogTime(activity, totalDurationMinutes);
+        handleToggleComplete(activity.slot, activity.id);
       }
     }
     onClose();
   };
   
   const togglePlayPause = () => {
-    const newIsActive = !isActive;
-    if (!newIsActive) { // If we are pausing
+    const newSessionState = sessionState === 'running' ? 'paused' : 'running';
+    if (newSessionState === 'paused') {
         updateActivity({ ...activity, focusSessionPauses: (activity.focusSessionPauses || 0) + 1 });
     }
-    setIsActive(newIsActive);
-    setIsAudioPlaying(newIsActive);
+    setSessionState(newSessionState);
+    setIsAudioPlaying(newSessionState === 'running');
+  };
+  
+  const handleExtend = () => {
+    const newTotalSeconds = totalSeconds + 15 * 60;
+    setTotalSeconds(newTotalSeconds);
+    setSecondsLeft(prev => prev + (15 * 60));
+    setSessionState('running');
+    setIsAudioPlaying(true);
   };
   
   const handleOpenContext = (e: React.MouseEvent) => {
@@ -142,58 +159,46 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 </div>
             </div>
             
-            <div className="relative w-40 h-40 mx-auto">
-                <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                    innerRadius="80%"
-                    outerRadius="100%"
-                    data={chartData}
-                    startAngle={90}
-                    endAngle={-270}
-                    barSize={8}
-                >
-                    <PolarAngleAxis
-                    type="number"
-                    domain={[0, 100]}
-                    angleAxisId={0}
-                    tick={false}
-                    />
-                    <RadialBar
-                    background={{ fill: 'hsl(var(--muted))' }}
-                    dataKey="value"
-                    cornerRadius={10}
-                    angleAxisId={0}
-                    />
-                </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-3xl font-bold font-mono">
-                    {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-                </span>
+            {sessionState !== 'finished' ? (
+              <>
+                <div className="relative w-40 h-40 mx-auto">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart innerRadius="80%" outerRadius="100%" data={chartData} startAngle={90} endAngle={-270} barSize={8}>
+                        <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+                        <RadialBar background={{ fill: 'hsl(var(--muted))' }} dataKey="value" cornerRadius={10} angleAxisId={0} />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-3xl font-bold font-mono">
+                        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                    </span>
+                  </div>
                 </div>
-            </div>
-            
-            <div className="flex justify-center items-center gap-4 mt-4">
-                <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
-                {isActive ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                </Button>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-                            <MoreHorizontal className="h-5 w-5" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-1" side="top" align="center">
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start text-destructive hover:text-destructive"
-                            onClick={() => handleStop(false)}
-                        >
-                            <Square className="mr-2 h-4 w-4" /> Stop Session
-                        </Button>
-                    </PopoverContent>
-                </Popover>
-            </div>
+                <div className="flex justify-center items-center gap-4 mt-4">
+                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
+                      {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                    </Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                                <MoreHorizontal className="h-5 w-5" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-1" side="top" align="center">
+                            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => handleStop(false)}>
+                                <Square className="mr-2 h-4 w-4" /> Stop Session
+                            </Button>
+                        </PopoverContent>
+                    </Popover>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-4 pt-4 pb-2">
+                <Button className="w-full" onClick={() => handleStop(true)}><Check className="mr-2 h-4 w-4"/> Completed</Button>
+                <Button variant="outline" className="w-full" onClick={handleExtend}><RefreshCw className="mr-2 h-4 w-4"/> Extend 15 mins</Button>
+              </div>
+            )}
+
 
             <div className="mt-4 pt-4 border-t border-border/20 text-center">
                 <p className="text-sm font-semibold truncate" title={activity.details}>
