@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, TaskContextPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -177,6 +177,12 @@ interface AuthContextType {
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
 
+  // Task Context Popup
+  taskContextPopup: TaskContextPopupState | null;
+  openTaskContextPopup: (taskId: string, event: React.MouseEvent) => void;
+  closeTaskContextPopup: () => void;
+  handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
+
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -344,6 +350,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Meta Rule Popup
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
+
+  // Task Context Popup
+  const [taskContextPopup, setTaskContextPopup] = useState<TaskContextPopupState | null>(null);
 
 
   // Sidebar State
@@ -1788,6 +1797,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const openTaskContextPopup = (taskId: string, event: React.MouseEvent) => {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const popupWidth = 416;
+    const popupHeight = 400; // A guess, might need adjustment
+    
+    // Position it to the right of the triggering element, if possible.
+    let x = rect.right + 10;
+    let y = rect.top;
+    
+    if (x + popupWidth > window.innerWidth) {
+      x = rect.left - popupWidth - 10;
+    }
+    if (y + popupHeight > window.innerHeight) {
+      y = window.innerHeight - popupHeight - 10;
+    }
+
+    setTaskContextPopup({ taskId, x: Math.max(10, x), y: Math.max(10, y) });
+  };
+
+  const closeTaskContextPopup = () => {
+    setTaskContextPopup(null);
+  };
+
+  const handleTaskContextPopupDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    if (taskContextPopup && active.id === `task-context-popup-${taskContextPopup.taskId}`) {
+      setTaskContextPopup(prev => prev ? {
+        ...prev,
+        x: prev.x + delta.x,
+        y: prev.y + delta.y,
+      } : null);
+    }
+  };
+
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
@@ -1837,6 +1880,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    taskContextPopup, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,

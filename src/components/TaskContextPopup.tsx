@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -13,7 +14,7 @@ import { Badge } from './ui/badge';
 
 interface TaskContextPopupProps {
     popupState: TaskContextPopupState;
-    onClose: (taskId: string) => void;
+    onClose: () => void;
 }
 
 export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps) {
@@ -23,6 +24,7 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
         projects, 
         coreSkills, 
         skillDomains,
+        microSkillMap
     } = useAuth();
     
     const { taskId, x, y } = popupState;
@@ -60,36 +62,35 @@ export function TaskContextPopup({ popupState, onClose }: TaskContextPopupProps)
             ? projects.find(p => p.id === parent.linkedProjectId) 
             : null;
 
-        // Find skill hierarchy
-        const skillAreaMap = new Map<string, {area: SkillArea, coreSkill: CoreSkill, domain: SkillDomain}>();
-        skillDomains.forEach(domain => {
-            coreSkills.filter(cs => cs.domainId === domain.id).forEach(coreSkill => {
-                coreSkill.skillAreas.forEach(skillArea => {
-                    skillAreaMap.set(skillArea.id, { area: skillArea, coreSkill, domain });
-                });
-            });
-        });
+        const microSkillId = Array.from(microSkillMap.entries()).find(([, v]) => v.microSkillName === task.category)?.[0];
+        const microSkillInfo = microSkillId ? microSkillMap.get(microSkillId) : null;
         
-        const microSkillInfo = coreSkills.flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills.map(ms => ({...ms, skillAreaId: sa.id})))).find(ms => ms.name === task.category);
-        
-        const hierarchy = microSkillInfo && skillAreaMap.has(microSkillInfo.skillAreaId)
-            ? skillAreaMap.get(microSkillInfo.skillAreaId)
-            : null;
+        let domain: SkillDomain | undefined;
+        let coreSkill: CoreSkill | undefined;
+        let skillArea: SkillArea | undefined;
 
+        if (microSkillInfo) {
+            coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+            if (coreSkill) {
+                domain = skillDomains.find(d => d.id === coreSkill!.domainId);
+                skillArea = coreSkill.skillAreas.find(sa => sa.microSkills.some(ms => ms.id === microSkillId));
+            }
+        }
+        
         return {
             task,
             parent,
             project: linkedProject,
-            domain: hierarchy?.domain,
-            coreSkill: hierarchy?.coreSkill,
-            skillArea: hierarchy?.area,
+            domain,
+            coreSkill,
+            skillArea,
         };
 
-    }, [taskId, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains]);
+    }, [taskId, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
     const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
-        onClose(taskId);
+        onClose();
     };
 
     if (!taskInfo) return null;

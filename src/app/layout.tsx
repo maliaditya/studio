@@ -21,6 +21,7 @@ import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
+import { TaskContextPopup } from '@/components/TaskContextPopup';
 
 
 // export const metadata: Metadata = {
@@ -36,7 +37,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     intentionPopups, closeIntentionPopup, 
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
-    ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd
+    ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    taskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
 
@@ -69,6 +71,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     <DndContext onDragEnd={(e) => {
         handlePopupDragEnd(e);
         handleRulePopupDragEnd(e);
+        handleTaskContextPopupDragEnd(e);
     }}>
       <DefaultBackground />
       <MatrixBackground />
@@ -101,6 +104,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 <RuleDetailPopupCard 
                     popupState={ruleDetailPopup}
                     onClose={closeRuleDetailPopup}
+                />
+            )}
+             {taskContextPopup && (
+                <TaskContextPopup
+                    popupState={taskContextPopup}
+                    onClose={() => closeTaskContextPopup()}
                 />
             )}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">

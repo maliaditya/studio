@@ -216,14 +216,52 @@ export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card';
+  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d';
+  createdAt: string;
+
   // For 'link' type
   link?: string;
   description?: string;
   iconUrl?: string;
+  githubLink?: string;
+  demoLink?: string;
+  linkedResourceId?: string;
+
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
+  audioUrl?: string;
+  
+  // For 'habit' type
+  trigger?: {
+    action?: string;
+    feeling?: string;
+  };
+  response?: {
+    text?: string;
+    resourceId?: string;
+    visualize?: string;
+  };
+  reward?: string;
+  newResponse?: {
+    text?: string;
+    resourceId?: string;
+    action?: string;
+    visualize?: string;
+  };
+  stoppers?: Stopper[];
+  strengths?: Strength[];
+  
+  // For 'mechanism' type
+  mechanismFramework?: 'positive' | 'negative';
+  benefit?: string;
+  law?: {
+    premise?: string;
+    outcome?: string;
+  };
+  
+  // For 3D Model
+  modelUrl?: string;
 }
 
 export interface ResourceFolder {
@@ -241,6 +279,7 @@ export interface PopupState {
     parentId?: string;
     width?: number;
     height?: number;
+    z?: number;
 }
 
 // Canvas Types
@@ -514,6 +553,12 @@ export interface PopupState {
 
 export interface RuleDetailPopupState {
   ruleId: string;
+  x: number;
+  y: number;
+}
+
+export interface TaskContextPopupState {
+  taskId: string;
   x: number;
   y: number;
 }
