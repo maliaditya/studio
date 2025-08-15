@@ -8,9 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
@@ -29,7 +28,7 @@ interface FocusSessionModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   activity: Activity | null;
-  onStartSession: (activity: Activity, duration: number, breakDuration: number, breakInterval: number) => void;
+  onStartSession: (activity: Activity, duration: number) => void;
 }
 
 export function FocusSessionModal({
@@ -83,7 +82,7 @@ export function FocusSessionModal({
 
   const handleStartClick = () => {
     if (activity) {
-      onStartSession(activity, duration, breakMinutes, breakAfterMinutes);
+      onStartSession(activity, duration);
       onOpenChange(false);
     }
   };
@@ -195,4 +194,3 @@ export function FocusSessionModal({
     </Dialog>
   );
 }
-
