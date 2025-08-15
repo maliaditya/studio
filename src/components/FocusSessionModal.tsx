@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -9,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from './ui/button';
@@ -117,19 +117,29 @@ export function FocusSessionModal({
   
   const handleSaveRuleSelection = () => {
     if (!activity) return;
+    const { slot } = activity;
+
     setSchedule(prevSchedule => {
+        const dateKey = Object.keys(prevSchedule).find(key => 
+            Object.values(prevSchedule[key]).flat().some(act => act.id === activity.id)
+        );
+
+        if (!dateKey) return prevSchedule;
+
         const newSchedule = { ...prevSchedule };
-        const daySchedule = { ...newSchedule[activity.slot] };
-        if (daySchedule[activity.slot]) {
-            daySchedule[activity.slot] = (daySchedule[activity.slot] as Activity[]).map(act => 
+        const daySchedule = { ...newSchedule[dateKey] };
+
+        if (daySchedule[slot]) {
+            daySchedule[slot] = (daySchedule[slot] as Activity[]).map(act => 
                 act.id === activity.id ? { ...act, habitEquationIds: tempSelectedRuleIds } : act
             );
-            newSchedule[activity.slot] = daySchedule[activity.slot];
+            newSchedule[dateKey] = daySchedule;
         }
         return newSchedule;
     });
     setIsSelectRulesOpen(false);
   };
+  
   
   const handleLinkResourceSave = () => {
     if (!linkingToEquationId || !selectedResourceId) return;
