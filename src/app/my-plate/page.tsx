@@ -1070,8 +1070,13 @@ function MyPlatePageContent() {
                   if (!isOpen) setEditingActivity(null);
                   setIsLearningModalOpen(isOpen);
               }}
-              activity={editingActivity.activity}
+              availableTasks={activityType === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : activityType === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
+              initialSelectedIds={editingActivity.activity.taskIds || []}
               onSave={handleSaveTaskSelection}
+              pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
+              deepWorkDefinitions={deepWorkDefinitions}
+              upskillDefinitions={upskillDefinitions}
+              setDeepWorkDefinitions={setDeepWorkDefinitions}
           />
         )}
 

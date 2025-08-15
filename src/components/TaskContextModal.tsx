@@ -31,13 +31,13 @@ export function TaskContextModal({ isOpen, onOpenChange, taskId }: TaskContextMo
         if (!taskId) return null;
         
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const task = allDefs.find(d => d.id === taskId);
+        const task = allDefs.find(d => d.id === taskId || d.id === taskId.replace('def_upskill_', 'def_').replace('def_deep_', 'def_') || d.id.startsWith(taskId.substring(0, 10)));
         if (!task) return null;
 
         // Find parent Objective/Intention
         const parent = allDefs.find(p => 
-            (p.linkedDeepWorkIds?.includes(taskId)) || 
-            (p.linkedUpskillIds?.includes(taskId))
+            (p.linkedDeepWorkIds?.includes(task.id)) || 
+            (p.linkedUpskillIds?.includes(task.id))
         );
         
         // Find linked project if parent is an intention
