@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow, PlusCircle, Library, Database } from 'lucide-react';
@@ -11,7 +10,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
-import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry as AutoSuggestionEntry, RuleDetailPopupState, HabitEquation } from '@/types/workout';
+import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry as AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, ResourceFolder } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -20,7 +19,7 @@ import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 
