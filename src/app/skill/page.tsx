@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -60,6 +59,64 @@ function Droppable({ id, children, className }: { id: string, children: React.Re
       </div>
     );
 }
+
+const SpecializationItem: React.FC<{
+  spec: CoreSkill;
+  allSpecs: CoreSkill[];
+  level?: number;
+  selectedSkillId: string | null;
+  onSelect: (skillId: string) => void;
+  onAddSub: (parentId: string) => void;
+  onEdit: (skill: CoreSkill) => void;
+  onDelete: (skillId: string) => void;
+}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
+    
+    const childSpecs = allSpecs.filter(s => s.parentId === spec.id);
+
+    return (
+        <div style={{ marginLeft: `${level * 20}px` }}>
+            <Droppable id={spec.id} className="group rounded-md hover:bg-muted">
+                <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2">
+                    <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => onSelect(spec.id)}>
+                        <span {...listeners} {...attributes} className="cursor-grab p-1 -ml-1">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </span>
+                        <BrainCircuit className="h-4 w-4 flex-shrink-0" />
+                        <span className={cn("text-sm truncate", selectedSkillId === spec.id && 'font-semibold text-primary')} title={spec.name}>
+                            {spec.name}
+                        </span>
+                    </button>
+                    <div className="flex items-center opacity-0 group-hover:opacity-100">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(spec.id)}>
+                            <Plus className="h-4 w-4 text-green-500" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(spec)}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                    </div>
+                </div>
+            </Droppable>
+            {childSpecs.length > 0 && (
+                <div className="pl-4 border-l-2 ml-4">
+                    {childSpecs.map(child => (
+                        <SpecializationItem
+                            key={child.id}
+                            spec={child}
+                            allSpecs={allSpecs}
+                            level={level + 1}
+                            selectedSkillId={selectedSkillId}
+                            onSelect={onSelect}
+                            onAddSub={onAddSub}
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 
 function SkillPageContent() {
@@ -428,43 +485,6 @@ function SkillPageContent() {
     }
   };
 
-  const renderSpecialization = (spec: CoreSkill, allSpecs: CoreSkill[], level = 0) => {
-    const childSpecs = allSpecs.filter(s => s.parentId === spec.id);
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
-    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
-
-    return (
-      <div key={spec.id} style={{ marginLeft: `${level * 20}px` }}>
-        <Droppable id={spec.id} className="group rounded-md hover:bg-muted">
-          <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2">
-            <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(spec.id)}>
-              <span {...listeners} {...attributes} className="cursor-grab p-1 -ml-1">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-              </span>
-              <BrainCircuit className="h-4 w-4 flex-shrink-0" />
-              <span className={cn("text-sm truncate", selectedSkillId === spec.id && 'font-semibold text-primary')} title={spec.name}>
-                {spec.name}
-              </span>
-            </button>
-            <div className="flex items-center opacity-0 group-hover:opacity-100">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddSpecialization(spec.domainId, spec.id)}>
-                <Plus className="h-4 w-4 text-green-500" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSkill(spec)}><Edit className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteCoreSkill(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-            </div>
-          </div>
-        </Droppable>
-        {childSpecs.length > 0 && (
-          <div className="pl-4 border-l-2 ml-4">
-            {childSpecs.map(child => renderSpecialization(child, allSpecs, level + 1))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-
   return (
     <DndContext onDragEnd={handleDragEnd}>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -522,7 +542,18 @@ function SkillPageContent() {
                                               </Button>
                                             ))}
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
-                                            {topLevelSpecializations.map(spec => renderSpecialization(spec, domainCoreSkills))}
+                                            {topLevelSpecializations.map(spec => (
+                                                <SpecializationItem
+                                                    key={spec.id}
+                                                    spec={spec}
+                                                    allSpecs={domainCoreSkills}
+                                                    selectedSkillId={selectedSkillId}
+                                                    onSelect={handleSelectCoreSkill}
+                                                    onAddSub={(parentId) => handleAddSpecialization(domain.id, parentId)}
+                                                    onEdit={setEditingSkill}
+                                                    onDelete={handleDeleteCoreSkill}
+                                                />
+                                            ))}
                                             <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
                                               <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
@@ -932,3 +963,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
