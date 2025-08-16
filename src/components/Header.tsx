@@ -40,7 +40,6 @@ export function Header() {
     { href: '/patterns', label: 'Patterns' },
     { href: '/purpose', label: 'Purpose' },
     { href: '/skill', label: 'Skill' },
-    { href: '/upskill', label: 'Upskill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/personal-branding', label: 'Branding' },
     { href: '/strategic-planning', label: 'Strategy' },

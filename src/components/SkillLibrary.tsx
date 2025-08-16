@@ -28,12 +28,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 
 interface SkillLibraryProps {
-  pageType: 'deepwork' | 'upskill';
   selectedMicroSkill: MicroSkill | null;
   onSelectMicroSkill: (skill: MicroSkill | null) => void;
-  definitions: ExerciseDefinition[];
-  onSelectFocusArea: (def: ExerciseDefinition | null) => void;
-  onOpenNewFocusArea: () => void;
+  onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
+  onOpenNewFocusArea: (type: 'deepwork' | 'upskill') => void;
   selectedProject: Project | null;
   onSelectProject: (project: Project | null) => void;
   onDeleteFocusArea: (defId: string) => void;
@@ -43,10 +41,8 @@ interface SkillLibraryProps {
 }
 
 export function SkillLibrary({ 
-    pageType, 
     selectedMicroSkill, 
     onSelectMicroSkill,
-    definitions,
     onSelectFocusArea,
     onOpenNewFocusArea,
     selectedProject,
@@ -71,9 +67,11 @@ export function SkillLibrary({
   
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
 
   const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
   const selectedCoreSkill = coreSkills.find(s => s.id === selectedSkillId);
+  const definitions = libraryView === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
   
   const handleBack = () => {
     if (selectedMicroSkill) {
@@ -89,7 +87,7 @@ export function SkillLibrary({
   };
   
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
-    onSelectFocusArea(null);
+    onSelectFocusArea(null, 'deepwork');
     onSelectProject(null);
     switch(type) {
         case 'domain':
@@ -106,11 +104,6 @@ export function SkillLibrary({
             setSelectedProjectId(item.id);
             break;
     }
-  };
-
-  const handleStartEditing = (def: ExerciseDefinition) => {
-    setEditingFocusAreaId(def.id);
-    setEditingName(def.name);
   };
   
   const handleSaveName = () => {
@@ -137,25 +130,16 @@ export function SkillLibrary({
     return isChild ? 'Visualization' : 'Standalone';
   };
 
-  const getDeepWorkIcon = (def: ExerciseDefinition) => {
-    const nodeType = getDeepWorkNodeType(def);
+  const getIcon = (def: ExerciseDefinition) => {
+    const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
     switch (nodeType) {
         case 'Intention': return <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />;
         case 'Objective': return <Flag className="mr-2 h-4 w-4 text-green-500" />;
         case 'Action': return <Bolt className="mr-2 h-4 w-4 text-blue-500" />;
-        case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
-        default: return <Briefcase className="mr-2 h-4 w-4" />;
-    }
-  };
-
-  const getUpskillIcon = (def: ExerciseDefinition) => {
-    const nodeType = getUpskillNodeType(def);
-    switch (nodeType) {
         case 'Curiosity': return <Flashlight className="mr-2 h-4 w-4 text-amber-500" />;
-        case 'Objective': return <Flag className="mr-2 h-4 w-4 text-green-500" />;
         case 'Visualization': return <Frame className="mr-2 h-4 w-4 text-blue-500" />;
         case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
-        default: return <BookCopy className="mr-2 h-4 w-4" />;
+        default: return <Briefcase className="mr-2 h-4 w-4" />;
     }
   };
   
@@ -183,8 +167,8 @@ export function SkillLibrary({
       const allTasks = definitions.filter(def => def.category === selectedMicroSkill.name);
       
       const filteredTasks = allTasks.filter(task => {
-        const nodeType = pageType === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
-        if (pageType === 'deepwork') {
+        const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
+        if (libraryView === 'deepwork') {
           return ['Intention', 'Standalone'].includes(nodeType);
         }
         return ['Curiosity', 'Standalone'].includes(nodeType);
@@ -194,7 +178,7 @@ export function SkillLibrary({
         <div className="space-y-1">
            <div className="flex items-center justify-between group">
               <h3 className="font-semibold text-base py-2 flex items-center gap-2"><Activity className="h-4 w-4"/>Micro-Skill: {selectedMicroSkill.name}</h3>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenNewFocusArea}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
                   <PlusCircle className="h-4 w-4 text-green-500" />
               </Button>
             </div>
@@ -213,10 +197,10 @@ export function SkillLibrary({
                         ) : (
                           <button
                             onDoubleClick={() => onEditFocusArea(task)}
-                            onClick={() => onSelectFocusArea(task)}
+                            onClick={() => onSelectFocusArea(task, libraryView)}
                             className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0"
                           >
-                            {pageType === 'deepwork' ? getDeepWorkIcon(task) : getUpskillIcon(task)}
+                            {getIcon(task)}
                             <TooltipProvider>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
@@ -361,9 +345,13 @@ export function SkillLibrary({
            {renderHeader()}
         </CardHeader>
         <CardContent>
+            <div className="flex gap-1 mb-4 p-1 bg-muted rounded-md">
+                <Button variant={libraryView === 'deepwork' ? 'secondary' : 'ghost'} className="flex-1" onClick={() => setLibraryView('deepwork')}>Deep Work</Button>
+                <Button variant={libraryView === 'upskill' ? 'secondary' : 'ghost'} className="flex-1" onClick={() => setLibraryView('upskill')}>Upskill</Button>
+            </div>
            <AnimatePresence mode="wait">
              <motion.div
-               key={(selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '')}
+               key={(selectedDomain?.id || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '') + libraryView}
                initial={{ opacity: 0, x: -20 }}
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
