@@ -244,7 +244,7 @@ function LinkedDeepWorkCard({
     onUpdateName: (id: string, newName: string) => void;
     projectsInDomain: Project[];
     handleLinkProject: (intentionId: string, projectId: string | null) => void;
-    onCreateAndLinkChild?: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -298,7 +298,7 @@ function LinkedDeepWorkCard({
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            {isParentNode && onCreateAndLinkChild && (
+                            {isParentNode && (
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger>
                                         <PlusCircle className="mr-2 h-4 w-4" /> Create & Link New
@@ -1230,21 +1230,6 @@ function DeepWorkPageContent() {
     return upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Curiosity');
   }, [upskillDefinitions, getUpskillNodeType]);
 
-  const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
-    let nodes: React.ReactNode[] = [];
-    items.forEach(item => {
-        nodes.push(
-            <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5 + 1}rem` }}>
-                {item.name}
-            </SelectItem>
-        );
-        if (item.children && item.children.length > 0) {
-            nodes = [...nodes, ...renderUpskillHierarchySelect(item.children, level + 1)];
-        }
-    });
-    return nodes;
-  };
-
   const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
     if (!currentTask) return;
     let updatedParent: ExerciseDefinition;
@@ -1521,7 +1506,7 @@ function DeepWorkPageContent() {
                     {(currentTask.linkedDeepWorkIds || []).map(id => {
                         const def = deepWorkDefinitions.find(d => d.id === id);
                         if (!def) return null;
-                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} {...{ getDeepWorkNodeType, getDeepWorkLoggedMinutes, permanentlyLoggedActionIds, handleAddTaskToSession, handleCardClick, handleToggleReadyForBranding, handleUnlinkItem, handleDeleteFocusArea, handleViewProgress, deepWorkDefinitions, formatDuration: formatMinutes, calculatedEstimate: calculateTotalEstimate(def), upskillDefinitions, resources, setSelectedSubtopic: (d, type) => handleSelectFocusArea(d, type), onOpenMindMap: (id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}, onUpdateName: handleUpdateFocusAreaName, projectsInDomain, handleLinkProject, onCreateAndLinkChild }}/>;
+                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} onCreateAndLinkChild={handleCreateAndLinkChild}/>;
                     })}
                      {(currentTask.linkedUpskillIds || []).map(id => {
                         const def = upskillDefinitions.find(d => d.id === id);
