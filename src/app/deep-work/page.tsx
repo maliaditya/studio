@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -611,18 +610,32 @@ function DeepWorkPageContent() {
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent && !isChild) return 'Intention';
-    if (isParent && isChild) return 'Objective';
-    if (!isParent && isChild) return 'Action';
-    return 'Standalone';
-  }, [linkedDeepWorkChildIds]);
+    const hasActionableChildren = (def.linkedDeepWorkIds || []).some(childId => {
+      const childDef = deepWorkDefinitions.find(c => c.id === childId);
+      return childDef && !((childDef.linkedDeepWorkIds?.length ?? 0) > 0);
+    });
+
+    if (isParent) {
+      if (isChild && hasActionableChildren) return 'Objective';
+      return 'Intention';
+    }
+    return isChild ? 'Action' : 'Standalone';
+  }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedUpskillChildIds.has(def.id);
-    if (isParent) return isChild ? 'Objective' : 'Curiosity';
+    const hasActionableChildren = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(c => c.id === childId);
+        return childDef && !((childDef.linkedUpskillIds?.length ?? 0) > 0);
+    });
+
+    if (isParent) {
+      if(isChild && hasActionableChildren) return 'Objective';
+      return 'Curiosity';
+    }
     return isChild ? 'Visualization' : 'Standalone';
-  }, [linkedUpskillChildIds]);
+  }, [upskillDefinitions, linkedUpskillChildIds]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
@@ -1877,3 +1890,5 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+
+    
