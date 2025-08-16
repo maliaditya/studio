@@ -143,7 +143,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (!containerRef.current) return;
         if (!document.fullscreenElement) {
             containerRef.current.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                console.error(`Error attempting to enable full-screen mode: ${''}`err.message} (${''}`err.name})`);
             });
         } else {
             if (document.exitFullscreen) {
@@ -219,8 +219,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
             childIds.forEach(childId => {
                 if (nodesOnCanvas.has(childId)) {
-                    const edgeId1 = `${nodeId}-${childId}`;
-                    const edgeId2 = `${childId}-${nodeId}`;
+                    const edgeId1 = `${''}`nodeId}-${''}`childId}`;
+                    const edgeId2 = `${''}`childId}-${''}`nodeId}`;
                     if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
                         edgesToAdd.add(edgeId1);
                     }
@@ -230,8 +230,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const parentIds = parentMap.get(nodeId) || [];
             parentIds.forEach(parentId => {
                 if (nodesOnCanvas.has(parentId)) {
-                    const edgeId1 = `${parentId}-${nodeId}`;
-                    const edgeId2 = `${nodeId}-${parentId}`;
+                    const edgeId1 = `${''}`parentId}-${''}`nodeId}`;
+                    const edgeId2 = `${''}`nodeId}-${''}`parentId}`;
                     if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
                         edgesToAdd.add(edgeId1);
                     }
@@ -294,7 +294,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                         x: pos.x + HORIZONTAL_SPACING, 
                         y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((childrenToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
-                    newEdgesSet.add(`${nodeId}-${childId}`);
+                    newEdgesSet.add(`${''}`nodeId}-${''}`childId}`);
                 });
             }
     
@@ -309,7 +309,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                         x: pos.x + HORIZONTAL_SPACING, // Changed to expand to the right
                         y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
-                    newEdgesSet.add(`${parentId}-${nodeId}`);
+                    newEdgesSet.add(`${''}`parentId}-${''}`nodeId}`);
                 });
             }
         });
@@ -351,8 +351,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                     y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((validChildIds.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
-            const edgeId1 = `${nodeId}-${childId}`;
-            const edgeId2 = `${childId}-${nodeId}`;
+            const edgeId1 = `${''}`nodeId}-${''}`childId}`;
+            const edgeId2 = `${''}`childId}-${''}`nodeId}`;
             if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
                 edgesToUpdate.add(edgeId1);
             }
@@ -385,8 +385,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                     y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
-            const edgeId1 = `${parentId}-${nodeId}`;
-            const edgeId2 = `${nodeId}-${parentId}`;
+            const edgeId1 = `${''}`parentId}-${''}`nodeId}`;
+            const edgeId2 = `${''}`nodeId}-${''}`parentId}`;
             if (!edges.has(edgeId1) && !edges.has(edgeId2)) {
                 edgesToUpdate.add(edgeId1);
             }
@@ -442,7 +442,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const totalTimeToday = deepWorkTime + upskillTime;
             status.isLoggedToday = true;
             status.text = 'Completed';
-            status.subtext = totalTimeToday > 0 ? `${totalTimeToday} min today` : `Today`;
+            status.subtext = totalTimeToday > 0 ? `${''}`totalTimeToday} min today` : `Today`;
             return status;
         }
     
@@ -453,7 +453,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 if (activity) {
                     status.isScheduledToday = true;
                     status.text = 'Scheduled Today';
-                    status.subtext = `in ${slotName}`;
+                    status.subtext = `in ${''}`slotName}`;
                     return status;
                 }
             }
@@ -479,7 +479,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const daysAgo = differenceInDays(today, mostRecentPendingDate);
             status.isPending = true;
             status.text = 'Pending';
-            status.subtext = `${daysAgo} day${daysAgo > 1 ? 's' : ''} ago`;
+            status.subtext = `${''}`daysAgo} day${''}`daysAgo > 1 ? 's' : ''} ago`;
             return status;
         }
     
@@ -559,7 +559,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const controlPointX1 = startX + dx / 2;
         const controlPointX2 = endX - dx / 2;
         
-        return `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
+        return `M ${''}`startX},${''}`startY} C ${''}`controlPointX1},${''}`startY} ${''}`controlPointX2},${''}`endY} ${''}`endX},${''}`endY}`;
     };
 
     const Controls = () => {
@@ -614,12 +614,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             
                             const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
-                            const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
+                            const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${''}`nodeId}-${''}`childId}` || edgeId === `${''}`childId}-${''}`nodeId}`));
                             const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
                             
                             const potentialParents = parentMap.get(nodeId) || [];
                             const hasUnloadedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && !nodes.has(parentId));
-                            const hasUnlinkedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && nodes.has(parentId) && !Array.from(edges).some(edgeId => edgeId === `${parentId}-${nodeId}` || edgeId === `${nodeId}-${parentId}`));
+                            const hasUnlinkedParent = potentialParents.some(parentId => allDefinitions.has(parentId) && nodes.has(parentId) && !Array.from(edges).some(edgeId => edgeId === `${''}`parentId}-${''}`nodeId}` || edgeId === `${''}`nodeId}-${''}`parentId}`));
                             const canRevealParents = hasUnloadedParent || hasUnlinkedParent;
 
                             const isRootNode = !(parentMap.get(nodeId) || []).some(parentId => nodes.has(parentId));
@@ -672,7 +672,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
 const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
-    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : style;
+    const style = transform ? { transform: `translate3d(${''}`transform.x}px, ${''}`transform.y}px, 0)` } : undefined;
     
     const { loggedHours = 0, estimatedHours = 0 } = progress || {};
     const showProgress = estimatedHours > 0;
@@ -904,9 +904,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
-            if (bundle.sharingStatus?.twitter) socialChildren.push(getNode({ id: `${bundle.id}-twitter`, name: 'X/Twitter' }, 'Social'));
-            if (bundle.sharingStatus?.linkedin) socialChildren.push(getNode({ id: `${bundle.id}-linkedin`, name: 'LinkedIn' }, 'Social'));
-            if (bundle.sharingStatus?.devto) socialChildren.push(getNode({ id: `${bundle.id}-devto`, name: 'Dev.to' }, 'Social'));
+            if (bundle.sharingStatus?.twitter) socialChildren.push(getNode({ id: `${''}`bundle.id}-twitter`, name: 'X/Twitter' }, 'Social'));
+            if (bundle.sharingStatus?.linkedin) socialChildren.push(getNode({ id: `${''}`bundle.id}-linkedin`, name: 'LinkedIn' }, 'Social'));
+            if (bundle.sharingStatus?.devto) socialChildren.push(getNode({ id: `${''}`bundle.id}-devto`, name: 'Dev.to' }, 'Social'));
             const focusAreaChildren = (bundle.focusAreaIds || []).map(buildDeepWorkTree).filter((n): n is MindMapNode => !!n);
             return getNode(bundle, 'Content Bundle', [...focusAreaChildren, ...socialChildren]);
         });
@@ -921,9 +921,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         const bundles = deepWorkDefinitions.filter(def => def.focusAreaIds && def.focusAreaIds.length > 0);
         const bundleNodes: MindMapNode[] = bundles.map(bundle => {
             const socialChildren: MindMapNode[] = [];
-            if (bundle.sharingStatus?.twitter) socialChildren.push(getNode({ id: `${bundle.id}-twitter`, name: 'X/Twitter' }, 'Social'));
-            if (bundle.sharingStatus?.linkedin) socialChildren.push(getNode({ id: `${bundle.id}-linkedin`, name: 'LinkedIn' }, 'Social'));
-            if (bundle.sharingStatus?.devto) socialChildren.push(getNode({ id: `${bundle.id}-devto`, name: 'Dev.to' }, 'Social'));
+            if (bundle.sharingStatus?.twitter) socialChildren.push(getNode({ id: `${''}`bundle.id}-twitter`, name: 'X/Twitter' }, 'Social'));
+            if (bundle.sharingStatus?.linkedin) socialChildren.push(getNode({ id: `${''}`bundle.id}-linkedin`, name: 'LinkedIn' }, 'Social'));
+            if (bundle.sharingStatus?.devto) socialChildren.push(getNode({ id: `${''}`bundle.id}-devto`, name: 'Dev.to' }, 'Social'));
             const focusAreaChildren = (bundle.focusAreaIds || []).map(buildDeepWorkTree).filter((n): n is MindMapNode => !!n);
             return getNode(bundle, 'Content Bundle', [...focusAreaChildren, ...socialChildren]);
         });
@@ -1282,11 +1282,11 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
                 {loggedUpskillDefinitions.map(def => (
                   <div key={def.id} className="flex items-center space-x-3">
                     <Checkbox
-                      id={`link-upskill-${def.id}`}
+                      id={`link-upskill-${''}`def.id}`}
                       checked={editableLinkedUpskillIds.includes(def.id)}
                       onCheckedChange={() => handleToggleUpskillLink(def.id)}
                     />
-                    <Label htmlFor={`link-upskill-${def.id}`} className="font-normal w-full cursor-pointer">
+                    <Label htmlFor={`link-upskill-${''}`def.id}`} className="font-normal w-full cursor-pointer">
                       {def.name} <span className="text-muted-foreground text-xs">({def.category})</span>
                     </Label>
                   </div>
