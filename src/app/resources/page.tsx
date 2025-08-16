@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1720,7 +1721,7 @@ function ResourcesPageContent() {
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="sr-only"><DialogTitle>Resource Mind Map</DialogTitle></DialogHeader>
-                <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
+                <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={true} />
             </DialogContent>
         </Dialog>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -1909,3 +1910,4 @@ export default function ResourcesPage() {
     
 
     
+
