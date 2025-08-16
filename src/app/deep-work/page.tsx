@@ -614,18 +614,17 @@ function DeepWorkPageContent() {
     const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     
     if (!hasTaskChildren) {
-        // It's a leaf node. Check if it's a child of another task.
+        // A node with no task children is either an Action (if it's a child of something) or Standalone.
         const isChildOfTask = deepWorkDefinitions.some(parent => 
-            (parent.linkedDeepWorkIds || []).includes(def.id) || 
-            (parent.linkedUpskillIds || []).includes(def.id)
+            (parent.linkedDeepWorkIds || []).includes(def.id)
         );
         return isChildOfTask ? 'Action' : 'Standalone';
     }
 
     // It has children. Check if any of its children are Objectives.
+    // An Objective is a node that itself has task children.
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        // An Objective has its own task children.
         return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
     });
 
@@ -638,15 +637,12 @@ function DeepWorkPageContent() {
     const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
 
     if (!hasTaskChildren) {
-        // It's a leaf node. Check if it's a child of another task.
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
       
-    // It has children. Check if any of its children are Objectives.
     const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
-        // An Objective has its own task children.
         return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
     });
 
@@ -1451,8 +1447,6 @@ useEffect(() => {
 
   const libraryContent = () => {
     if (currentTask) {
-        const isParentNode = ['Intention', 'Objective', 'Curiosity'].includes(currentTaskType === 'deepwork' ? getDeepWorkNodeType(currentTask) : getUpskillNodeType(currentTask));
-
         return (
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1516,17 +1510,15 @@ useEffect(() => {
                         const resource = resources.find(r => r.id === id);
                         return resource ? <LinkedResourceItem key={id} resource={resource} handleUnlinkItem={(type, id) => handleUnlinkItem(type, id)} setEmbedUrl={setEmbedUrl} handleOpenNestedPopup={handleOpenNestedPopup} handleStartEditResource={handleStartEditResource} /> : null;
                     })}
-                    {isParentNode && (
-                      <Card
-                          onClick={() => handleCreateAndLinkChild(currentTask.id, currentTask.type)}
-                          className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
-                      >
-                          <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                          <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">
-                              Add New {currentTask.type === 'deepwork' ? 'Action' : 'Visualization'}
-                          </p>
-                      </Card>
-                    )}
+                    <Card
+                        onClick={() => handleCreateAndLinkChild(currentTask.id, currentTask.type)}
+                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                    >
+                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                            Add New {currentTask.type === 'deepwork' ? 'Action' : 'Visualization'}
+                        </p>
+                    </Card>
                 </div>
             </div>
         );
@@ -1595,7 +1587,7 @@ useEffect(() => {
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
                     selectedProject={selectedProject}
-                    onSelectProject={handleProjectSelect}
+                    onSelectProject={handleSelectRecentItem}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={(id) => {
