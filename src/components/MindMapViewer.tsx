@@ -5,7 +5,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight, Flag, Bolt } from 'lucide-react';
+import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight, Flag, Bolt, Library } from 'lucide-react';
 import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType, DailySchedule } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
@@ -870,7 +870,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
       if (nodeRegistry.has(def.id)) return nodeRegistry.get(def.id)!;
       const node = getNode(def, 'Learning Task');
       const linkedUpskillChildren = (def.linkedUpskillIds || []).map(buildUpskillTree).filter((n): n is MindMapNode => !!n);
-      const linkedResourceChildren = (def.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter((r): r is Resource => !!r).map(r => getNode(r, r.type, [], { name: r.name }));
+      const linkedResourceChildren = (def.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter((r): r is Resource => !!r).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
       node.children = [...linkedUpskillChildren, ...linkedResourceChildren];
       return node;
     }
@@ -889,14 +889,14 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (rootFolderId) {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
             return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
                 const childrenFolders = buildFolderTree(folder.id);
                 return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
             });
         };
         const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
         if (!rootFolder) return null;
-        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
+        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
         const childrenFolders = buildFolderTree(rootFolderId);
         return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
     }
@@ -907,7 +907,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (selectedTopic === 'Resources') {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
             return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
                 const childrenFolders = buildFolderTree(folder.id);
                 return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
             });
@@ -963,7 +963,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, rootFocusAreaId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
+  }, [selectedTopic, rootFolderId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
   const scheduledTaskInfo = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
