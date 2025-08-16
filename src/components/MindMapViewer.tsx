@@ -90,7 +90,7 @@ interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Par
   children: MindMapNode[];
   totalLoggedHours?: number;
   topic?: string;
-  type?: 'product' | 'service';
+  type?: 'product' | 'service' | 'card' | 'link';
 }
 
 interface MindMapViewerProps {
@@ -114,7 +114,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         schedule, 
         allUpskillLogs, 
         allDeepWorkLogs, 
-        brandingLogs 
+        brandingLogs,
+        openGeneralPopup, 
     } = useAuth();
     const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -608,7 +609,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             })}
                         </svg>
                         {Array.from(nodes.entries()).map(([nodeId, pos]) => {
-                            const definition = allDefinitions.get(nodeId);
+                            const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource);
                             if (!definition) return null;
                             
                             const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
@@ -634,7 +635,10 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 else if (isParent && isChild) nodeType = 'Objective';
                                 else if (!isParent && isChild) nodeType = 'Visualization';
                                 else nodeType = 'Standalone';
-                            } else { // Deep Work
+                            } else if (definition.type === 'card' || definition.type === 'link') {
+                                nodeType = 'Resource';
+                            }
+                            else { // Deep Work
                                 const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0;
                                 const isChild = linkedDeepWorkChildIds.has(definition.id);
                                 if (isParent && !isChild) nodeType = 'Intention';
@@ -659,6 +663,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                     nodeType={nodeType}
                                     upskillDefinitions={upskillDefinitions}
                                     progress={getNodeProgress(nodeId)}
+                                    openGeneralPopup={openGeneralPopup}
                                 />
                             );
                         })}
@@ -669,7 +674,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress, openGeneralPopup }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
@@ -684,13 +689,21 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
             case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
             case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
+            case 'Resource': return <Library className="h-4 w-4 text-indigo-500" />;
             default: return <Briefcase className="h-4 w-4" />;
         }
     };
 
     const isUpskillNode = upskillDefinitions.some((d: any) => d.id === definition.id);
+    const isResourceNode = definition.type === 'card' || definition.type === 'link';
     const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
     
+    const handleClick = (e: React.MouseEvent) => {
+        if (isResourceNode) {
+            openGeneralPopup(definition.id, e);
+        }
+    };
+
     return (
         <motion.div
             ref={setNodeRef}
@@ -698,13 +711,15 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             className="w-48 z-10"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
+            onClick={handleClick}
         >
             <Card className={cn(
-                "shadow-lg hover:shadow-xl transition-shadow border-2",
+                "shadow-lg hover:shadow-xl transition-shadow border-l-4",
                 status.isLoggedToday && "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-400",
-                status.isScheduledToday && "bg-yellow-100 dark:bg-transparent border-yellow-500 dark:border-yellow-400",
-                status.isPending && "bg-orange-100 dark:bg-transparent border-orange-400 dark:border-orange-500",
-                status.isPastLogged && !status.isLoggedToday && "border-green-400"
+                status.isScheduledToday && "dark:bg-transparent border-yellow-500 dark:border-yellow-400",
+                status.isPending && "dark:bg-transparent border-orange-400 dark:border-orange-500",
+                status.isPastLogged && !status.isLoggedToday && "border-green-400",
+                !status.isLoggedToday && !status.isScheduledToday && !status.isPending && !status.isPastLogged && "border-transparent"
             )}>
                 <div className="p-2 cursor-grab" {...listeners} {...attributes}>
                     <div className="flex items-start justify-between">
@@ -715,7 +730,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                                     {definition.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground capitalize">
-                                    {isUpskillNode ? 'Learning' : 'Deep Work'}
+                                    {isResourceNode ? 'Resource' : (isUpskillNode ? 'Learning' : 'Deep Work')}
                                 </p>
                             </div>
                         </div>
@@ -739,20 +754,20 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                   </CardFooter>
                 )}
                 
-                {hasFooterActions && (
+                {hasFooterActions && !isResourceNode && (
                     <CardContent className="p-2 border-t flex justify-end gap-1">
                         {isRootNode && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandAll}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onExpandAll(); }}>
                                 <Expand className="h-4 w-4 text-purple-500" />
                             </Button>
                         )}
                         {canExpandChildren && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onExpandChildren}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onExpandChildren(); }}>
                                 <GitBranch className="h-4 w-4 text-green-500" />
                             </Button>
                         )}
                         {canRevealParents && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onRevealParents}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onRevealParents(); }}>
                                 <GitMerge className="h-4 w-4 text-amber-500" />
                             </Button>
                         )}
@@ -855,7 +870,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
       if (nodeRegistry.has(def.id)) return nodeRegistry.get(def.id)!;
       const node = getNode(def, 'Learning Task');
       const linkedUpskillChildren = (def.linkedUpskillIds || []).map(buildUpskillTree).filter((n): n is MindMapNode => !!n);
-      const linkedResourceChildren = (def.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter((r): r is Resource => !!r).map(r => getNode(r, 'Resource'));
+      const linkedResourceChildren = (def.linkedResourceIds || []).map(id => resources.find(r => r.id === id)).filter((r): r is Resource => !!r).map(r => getNode(r, r.type, [], { name: r.name }));
       node.children = [...linkedUpskillChildren, ...linkedResourceChildren];
       return node;
     }
@@ -872,20 +887,18 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     };
 
     if (rootFolderId) {
-      const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
-      if (!rootFolder) return null;
-      
-      const buildFolderTree = (parentId: string | null): MindMapNode[] => {
-          return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-              const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, 'Resource'));
-              const childrenFolders = buildFolderTree(folder.id);
-              return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
-          });
-      };
-      
-      const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, 'Resource'));
-      const childrenFolders = buildFolderTree(rootFolderId);
-      return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
+        const buildFolderTree = (parentId: string | null): MindMapNode[] => {
+            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
+                const childrenFolders = buildFolderTree(folder.id);
+                return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
+            });
+        };
+        const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
+        if (!rootFolder) return null;
+        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
+        const childrenFolders = buildFolderTree(rootFolderId);
+        return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
     }
     
     if (!selectedTopic) return null;
@@ -894,7 +907,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     if (selectedTopic === 'Resources') {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
             return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, 'Resource'));
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type, [], { name: r.name }));
                 const childrenFolders = buildFolderTree(folder.id);
                 return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
             });
@@ -950,7 +963,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, rootFocusAreaId, rootFolderId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
+  }, [selectedTopic, rootFocusAreaId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
   const scheduledTaskInfo = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -1134,14 +1147,15 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         }
         if (node.category === 'Content Bundle') return <Share2 className="h-4 w-4" />;
         if (node.category === 'Branding') return <Share2 className="h-4 w-4" />;
-        if (node.category === 'Resource') return <Globe className="h-4 w-4" />;
+        if (node.type === 'link') return <Globe className="h-4 w-4" />;
+        if (node.type === 'card' || node.category === 'Resource') return <Library className="h-4 w-4" />;
         if (node.category === 'Folder') return <Folder className="h-4 w-4" />;
         if (node.category === 'FocusArea') {
             const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
             const isChild = linkedDeepWorkChildIds.has(node.id);
             if (isParent && !isChild) return <Lightbulb className="h-4 w-4 text-amber-500" />; // Intention
             if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />; // Objective
-            if (!isParent && isChild) return <Bolt className="h-4 w-4 text-blue-500" />; // Action
+            if (isParent && isChild) return <Bolt className="h-4 w-4 text-blue-500" />; // Action
             return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
         }
         return <Briefcase className="h-4 w-4" />;
@@ -1165,8 +1179,11 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
     const isExpandable = node.children.length > 0;
     
-    const handleNodeClick = () => {
-        if (node.category === 'FocusArea') {
+    const { openGeneralPopup } = useAuth();
+    const handleNodeClick = (e: React.MouseEvent) => {
+        if (node.type === 'card' || node.type === 'link') {
+            openGeneralPopup(node.id, e);
+        } else if (node.category === 'FocusArea') {
             const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
             const isChild = linkedDeepWorkChildIds.has(node.id);
             if (isParent && !isChild) {
@@ -1175,7 +1192,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         }
     }
     const isUpskillNode = upskillDefinitions.some(d => d.id === node.definitionId);
-    const hasFooterActions = node.category !== 'Social' && node.category !== 'Resource' && node.category !== 'Folder' && !getIcon().props.className.includes('lucide');
+    const hasFooterActions = node.category !== 'Social' && node.type !== 'link' && node.type !== 'card' && node.category !== 'Folder' && !getIcon().props.className?.includes('lucide');
 
     
     return (
@@ -1191,7 +1208,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
                         <span className="text-primary">{getIcon()}</span>
                         <div className='flex flex-col text-left'>
                             <span className="font-semibold text-sm text-foreground truncate">{node.name}</span>
-                             {node.category !== 'product' && node.category !== 'service' && node.category !== 'System' && node.category !== 'System Branch' && node.category !== 'Release' && node.category !== 'Content Bundle' && node.category !== 'Social' && node.category !== 'Folder' && (
+                             {node.category !== 'product' && node.category !== 'service' && node.category !== 'System' && node.category !== 'System Branch' && node.category !== 'Release' && node.category !== 'Content Bundle' && node.category !== 'Social' && node.category !== 'Folder' && node.type !== 'card' && node.type !== 'link' && (
                                 <span className="text-xs text-muted-foreground capitalize">{isUpskillNode ? "Learning" : "Deep Work"}</span>
                             )}
                         </div>
