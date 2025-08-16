@@ -644,7 +644,7 @@ function DeepWorkPageContent() {
 
     if (hasObjectiveChildren) return 'Intention';
 
-    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
                            
     if (hasAnyChildren) return 'Intention';
 
@@ -666,7 +666,7 @@ function DeepWorkPageContent() {
     });
     if (hasObjectiveChildren) return 'Curiosity';
 
-    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
 
     if (hasAnyChildren) return 'Curiosity';
     
@@ -1901,4 +1901,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
