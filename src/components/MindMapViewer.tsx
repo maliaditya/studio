@@ -305,7 +305,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                     newNodesMap.set(parentId, {
-                        x: pos.x + HORIZONTAL_SPACING, // Changed to expand to the right
+                        x: pos.x - HORIZONTAL_SPACING, 
                         y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
                     newEdgesSet.add(`${parentId}-${nodeId}`);
@@ -379,9 +379,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
-                nodesToUpdate.set(parentId, {
-                    x: pos.x + HORIZONTAL_SPACING, // Changed to expand to the right
-                    y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
+                 nodesToUpdate.set(parentId, {
+                    x: currentNodePos.x - HORIZONTAL_SPACING,
+                    y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
             const edgeId1 = `${parentId}-${nodeId}`;
@@ -870,6 +870,23 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         node.children = [...linkedWorkChildren, ...linkedLearningChildren];
         return node;
     };
+
+    if (rootFolderId) {
+      const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
+      if (!rootFolder) return null;
+      
+      const buildFolderTree = (parentId: string | null): MindMapNode[] => {
+          return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
+              const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, 'Resource'));
+              const childrenFolders = buildFolderTree(folder.id);
+              return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
+          });
+      };
+      
+      const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, 'Resource'));
+      const childrenFolders = buildFolderTree(rootFolderId);
+      return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
+    }
     
     if (!selectedTopic) return null;
     if (selectedTopic === 'Conceptual Flow') return null; // Handled separately
