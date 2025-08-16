@@ -221,6 +221,7 @@ function LinkedDeepWorkCard({
     onUpdateName,
     projectsInDomain,
     handleLinkProject,
+    onCreateAndLinkChild,
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -243,6 +244,7 @@ function LinkedDeepWorkCard({
     onUpdateName: (id: string, newName: string) => void;
     projectsInDomain: Project[];
     handleLinkProject: (intentionId: string, projectId: string | null) => void;
+    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -605,28 +607,40 @@ function DeepWorkPageContent() {
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
   
-  const linkedDeepWorkChildIds = useMemo(() => 
-    new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []))
-  , [deepWorkDefinitions]);
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
+    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    if (!hasChildren) {
+        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+        return isChild ? 'Action' : 'Standalone';
+    }
 
-  const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
-  , [upskillDefinitions]);
+    const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(d => d.id === childId);
+        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
+    });
 
-  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
-    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (hasChildren) return isChild ? 'Objective' : 'Intention';
-    return isChild ? 'Action' : 'Standalone';
-  }, [linkedDeepWorkChildIds]);
+    if (hasObjectiveChild) return 'Intention';
+
+    return 'Objective';
+  }, [deepWorkDefinitions]);
 
 
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(def.id);
-    if (hasChildren) return isChild ? 'Objective' : 'Curiosity';
-    return isChild ? 'Visualization' : 'Standalone';
-  }, [linkedUpskillChildIds]);
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
+      const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+      if (!hasChildren) {
+          const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+          return isChild ? 'Visualization' : 'Standalone';
+      }
+      
+      const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+          const childDef = upskillDefinitions.find(d => d.id === childId);
+          return childDef && getUpskillNodeType(childDef) === 'Objective';
+      });
+
+      if (hasObjectiveChild) return 'Curiosity';
+      
+      return 'Objective';
+  }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
@@ -670,10 +684,9 @@ function DeepWorkPageContent() {
         const node = deepWorkDefinitions.find(d => d.id === nodeId);
         if (!node) return;
         
-        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0;
-        const isChild = linkedDeepWorkChildIds.has(node.id);
+        const nodeType = getDeepWorkNodeType(node);
 
-        if ((!isParent && isChild) || (!isParent && !isChild)) { // Action or Standalone
+        if (nodeType === 'Action' || nodeType === 'Standalone') {
             actionIds.add(node.id);
         } else {
             (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
@@ -692,7 +705,7 @@ function DeepWorkPageContent() {
         });
     }
     return totalMinutes;
-  }, [allDeepWorkLogs, deepWorkDefinitions, linkedDeepWorkChildIds]);
+  }, [allDeepWorkLogs, deepWorkDefinitions, getDeepWorkNodeType]);
   
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
     if (!definition) return 0;
@@ -705,9 +718,9 @@ function DeepWorkPageContent() {
         const node = upskillDefinitions.find(d => d.id === nodeId);
         if (!node) return;
         
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
+        const nodeType = getUpskillNodeType(node);
 
-        if (!isParent) {
+        if (nodeType === 'Visualization' || nodeType === 'Standalone') {
             visualizationIds.add(node.id);
         } else {
             (node.linkedUpskillIds || []).forEach(childId => recurse(childId));
@@ -726,7 +739,7 @@ function DeepWorkPageContent() {
         });
     }
     return totalMinutes;
-  }, [allUpskillLogs, upskillDefinitions]);
+  }, [allUpskillLogs, upskillDefinitions, getUpskillNodeType]);
 
   const totalLoggedTime = useMemo(() => {
     if (!currentTask) return 0;
@@ -1387,15 +1400,18 @@ function DeepWorkPageContent() {
     }
   };
 
-  const handleSelectRecentItem = (item: ExerciseDefinition & { type: 'deepwork' | 'upskill' }) => {
+  const handleSelectRecentItem = (item: (ExerciseDefinition | Project) & { type: string }) => {
     setSelectedMicroSkill(null);
-    setSelectedProject(null);
-    if(item.type === 'deepwork') {
-        setSelectedDeepWorkTask(item);
-        setSelectedUpskillTask(null);
+    if (item.type === 'project') {
+      handleProjectSelect(item as Project);
+      return;
+    }
+    if (item.type === 'deepwork') {
+      setSelectedDeepWorkTask(item as ExerciseDefinition);
+      setSelectedUpskillTask(null);
     } else {
-        setSelectedUpskillTask(item);
-        setSelectedDeepWorkTask(null);
+      setSelectedUpskillTask(item as ExerciseDefinition);
+      setSelectedDeepWorkTask(null);
     }
   };
 
@@ -1476,14 +1492,14 @@ function DeepWorkPageContent() {
                     {(currentTask.linkedDeepWorkIds || []).map(id => {
                         const def = deepWorkDefinitions.find(d => d.id === id);
                         if (!def) return null;
-                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} />;
+                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} onCreateAndLinkChild={handleCreateAndLinkChild}/>;
                     })}
                      {(currentTask.linkedUpskillIds || []).map(id => {
                         const def = upskillDefinitions.find(d => d.id === id);
                         if (!def) return null;
                         const domain = getDomainForCategory(def.category);
                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={linkedUpskillChildIds} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea} onCreateAndLinkChild={handleCreateAndLinkChild} />;
+                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea} onCreateAndLinkChild={handleCreateAndLinkChild} />;
                     })}
                     {(currentTask.linkedResourceIds || []).map(id => {
                         const resource = resources.find(r => r.id === id);
@@ -1546,10 +1562,10 @@ function DeepWorkPageContent() {
                                         <Button
                                             variant="ghost"
                                             className="w-full justify-start h-auto py-2"
-                                            onClick={() => handleSelectRecentItem(item as ExerciseDefinition & { type: 'deepwork' | 'upskill' })}
+                                            onClick={() => handleSelectRecentItem(item as (ExerciseDefinition | Project) & { type: 'deepwork' | 'upskill' | 'project' })}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                {(item as any).type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : <Flashlight className="h-4 w-4 text-amber-500" />}
+                                                {(item as any).type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : (item as any).type === 'project' ? <Briefcase className="h-4 w-4 text-indigo-500" /> : <Flashlight className="h-4 w-4 text-cyan-500" />}
                                                 <span className="truncate" title={item.name}>{item.name}</span>
                                             </div>
                                         </Button>
