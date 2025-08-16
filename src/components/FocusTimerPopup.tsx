@@ -43,18 +43,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     id: `focus-timer-popup-${activity.id}`,
   });
 
-  React.useEffect(() => {
-    // Set initial position only on the client-side
-    setPosition({
-      x: window.innerWidth - 256 - 24,
-      y: 24,
-    });
-  }, []);
-
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: position.y,
-    left: position.x,
+    top: '1.5rem', // 24px
+    right: '1.5rem', // 24px
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
