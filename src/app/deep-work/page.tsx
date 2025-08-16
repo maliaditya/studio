@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -608,10 +609,11 @@ function DeepWorkPageContent() {
   }, [allDeepWorkLogs, allUpskillLogs]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    if (!hasChildren) {
-        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-        return isChild ? 'Action' : 'Standalone';
+    const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+    
+    if (!hasTaskChildren) {
+        const isChildOfTask = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id) || (parent.linkedUpskillIds || []).includes(def.id));
+        return isChildOfTask ? 'Action' : 'Standalone';
     }
 
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
@@ -622,12 +624,12 @@ function DeepWorkPageContent() {
     if (hasObjectiveChild) return 'Intention';
 
     return 'Objective';
-  }, [deepWorkDefinitions]);
+  }, [deepWorkDefinitions, upskillDefinitions]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-      const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-      if (!hasChildren) {
+      const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+      if (!hasTaskChildren) {
           const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
           return isChild ? 'Visualization' : 'Standalone';
       }
