@@ -608,32 +608,52 @@ function DeepWorkPageContent() {
   , [upskillDefinitions]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-    const hasActionableChildren = (def.linkedDeepWorkIds || []).some(childId => {
-      const childDef = deepWorkDefinitions.find(c => c.id === childId);
-      return childDef && !((childDef.linkedDeepWorkIds?.length ?? 0) > 0);
+
+    const hasActionChildren = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(c => c.id === childId);
+        return childDef && getDeepWorkNodeType(childDef) === 'Action';
     });
 
-    if (isParent) {
-      if (isChild && hasActionableChildren) return 'Objective';
-      return 'Intention';
-    }
+    if (hasActionChildren) return 'Objective';
+
+    const hasObjectiveChildren = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(c => c.id === childId);
+        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
+    });
+
+    if (hasObjectiveChildren) return 'Intention';
+
+    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || 
+                           (def.linkedUpskillIds?.length ?? 0) > 0 || 
+                           (def.linkedResourceIds?.length ?? 0) > 0;
+                           
+    if (hasAnyChildren) return 'Intention'; // Default for parents without specific objective children
+
     return isChild ? 'Action' : 'Standalone';
   }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
 
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(def.id);
-    const hasActionableChildren = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(c => c.id === childId);
-        return childDef && !((childDef.linkedUpskillIds?.length ?? 0) > 0);
-    });
 
-    if (isParent) {
-      if(isChild && hasActionableChildren) return 'Objective';
-      return 'Curiosity';
-    }
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
+    const isChild = linkedUpskillChildIds.has(def.id);
+
+    const hasVisualizationChildren = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(c => c.id === childId);
+        return childDef && getUpskillNodeType(childDef) === 'Visualization';
+    });
+    if (hasVisualizationChildren) return 'Objective';
+
+    const hasObjectiveChildren = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(c => c.id === childId);
+        return childDef && getUpskillNodeType(childDef) === 'Objective';
+    });
+    if (hasObjectiveChildren) return 'Curiosity';
+
+    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0 || 
+                           (def.linkedResourceIds?.length ?? 0) > 0;
+
+    if (hasAnyChildren) return 'Curiosity';
+
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions, linkedUpskillChildIds]);
 
@@ -1189,65 +1209,24 @@ function DeepWorkPageContent() {
   }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, getUpskillNodeType, selectedSpecializationId, coreSkills]);
 
 
-  const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
-    const parentDef = upskillDefinitions.find(p => p.id === parentId);
-    if (!parentDef) return [];
+  const curiositiesForLinking = useMemo(() => {
+    return upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Curiosity');
+  }, [upskillDefinitions, getUpskillNodeType]);
 
-    const children = (parentDef.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((item): item is ExerciseDefinition => !!item)
-        .sort((a, b) => a.name.localeCompare(b.name));
-
-    return children.map((item) => {
-        const nodeType = getUpskillNodeType(item);
-        const hasChildren = (item.linkedUpskillIds || []).filter(id => upskillDefinitions.some(child => child.id === id)).length > 0;
-        
-        const getIcon = () => {
-            switch (nodeType) {
-                case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
-                case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
-                default: return <Flashlight className="h-4 w-4 text-amber-500" />;
-            }
-        };
-
-        return (
-            <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                <div className="flex items-center w-full group/item" style={{ paddingLeft: `${level * 1}rem` }}>
-                        <Checkbox
-                            id={`cb-link-${item.id}`}
-                            checked={tempLinkedIds.includes(item.id)}
-                            onCheckedChange={(checked) => {
-                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mr-2"
-                        />
-                        <AccordionTrigger
-                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                            asChild
-                            className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-                        >
-                            <div className="flex items-center justify-between w-full" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
-                                <div className="flex items-center space-x-2">
-                                    <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                        {getIcon()}
-                                        {item.name}
-                                    </Label>
-                                </div>
-                                {hasChildren && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                            </div>
-                        </AccordionTrigger>
-                </div>
-                {hasChildren && (
-                    <AccordionContent className="pl-4">
-                        {renderHierarchy(item.id, level + 1)}
-                    </AccordionContent>
-                )}
-            </AccordionItem>
+  const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
+    let nodes: React.ReactNode[] = [];
+    items.forEach(item => {
+        nodes.push(
+            <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5 + 1}rem` }}>
+                {item.name}
+            </SelectItem>
         );
+        if (item.children && item.children.length > 0) {
+            nodes = [...nodes, ...renderUpskillHierarchySelect(item.children, level + 1)];
+        }
     });
-  }, [upskillDefinitions, getUpskillNodeType, tempLinkedIds]);
-
+    return nodes;
+  };
 
   const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
     if (!currentTask) return;
@@ -1398,40 +1377,6 @@ function DeepWorkPageContent() {
     if (selectedMicroSkill) return selectedMicroSkill.name;
     return 'Library';
   }
-
-  const curiositiesForLinking = useMemo(() => {
-    const curiosityDefs = upskillDefinitions.filter(def => {
-        const nodeType = getUpskillNodeType(def);
-        return nodeType === 'Curiosity';
-    });
-
-    const buildHierarchy = (items: ExerciseDefinition[], parentId: string | null = null): any[] => {
-      return items
-        .filter(item => item.parentId === parentId)
-        .map(item => ({
-          ...item,
-          children: buildHierarchy(items, item.id)
-        }));
-    };
-    // This part is tricky if curiosities can be nested. Assuming for now they are top-level.
-    // If they can be nested, a recursive build function would be needed here.
-    return curiosityDefs;
-  }, [upskillDefinitions, getUpskillNodeType]);
-
-  const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
-    let nodes: React.ReactNode[] = [];
-    items.forEach(item => {
-        nodes.push(
-            <SelectItem key={item.id} value={item.id} style={{ paddingLeft: `${level * 1.5 + 1}rem` }}>
-                {item.name}
-            </SelectItem>
-        );
-        if (item.children && item.children.length > 0) {
-            nodes = [...nodes, ...renderUpskillHierarchySelect(item.children, level + 1)];
-        }
-    });
-    return nodes;
-  };
 
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
@@ -1892,3 +1837,4 @@ export default function DeepWorkPage() {
 }
 
     
+
