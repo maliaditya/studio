@@ -614,36 +614,44 @@ function DeepWorkPageContent() {
     const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     
     if (!hasTaskChildren) {
-        const isChildOfTask = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id) || (parent.linkedUpskillIds || []).includes(def.id));
+        // It's a leaf node. Check if it's a child of another task.
+        const isChildOfTask = deepWorkDefinitions.some(parent => 
+            (parent.linkedDeepWorkIds || []).includes(def.id) || 
+            (parent.linkedUpskillIds || []).includes(def.id)
+        );
         return isChildOfTask ? 'Action' : 'Standalone';
     }
 
+    // It has children. Check if any of its children are Objectives.
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
+        // An Objective has its own task children.
+        return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
     });
 
     if (hasObjectiveChild) return 'Intention';
-
     return 'Objective';
   }, [deepWorkDefinitions]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-      const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-      if (!hasTaskChildren) {
-          const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-          return isChild ? 'Visualization' : 'Standalone';
-      }
-      
-      const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-          const childDef = upskillDefinitions.find(d => d.id === childId);
-          return childDef && getUpskillNodeType(childDef) === 'Objective';
-      });
+    const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
 
-      if (hasObjectiveChild) return 'Curiosity';
+    if (!hasTaskChildren) {
+        // It's a leaf node. Check if it's a child of another task.
+        const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+        return isChild ? 'Visualization' : 'Standalone';
+    }
       
-      return 'Objective';
+    // It has children. Check if any of its children are Objectives.
+    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        // An Objective has its own task children.
+        return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
+    });
+
+    if (hasObjectiveChild) return 'Curiosity';
+    return 'Objective';
   }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
@@ -664,7 +672,7 @@ function DeepWorkPageContent() {
         });
       } else if (hasUpskillChildren) {
          (d.linkedUpskillIds || []).forEach(childId => {
-          const childDef = upskillDefinitions.find(c => c.id === childId);
+          const childDef = upskillDefinitions.find(d => d.id === childId);
           if (childDef) recurse(childDef);
         });
       }
