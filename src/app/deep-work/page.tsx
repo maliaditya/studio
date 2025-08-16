@@ -346,27 +346,23 @@ function LinkedDeepWorkCard({
                     )}
                 </CardHeader>
                 <CardContent className="flex-grow">
-                    {isParentNode ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                            {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
-                                const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                                if (!childDef) return null;
-                                return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" onClick={() => handleCardClick(childDef)}/>;
-                            })}
-                            {(deepworkDef.linkedUpskillIds || []).map(childId => {
-                                const childDef = upskillDefinitions.find(d => d.id === childId);
-                                if (!childDef) return null;
-                                return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => setSelectedSubtopic(childDef, 'upskill')}/>;
-                            })}
-                            {(deepworkDef.linkedResourceIds || []).map(childId => {
-                                const childDef = resources.find(d => d.id === childId);
-                                if (!childDef) return null;
-                                return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => router.push('/resources')}/>;
-                            })}
-                        </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">This is an action. Add it to a session to log time.</p>
-                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                        {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
+                            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+                            if (!childDef) return null;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" onClick={() => handleCardClick(childDef)}/>;
+                        })}
+                        {(deepworkDef.linkedUpskillIds || []).map(childId => {
+                            const childDef = upskillDefinitions.find(d => d.id === childId);
+                            if (!childDef) return null;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => setSelectedSubtopic(childDef, 'upskill')}/>;
+                        })}
+                        {(deepworkDef.linkedResourceIds || []).map(childId => {
+                            const childDef = resources.find(d => d.id === childId);
+                            if (!childDef) return null;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => router.push('/resources')}/>;
+                        })}
+                    </div>
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
@@ -631,14 +627,15 @@ function DeepWorkPageContent() {
     
     if (!hasTaskChildren) {
         const isChildOfTask = deepWorkDefinitions.some(parent => 
-            (parent.linkedDeepWorkIds || []).includes(def.id) || (parent.linkedUpskillIds || []).includes(def.id)
+            (parent.linkedDeepWorkIds || []).includes(def.id)
         );
         return isChildOfTask ? 'Action' : 'Standalone';
     }
 
+    // Check if any child is an Objective (i.e., a parent itself)
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        // An objective has children, but none of its children are also objectives (they are actions)
+        // An objective has task children, but none of its children are also objectives
         return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
     });
 
@@ -654,6 +651,7 @@ function DeepWorkPageContent() {
         return isChild ? 'Visualization' : 'Standalone';
     }
       
+    // An objective has children, but none of its children are also objectives
     const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
         return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
@@ -1489,7 +1487,13 @@ function DeepWorkPageContent() {
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
     addToRecents({ ...def, type });
-    setNavigationStack(prev => [...prev, {...def, type}]);
+    
+    const existingIndex = navigationStack.findIndex(item => item.id === def.id);
+    if (existingIndex !== -1) {
+        setNavigationStack(prev => prev.slice(0, existingIndex + 1));
+    } else {
+        setNavigationStack(prev => [...prev, { ...def, type }]);
+    }
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
@@ -1570,7 +1574,7 @@ useEffect(() => {
                         Library
                     </Button>
                     {navigationStack.map((task, index) => (
-                        <React.Fragment key={task.id}>
+                        <React.Fragment key={`${task.id}-${index}`}>
                            <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
                             <Button variant={index === navigationStack.length - 1 ? "secondary" : "link"} onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto px-1">
                                 {task.name}
