@@ -372,6 +372,7 @@ export interface CoreSkill {
   type: 'Foundation' | 'Specialization' | 'Professionalism';
   skillAreas: SkillArea[];
   purposePillar?: string;
+  parentId?: string | null;
 }
 
 export interface SkillArea {

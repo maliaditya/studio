@@ -35,6 +35,32 @@ import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+
+function Draggable({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
+    const style = transform ? {
+      transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+      zIndex: 100,
+    } : undefined;
+  
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
+        {children}
+      </div>
+    );
+}
+
+function Droppable({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
+    const { isOver, setNodeRef } = useDroppable({ id });
+  
+    return (
+      <div ref={setNodeRef} className={cn(className, isOver && "bg-primary/10 ring-2 ring-primary rounded-md")}>
+        {children}
+      </div>
+    );
+}
+
 
 function SkillPageContent() {
   const { toast } = useToast();
@@ -100,8 +126,8 @@ function SkillPageContent() {
     e.preventDefault();
     if (!newDomainName.trim()) return;
     const newDomain: SkillDomain = { id: `d_${Date.now()}`, name: newDomainName.trim() };
-    const foundationSkill: CoreSkill = { id: `cs_${Date.now()}_f`, domainId: newDomain.id, name: 'Foundation', type: 'Foundation', skillAreas: [] };
-    const professionalismSkill: CoreSkill = { id: `cs_${Date.now()}_p`, domainId: newDomain.id, name: 'Professionalism', type: 'Professionalism', skillAreas: [] };
+    const foundationSkill: CoreSkill = { id: `cs_${Date.now()}_f`, domainId: newDomain.id, name: 'Foundation', type: 'Foundation', skillAreas: [], parentId: null };
+    const professionalismSkill: CoreSkill = { id: `cs_${Date.now()}_p`, domainId: newDomain.id, name: 'Professionalism', type: 'Professionalism', skillAreas: [], parentId: null };
     
     setSkillDomains(prev => [...prev, newDomain]);
     setCoreSkills(prev => [...prev, foundationSkill, professionalismSkill]);
@@ -125,18 +151,18 @@ function SkillPageContent() {
     }
   };
 
-  const handleAddSpecialization = (domainId: string) => {
-    const name = newSpecializationNames[domainId]?.trim();
+  const handleAddSpecialization = (domainId: string, parentId: string | null = null) => {
+    const name = newSpecializationNames[parentId || domainId]?.trim();
     if (!name) return;
-    const newSkill: CoreSkill = { id: `cs_${Date.now()}_s`, domainId, name, type: 'Specialization', skillAreas: [] };
+    const newSkill: CoreSkill = { id: `cs_${Date.now()}_s`, domainId, name, type: 'Specialization', skillAreas: [], parentId };
     setCoreSkills(prev => [...prev, newSkill]);
-    setNewSpecializationNames(prev => ({ ...prev, [domainId]: '' }));
+    setNewSpecializationNames(prev => ({ ...prev, [parentId || domainId]: '' }));
     setSelectedSkillId(newSkill.id);
     toast({ title: "Specialization Added", description: `"${newSkill.name}" was added.` });
   };
   
   const handleDeleteCoreSkill = (skillId: string) => {
-    setCoreSkills(prev => prev.filter(s => s.id !== skillId));
+    setCoreSkills(prev => prev.filter(s => s.id !== skillId && s.parentId !== skillId));
     if (selectedSkillId === skillId) {
         setSelectedSkillId(null);
     }
@@ -387,8 +413,54 @@ function SkillPageContent() {
     return taskMap;
   }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions]);
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+        setCoreSkills(prevSkills => {
+            const activeSkill = prevSkills.find(s => s.id === active.id);
+            const overSkill = prevSkills.find(s => s.id === over.id);
+
+            if (activeSkill && overSkill && activeSkill.type === 'Specialization' && overSkill.type === 'Specialization') {
+                return prevSkills.map(s => s.id === active.id ? { ...s, parentId: over.id as string } : s);
+            }
+            return prevSkills;
+        });
+    }
+  };
+
+  const renderSpecialization = (spec: CoreSkill, allSpecs: CoreSkill[], level = 0) => {
+    const childSpecs = allSpecs.filter(s => s.parentId === spec.id);
+    return (
+        <div key={spec.id} style={{ marginLeft: `${level * 20}px` }}>
+            <Droppable id={spec.id} className="group">
+                <Draggable id={spec.id}>
+                    <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                        <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(spec.id)}>
+                            <BrainCircuit className="h-4 w-4" />
+                            <span className={`text-sm ${selectedSkillId === spec.id ? 'font-semibold text-primary' : ''}`}>{spec.name}</span>
+                        </button>
+                         <div className="flex items-center opacity-0 group-hover:opacity-100">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddSpecialization(spec.domainId, spec.id)}>
+                                <Plus className="h-4 w-4 text-green-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSkill(spec)}><Edit className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteCoreSkill(spec.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                        </div>
+                    </div>
+                </Draggable>
+            </Droppable>
+            {childSpecs.length > 0 && (
+                <div className="pl-4 border-l-2 ml-2">
+                    {childSpecs.map(child => renderSpecialization(child, allSpecs, level + 1))}
+                </div>
+            )}
+        </div>
+    );
+  };
+
+
   return (
-    <>
+    <DndContext onDragEnd={handleDragEnd}>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
         <aside className="lg:col-span-1 space-y-6">
@@ -410,6 +482,8 @@ function SkillPageContent() {
                         {skillDomains.map(domain => {
                             const domainCoreSkills = coreSkills.filter(s => s.domainId === domain.id);
                             const domainProjects = projects.filter(p => p.domainId === domain.id);
+                            const topLevelSpecializations = domainCoreSkills.filter(s => s.type === 'Specialization' && !s.parentId);
+                            
                             return (
                                 <AccordionItem value={domain.id} key={domain.id}>
                                     <div className="flex items-center justify-between w-full group">
@@ -442,12 +516,7 @@ function SkillPageContent() {
                                               </Button>
                                             ))}
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
-                                            {domainCoreSkills.filter(s => s.type === 'Specialization').map(skill => (
-                                              <Button key={skill.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedSkillId === skill.id && "bg-accent font-semibold")} onClick={() => handleSelectCoreSkill(skill.id)}>
-                                                  <BrainCircuit className="mr-2 h-4 w-4"/>
-                                                  {skill.name}
-                                              </Button>
-                                            ))}
+                                            {topLevelSpecializations.map(spec => renderSpecialization(spec, domainCoreSkills))}
                                             <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
                                               <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
@@ -846,7 +915,7 @@ function SkillPageContent() {
         </div>
        )}
     </div>
-    </>
+    </DndContext>
   );
 }
 
