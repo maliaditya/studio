@@ -38,6 +38,7 @@ interface SkillLibraryProps {
   onUpdateFocusAreaName: (defId: string, newName: string) => void;
   onOpenMindMap: (focusAreaId: string) => void;
   onEditFocusArea: (def: ExerciseDefinition) => void;
+  addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
 }
 
 export function SkillLibrary({ 
@@ -51,6 +52,7 @@ export function SkillLibrary({
     onUpdateFocusAreaName,
     onOpenMindMap,
     onEditFocusArea,
+    addToRecents,
 }: SkillLibraryProps) {
   const { 
     skillDomains, 
@@ -89,6 +91,12 @@ export function SkillLibrary({
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
     onSelectFocusArea(null, 'deepwork');
     onSelectProject(null);
+    
+    // Add to recents if it's a project
+    if(type === 'project') {
+        addToRecents({ ...item, type: 'project' });
+    }
+
     switch(type) {
         case 'domain':
             setSelectedDomainId(item.id);
@@ -117,14 +125,14 @@ export function SkillLibrary({
   const linkedUpskillChildIds = React.useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
   const getDeepWorkNodeType = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
     if (isParent) return isChild ? 'Objective' : 'Intention';
     return isChild ? 'Action' : 'Standalone';
   };
   
   const getUpskillNodeType = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedUpskillChildIds.has(def.id);
     if (isParent) return isChild ? 'Objective' : 'Curiosity';
     return isChild ? 'Visualization' : 'Standalone';

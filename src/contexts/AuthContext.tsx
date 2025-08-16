@@ -271,7 +271,10 @@ interface AuthContextType {
   // Auto Suggestion
   autoSuggestions: Record<string, AutoSuggestionEntry[]>;
   setAutoSuggestions: React.Dispatch<React.SetStateAction<Record<string, AutoSuggestionEntry[]>>>;
-
+  
+  // Recents
+  recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
+  addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -403,6 +406,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Auto Suggestion State
   const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
+
+  // Recents State
+  const [recentItems, setRecentItems] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
 
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
@@ -552,6 +558,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
 
       try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
+      try { const d = loadItem(`recent_items_${username}`); setRecentItems(d ? JSON.parse(d) : []); } catch(e) { setRecentItems([]); }
 
       // Load active focus session from localStorage
       const savedSession = localStorage.getItem(`focus_session_${username}`);
@@ -590,6 +597,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSelectedMicroSkill(null);
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
       setAutoSuggestions({});
+      setRecentItems([]);
     }
   }, [currentUser]);
 
@@ -657,6 +665,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
 
       localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
+      localStorage.setItem(`recent_items_${username}`, JSON.stringify(recentItems));
 
       // Persist active focus session
       if (activeFocusSession) {
@@ -679,7 +688,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    autoSuggestions, activeFocusSession
+    autoSuggestions, activeFocusSession, recentItems
   ]);
 
 
@@ -865,6 +874,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSkillAcquisitionPlans(data.skillAcquisitionPlans || []);
     
     setAutoSuggestions(data.autoSuggestions || {});
+    setRecentItems(data.recentItems || []);
   };
   
   const register = async (username: string, password: string) => {
@@ -929,7 +939,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       patterns, metaRules, pillarEquations, skillAcquisitionPlans,
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
-      autoSuggestions
+      autoSuggestions,
+      recentItems,
     };
   }
 
@@ -1925,6 +1936,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const addToRecents = (item: (ExerciseDefinition | Project) & { type: string }) => {
+    setRecentItems(prev => {
+        const newItems = prev.filter(i => i.id !== item.id);
+        newItems.unshift(item);
+        return newItems.slice(0, 6);
+    });
+  };
+
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1996,6 +2016,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedProjectId, setSelectedProjectId,
     selectedCompanyId, setSelectedCompanyId,
     autoSuggestions, setAutoSuggestions,
+    recentItems, addToRecents,
   };
 
   return (
@@ -2017,4 +2038,5 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 

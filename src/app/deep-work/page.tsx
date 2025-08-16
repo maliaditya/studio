@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -298,23 +298,6 @@ function LinkedDeepWorkCard({
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            {isParentNode && (
-                                <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Create & Link New
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuPortal>
-                                        <DropdownMenuSubContent>
-                                            <DropdownMenuItem onSelect={() => onCreateAndLinkChild(deepworkDef.id, 'deepwork')}>
-                                                <Bolt className="mr-2 h-4 w-4 text-blue-500" /> New Deep Work Task
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem onSelect={() => onCreateAndLinkChild(deepworkDef.id, 'upskill')}>
-                                                 <Frame className="mr-2 h-4 w-4 text-blue-500" /> New Upskill Task
-                                            </DropdownMenuItem>
-                                        </DropdownMenuSubContent>
-                                    </DropdownMenuPortal>
-                                </DropdownMenuSub>
-                            )}
                             <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
                             {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
@@ -527,6 +510,10 @@ function DeepWorkPageContent() {
     microSkillMap,
     handleOpenNestedPopup,
     scheduleTaskFromMindMap,
+    recentItems,
+    addToRecents,
+    selectedMicroSkill,
+    setSelectedMicroSkill
   } = useAuth();
   const router = useRouter();
   
@@ -571,7 +558,6 @@ function DeepWorkPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
   
-  const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
@@ -716,7 +702,7 @@ function DeepWorkPageContent() {
         const node = deepWorkDefinitions.find(d => d.id === nodeId);
         if (!node) return;
         
-        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0;
         const isChild = linkedDeepWorkChildIds.has(node.id);
 
         if ((!isParent && isChild) || (!isParent && !isChild)) { // Action or Standalone
@@ -751,7 +737,7 @@ function DeepWorkPageContent() {
         const node = upskillDefinitions.find(d => d.id === nodeId);
         if (!node) return;
         
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
 
         if (!isParent) {
             visualizationIds.add(node.id);
@@ -1354,7 +1340,7 @@ function DeepWorkPageContent() {
         const node = upskillDefinitions.find(d => d.id === currentId);
         if (!node) continue;
 
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
         
         if (!isParent) { // It's a Visualization
             visualizationIds.add(node.id);
@@ -1416,6 +1402,10 @@ function DeepWorkPageContent() {
 
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
+    const nodeType = type === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
+    if(nodeType === 'Intention' || nodeType === 'Curiosity' || nodeType === 'Objective') {
+        addToRecents({ ...def, type });
+    }
     setNavigationStack(prev => [...prev, {...def, type}]);
   };
 
@@ -1426,6 +1416,18 @@ function DeepWorkPageContent() {
     } else {
       setSelectedUpskillTask(def);
       setSelectedDeepWorkTask(null);
+    }
+  };
+
+  const handleSelectRecentItem = (item: ExerciseDefinition & { type: 'deepwork' | 'upskill' }) => {
+    setSelectedMicroSkill(null);
+    setSelectedProject(null);
+    if(item.type === 'deepwork') {
+        setSelectedDeepWorkTask(item);
+        setSelectedUpskillTask(null);
+    } else {
+        setSelectedUpskillTask(item);
+        setSelectedDeepWorkTask(null);
     }
   };
 
@@ -1564,6 +1566,34 @@ function DeepWorkPageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><History />Recents</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {recentItems.length > 0 ? (
+                            <ul className="space-y-1">
+                                {recentItems.map(item => (
+                                    <li key={item.id}>
+                                        <Button
+                                            variant="ghost"
+                                            className="w-full justify-start h-auto py-2"
+                                            onClick={() => handleSelectRecentItem(item)}
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {item.type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : <Flashlight className="h-4 w-4 text-amber-500" />}
+                                                <span className="truncate" title={item.name}>{item.name}</span>
+                                            </div>
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center">No recent items.</p>
+                        )}
+                    </CardContent>
+                </Card>
+
                  <SkillLibrary
                     selectedMicroSkill={selectedMicroSkill}
                     onSelectMicroSkill={setSelectedMicroSkill}
@@ -1578,6 +1608,7 @@ function DeepWorkPageContent() {
                       setIsMindMapModalOpen(true);
                     }}
                     onEditFocusArea={setEditingFocusArea}
+                    addToRecents={addToRecents}
                 />
               {currentTask && (
                   <Card>
