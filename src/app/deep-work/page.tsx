@@ -1041,7 +1041,7 @@ function DeepWorkPageContent() {
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
     const { type, parent } = manageLinksConfig;
-    
+
     if (type === 'resource') {
         let displayItems: (ResourceFolder | Resource)[] = [];
         const subfolders = resourceFolders.filter(f => f.parentId === currentFolderIdForLinking);
@@ -1049,7 +1049,7 @@ function DeepWorkPageContent() {
         displayItems = [...subfolders, ...resourcesInFolder];
         
         return displayItems.filter(item => {
-            if ('link' in item) { // It's a resource
+            if ('link' in item || 'points' in item) { // It's a resource, not a folder
                 if (linkSearchTerm && !item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) return false;
             }
             return true;
@@ -1065,7 +1065,11 @@ function DeepWorkPageContent() {
     }
 
     // Type is 'upskill'
-    let sourceDefs = upskillDefinitions;
+    let sourceDefs = upskillDefinitions.filter(def => {
+      if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
+      const nodeType = getUpskillNodeType(def);
+      return nodeType === 'Visualization' || nodeType === 'Standalone';
+    });
 
     if (selectedSpecializationId) {
         const microSkillNames = new Set(
@@ -1076,17 +1080,10 @@ function DeepWorkPageContent() {
         sourceDefs = sourceDefs.filter(def => microSkillNames.has(def.category));
     }
     
-    let filteredDefs = sourceDefs.filter(def => {
-        if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
-        
-        const nodeType = getUpskillNodeType(def);
-        return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-    
     if (linkSearchTerm) {
-        filteredDefs = filteredDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
+        sourceDefs = sourceDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
     }
-    return filteredDefs;
+    return sourceDefs;
 
   }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, getUpskillNodeType, selectedSpecializationId, coreSkills]);
 
