@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3 } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -171,7 +172,7 @@ export function SkillLibrary({
     return (
         <div className="flex items-center gap-2">
             {showBackButton && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ArrowLeft className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ChevronLeft className="h-4 w-4" /></Button>
             )}
             <CardTitle className="text-lg text-primary truncate" title={title}>{title}</CardTitle>
         </div>

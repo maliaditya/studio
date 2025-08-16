@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -514,7 +514,9 @@ function DeepWorkPageContent() {
     recentItems,
     addToRecents,
     selectedMicroSkill,
-    setSelectedMicroSkill
+    setSelectedMicroSkill,
+    setSelectedDomainId,
+    setSelectedSkillId,
   } = useAuth();
   const router = useRouter();
   
@@ -1366,10 +1368,7 @@ function DeepWorkPageContent() {
 
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
-    const nodeType = type === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
-    if(nodeType === 'Intention' || nodeType === 'Curiosity' || nodeType === 'Objective') {
-        addToRecents({ ...def, type });
-    }
+    addToRecents({ ...def, type });
     setNavigationStack(prev => [...prev, {...def, type}]);
   };
 
@@ -1416,6 +1415,27 @@ function DeepWorkPageContent() {
         setNavigationStack([]);
     }
 }, [selectedDeepWorkTask, selectedUpskillTask]);
+
+useEffect(() => {
+  if (currentTask) {
+    const { category } = currentTask;
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
+    if (microSkill) {
+      const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+      if (coreSkill) {
+        setSelectedDomainId(coreSkill.domainId);
+        setSelectedSkillId(coreSkill.id);
+        const skillArea = coreSkill.skillAreas.find(sa => sa.name === microSkill.skillAreaName);
+        if (skillArea) {
+          const fullMicroSkill = skillArea.microSkills.find(ms => ms.name === microSkill.microSkillName);
+          if (fullMicroSkill) {
+            setSelectedMicroSkill(fullMicroSkill);
+          }
+        }
+      }
+    }
+  }
+}, [currentTask, microSkillMap, coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedMicroSkill]);
   
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
@@ -1434,7 +1454,7 @@ function DeepWorkPageContent() {
                     {navigationStack.map((task, index) => (
                         <React.Fragment key={task.id}>
                            <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />
-                            <Button variant="link" onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto text-muted-foreground hover:text-primary" disabled={index === navigationStack.length - 1}>
+                            <Button variant={index === navigationStack.length - 1 ? "secondary" : "link"} onClick={() => handleBreadcrumbClick(index)} className="p-0 h-auto px-1">
                                 {task.name}
                             </Button>
                         </React.Fragment>
@@ -1610,9 +1630,8 @@ function DeepWorkPageContent() {
                           </CardTitle>
                         </div>
                         <div className='flex items-center gap-2 flex-shrink-0'>
-                          <Button variant={viewMode === 'session' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('session')}>Session</Button>
-                          <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); handleSelectFocusArea(null, 'deepwork'); }}>Library</Button>
-                          <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
+                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); }}>Library</Button>
+                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
                         </div>
                     </CardHeader>
                     <CardContent className="p-4">
