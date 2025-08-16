@@ -1065,30 +1065,33 @@ function DeepWorkPageContent() {
     }
 
     // Type is 'upskill'
-    const sourceDefs = upskillDefinitions;
+    let sourceDefs = upskillDefinitions;
+
+    if (selectedSpecializationId) {
+        const skillAreaIds = new Set(coreSkills.find(s => s.id === selectedSpecializationId)?.skillAreas.map(sa => sa.id) || []);
+        const microSkillNames = new Set(
+            coreSkills.flatMap(cs => cs.skillAreas)
+                .filter(sa => skillAreaIds.has(sa.id))
+                .flatMap(sa => sa.microSkills)
+                .map(ms => ms.name)
+        );
+        sourceDefs = sourceDefs.filter(def => microSkillNames.has(def.category));
+    }
 
     let filteredDefs = sourceDefs.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
         
         const nodeType = getUpskillNodeType(def);
-        if (nodeType === 'Objective') return false; 
-        
-        return true;
+        return nodeType === 'Visualization' || nodeType === 'Standalone';
     });
-
-    if (newLinkedItemMicroSkillId) {
-        const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
-        if(microSkillName) {
-            filteredDefs = filteredDefs.filter(def => def.category === microSkillName);
-        }
-    }
     
     if (linkSearchTerm) {
         filteredDefs = filteredDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
     }
     return filteredDefs;
 
-  }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, newLinkedItemMicroSkillId, microSkillMap, getUpskillNodeType]);
+  }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, getUpskillNodeType, selectedSpecializationId, coreSkills]);
+
 
   const renderHierarchy = useCallback((parentId: string, level = 0): React.ReactNode[] => {
     const parentDef = upskillDefinitions.find(p => p.id === parentId);
@@ -1587,7 +1590,10 @@ function DeepWorkPageContent() {
                           <div className="flex flex-col h-full">
                               <div className="flex gap-2 mb-2 p-1">
                                 <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
-                                <Select value={manageLinksConfig.type} onValueChange={(value) => setManageLinksConfig(prev => prev ? { ...prev, type: value as any } : null)}>
+                                <Select value={manageLinksConfig.type} onValueChange={(value) => {
+                                    setManageLinksConfig(prev => prev ? { ...prev, type: value as any } : null);
+                                    setSelectedSpecializationId(null);
+                                }}>
                                     <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="deepwork">Deep Work</SelectItem>
@@ -1595,6 +1601,19 @@ function DeepWorkPageContent() {
                                         <SelectItem value="resource">Resource</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                {manageLinksConfig.type === 'upskill' && (
+                                    <Select value={selectedSpecializationId || ''} onValueChange={(id) => setSelectedSpecializationId(id === 'all' ? null : id)}>
+                                        <SelectTrigger className="w-[240px]">
+                                            <SelectValue placeholder="Filter by Specialization..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Specializations</SelectItem>
+                                            {coreSkills.filter(cs => cs.type === 'Specialization').map(spec => (
+                                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                               </div>
                               {manageLinksConfig.type === 'resource' && (
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
@@ -1607,57 +1626,23 @@ function DeepWorkPageContent() {
                               )}
                               <ScrollArea className="flex-grow border rounded-md p-2">
                                   {filteredItemsForLinking.length > 0 ? (
-                                      manageLinksConfig.type === 'upskill' ? (
-                                        <Accordion type="multiple" className="w-full">
-                                          {(filteredItemsForLinking as ExerciseDefinition[]).filter(item => getUpskillNodeType(item) === 'Curiosity').map(item => (
-                                              <AccordionItem value={item.id} key={item.id} className="border-b-0">
-                                                  <div className="flex items-center w-full group/item" onDoubleClick={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}>
-                                                        <Checkbox
-                                                            id={`cb-link-${item.id}`}
-                                                            checked={tempLinkedIds.includes(item.id)}
-                                                            onCheckedChange={(checked) => {
-                                                                setTempLinkedIds(prev => checked ? [...prev, item.id] : prev.filter(id => id !== item.id));
-                                                            }}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className="mr-2"
-                                                        />
-                                                        <AccordionTrigger
-                                                          asChild
-                                                          className="p-1 hover:no-underline rounded-md hover:bg-muted/50 data-[state=open]:bg-muted/50 flex-grow"
-                                                        >
-                                                          <div className="flex items-center justify-between w-full">
-                                                              <div className="flex items-center space-x-2">
-                                                                  <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
-                                                                      <Flashlight className="h-4 w-4 text-amber-500"/>
-                                                                      {item.name}
-                                                                  </Label>
-                                                              </div>
-                                                              {((item.linkedUpskillIds || []).length > 0) && <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />}
-                                                          </div>
-                                                        </AccordionTrigger>
-                                                  </div>
-                                                  {((item.linkedUpskillIds || []).length > 0) && <AccordionContent className="pl-4">{renderHierarchy(item.id, 1)}</AccordionContent>}
-                                              </AccordionItem>
-                                          ))}
-                                        </Accordion>
-                                      ) : (
-                                        (filteredItemsForLinking as (Resource | ResourceFolder)[]).map(item => {
-                                            const isFolder = 'parentId' in item;
-                                            return (
+                                      (filteredItemsForLinking as any[]).map(item => {
+                                          const isFolder = 'parentId' in item;
+                                          const isChecked = tempLinkedIds.includes(item.id);
+                                          return (
                                               <div key={item.id} className="flex items-center space-x-2 p-1">
-                                                  <Checkbox id={`cb-link-${item.id}`} checked={tempLinkedIds.includes(item.id)} onCheckedChange={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])} disabled={isFolder}/>
+                                                  <Checkbox id={`cb-link-${item.id}`} checked={isChecked} onCheckedChange={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])} disabled={isFolder}/>
                                                   <Label 
                                                       htmlFor={`cb-link-${item.id}`}
                                                       className="font-normal w-full flex items-center gap-2 cursor-pointer"
                                                       onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
                                                   >
-                                                      {isFolder ? <Folder className="h-4 w-4 text-primary" /> : <Library className="h-4 w-4"/>}
+                                                      {isFolder ? <Folder className="h-4 w-4 text-primary" /> : manageLinksConfig.type === 'upskill' ? <BookCopy className="h-4 w-4" /> : <Library className="h-4 w-4"/>}
                                                       {item.name}
                                                   </Label>
                                               </div>
-                                            )
-                                        })
-                                      )
+                                          )
+                                      })
                                   ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
                               </ScrollArea>
                               <DialogFooter className="pt-4">
