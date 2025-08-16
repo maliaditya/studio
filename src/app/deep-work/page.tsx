@@ -221,7 +221,6 @@ function LinkedDeepWorkCard({
     onUpdateName,
     projectsInDomain,
     handleLinkProject,
-    onCreateAndLinkChild,
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -244,7 +243,6 @@ function LinkedDeepWorkCard({
     onUpdateName: (id: string, newName: string) => void;
     projectsInDomain: Project[];
     handleLinkProject: (intentionId: string, projectId: string | null) => void;
-    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
@@ -616,49 +614,19 @@ function DeepWorkPageContent() {
   , [upskillDefinitions]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
-    const hasActionChildren = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(c => c.id === childId);
-        return childDef && getDeepWorkNodeType(childDef) === 'Action';
-    });
-
-    if (hasActionChildren) return 'Objective';
-
-    const hasObjectiveChildren = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(c => c.id === childId);
-        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
-    });
-
-    if (hasObjectiveChildren) return 'Intention';
-
-    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-                           
-    if (hasAnyChildren) return 'Intention';
-
+    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
+    if (hasChildren) return isChild ? 'Objective' : 'Intention';
     return isChild ? 'Action' : 'Standalone';
-  }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
+  }, [linkedDeepWorkChildIds]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const hasVisualizationChildren = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(c => c.id === childId);
-        return childDef && getUpskillNodeType(childDef) === 'Visualization';
-    });
-    if (hasVisualizationChildren) return 'Objective';
-
-    const hasObjectiveChildren = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(c => c.id === childId);
-        return childDef && getUpskillNodeType(childDef) === 'Objective';
-    });
-    if (hasObjectiveChildren) return 'Curiosity';
-
-    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-
-    if (hasAnyChildren) return 'Curiosity';
-    
+    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedUpskillChildIds.has(def.id);
+    if (hasChildren) return isChild ? 'Objective' : 'Curiosity';
     return isChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions, linkedUpskillChildIds]);
+  }, [linkedUpskillChildIds]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
@@ -1508,7 +1476,7 @@ function DeepWorkPageContent() {
                     {(currentTask.linkedDeepWorkIds || []).map(id => {
                         const def = deepWorkDefinitions.find(d => d.id === id);
                         if (!def) return null;
-                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} onCreateAndLinkChild={handleCreateAndLinkChild}/>;
+                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} />;
                     })}
                      {(currentTask.linkedUpskillIds || []).map(id => {
                         const def = upskillDefinitions.find(d => d.id === id);
@@ -1578,10 +1546,10 @@ function DeepWorkPageContent() {
                                         <Button
                                             variant="ghost"
                                             className="w-full justify-start h-auto py-2"
-                                            onClick={() => handleSelectRecentItem(item)}
+                                            onClick={() => handleSelectRecentItem(item as ExerciseDefinition & { type: 'deepwork' | 'upskill' })}
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                {item.type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : <Flashlight className="h-4 w-4 text-amber-500" />}
+                                                {(item as any).type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : <Flashlight className="h-4 w-4 text-amber-500" />}
                                                 <span className="truncate" title={item.name}>{item.name}</span>
                                             </div>
                                         </Button>
