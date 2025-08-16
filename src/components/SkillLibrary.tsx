@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
@@ -90,9 +89,8 @@ export function SkillLibrary({
   
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
     onSelectFocusArea(null, 'deepwork');
-    onSelectProject(null);
+    if(type !== 'project') onSelectProject(null);
     
-    // Add to recents if it's a project
     if(type === 'project') {
         addToRecents({ ...item, type: 'project' });
     }
@@ -121,21 +119,31 @@ export function SkillLibrary({
     setEditingFocusAreaId(null);
   };
 
-  const linkedDeepWorkChildIds = React.useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
-  const linkedUpskillChildIds = React.useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
+  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
+  const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
   const getDeepWorkNodeType = (def: ExerciseDefinition) => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent) return isChild ? 'Objective' : 'Intention';
-    return isChild ? 'Action' : 'Standalone';
+    if (isParent) {
+        const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
+            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+            return childDef && getDeepWorkNodeType(childDef) === 'Objective';
+        });
+        return hasObjectiveChild ? 'Intention' : 'Objective';
+    }
+    return linkedDeepWorkChildIds.has(def.id) ? 'Action' : 'Standalone';
   };
   
   const getUpskillNodeType = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(def.id);
-    if (isParent) return isChild ? 'Objective' : 'Curiosity';
-    return isChild ? 'Visualization' : 'Standalone';
+     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
+    if (isParent) {
+        const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+            const childDef = upskillDefinitions.find(d => d.id === childId);
+            return childDef && getUpskillNodeType(childDef) === 'Objective';
+        });
+        return hasObjectiveChild ? 'Curiosity' : 'Objective';
+    }
+    return linkedUpskillChildIds.has(def.id) ? 'Visualization' : 'Standalone';
   };
 
   const getIcon = (def: ExerciseDefinition) => {
@@ -175,11 +183,8 @@ export function SkillLibrary({
       const allTasks = definitions.filter(def => def.category === selectedMicroSkill.name);
       
       const filteredTasks = allTasks.filter(task => {
-        const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
-        if (libraryView === 'deepwork') {
-          return ['Intention', 'Standalone'].includes(nodeType);
-        }
-        return ['Curiosity', 'Standalone'].includes(nodeType);
+        const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
+        return !childIdSet.has(task.id);
       });
       
       return (
@@ -205,7 +210,13 @@ export function SkillLibrary({
                         ) : (
                           <button
                             onDoubleClick={() => onEditFocusArea(task)}
-                            onClick={() => onSelectFocusArea(task, libraryView)}
+                            onClick={() => {
+                                onSelectFocusArea(task, libraryView);
+                                const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
+                                if (nodeType === 'Intention' || nodeType === 'Curiosity') {
+                                    addToRecents({ ...task, type: libraryView });
+                                }
+                            }}
                             className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0"
                           >
                             {getIcon(task)}
