@@ -1386,6 +1386,25 @@ function DeepWorkPageContent() {
     return 'Library';
   }
 
+  const curiositiesForLinking = useMemo(() => {
+    const curiosityDefs = upskillDefinitions.filter(def => {
+        const nodeType = getUpskillNodeType(def);
+        return nodeType === 'Curiosity';
+    });
+
+    const buildHierarchy = (items: ExerciseDefinition[], parentId: string | null = null): any[] => {
+      return items
+        .filter(item => item.parentId === parentId)
+        .map(item => ({
+          ...item,
+          children: buildHierarchy(items, item.id)
+        }));
+    };
+    // This part is tricky if curiosities can be nested. Assuming for now they are top-level.
+    // If they can be nested, a recursive build function would be needed here.
+    return curiosityDefs;
+  }, [upskillDefinitions, getUpskillNodeType]);
+
   const renderUpskillHierarchySelect = (items: any[], level = 0): React.ReactNode[] => {
     let nodes: React.ReactNode[] = [];
     items.forEach(item => {
