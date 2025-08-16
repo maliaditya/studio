@@ -1068,16 +1068,14 @@ function DeepWorkPageContent() {
     let sourceDefs = upskillDefinitions;
 
     if (selectedSpecializationId) {
-        const skillAreaIds = new Set(coreSkills.find(s => s.id === selectedSpecializationId)?.skillAreas.map(sa => sa.id) || []);
         const microSkillNames = new Set(
-            coreSkills.flatMap(cs => cs.skillAreas)
-                .filter(sa => skillAreaIds.has(sa.id))
-                .flatMap(sa => sa.microSkills)
-                .map(ms => ms.name)
+            coreSkills.find(s => s.id === selectedSpecializationId)
+                ?.skillAreas.flatMap(sa => sa.microSkills)
+                .map(ms => ms.name) || []
         );
         sourceDefs = sourceDefs.filter(def => microSkillNames.has(def.category));
     }
-
+    
     let filteredDefs = sourceDefs.filter(def => {
         if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
         
@@ -1745,4 +1743,3 @@ function DeepWorkPageContent() {
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-
