@@ -608,8 +608,6 @@ function DeepWorkPageContent() {
   , [upskillDefinitions]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
-    const isChild = linkedDeepWorkChildIds.has(def.id);
-
     const hasActionChildren = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(c => c.id === childId);
         return childDef && getDeepWorkNodeType(childDef) === 'Action';
@@ -624,19 +622,16 @@ function DeepWorkPageContent() {
 
     if (hasObjectiveChildren) return 'Intention';
 
-    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || 
-                           (def.linkedUpskillIds?.length ?? 0) > 0 || 
-                           (def.linkedResourceIds?.length ?? 0) > 0;
+    const hasAnyChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
                            
-    if (hasAnyChildren) return 'Intention'; // Default for parents without specific objective children
+    if (hasAnyChildren) return 'Intention';
 
+    const isChild = linkedDeepWorkChildIds.has(def.id);
     return isChild ? 'Action' : 'Standalone';
   }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const isChild = linkedUpskillChildIds.has(def.id);
-
     const hasVisualizationChildren = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(c => c.id === childId);
         return childDef && getUpskillNodeType(childDef) === 'Visualization';
@@ -649,11 +644,11 @@ function DeepWorkPageContent() {
     });
     if (hasObjectiveChildren) return 'Curiosity';
 
-    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0 || 
-                           (def.linkedResourceIds?.length ?? 0) > 0;
+    const hasAnyChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
 
     if (hasAnyChildren) return 'Curiosity';
-
+    
+    const isChild = linkedUpskillChildIds.has(def.id);
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions, linkedUpskillChildIds]);
 
@@ -1030,7 +1025,7 @@ function DeepWorkPageContent() {
     let newId: string;
     let updatedParent: ExerciseDefinition;
     
-    const setParentDefinitions = parent.id.includes('_upskill_') ? setUpskillDefinitions : setDeepWorkDefinitions;
+    const setParentDefinitions = upskillDefinitions.some(d => d.id === parent.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
     
     if (type === 'resource') {
         if (addResourceType === 'link') {
@@ -1151,7 +1146,7 @@ function DeepWorkPageContent() {
     
     const updatedParent = { ...parent, [key]: tempLinkedIds };
     
-    const setParentDefinitions = parent.id.includes('_upskill_') ? setUpskillDefinitions : setDeepWorkDefinitions;
+    const setParentDefinitions = upskillDefinitions.some(d => d.id === parent.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
     
     setParentDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
     setNavigationStack(prev => prev.map(item => item.id === parent.id ? { ...item, ...updatedParent } : item));
@@ -1193,12 +1188,12 @@ function DeepWorkPageContent() {
     });
 
     if (selectedSpecializationId) {
-        const microSkillNames = new Set(
+        const microSkillNamesInSpecialization = new Set(
             coreSkills.find(s => s.id === selectedSpecializationId)
                 ?.skillAreas.flatMap(sa => sa.microSkills)
                 .map(ms => ms.name) || []
         );
-        sourceDefs = sourceDefs.filter(def => microSkillNames.has(def.category));
+        sourceDefs = sourceDefs.filter(def => microSkillNamesInSpecialization.has(def.category));
     }
     
     if (linkSearchTerm) {
@@ -1837,4 +1832,5 @@ export default function DeepWorkPage() {
 }
 
     
+
 
