@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink } from '@/types/workout';
@@ -430,31 +430,37 @@ function SkillPageContent() {
 
   const renderSpecialization = (spec: CoreSkill, allSpecs: CoreSkill[], level = 0) => {
     const childSpecs = allSpecs.filter(s => s.parentId === spec.id);
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
+
     return (
-        <div key={spec.id} style={{ marginLeft: `${level * 20}px` }}>
-            <Droppable id={spec.id} className="group">
-                <Draggable id={spec.id}>
-                    <div className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
-                        <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(spec.id)}>
-                            <BrainCircuit className="h-4 w-4" />
-                            <span className={`text-sm ${selectedSkillId === spec.id ? 'font-semibold text-primary' : ''}`}>{spec.name}</span>
-                        </button>
-                         <div className="flex items-center opacity-0 group-hover:opacity-100">
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddSpecialization(spec.domainId, spec.id)}>
-                                <Plus className="h-4 w-4 text-green-500" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSkill(spec)}><Edit className="h-4 w-4"/></Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteCoreSkill(spec.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                        </div>
-                    </div>
-                </Draggable>
-            </Droppable>
-            {childSpecs.length > 0 && (
-                <div className="pl-4 border-l-2 ml-2">
-                    {childSpecs.map(child => renderSpecialization(child, allSpecs, level + 1))}
-                </div>
-            )}
-        </div>
+      <div key={spec.id} style={{ marginLeft: `${level * 20}px` }}>
+        <Droppable id={spec.id} className="group rounded-md hover:bg-muted">
+          <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2">
+            <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => handleSelectCoreSkill(spec.id)}>
+              <span {...listeners} {...attributes} className="cursor-grab p-1 -ml-1">
+                <GripVertical className="h-4 w-4 text-muted-foreground" />
+              </span>
+              <BrainCircuit className="h-4 w-4 flex-shrink-0" />
+              <span className={cn("text-sm truncate", selectedSkillId === spec.id && 'font-semibold text-primary')} title={spec.name}>
+                {spec.name}
+              </span>
+            </button>
+            <div className="flex items-center opacity-0 group-hover:opacity-100">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddSpecialization(spec.domainId, spec.id)}>
+                <Plus className="h-4 w-4 text-green-500" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingSkill(spec)}><Edit className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteCoreSkill(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+            </div>
+          </div>
+        </Droppable>
+        {childSpecs.length > 0 && (
+          <div className="pl-4 border-l-2 ml-4">
+            {childSpecs.map(child => renderSpecialization(child, allSpecs, level + 1))}
+          </div>
+        )}
+      </div>
     );
   };
 
