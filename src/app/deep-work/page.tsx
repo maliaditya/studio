@@ -502,7 +502,36 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-const LibraryContent: React.FC<any> = ({
+const LibraryContent: React.FC<{
+    currentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' };
+    deepWorkDefinitions: ExerciseDefinition[];
+    upskillDefinitions: ExerciseDefinition[];
+    resources: Resource[];
+    permanentlyLoggedActionIds: Set<string>;
+    getDeepWorkNodeType: (def: ExerciseDefinition) => string;
+    getUpskillNodeType: (def: ExerciseDefinition) => string;
+    getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
+    getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
+    calculateTotalEstimate: (def: ExerciseDefinition) => number;
+    formatMinutes: (minutes: number) => string;
+    isUpskillObjectiveComplete: (id: string) => boolean;
+    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
+    handleCardClick: (def: ExerciseDefinition) => void;
+    handleSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
+    handleToggleReadyForBranding: (id: string) => void;
+    handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
+    handleDeleteFocusArea: (id: string) => void;
+    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
+    onOpenMindMap: (id: string) => void;
+    handleUpdateFocusAreaName: (id: string, newName: string) => void;
+    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    setEmbedUrl: (url: string | null) => void;
+    setFloatingVideoUrl: (url: string | null) => void;
+    handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    handleStartEditResource: (resource: Resource) => void;
+    handleLinkProjectToTask: (intentionId: string, projectId: string | null) => void;
+    setViewMode: (mode: 'session' | 'library') => void;
+}> = ({
     currentTask,
     deepWorkDefinitions,
     upskillDefinitions,
@@ -1115,7 +1144,7 @@ function DeepWorkPageContent() {
     } else {
         defToDelete = upskillDefinitions.find(d => d.id === id);
         setUpskillDefinitions(prev => prev.filter(def => def.id !== id).map(d => ({...d, linkedUpskillIds: (d.linkedUpskillIds || []).filter(linkedId => linkedId !== id)})));
-        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
     }
 
     if (defToDelete) {
@@ -2202,7 +2231,7 @@ useEffect(() => {
             </DialogContent>
           </Dialog>
 
-        <Dialog open={!!linkingTask} onOpenChange={(isOpen) => {
+        <Dialog open={isLinkProjectModalOpen} onOpenChange={(isOpen) => {
             if (!isOpen) {
                 setLinkingTask(null);
             }
@@ -2250,3 +2279,6 @@ export default function DeepWorkPage() {
 
 
 
+
+
+    
