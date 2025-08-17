@@ -33,13 +33,14 @@ import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TaskContextModal } from '@/components/TaskContextModal';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -123,6 +124,11 @@ function MyPlatePageContent() {
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
+  
+  const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [interruptDetails, setInterruptDetails] = useState('');
+  const [interruptDuration, setInterruptDuration] = useState('');
+
 
   // Focus Session State
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
@@ -247,6 +253,12 @@ function MyPlatePageContent() {
 
   const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
+    
+    if (type === 'interrupt') {
+        setInterruptModalState({ isOpen: true, slotName });
+        return;
+    }
+
     const SLOT_CAPACITY_MINUTES = 240;
     
     const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
@@ -267,7 +279,6 @@ function MyPlatePageContent() {
       case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
       case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
       case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
-      case 'interrupt': details = 'Unplanned Interruption'; newActivityDuration = 30; break;
     }
     
     if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
@@ -283,12 +294,43 @@ function MyPlatePageContent() {
       taskIds: [],
     };
     
-    if(type === 'interrupt') {
-        (newActivity as any).duration = newActivityDuration;
-    }
-
     setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity] } }));
   };
+
+  const handleSaveInterrupt = () => {
+    const { slotName } = interruptModalState;
+    if (!slotName || !interruptDetails.trim() || !interruptDuration.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide both a description and a duration.', variant: 'destructive' });
+        return;
+    }
+    const durationMinutes = parseInt(interruptDuration, 10);
+    if (isNaN(durationMinutes) || durationMinutes <= 0) {
+        toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
+        return;
+    }
+
+    const newActivity: Activity = {
+        id: `interrupt-${Date.now()}`,
+        type: 'interrupt',
+        details: interruptDetails,
+        completed: true,
+        taskIds: [],
+        duration: durationMinutes,
+    };
+
+    setSchedule(prev => ({
+        ...prev,
+        [selectedDateKey]: {
+            ...(prev[selectedDateKey] || {}),
+            [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
+        },
+    }));
+
+    setInterruptDetails('');
+    setInterruptDuration('');
+    setInterruptModalState({ isOpen: false, slotName: null });
+    toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
+};
 
   const handleRemoveActivity = (slotName: string, activityId: string) => {
     if (!selectedDateKey) return;
@@ -1147,6 +1189,28 @@ function MyPlatePageContent() {
             onLogTime={handleLogFocusTime}
           />
         )}
+        <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Log an Interruption</DialogTitle>
+                    <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="interrupt-details">Description</Label>
+                        <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
+                        <Input id="interrupt-duration" type="number" value={interruptDuration} onChange={(e) => setInterruptDuration(e.target.value)} placeholder="e.g., 30" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
+                    <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </div>
     </>
   );

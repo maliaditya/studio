@@ -55,7 +55,7 @@ function AgendaWidgetItem({
         onStartLeadGenLog(activity);
     } else if (canLogProgress) {
       setOpenPopover(true);
-    } else {
+    } else if (activity.type !== 'interrupt') {
       onToggleComplete(activity.slot, activity.id);
     }
   };
@@ -85,7 +85,7 @@ function AgendaWidgetItem({
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
       <div 
-        className={cn("flex items-center gap-3 min-w-0 flex-grow", !activity.completed && "cursor-pointer")}
+        className={cn("flex items-center gap-3 min-w-0 flex-grow", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
         onClick={handleItemClick}
       >
         {activity.completed 
@@ -100,7 +100,7 @@ function AgendaWidgetItem({
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
-        {!activity.completed ? (
+        {!activity.completed && activity.type !== 'interrupt' ? (
             <Button
                 variant="ghost"
                 size="icon"
