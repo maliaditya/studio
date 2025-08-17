@@ -403,33 +403,48 @@ function SkillPageContent() {
   const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
   const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedDeepWorkChildIds.has(def.id);
+    if (isParent && !isChild) return 'Intention';
+    if (isParent && isChild) return 'Objective';
+    if (!isParent && isChild) return 'Action';
+    return 'Standalone';
+  }, [linkedDeepWorkChildIds]);
+  
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isChild = linkedUpskillChildIds.has(def.id);
+    if (isParent && !isChild) return 'Curiosity';
+    if (isParent && isChild) return 'Objective';
+    if (!isParent && isChild) return 'Visualization';
+    return 'Standalone';
+  }, [linkedUpskillChildIds]);
+
+
   const microSkillIntentions = useMemo(() => {
     const map = new Map<string, ExerciseDefinition[]>();
     deepWorkDefinitions.forEach(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedDeepWorkChildIds.has(def.id);
-        if (isParent && !isChild) { // Is an Intention
+        if (getDeepWorkNodeType(def) === 'Intention') {
             const category = def.category;
             if (!map.has(category)) map.set(category, []);
             map.get(category)!.push(def);
         }
     });
     return map;
-  }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
+  }, [deepWorkDefinitions, getDeepWorkNodeType]);
 
   const microSkillCuriosities = useMemo(() => {
     const map = new Map<string, ExerciseDefinition[]>();
     upskillDefinitions.forEach(def => {
-        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-        const isChild = linkedUpskillChildIds.has(def.id);
-        if (isParent && !isChild) { // Is a Curiosity
+        if (getUpskillNodeType(def) === 'Curiosity') {
             const category = def.category;
             if (!map.has(category)) map.set(category, []);
             map.get(category)!.push(def);
         }
     });
     return map;
-  }, [upskillDefinitions, linkedUpskillChildIds]);
+  }, [upskillDefinitions, getUpskillNodeType]);
   
   const linkedTasksByCoreSkill = useMemo(() => {
     if (!selectedProject) return new Map();
@@ -459,8 +474,8 @@ function SkillPageContent() {
           
           const microSkillData = coreSkillData.microSkills.get(mapKey);
           if (microSkillData) {
-            const intentions = deepWorkDefinitions.filter(def => def.category === microSkillName);
-            const curiosities = upskillDefinitions.filter(def => def.category === microSkillName);
+            const intentions = deepWorkDefinitions.filter(def => def.category === microSkillName && getDeepWorkNodeType(def) === 'Intention');
+            const curiosities = upskillDefinitions.filter(def => def.category === microSkillName && getUpskillNodeType(def) === 'Curiosity');
             microSkillData.tasks.push(...intentions, ...curiosities);
           }
         }
@@ -468,7 +483,7 @@ function SkillPageContent() {
     });
 
     return taskMap;
-  }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions]);
+  }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -621,10 +636,9 @@ function SkillPageContent() {
                               </CardHeader>
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                                   {Array.from(data.microSkills.entries()).map(([mapKey, { microSkill, tasks }]) => {
-                                      const curiosities = tasks.filter(t => upskillDefinitions.some(d => d.id === t.id));
-                                      const intentions = tasks.filter(t => deepWorkDefinitions.some(d => d.id === t.id));
+                                      const curiosities = microSkillCuriosities.get(microSkill.name) || [];
+                                      const intentions = microSkillIntentions.get(microSkill.name) || [];
                                       const skillAreaName = mapKey.split(' > ')[0];
-                                      const relatedIntentions = microSkillIntentions.get(microSkill.name) || [];
                                       
                                       return (
                                         <Card key={mapKey} className="w-full">
@@ -649,9 +663,9 @@ function SkillPageContent() {
                                               </div>
                                               <div className="space-y-1">
                                                   <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                                   {relatedIntentions.length > 0 ? (
+                                                   {intentions.length > 0 ? (
                                                     <ul className="space-y-1 text-xs">
-                                                      {relatedIntentions.map(intention => (
+                                                      {intentions.map(intention => (
                                                         <li key={intention.id}>
                                                           <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                         </li>
