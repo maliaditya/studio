@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
   branding: <Share2 className="h-5 w-5 text-primary" />,
   'lead-generation': <Magnet className="h-5 w-5 text-primary" />,
+  interrupt: <AlertCircle className="h-5 w-5 text-destructive" />,
 };
 
 interface TimeSlotsProps {
@@ -186,6 +187,11 @@ export function TimeSlots({
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'tracking')}>
                         <ClipboardCheck className="h-4 w-4 mr-2" />
                         Add Tracking
+                      </Button>
+                      <Separator className="my-1" />
+                      <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name, 'interrupt')}>
+                        <AlertCircle className="h-4 w-4 mr-2" />
+                        Add Interrupt
                       </Button>
                     </div>
                   </PopoverContent>

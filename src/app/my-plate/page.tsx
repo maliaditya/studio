@@ -240,6 +240,7 @@ function MyPlatePageContent() {
         case 'lead-generation': return 45;
         case 'branding': return 120;
         case 'upskill': case 'deepwork': return 120; // Default block size
+        case 'interrupt': return activity.duration || 30;
         default: return 30;
     }
   }, [allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
@@ -266,6 +267,7 @@ function MyPlatePageContent() {
       case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
       case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
       case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
+      case 'interrupt': details = 'Unplanned Interruption'; newActivityDuration = 30; break;
     }
     
     if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
@@ -280,6 +282,11 @@ function MyPlatePageContent() {
       completed: false,
       taskIds: [],
     };
+    
+    if(type === 'interrupt') {
+        (newActivity as any).duration = newActivityDuration;
+    }
+
     setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity] } }));
   };
 

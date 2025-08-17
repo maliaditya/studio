@@ -144,7 +144,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt';
 
 export interface PauseEvent {
   pauseTime: number;
