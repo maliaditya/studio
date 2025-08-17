@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -1850,6 +1849,11 @@ useEffect(() => {
     if (!linkingTask) return;
     handleLinkProjectToTask(linkingTask.id, projectId);
   };
+  
+  const handleOpenLinkProjectModal = (task: ExerciseDefinition) => {
+    setLinkingTask(task);
+    setIsLinkProjectModalOpen(true);
+  };
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1900,7 +1904,7 @@ useEffect(() => {
                     }}
                     onEditFocusArea={setEditingFocusArea}
                     addToRecents={addToRecents}
-                    onOpenLinkProjectModal={setLinkingTask}
+                    onOpenLinkProjectModal={handleOpenLinkProjectModal}
                 />
               {currentTask && (
                   <Card>
@@ -2280,5 +2284,7 @@ export default function DeepWorkPage() {
 
 
 
+
+    
 
     
