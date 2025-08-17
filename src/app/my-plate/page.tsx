@@ -103,6 +103,7 @@ function MyPlatePageContent() {
     setActiveFocusSession,
     setIsAudioPlaying,
     openTaskContextPopup,
+    metaRules,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -1011,6 +1012,7 @@ function MyPlatePageContent() {
                   deepWorkDefinitions={deepWorkDefinitions}
                   upskillDefinitions={upskillDefinitions}
                   onOpenIntentionPopup={openIntentionPopup}
+                  metaRules={metaRules}
                 />
               </div>
             </div>

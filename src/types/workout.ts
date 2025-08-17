@@ -166,9 +166,15 @@ export interface Activity {
   focusSessionInitialDuration?: number; // The originally intended duration
 };
 
+export interface Interrupt {
+  id: string;
+  text: string;
+  duration: number; // in minutes
+}
+
 export interface DailySchedule {
   purpose?: string;
-  [slotName: string]: Activity[] | string | undefined;
+  [slotName: string]: Activity[] | string | Interrupt[] | undefined;
 }
 
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
