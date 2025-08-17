@@ -124,7 +124,7 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject, onEdit }: {
+export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject, onEdit, onCreateAndLinkChild }: {
   upskillDef: ExerciseDefinition;
   handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
@@ -144,6 +144,7 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
   projectsInDomain: Project[];
   onLinkProject: (curiosityId: string, projectId: string | null) => void;
   onEdit: (def: ExerciseDefinition) => void;
+  onCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
@@ -305,4 +306,3 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
     </div>
   );
 }
-
