@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -24,6 +25,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 
 interface SkillLibraryProps {
@@ -38,6 +46,7 @@ interface SkillLibraryProps {
   onOpenMindMap: (focusAreaId: string) => void;
   onEditFocusArea: (def: ExerciseDefinition) => void;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
+  onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
 }
 
 export function SkillLibrary({ 
@@ -52,6 +61,7 @@ export function SkillLibrary({
     onOpenMindMap,
     onEditFocusArea,
     addToRecents,
+    onOpenLinkProjectModal,
 }: SkillLibraryProps) {
   const { 
     skillDomains, 
@@ -204,71 +214,73 @@ export function SkillLibrary({
               </Button>
             </div>
             <div className="pl-4 space-y-1">
-                {filteredTasks.length > 0 ? filteredTasks.map(task => (
-                    <div key={task.id} className="flex items-center justify-between group/task">
-                        {editingFocusAreaId === task.id ? (
-                          <Input
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onBlur={handleSaveName}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                            className="h-8"
-                            autoFocus
-                          />
-                        ) : (
-                          <button
-                            onDoubleClick={() => onEditFocusArea(task)}
-                            onClick={() => {
-                                onSelectFocusArea(task, libraryView);
-                                const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
-                                if (nodeType === 'Intention' || nodeType === 'Curiosity') {
-                                    addToRecents({ ...task, type: libraryView });
-                                }
-                            }}
-                            className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground hover:bg-muted flex items-center gap-2 min-w-0"
-                          >
-                            {getIcon(task)}
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <span className="truncate" title={task.name}>
-                                            {task.name.length > 25 ? `${task.name.substring(0, 25)}...` : task.name}
-                                        </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <p>{task.name}</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                          </button>
-                        )}
-                        <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEditFocusArea(task)}>
-                                <Edit3 className="h-3 w-3" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
-                                <GitMerge className="h-3 w-3" />
-                            </Button>
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                        <AlertDialogDescription>This will permanently delete the task "{task.name}". This action cannot be undone.</AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction onClick={() => onDeleteFocusArea(task.id)}>Delete</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    </div>
-                )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
+                {filteredTasks.length > 0 ? filteredTasks.map(task => {
+                    const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
+                    const isLinkable = nodeType === 'Intention' || nodeType === 'Curiosity';
+
+                    return (
+                        <DropdownMenu key={task.id}>
+                            <DropdownMenuTrigger asChild>
+                                <div className="flex items-center justify-between group/task rounded-md hover:bg-muted">
+                                    {editingFocusAreaId === task.id ? (
+                                      <Input
+                                        value={editingName}
+                                        onChange={(e) => setEditingName(e.target.value)}
+                                        onBlur={handleSaveName}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                                        className="h-8"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <button
+                                        onDoubleClick={() => onEditFocusArea(task)}
+                                        onClick={() => {
+                                            onSelectFocusArea(task, libraryView);
+                                            if (nodeType === 'Intention' || nodeType === 'Curiosity') {
+                                                addToRecents({ ...task, type: libraryView });
+                                            }
+                                        }}
+                                        className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
+                                      >
+                                        {getIcon(task)}
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <span className="truncate" title={task.name}>
+                                                        {task.name.length > 25 ? `${task.name.substring(0, 25)}...` : task.name}
+                                                    </span>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>{task.name}</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                      </button>
+                                    )}
+                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
+                                            <GitMerge className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuItem onSelect={() => onEditFocusArea(task)}>
+                                    <Edit3 className="mr-2 h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                                {isLinkable && (
+                                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}>
+                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                    </DropdownMenuItem>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    );
+                }) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
             </div>
         </div>
       )
