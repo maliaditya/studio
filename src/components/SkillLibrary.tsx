@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -80,6 +79,7 @@ export function SkillLibrary({
   const [editingName, setEditingName] = useState('');
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextMenuTaskId, setContextMenuTaskId] = useState<string | null>(null);
 
 
   const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
@@ -221,15 +221,17 @@ export function SkillLibrary({
                     const isLinkable = nodeType === 'Intention' || nodeType === 'Curiosity';
 
                     return (
-                        <DropdownMenu key={task.id}>
-                            <DropdownMenuTrigger
-                                asChild
-                                onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    setContextMenuOpen(true);
-                                }}
-                            >
-                                <div className="flex items-center justify-between group/task rounded-md hover:bg-muted">
+                        <DropdownMenu key={task.id} open={contextMenuTaskId === task.id} onOpenChange={(open) => {
+                            if (!open) setContextMenuTaskId(null);
+                        }}>
+                            <DropdownMenuTrigger asChild>
+                                <div
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        setContextMenuTaskId(task.id);
+                                    }}
+                                    className="flex items-center justify-between group/task rounded-md hover:bg-muted"
+                                >
                                     {editingFocusAreaId === task.id ? (
                                       <Input
                                         value={editingName}
