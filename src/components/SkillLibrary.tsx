@@ -78,7 +78,6 @@ export function SkillLibrary({
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [contextMenuTaskId, setContextMenuTaskId] = useState<string | null>(null);
 
 

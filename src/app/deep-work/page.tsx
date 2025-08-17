@@ -501,36 +501,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-const LibraryContent: React.FC<{
-    currentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' };
-    deepWorkDefinitions: ExerciseDefinition[];
-    upskillDefinitions: ExerciseDefinition[];
-    resources: Resource[];
-    permanentlyLoggedActionIds: Set<string>;
-    getDeepWorkNodeType: (def: ExerciseDefinition) => string;
-    getUpskillNodeType: (def: ExerciseDefinition) => string;
-    getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
-    getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
-    calculateTotalEstimate: (def: ExerciseDefinition) => number;
-    formatMinutes: (minutes: number) => string;
-    isUpskillObjectiveComplete: (id: string) => boolean;
-    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
-    handleCardClick: (def: ExerciseDefinition) => void;
-    handleSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
-    handleToggleReadyForBranding: (id: string) => void;
-    handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
-    handleDeleteFocusArea: (id: string) => void;
-    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
-    onOpenMindMap: (id: string) => void;
-    handleUpdateFocusAreaName: (id: string, newName: string) => void;
-    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
-    setEmbedUrl: (url: string | null) => void;
-    setFloatingVideoUrl: (url: string | null) => void;
-    handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
-    handleStartEditResource: (resource: Resource) => void;
-    handleLinkProjectToTask: (intentionId: string, projectId: string | null) => void;
-    setViewMode: (mode: 'session' | 'library') => void;
-}> = ({
+const LibraryContent = ({
     currentTask,
     deepWorkDefinitions,
     upskillDefinitions,
@@ -559,6 +530,35 @@ const LibraryContent: React.FC<{
     handleStartEditResource,
     handleLinkProjectToTask,
     setViewMode,
+}: {
+    currentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' };
+    deepWorkDefinitions: ExerciseDefinition[];
+    upskillDefinitions: ExerciseDefinition[];
+    resources: Resource[];
+    permanentlyLoggedActionIds: Set<string>;
+    getDeepWorkNodeType: (def: ExerciseDefinition) => string;
+    getUpskillNodeType: (def: ExerciseDefinition) => string;
+    getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
+    getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
+    calculateTotalEstimate: (def: ExerciseDefinition) => number;
+    formatMinutes: (minutes: number) => string;
+    isUpskillObjectiveComplete: (id: string) => boolean;
+    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
+    handleCardClick: (def: ExerciseDefinition) => void;
+    handleSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
+    handleToggleReadyForBranding: (id: string) => void;
+    handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
+    handleDeleteFocusArea: (id: string) => void;
+    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
+    onOpenMindMap: (id: string) => void;
+    handleUpdateFocusAreaName: (id: string, newName: string) => void;
+    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    setEmbedUrl: (url: string | null) => void;
+    setFloatingVideoUrl: (url: string | null) => void;
+    handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    handleStartEditResource: (resource: Resource) => void;
+    handleLinkProjectToTask: (intentionId: string, projectId: string | null) => void;
+    setViewMode: (mode: 'session' | 'library') => void;
 }) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -659,7 +659,7 @@ const LibraryContent: React.FC<{
                     <Button size="sm" variant="outline" onClick={() => {}}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
-                    {isHighLevelNode && (
+                     {isHighLevelNode && (
                         linkedProject ? (
                             <div className="flex items-center gap-1">
                                 <Button size="sm" variant="secondary" className="gap-2">
@@ -1848,6 +1848,7 @@ useEffect(() => {
   const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
     if (!linkingTask) return;
     handleLinkProjectToTask(linkingTask.id, projectId);
+    setIsLinkProjectModalOpen(false);
   };
   
   const handleOpenLinkProjectModal = (task: ExerciseDefinition) => {
