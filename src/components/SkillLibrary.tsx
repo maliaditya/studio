@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -80,17 +79,16 @@ export function SkillLibrary({
         onSelectMicroSkill(null);
     } else if (selectedSkillId) {
         setSelectedSkillId(null);
-    } else if (selectedDomainId) {
-        setSelectedDomainId(null);
     } else if (selectedProjectId) {
         setSelectedProjectId(null);
         onSelectProject(null);
+    } else if (selectedDomainId) {
+        setSelectedDomainId(null);
     }
   };
   
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
     onSelectFocusArea(null, 'deepwork');
-    if(type !== 'project') onSelectProject(null);
     
     if(type === 'project') {
         addToRecents({ ...item, type: 'project' });
