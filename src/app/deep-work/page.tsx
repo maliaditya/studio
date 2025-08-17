@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -28,6 +27,7 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -501,7 +501,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-function LibraryContent({
+const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
     currentTask,
     deepWorkDefinitions,
     upskillDefinitions,
@@ -528,9 +528,9 @@ function LibraryContent({
     setFloatingVideoUrl,
     handleOpenNestedPopup,
     handleStartEditResource,
-    handleLinkProject,
+    handleLinkProjectToTask,
     setViewMode,
-}: any) {
+}, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
     
@@ -582,11 +582,11 @@ function LibraryContent({
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4" ref={ref}>
             <div className="space-y-1">
                 <h3 className="text-xl font-bold">{currentTask.name}</h3>
                 <div className="flex flex-wrap items-center gap-2">
-                     <DropdownMenu>
+                    <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="outline"><LinkIcon className="mr-2 h-4 w-4" /> Link Deep Work</Button>
                         </DropdownMenuTrigger>
@@ -640,14 +640,14 @@ function LibraryContent({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
                                 {projectsInDomain.map((proj: Project) => (
-                                    <DropdownMenuCheckboxItem key={proj.id} checked={currentTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(currentTask.id, currentTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
+                                    <DropdownMenuCheckboxItem key={proj.id} checked={currentTask.linkedProjectId === proj.id} onSelect={() => handleLinkProjectToTask(currentTask.id, currentTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
                                 ))}
                                 {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     )}
                     {linkedProject && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProject(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
                     )}
                 </div>
             </div>
@@ -678,7 +678,7 @@ function LibraryContent({
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projects}
-                            handleLinkProject={handleLinkProject}
+                            handleLinkProject={handleLinkProjectToTask}
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
@@ -708,7 +708,7 @@ function LibraryContent({
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={handleLinkProject} 
+                            onLinkProject={handleLinkProjectToTask} 
                             onEdit={setEditingFocusArea} 
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
@@ -739,7 +739,8 @@ function LibraryContent({
             </div>
         </div>
     );
-}
+});
+LibraryContent.displayName = 'LibraryContent';
 
 function DeepWorkPageContent() {
   const { toast } = useToast();
@@ -1946,7 +1947,7 @@ useEffect(() => {
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
                                 handleStartEditResource={handleStartEditResource}
-                                handleLinkProject={handleLinkProjectToTask}
+                                handleLinkProjectToTask={handleLinkProjectToTask}
                                 setViewMode={setViewMode}
                             />
                         ) : (
@@ -2203,7 +2204,7 @@ useEffect(() => {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <Select onValueChange={(projectId) => handleLinkProjectToTask(linkingTask!.id, projectId === 'none' ? null : projectId)} defaultValue={linkingTask?.linkedProjectId || 'none'}>
+                    <Select onValueChange={(projectId) => handleLinkProjectToTaskFromModal(projectId === 'none' ? null : projectId)} defaultValue={linkingTask?.linkedProjectId || 'none'}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a project..." />
                         </SelectTrigger>
@@ -2229,5 +2230,6 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
