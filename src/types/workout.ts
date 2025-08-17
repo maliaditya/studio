@@ -64,7 +64,7 @@ export interface ExerciseDefinition {
   linkedDeepWorkIds?: string[];
   linkedResourceIds?: string[];
   isReadyForBranding?: boolean;
-  linkedProjectId?: string;
+  linkedProjectIds?: string[];
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
@@ -582,4 +582,3 @@ export interface TaskContextPopupState {
   level: number;
   parentId?: string;
 }
-

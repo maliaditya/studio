@@ -207,7 +207,9 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
     setIsEditingName(false);
   };
   
-  const linkedProject = upskillDef.linkedProjectId ? projectsInDomain.find(p => p.id === upskillDef.linkedProjectId) : null;
+  const linkedProjects = (upskillDef.linkedProjectIds || [])
+    .map(pid => projectsInDomain.find(p => p.id === pid))
+    .filter((p): p is Project => !!p);
   const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone';
 
   return (
@@ -268,9 +270,10 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
                 )}
                  <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
             </div>
-            {linkedProject ? (
-                <CardDescription>
-                    Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
+            {linkedProjects.length > 0 ? (
+                <CardDescription className="flex flex-wrap gap-x-2 gap-y-1 text-xs mt-1">
+                    <span>Projects:</span>
+                    {linkedProjects.map(p => <Badge key={p.id} variant="secondary">{p.name}</Badge>)}
                 </CardDescription>
             ) : (
                 <CardDescription>{upskillDef.category}</CardDescription>
@@ -315,4 +318,3 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
   );
 }
 
-    

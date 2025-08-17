@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -294,7 +295,9 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         setIsEditingName(false);
     };
 
-    const linkedProject = deepworkDef.linkedProjectId ? projects.find(p => p.id === deepworkDef.linkedProjectId) : null;
+    const linkedProjects = (deepworkDef.linkedProjectIds || [])
+        .map(pid => projects.find(p => p.id === pid))
+        .filter((p): p is Project => !!p);
     
     return (
         <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
@@ -331,9 +334,10 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         )}
                         <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
                     </div>
-                     {linkedProject ? (
-                        <CardDescription>
-                            Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
+                     {linkedProjects.length > 0 ? (
+                        <CardDescription className="flex flex-wrap gap-x-2 gap-y-1 text-xs mt-1">
+                            <span>Projects:</span>
+                            {linkedProjects.map(p => <Badge key={p.id} variant="secondary">{p.name}</Badge>)}
                         </CardDescription>
                     ) : (
                         <CardDescription>{deepworkDef.category}</CardDescription>
@@ -526,7 +530,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource: (resource: Resource) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
-    handleLinkProjectToTask: (taskId: string, projectId: string | null) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -556,7 +559,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource,
     setViewMode,
     handleOpenLinkProjectModal,
-    handleLinkProjectToTask,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -578,7 +580,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     
     const nodeType = currentTask.type === 'deepwork' ? getDeepWorkNodeType(currentTask) : getUpskillNodeType(currentTask);
     const isHighLevelNode = nodeType === 'Intention' || nodeType === 'Curiosity';
-    const linkedProject = currentTask?.linkedProjectId ? projects.find(p => p.id === currentTask.linkedProjectId) : null;
+    const linkedProjects = (currentTask.linkedProjectIds || [])
+      .map(pid => projects.find(p => p.id === pid))
+      .filter((p): p is Project => !!p);
     
     const deepWorkLinkableTasks = deepWorkDefinitions.filter((def: ExerciseDefinition) => {
         if (def.id === currentTask.id) return false;
@@ -658,22 +662,17 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
                     {isHighLevelNode && (
-                      linkedProject ? (
-                        <div className="flex items-center gap-1">
-                          <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
-                            <Briefcase className="h-4 w-4" />
-                            {linkedProject.name}
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive" /></Button>
-                        </div>
-                      ) : (
-                        <Button size="sm" variant="outline" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
-                          <Briefcase className="h-4 w-4" />
-                          Link Project
-                        </Button>
-                      )
+                      <Button size="sm" variant="outline" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
+                        <Briefcase className="h-4 w-4" />
+                        {linkedProjects.length > 0 ? `${linkedProjects.length} Linked Project(s)` : "Link Project"}
+                      </Button>
                     )}
                 </div>
+                {linkedProjects.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {linkedProjects.map(p => <Badge key={p.id} variant="secondary">{p.name}</Badge>)}
+                    </div>
+                )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {(currentTask.linkedDeepWorkIds || []).map((id: string) => {
@@ -851,7 +850,7 @@ function DeepWorkPageContent() {
   const [isLinkProjectModalOpen, setIsLinkProjectModalOpen] = useState(false);
   const [linkingTask, setLinkingTask] = useState<ExerciseDefinition | null>(null);
   
-  const linkProjectToTask = useCallback((taskId: string, projectId: string | null) => {
+  const linkProjectToTask = useCallback((taskId: string, projectId: string) => {
     const isDeepWork = deepWorkDefinitions.some(d => d.id === taskId);
     const definitions = isDeepWork ? deepWorkDefinitions : upskillDefinitions;
     const setDefinitions = isDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
@@ -860,21 +859,33 @@ function DeepWorkPageContent() {
     if (!taskToUpdate) return;
     
     setDefinitions(prev => 
-        prev.map(def => 
-            def.id === taskId ? { ...def, linkedProjectId: projectId || undefined } : def
-        )
+        prev.map(def => {
+            if (def.id === taskId) {
+                const currentLinkedIds = def.linkedProjectIds || [];
+                const isLinked = currentLinkedIds.includes(projectId);
+                const newLinkedIds = isLinked 
+                    ? currentLinkedIds.filter(id => id !== projectId)
+                    : [...currentLinkedIds, projectId];
+                return { ...def, linkedProjectIds: newLinkedIds };
+            }
+            return def;
+        })
     );
     
     setNavigationStack(prev => 
-        prev.map(item => 
-            item.id === taskId ? { ...item, linkedProjectId: projectId || undefined } : item
-        )
+        prev.map(item => {
+            if (item.id === taskId) {
+                const currentLinkedIds = item.linkedProjectIds || [];
+                const isLinked = currentLinkedIds.includes(projectId);
+                const newLinkedIds = isLinked 
+                    ? currentLinkedIds.filter(id => id !== projectId)
+                    : [...currentLinkedIds, projectId];
+                return { ...item, linkedProjectIds: newLinkedIds };
+            }
+            return item;
+        })
     );
-    toast({
-        title: projectId ? "Project Linked!" : "Project Unlinked!",
-        description: `Task "${taskToUpdate.name}" has been updated.`
-    });
-}, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions, toast]);
+  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
 
   const handleOpenNewFocusAreaModal = (type: 'deepwork' | 'upskill') => {
     if (!selectedMicroSkill) {
@@ -1153,7 +1164,7 @@ function DeepWorkPageContent() {
     } else {
         defToDelete = upskillDefinitions.find(d => d.id === id);
         setUpskillDefinitions(prev => prev.filter(def => def.id !== id).map(d => ({...d, linkedUpskillIds: (d.linkedUpskillIds || []).filter(linkedId => linkedId !== id)})));
-        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
     }
 
     if (defToDelete) {
@@ -1855,12 +1866,6 @@ useEffect(() => {
   }
 }, [currentTask, microSkillMap, coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedMicroSkill]);
   
-  const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
-    if (!linkingTask) return;
-    linkProjectToTask(linkingTask.id, projectId);
-    setIsLinkProjectModalOpen(false);
-  };
-  
   const handleOpenLinkProjectModal = (task: ExerciseDefinition) => {
     setLinkingTask(task);
     setIsLinkProjectModalOpen(true);
@@ -2011,7 +2016,6 @@ useEffect(() => {
                                 handleStartEditResource={handleStartEditResource}
                                 setViewMode={setViewMode}
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
-                                handleLinkProjectToTask={linkProjectToTask}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2263,22 +2267,21 @@ useEffect(() => {
                 <DialogHeader>
                     <DialogTitle>Link "{linkingTask?.name}" to a Project</DialogTitle>
                     <DialogDescription>
-                        Select a project from the same domain to create a strategic link.
+                        Select projects from the same domain to create strategic links.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <Select onValueChange={(projectId) => handleLinkProjectToTaskFromModal(projectId === 'none' ? null : projectId)} defaultValue={linkingTask?.linkedProjectId || 'none'}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select a project..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None (Unlink)</SelectItem>
-                            <DropdownMenuSeparator />
-                            {projectsForLinking.map(proj => (
-                                <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                <div className="py-4 space-y-2">
+                    {projectsForLinking.map(proj => (
+                         <div key={proj.id} className="flex items-center space-x-2">
+                            <Checkbox
+                                id={`proj-check-${proj.id}`}
+                                checked={(linkingTask?.linkedProjectIds || []).includes(proj.id)}
+                                onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
+                            />
+                            <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
+                        </div>
+                    ))}
+                    {projectsForLinking.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects in this domain.</p>}
                 </div>
             </DialogContent>
         </Dialog>
