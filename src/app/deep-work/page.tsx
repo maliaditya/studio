@@ -228,6 +228,7 @@ function LinkedDeepWorkCard({
     onOpenMindMap,
     onUpdateName,
     onCreateAndLinkChild,
+    projects
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -249,6 +250,7 @@ function LinkedDeepWorkCard({
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
     onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    projects: Project[];
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id,
@@ -296,6 +298,8 @@ function LinkedDeepWorkCard({
         setIsEditingName(false);
     };
     
+    const linkedProject = deepworkDef.linkedProjectId ? projects.find(p => p.id === deepworkDef.linkedProjectId) : null;
+    
     return (
         <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
@@ -331,9 +335,9 @@ function LinkedDeepWorkCard({
                         )}
                         <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
                     </div>
-                    {deepworkDef.linkedProjectId ? (
+                    {linkedProject ? (
                          <CardDescription>
-                            Project: <span className="font-semibold text-foreground">{deepWorkDefinitions.find(d => d.id === deepworkDef.linkedProjectId)?.name || '...'}</span>
+                            Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
                         </CardDescription>
                     ) : (
                         <CardDescription>{deepworkDef.category}</CardDescription>
@@ -524,6 +528,7 @@ function LibraryContent({
     handleOpenNestedPopup,
     handleStartEditResource,
     handleLinkProject,
+    setViewMode,
 }: any) {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -546,11 +551,13 @@ function LibraryContent({
     const currentTaskIsIntention = currentTask && getDeepWorkNodeType(currentTask) === 'Intention';
     
     const deepWorkLinkableTasks = deepWorkDefinitions.filter((def: ExerciseDefinition) => {
+        if (def.id === currentTask.id) return false;
         const nodeType = getDeepWorkNodeType(def);
         return def.category === currentTask.category && (nodeType === 'Action' || nodeType === 'Standalone');
     });
 
     const upskillLinkableTasks = upskillDefinitions.filter((def: ExerciseDefinition) => {
+        if (def.id === currentTask.id) return false;
         const nodeType = getUpskillNodeType(def);
         return def.category === currentTask.category && (nodeType === 'Visualization' || nodeType === 'Standalone');
     });
@@ -564,7 +571,7 @@ function LibraryContent({
         
         const newLinks = isLinked ? currentLinks.filter((id: string) => id !== itemId) : [...currentLinks, itemId];
         
-        const setParentDefinitions = currentTask.type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
+        const setParentDefinitions = currentTask.type === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
         
         setParentDefinitions((prev: ExerciseDefinition[]) => prev.map(def => 
             def.id === currentTask.id ? { ...def, [linkKey]: newLinks } : def
@@ -630,7 +637,8 @@ function LibraryContent({
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" variant="outline">
-                                    <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                    <Briefcase className="mr-2 h-4 w-4" /> 
+                                    {currentTask.linkedProjectId ? projects.find(p => p.id === currentTask.linkedProjectId)?.name || 'Link Project' : 'Link Project'}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
@@ -672,6 +680,7 @@ function LibraryContent({
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             onCreateAndLinkChild={onCreateAndLinkChild}
+                            projects={projects}
                         />
                     );
                 })}
@@ -760,6 +769,7 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
+    handleLinkProjectToTask
   } = useAuth();
   const router = useRouter();
   
@@ -1093,7 +1103,7 @@ function DeepWorkPageContent() {
     } else {
         defToDelete = upskillDefinitions.find(d => d.id === id);
         setUpskillDefinitions(prev => prev.filter(def => def.id !== id).map(d => ({...d, linkedUpskillIds: (d.linkedUpskillIds || []).filter(linkedId => linkedId !== id)})));
-        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
     }
 
     if (defToDelete) {
@@ -1421,7 +1431,7 @@ function DeepWorkPageContent() {
     }
 
     if (type === 'deepwork') {
-        let filteredDefs = deepWorkDefinitions.filter(def => !def.name || def.name === 'placeholder' || def.id === parent.id);
+        let filteredDefs = deepWorkDefinitions.filter(def => def.name && def.name !== 'placeholder' && def.id !== parent.id);
         if (linkSearchTerm) {
             filteredDefs = filteredDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
         }
@@ -1484,6 +1494,8 @@ function DeepWorkPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
+    if (!over) return;
+    
     if (active.id === over?.id) return;
 
     if (active.data.current?.type === 'card' && over?.data.current?.type === 'card' && over.data.current?.itemType !== 'resource') {
@@ -1644,18 +1656,6 @@ function DeepWorkPageContent() {
       def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
     ));
     toast({ title: "Status Updated", description: "Ready for Branding status has been toggled." });
-  };
-
-  const handleLinkProjectToTask = (taskId: string, projectId: string | null) => {
-    const isDeepWork = deepWorkDefinitions.some(d => d.id === taskId);
-    if (isDeepWork) {
-        setDeepWorkDefinitions(prev => prev.map(def => def.id === taskId ? { ...def, linkedProjectId: projectId || undefined } : def));
-    } else {
-        setUpskillDefinitions(prev => prev.map(def => def.id === taskId ? { ...def, linkedProjectId: projectId || undefined } : def));
-    }
-    toast({ title: "Project Linked", description: "The task has been successfully linked to the project." });
-    setLinkingTask(null);
-    setIsLinkProjectModalOpen(false);
   };
   
   const currentTaskIsIntention = currentTask && getDeepWorkNodeType(currentTask) === 'Intention';
@@ -1948,6 +1948,8 @@ useEffect(() => {
                                 handleOpenNestedPopup={handleOpenNestedPopup}
                                 handleStartEditResource={handleStartEditResource}
                                 handleLinkProject={handleLinkProjectToTask}
+                                setViewMode={setViewMode}
+                                projects={projects}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2189,7 +2191,12 @@ useEffect(() => {
             </DialogContent>
           </Dialog>
 
-        <Dialog open={!!linkingTask} onOpenChange={() => setLinkingTask(null)}>
+        <Dialog open={!!linkingTask} onOpenChange={(isOpen) => {
+            if (!isOpen) {
+                setLinkingTask(null);
+            }
+            setIsLinkProjectModalOpen(isOpen);
+        }}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Link "{linkingTask?.name}" to a Project</DialogTitle>
@@ -2198,7 +2205,7 @@ useEffect(() => {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <Select onValueChange={(projectId) => handleLinkProjectToTaskFromModal(projectId)}>
+                    <Select onValueChange={(projectId) => handleLinkProjectToTask(linkingTask!.id, projectId === 'none' ? null : projectId)} defaultValue={linkingTask?.linkedProjectId || 'none'}>
                         <SelectTrigger>
                             <SelectValue placeholder="Select a project..." />
                         </SelectTrigger>

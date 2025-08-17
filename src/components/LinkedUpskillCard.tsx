@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useRouter } from 'next/navigation';
 
 
@@ -146,7 +146,14 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
   onEdit: (def: ExerciseDefinition) => void;
   onCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: upskillDef.id });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: upskillDef.id,
+      data: {
+          type: 'card',
+          id: upskillDef.id,
+          itemType: 'upskill'
+      }
+  });
   const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
   const router = useRouter();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -260,7 +267,7 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
                 )}
                  <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
             </div>
-            {linkedProject ? (
+             {linkedProject ? (
                 <CardDescription>
                     Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
                 </CardDescription>
