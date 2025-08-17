@@ -211,7 +211,7 @@ export function TodaysScheduleCard({
   onOpenFocusModal,
   onOpenTaskContext,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask, dailyPurposes, setDailyPurposes, metaRules, openRuleDetailPopup } = useAuth();
+  const { carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
@@ -439,26 +439,6 @@ export function TodaysScheduleCard({
             <p className="text-sm">No activities scheduled.</p>
           </div>
         )}
-        <div className="mt-4 pt-4 border-t">
-          <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
-              <BrainCircuit className="h-4 w-4" />
-              Meta Rules
-          </h4>
-          <ScrollArea className="h-48">
-              <ul className="space-y-1 pr-2">
-                  {metaRules.map(rule => (
-                      <li key={rule.id}>
-                          <button 
-                              className="text-left text-xs text-muted-foreground hover:text-foreground w-full p-1 rounded"
-                              onClick={(e) => openRuleDetailPopup(rule.id, e)}
-                          >
-                              {rule.text}
-                          </button>
-                      </li>
-                  ))}
-              </ul>
-          </ScrollArea>
-        </div>
       </CardContent>
     </Card>
   );

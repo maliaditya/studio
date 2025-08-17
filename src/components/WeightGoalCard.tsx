@@ -11,7 +11,7 @@ import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition } from '@/types/workout';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -39,6 +39,7 @@ interface WeightGoalCardProps {
   deepWorkDefinitions: ExerciseDefinition[];
   upskillDefinitions: ExerciseDefinition[];
   onOpenIntentionPopup: (intentionId: string) => void;
+  metaRules: MetaRule[];
 }
 
 const weightChartConfig = {
@@ -78,6 +79,7 @@ export function WeightGoalCard({
     deepWorkDefinitions,
     upskillDefinitions,
     onOpenIntentionPopup,
+    metaRules
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
@@ -85,7 +87,9 @@ export function WeightGoalCard({
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
-    const [mainView, setMainView] = useState<'weight' | 'diet' | 'projects'>('projects');
+    const [mainView, setMainView] = useState<'projects' | 'weight' | 'diet' | 'rules'>('projects');
+    const { openRuleDetailPopup } = useAuth();
+
 
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -541,25 +545,31 @@ export function WeightGoalCard({
         return <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>;
     }
     
+    const renderRulesContent = () => {
+        return (
+            <ScrollArea className="h-[250px] pr-2">
+                <ul className="space-y-1">
+                    {metaRules.map(rule => (
+                        <li key={rule.id}>
+                            <button
+                                className="text-left text-xs text-muted-foreground hover:text-foreground w-full p-1 rounded"
+                                onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                            >
+                                {rule.text}
+                            </button>
+                        </li>
+                    ))}
+                    {metaRules.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">No meta rules defined.</p>}
+                </ul>
+            </ScrollArea>
+        );
+    };
+
     const cardViews = {
-        weight: {
-          icon: <Target />,
-          title: "Weight Goal",
-          description: "Your weekly weight trend and projections.",
-          content: renderWeightContent()
-        },
-        diet: {
-          icon: <Utensils />,
-          title: "Today's Diet",
-          description: `Your planned meals for ${format(new Date(), 'EEEE')}.`,
-          content: renderDietContent()
-        },
-        projects: {
-          icon: <Workflow />,
-          title: "Vision",
-          description: "A high-level view of your current work.",
-          content: renderProjectsContent()
-        }
+        weight: { icon: <Target />, title: "Weight Goal", description: "Your weekly weight trend and projections.", content: renderWeightContent() },
+        diet: { icon: <Utensils />, title: "Today's Diet", description: `Your planned meals for ${format(new Date(), 'EEEE')}.`, content: renderDietContent() },
+        projects: { icon: <Workflow />, title: "Vision", description: "A high-level view of your current work.", content: renderProjectsContent() },
+        rules: { icon: <Brain />, title: "Meta Rules", description: "Your guiding principles for success.", content: renderRulesContent() },
     };
     
     const currentViewData = cardViews[mainView];
@@ -580,6 +590,25 @@ export function WeightGoalCard({
                             <Button 
                                 variant="outline" 
                                 size="icon" 
+                                onClick={() => setMainView('projects')}
+                                className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}
+                            >
+                                <Briefcase className="h-4 w-4" />
+                            </Button>
+                             <Button 
+                                variant="outline" 
+                                size="icon" 
+                                onClick={() => setMainView('rules')}
+                                className={cn("h-8 w-8", mainView === 'rules' && 'bg-accent')}
+                            >
+                                <Brain className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => setMainView('diet')} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
+                                <Utensils className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
                                 onClick={() => {
                                     if (mainView === 'weight') {
                                         setWeightView(v => v === 'chart' ? 'details' : 'chart');
@@ -592,12 +621,6 @@ export function WeightGoalCard({
                                 {mainView === 'weight' 
                                     ? (weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />) 
                                     : <Target className="h-4 w-4" />}
-                            </Button>
-                            <Button variant="outline" size="icon" onClick={() => onEditDietClick()} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
-                                <Utensils className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="icon" onClick={() => setMainView('projects')} className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}>
-                                <Briefcase className="h-4 w-4" />
                             </Button>
                         </div>
                     </CardHeader>
