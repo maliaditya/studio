@@ -124,27 +124,38 @@ export function SkillLibrary({
   const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
   const getDeepWorkNodeType = (def: ExerciseDefinition) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (isParent) {
-        const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
-            const childDef = deepWorkDefinitions.find(d => d.id === childId);
-            return childDef && getDeepWorkNodeType(childDef) === 'Objective';
-        });
-        return hasObjectiveChild ? 'Intention' : 'Objective';
+    const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+    
+    if (!hasTaskChildren) {
+        const isChildOfTask = deepWorkDefinitions.some(parent => 
+            (parent.linkedDeepWorkIds || []).includes(def.id)
+        );
+        return isChildOfTask ? 'Action' : 'Standalone';
     }
-    return linkedDeepWorkChildIds.has(def.id) ? 'Action' : 'Standalone';
+
+    const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(d => d.id === childId);
+        return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
+    });
+
+    return hasObjectiveChild ? 'Intention' : 'Objective';
   };
   
   const getUpskillNodeType = (def: ExerciseDefinition) => {
-     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (isParent) {
-        const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-            const childDef = upskillDefinitions.find(d => d.id === childId);
-            return childDef && getUpskillNodeType(childDef) === 'Objective';
-        });
-        return hasObjectiveChild ? 'Curiosity' : 'Objective';
+     const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+
+    if (!hasTaskChildren) {
+        const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+        return isChild ? 'Visualization' : 'Standalone';
     }
-    return linkedUpskillChildIds.has(def.id) ? 'Visualization' : 'Standalone';
+      
+    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
+    });
+
+    if (hasObjectiveChild) return 'Curiosity';
+    return 'Objective';
   };
 
   const getIcon = (def: ExerciseDefinition) => {
@@ -183,10 +194,8 @@ export function SkillLibrary({
     if (selectedMicroSkill) {
       const allTasks = definitions.filter(def => def.category === selectedMicroSkill.name);
       
-      const filteredTasks = allTasks.filter(task => {
-        const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
-        return !childIdSet.has(task.id);
-      });
+      const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
+      const filteredTasks = allTasks.filter(task => !childIdSet.has(task.id));
       
       return (
         <div className="space-y-1">
