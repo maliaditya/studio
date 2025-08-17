@@ -1569,10 +1569,6 @@ useEffect(() => {
   }
 }, [currentTask, microSkillMap, coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedMicroSkill]);
   
-  if (isLoadingPage) {
-    return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
-  }
-  
   const handleLinkToggle = (itemId: string, itemType: 'deepwork' | 'upskill' | 'resource') => {
     if (!currentTask) return;
     
@@ -1700,7 +1696,7 @@ const libraryContent = () => {
                         if (!def) return null;
                         const domain = getDomainForCategory(def.category);
                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea} onCreateAndLinkChild={(pid,type) => {}} />;
+                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea} onCreateAndLinkChild={handleCreateAndLinkChild} />;
                     })}
                     {(currentTask.linkedResourceIds || []).map(id => {
                         const resource = resources.find(r => r.id === id);
