@@ -12,7 +12,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ExerciseDefinition, WorkoutExercise } from '@/types/workout';
+import type { ExerciseDefinition, WorkoutExercise, Project } from '@/types/workout';
 import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight, Flashlight, Focus, Frame, ArrowLeft, Bolt, Flag, Lightbulb } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -23,6 +23,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -50,6 +51,7 @@ export function TodaysLearningModal({
   setDeepWorkDefinitions,
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
+  const { projects, coreSkills, microSkillMap } = useAuth();
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for branding bundle creation
@@ -62,8 +64,8 @@ export function TodaysLearningModal({
   const [selectedDeepWorkObjective, setSelectedDeepWorkObjective] = useState<ExerciseDefinition | null>(null);
 
   // State for upskill selection flow
-  const [upskillSelectionStep, setUpskillSelectionStep] = useState<'topic' | 'curiosity' | 'visualization'>('topic');
-  const [selectedUpskillTopic, setSelectedUpskillTopic] = useState<string | null>(null);
+  const [upskillSelectionStep, setUpskillSelectionStep] = useState<'project' | 'curiosity' | 'visualization'>('project');
+  const [selectedUpskillProject, setSelectedUpskillProject] = useState<Project | null>(null);
   const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
 
 
@@ -75,8 +77,8 @@ export function TodaysLearningModal({
         setSelectedDeepWorkObjective(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       } else if (pageType === 'upskill') {
-        setUpskillSelectionStep('topic');
-        setSelectedUpskillTopic(null);
+        setUpskillSelectionStep('project');
+        setSelectedUpskillProject(null);
         setSelectedUpskillCuriosity(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       }
@@ -146,28 +148,31 @@ export function TodaysLearningModal({
   };
 
   // ----- UPSKILL-SPECIFIC LOGIC -----
-  const upskillTopics = useMemo(() => {
-    if (pageType !== 'upskill') return [];
-    return [...new Set(upskillDefinitions.map(def => def.category))].sort();
-  }, [upskillDefinitions, pageType]);
-
   const linkedUpskillChildIds = useMemo(() => 
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
 
-  const curiositiesForTopic = useMemo(() => {
-    if (!selectedUpskillTopic || pageType !== 'upskill') return [];
+  const curiositiesForProject = useMemo(() => {
+    if (!selectedUpskillProject || pageType !== 'upskill') return [];
+    
+    const microSkillIdsInProject = new Set(
+      selectedUpskillProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId))
+    );
 
     return (upskillDefinitions || []).filter(def => {
-        if (def.category !== selectedUpskillTopic) return false;
+        const microSkillInfo = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === def.category);
+        if (!microSkillInfo) return false;
         
+        const microSkillId = microSkillInfo[0];
+        if(!microSkillIdsInProject.has(microSkillId)) return false;
+
         const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
         
         return isParent && !isLinkedAsChild;
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [upskillDefinitions, selectedUpskillTopic, pageType, linkedUpskillChildIds]);
-  
+  }, [upskillDefinitions, selectedUpskillProject, pageType, linkedUpskillChildIds, microSkillMap]);
+
   const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();
       const visualizations: ExerciseDefinition[] = [];
@@ -335,7 +340,7 @@ export function TodaysLearningModal({
                                 <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
                                 {actionsForObjective.map(action => (
                                     <div key={action.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={action.id} id={`action-radio-${action.id}`} />
+                                        <RadioGroupItem value={action.definitionId} id={`action-radio-${action.id}`} />
                                         <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
                                             <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                             {action.name}
@@ -419,16 +424,16 @@ export function TodaysLearningModal({
                     <div className="flex items-center text-sm text-muted-foreground mb-4">
                         <button
                             onClick={() => {
-                                setUpskillSelectionStep('topic');
-                                setSelectedUpskillTopic(null);
+                                setUpskillSelectionStep('project');
+                                setSelectedUpskillProject(null);
                                 setSelectedUpskillCuriosity(null);
                             }}
                             className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
-                            disabled={upskillSelectionStep === 'topic'}
+                            disabled={upskillSelectionStep === 'project'}
                         >
-                            Topics
+                            Projects
                         </button>
-                        {selectedUpskillTopic && (
+                        {selectedUpskillProject && (
                             <>
                                 <ChevronRight className="h-4 w-4 mx-1" />
                                 <button
@@ -438,9 +443,9 @@ export function TodaysLearningModal({
                                     }}
                                     className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed truncate max-w-[150px]"
                                     disabled={upskillSelectionStep === 'curiosity'}
-                                    title={selectedUpskillTopic}
+                                    title={selectedUpskillProject.name}
                                 >
-                                    {selectedUpskillTopic}
+                                    {selectedUpskillProject.name}
                                 </button>
                             </>
                         )}
@@ -451,11 +456,11 @@ export function TodaysLearningModal({
                             </>
                         )}
                     </div>
-                    {upskillSelectionStep === 'topic' && (
+                     {upskillSelectionStep === 'project' && (
                         <div className="space-y-2">
-                            {upskillTopics.map(topic => (
-                                <button key={topic} onClick={() => { setSelectedUpskillTopic(topic); setUpskillSelectionStep('curiosity'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <span className="font-medium">{topic}</span>
+                            {projects.map(project => (
+                                <button key={project.id} onClick={() => { setSelectedUpskillProject(project); setUpskillSelectionStep('curiosity'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
                             ))}
@@ -463,7 +468,7 @@ export function TodaysLearningModal({
                     )}
                     {upskillSelectionStep === 'curiosity' && (
                          <div className="space-y-2">
-                            {curiositiesForTopic.length > 0 ? curiositiesForTopic.map(curiosity => (
+                            {curiositiesForProject.length > 0 ? curiositiesForProject.map(curiosity => (
                                 <button key={curiosity.id} onClick={() => { setSelectedUpskillCuriosity(curiosity); setUpskillSelectionStep('visualization'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <div className='flex items-center gap-2 min-w-0'>
                                         <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
@@ -471,7 +476,7 @@ export function TodaysLearningModal({
                                     </div>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
-                            )) : <p className="text-sm text-center text-muted-foreground py-4">No curiosities found in this topic.</p>}
+                            )) : <p className="text-sm text-center text-muted-foreground py-4">No curiosities found for this project.</p>}
                         </div>
                     )}
                     {upskillSelectionStep === 'visualization' && (
