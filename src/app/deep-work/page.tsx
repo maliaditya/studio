@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -523,7 +524,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
     handleViewProgress,
     onOpenMindMap,
     handleUpdateFocusAreaName,
-    onCreateAndLinkChild,
+    handleCreateAndLinkChild,
     setEmbedUrl,
     setFloatingVideoUrl,
     handleOpenNestedPopup,
@@ -631,23 +632,32 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
                     {isHighLevelNode && (
-                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant={linkedProject ? "secondary" : "outline"} className="gap-2">
-                                    <Briefcase className="h-4 w-4" /> 
-                                    {linkedProject ? linkedProject.name : 'Link Project'}
+                        linkedProject ? (
+                            <div className="flex items-center gap-1">
+                                <Button size="sm" variant="secondary" className="gap-2">
+                                    <Briefcase className="h-4 w-4" />
+                                    {linkedProject.name}
                                 </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                {projectsInDomain.map((proj: Project) => (
-                                    <DropdownMenuCheckboxItem key={proj.id} checked={currentTask.linkedProjectId === proj.id} onSelect={() => handleLinkProjectToTask(currentTask.id, currentTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
-                                ))}
-                                {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-                    {linkedProject && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
+                            </div>
+                        ) : (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline" className="gap-2">
+                                        <Briefcase className="h-4 w-4" />
+                                        Link Project
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {projectsInDomain.map((proj: Project) => (
+                                        <DropdownMenuCheckboxItem key={proj.id} checked={false} onSelect={() => handleLinkProjectToTask(currentTask.id, proj.id)}>
+                                            {proj.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                    {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )
                     )}
                 </div>
             </div>
@@ -681,7 +691,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projectsInDomainForChild}
                             handleLinkProject={handleLinkProjectToTask}
-                            onCreateAndLinkChild={onCreateAndLinkChild}
+                            onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
                 })}
@@ -712,7 +722,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                             projectsInDomain={projectsInDomainForChild} 
                             onLinkProject={handleLinkProjectToTask} 
                             onEdit={setEditingFocusArea} 
-                            onCreateAndLinkChild={onCreateAndLinkChild}
+                            onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
                 })}
@@ -730,7 +740,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                     ) : null;
                 })}
                 <Card
-                    onClick={() => onCreateAndLinkChild(currentTask.id, currentTask.type)}
+                    onClick={() => handleCreateAndLinkChild(currentTask.id, currentTask.type)}
                     className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
                 >
                     <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -2233,6 +2243,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
