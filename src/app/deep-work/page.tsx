@@ -28,7 +28,6 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -227,8 +226,9 @@ function LinkedDeepWorkCard({
     setSelectedSubtopic,
     onOpenMindMap,
     onUpdateName,
+    projects,
+    handleLinkProject,
     onCreateAndLinkChild,
-    projects
 }: {
     id: string;
     deepworkDef: ExerciseDefinition;
@@ -249,8 +249,9 @@ function LinkedDeepWorkCard({
     setSelectedSubtopic: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
-    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
     projects: Project[];
+    handleLinkProject: (intentionId: string, projectId: string | null) => void;
+    onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id,
@@ -297,7 +298,7 @@ function LinkedDeepWorkCard({
         }
         setIsEditingName(false);
     };
-    
+
     const linkedProject = deepworkDef.linkedProjectId ? projects.find(p => p.id === deepworkDef.linkedProjectId) : null;
     
     return (
@@ -335,8 +336,8 @@ function LinkedDeepWorkCard({
                         )}
                         <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
                     </div>
-                    {linkedProject ? (
-                         <CardDescription>
+                     {linkedProject ? (
+                        <CardDescription>
                             Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
                         </CardDescription>
                     ) : (
@@ -548,7 +549,9 @@ function LibraryContent({
         return projects.filter(p => p.domainId === domain.id);
     }, [currentTask, getDomainForCategory, projects]);
     
-    const currentTaskIsIntention = currentTask && getDeepWorkNodeType(currentTask) === 'Intention';
+    const nodeType = currentTask.type === 'deepwork' ? getDeepWorkNodeType(currentTask) : getUpskillNodeType(currentTask);
+    const isHighLevelNode = nodeType === 'Intention' || nodeType === 'Curiosity';
+    const linkedProject = currentTask?.linkedProjectId ? projects.find(p => p.id === currentTask.linkedProjectId) : null;
     
     const deepWorkLinkableTasks = deepWorkDefinitions.filter((def: ExerciseDefinition) => {
         if (def.id === currentTask.id) return false;
@@ -576,12 +579,6 @@ function LibraryContent({
         setParentDefinitions((prev: ExerciseDefinition[]) => prev.map(def => 
             def.id === currentTask.id ? { ...def, [linkKey]: newLinks } : def
         ));
-
-        // This should probably be handled differently - this component should not navigate.
-        // It's a sign that state management could be improved.
-        // setNavigationStack(prev => prev.map(item =>
-        //     item.id === currentTask!.id ? { ...item, [linkKey]: newLinks } : item
-        // ));
     };
 
     return (
@@ -633,23 +630,24 @@ function LibraryContent({
                     <Button size="sm" variant="outline" onClick={() => {}}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
-                    {currentTaskIsIntention && (
+                    {isHighLevelNode && (
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button size="sm" variant="outline">
-                                    <Briefcase className="mr-2 h-4 w-4" /> 
-                                    {currentTask.linkedProjectId ? projects.find(p => p.id === currentTask.linkedProjectId)?.name || 'Link Project' : 'Link Project'}
+                                <Button size="sm" variant={linkedProject ? "secondary" : "outline"} className="gap-2">
+                                    <Briefcase className="h-4 w-4" /> 
+                                    {linkedProject ? linkedProject.name : 'Link Project'}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
-                                <DropdownMenuItem onSelect={() => handleLinkProject(currentTask.id, null)}>None</DropdownMenuItem>
-                                <DropdownMenuSeparator />
                                 {projectsInDomain.map((proj: Project) => (
                                     <DropdownMenuCheckboxItem key={proj.id} checked={currentTask.linkedProjectId === proj.id} onSelect={() => handleLinkProject(currentTask.id, currentTask.linkedProjectId === proj.id ? null : proj.id)}>{proj.name}</DropdownMenuCheckboxItem>
                                 ))}
                                 {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
                             </DropdownMenuContent>
                         </DropdownMenu>
+                    )}
+                    {linkedProject && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProject(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
                     )}
                 </div>
             </div>
@@ -679,8 +677,9 @@ function LibraryContent({
                             setSelectedSubtopic={handleSelectFocusArea}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
-                            onCreateAndLinkChild={onCreateAndLinkChild}
                             projects={projects}
+                            handleLinkProject={handleLinkProject}
+                            onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
                 })}
@@ -709,7 +708,7 @@ function LibraryContent({
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={(cid: string, pid: string | null) => {}} 
+                            onLinkProject={handleLinkProject} 
                             onEdit={setEditingFocusArea} 
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
@@ -1949,7 +1948,6 @@ useEffect(() => {
                                 handleStartEditResource={handleStartEditResource}
                                 handleLinkProject={handleLinkProjectToTask}
                                 setViewMode={setViewMode}
-                                projects={projects}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2048,9 +2046,9 @@ useEffect(() => {
                                 }}>
                                     <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="deepwork">Deep Work</SelectItem>
-                                        <SelectItem value="upskill">Upskill</SelectItem>
-                                        <SelectItem value="resource">Resource</SelectItem>
+                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'deepwork' } : null)}>Deep Work</DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'upskill' } : null)}>Upskill</DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'resource' } : null)}>Resource</DropdownMenuItem>
                                     </SelectContent>
                                 </Select>
                                 {manageLinksConfig.type === 'upskill' && (
@@ -2059,9 +2057,9 @@ useEffect(() => {
                                             <SelectValue placeholder="Filter by Specialization..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Specializations</SelectItem>
+                                            <DropdownMenuItem onSelect={() => setSelectedSpecializationId(null)}>All Specializations</DropdownMenuItem>
                                             {coreSkills.filter(cs => cs.type === 'Specialization').map(spec => (
-                                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                                <DropdownMenuItem key={spec.id} onSelect={() => setSelectedSpecializationId(spec.id)}>{spec.name}</DropdownMenuItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -2157,9 +2155,9 @@ useEffect(() => {
                                                 <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
                                                     <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
                                                     <SelectContent>
-                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
+                                                        <DropdownMenuItem onSelect={() => setNewLinkedItemCuriosityId(null)}>None (create as new Curiosity)</DropdownMenuItem>
                                                         {curiositiesForLinking.map(curiosity => (
-                                                            <SelectItem key={curiosity.id} value={curiosity.id}>{curiosity.name}</SelectItem>
+                                                            <DropdownMenuItem key={curiosity.id} onSelect={() => setNewLinkedItemCuriosityId(curiosity.id)}>{curiosity.name}</DropdownMenuItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
@@ -2210,7 +2208,7 @@ useEffect(() => {
                             <SelectValue placeholder="Select a project..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="none">None (Unlink)</SelectItem>
+                            <DropdownMenuItem onSelect={() => handleLinkProjectToTask(linkingTask!.id, null)}>None (Unlink)</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             {projectsForLinking.map(proj => (
                                 <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
@@ -2231,3 +2229,5 @@ export default function DeepWorkPage() {
     
 
     
+
+

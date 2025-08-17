@@ -267,7 +267,7 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
                 )}
                  <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
             </div>
-             {linkedProject ? (
+            {linkedProject ? (
                 <CardDescription>
                     Project: <span className="font-semibold text-foreground">{linkedProject.name}</span>
                 </CardDescription>
