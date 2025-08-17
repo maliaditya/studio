@@ -206,30 +206,7 @@ function AddToSessionPopover({ definition, onSelectSlot }: { definition: Exercis
   );
 }
 
-function LinkedDeepWorkCard({
-    id,
-    deepworkDef,
-    getDeepWorkNodeType,
-    getDeepWorkLoggedMinutes,
-    permanentlyLoggedActionIds,
-    handleAddTaskToSession,
-    handleCardClick,
-    handleToggleReadyForBranding,
-    handleUnlinkItem,
-    handleDeleteFocusArea,
-    handleViewProgress,
-    deepWorkDefinitions,
-    formatDuration,
-    calculatedEstimate,
-    upskillDefinitions,
-    resources,
-    setSelectedSubtopic,
-    onOpenMindMap,
-    onUpdateName,
-    projects,
-    handleLinkProject,
-    onCreateAndLinkChild,
-}: {
+const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     id: string;
     deepworkDef: ExerciseDefinition;
     getDeepWorkNodeType: (def: ExerciseDefinition) => string;
@@ -250,28 +227,46 @@ function LinkedDeepWorkCard({
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
     projects: Project[];
-    handleLinkProject: (intentionId: string, projectId: string | null) => void;
+    handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
-}) {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id,
-        data: {
-          type: 'card',
-          id: id,
-          itemType: 'deepwork'
-        }
-    });
+}>(({
+    id,
+    deepworkDef,
+    getDeepWorkNodeType,
+    getDeepWorkLoggedMinutes,
+    permanentlyLoggedActionIds,
+    handleAddTaskToSession,
+    handleCardClick,
+    handleToggleReadyForBranding,
+    handleUnlinkItem,
+    handleDeleteFocusArea,
+    handleViewProgress,
+    deepWorkDefinitions,
+    formatDuration,
+    calculatedEstimate,
+    upskillDefinitions,
+    resources,
+    setSelectedSubtopic,
+    onOpenMindMap,
+    onUpdateName,
+    projects,
+    handleOpenLinkProjectModal,
+    onCreateAndLinkChild,
+}, ref) => {
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
     const router = useRouter();
 
     const setCombinedRefs = (node: HTMLElement | null) => {
-        setNodeRef(node);
+        if (typeof ref === 'function') {
+            ref(node);
+        } else if (ref) {
+            ref.current = node;
+        }
         setDroppableNodeRef(node);
     };
 
-    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: transform ? 100 : 'auto', } : undefined;
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
     const getIcon = () => {
@@ -302,10 +297,10 @@ function LinkedDeepWorkCard({
     const linkedProject = deepworkDef.linkedProjectId ? projects.find(p => p.id === deepworkDef.linkedProjectId) : null;
     
     return (
-        <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
+        <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                     <AddToSessionPopover definition={deepworkDef} onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} />
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleCardClick(deepworkDef)}><ArrowRight className="h-4 w-4" /></Button>
                     <DropdownMenu>
@@ -372,7 +367,8 @@ function LinkedDeepWorkCard({
             </Card>
         </div>
     );
-}
+});
+LinkedDeepWorkCard.displayName = 'LinkedDeepWorkCard';
 
 function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
@@ -530,6 +526,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource: (resource: Resource) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+    handleLinkProjectToTask: (taskId: string, projectId: string | null) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -559,6 +556,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource,
     setViewMode,
     handleOpenLinkProjectModal,
+    handleLinkProjectToTask,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -666,7 +664,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             <Briefcase className="h-4 w-4" />
                             {linkedProject.name}
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenLinkProjectModal(currentTask)}><Unlink className="h-4 w-4 text-destructive" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive" /></Button>
                         </div>
                       ) : (
                         <Button size="sm" variant="outline" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
@@ -706,7 +704,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projectsInDomainForChild}
-                            handleLinkProject={() => {}}
+                            handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
@@ -1979,6 +1977,12 @@ useEffect(() => {
                             </div>
                         ) : currentTask ? (
                             <LibraryContent 
+                                ref={(node) => {
+                                    const draggableNode = (node as any)?.querySelector('[data-dnd-kit-draggable]');
+                                    if(draggableNode) {
+                                      draggableNode.setAttribute('style', ''); // Or more targeted style reset
+                                    }
+                                }}
                                 currentTask={currentTask}
                                 deepWorkDefinitions={deepWorkDefinitions}
                                 upskillDefinitions={upskillDefinitions}
@@ -2007,6 +2011,7 @@ useEffect(() => {
                                 handleStartEditResource={handleStartEditResource}
                                 setViewMode={setViewMode}
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                handleLinkProjectToTask={linkProjectToTask}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2302,3 +2307,6 @@ export default function DeepWorkPage() {
 
     
 
+
+
+    
