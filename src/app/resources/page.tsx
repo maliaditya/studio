@@ -515,6 +515,9 @@ function ResourcesPageContent() {
   const [searchTerm, setSearchTerm] = useState('');
   const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
+  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
+  const [currentDisplayText, setCurrentDisplayText] = useState('');
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -1234,9 +1237,6 @@ function ResourcesPageContent() {
   }, [activeResourceTabIds, pinnedFolderIds]);
   
 
-  const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
-  const [currentDisplayText, setCurrentDisplayText] = useState('');
-
   const handleEditLinkText = (point: ResourcePoint) => {
     const resource = resources.find(r => r.points?.some(p => p.id === point.id));
     if (!resource) return;
@@ -1352,7 +1352,7 @@ function ResourcesPageContent() {
 
   return (
     <>
-      <audio ref={audioRef} onEnded={() => setPlayingAudio(null)} />
+      <audio ref={audioRef} />
       <DndContext
         sensors={sensors}
         onDragStart={(e) => setActiveId(e.active.id.toString())}
@@ -1812,6 +1812,22 @@ function ResourcesPageContent() {
               </div>
           </DialogContent>
         </Dialog>
+        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Link Display Text</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="display-text">Display Text</Label>
+                    <Input id="display-text" value={currentDisplayText} onChange={(e) => setCurrentDisplayText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveLinkText()} autoFocus />
+                    <p className="text-xs text-muted-foreground mt-2">Original URL: {linkTextDialog?.point.text}</p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                    <Button onClick={handleSaveLinkText}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </DndContext>
     </>
   );
@@ -1910,4 +1926,5 @@ export default function ResourcesPage() {
     
 
     
+
 

@@ -224,9 +224,10 @@ export interface GapAnalysis {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card';
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
+  displayText?: string;
 }
 export interface Resource {
   id: string;
@@ -581,3 +582,4 @@ export interface TaskContextPopupState {
   level: number;
   parentId?: string;
 }
+
