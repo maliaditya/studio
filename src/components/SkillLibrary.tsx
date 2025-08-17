@@ -79,6 +79,8 @@ export function SkillLibrary({
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+
 
   const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
   const selectedCoreSkill = coreSkills.find(s => s.id === selectedSkillId);
@@ -220,7 +222,13 @@ export function SkillLibrary({
 
                     return (
                         <DropdownMenu key={task.id}>
-                            <DropdownMenuTrigger asChild>
+                            <DropdownMenuTrigger
+                                asChild
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setContextMenuOpen(true);
+                                }}
+                            >
                                 <div className="flex items-center justify-between group/task rounded-md hover:bg-muted">
                                     {editingFocusAreaId === task.id ? (
                                       <Input
