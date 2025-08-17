@@ -502,7 +502,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
+const LibraryContent: React.FC<any> = ({
     currentTask,
     deepWorkDefinitions,
     upskillDefinitions,
@@ -524,14 +524,14 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
     handleViewProgress,
     onOpenMindMap,
     handleUpdateFocusAreaName,
-    handleCreateAndLinkChild,
+    onCreateAndLinkChild,
     setEmbedUrl,
     setFloatingVideoUrl,
     handleOpenNestedPopup,
     handleStartEditResource,
     handleLinkProjectToTask,
     setViewMode,
-}, ref) => {
+}) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
     
@@ -583,7 +583,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
     };
 
     return (
-        <div className="space-y-4" ref={ref}>
+        <div className="space-y-4">
             <div className="space-y-1">
                 <h3 className="text-xl font-bold">{currentTask.name}</h3>
                 <div className="flex flex-wrap items-center gap-2">
@@ -650,9 +650,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent>
                                     {projectsInDomain.map((proj: Project) => (
-                                        <DropdownMenuCheckboxItem key={proj.id} checked={false} onSelect={() => handleLinkProjectToTask(currentTask.id, proj.id)}>
+                                        <DropdownMenuItem key={proj.id} onSelect={() => handleLinkProjectToTask(currentTask.id, proj.id)}>
                                             {proj.name}
-                                        </DropdownMenuCheckboxItem>
+                                        </DropdownMenuItem>
                                     ))}
                                     {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
                                 </DropdownMenuContent>
@@ -691,7 +691,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projectsInDomainForChild}
                             handleLinkProject={handleLinkProjectToTask}
-                            onCreateAndLinkChild={handleCreateAndLinkChild}
+                            onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
                 })}
@@ -722,7 +722,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                             projectsInDomain={projectsInDomainForChild} 
                             onLinkProject={handleLinkProjectToTask} 
                             onEdit={setEditingFocusArea} 
-                            onCreateAndLinkChild={handleCreateAndLinkChild}
+                            onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
                 })}
@@ -740,7 +740,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                     ) : null;
                 })}
                 <Card
-                    onClick={() => handleCreateAndLinkChild(currentTask.id, currentTask.type)}
+                    onClick={() => onCreateAndLinkChild(currentTask.id, currentTask.type)}
                     className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
                 >
                     <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -751,7 +751,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
             </div>
         </div>
     );
-});
+};
 LibraryContent.displayName = 'LibraryContent';
 
 function DeepWorkPageContent() {
@@ -1933,7 +1933,6 @@ useEffect(() => {
                             </div>
                         ) : currentTask ? (
                             <LibraryContent 
-                                ref={null}
                                 currentTask={currentTask}
                                 deepWorkDefinitions={deepWorkDefinitions}
                                 upskillDefinitions={upskillDefinitions}
@@ -2243,6 +2242,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
