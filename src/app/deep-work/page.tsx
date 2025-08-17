@@ -623,41 +623,47 @@ function DeepWorkPageContent() {
   }, [allDeepWorkLogs, allUpskillLogs]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    
-    if (!hasTaskChildren) {
-        const isChildOfTask = deepWorkDefinitions.some(parent => 
-            (parent.linkedDeepWorkIds || []).includes(def.id)
-        );
-        return isChildOfTask ? 'Action' : 'Standalone';
+    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+    if (!hasChildren) {
+        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+        return isChild ? 'Action' : 'Standalone';
     }
+    
+    const hasActionableChild = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(d => d.id === childId);
+        return childDef && getDeepWorkNodeType(childDef).match(/Action|Standalone/);
+    });
+    if (hasActionableChild) return 'Objective';
 
-    // Check if any child is an Objective (i.e., a parent itself)
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        // An objective has task children, but none of its children are also objectives
-        return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
+        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
     });
+    if (hasObjectiveChild) return 'Intention';
 
-    return hasObjectiveChild ? 'Intention' : 'Objective';
+    return 'Objective';
   }, [deepWorkDefinitions]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-
-    if (!hasTaskChildren) {
+    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+    if (!hasChildren) {
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
-      
-    // An objective has children, but none of its children are also objectives
+    
+    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        return childDef && getUpskillNodeType(childDef).match(/Visualization|Standalone/);
+    });
+    if (hasActionableChild) return 'Objective';
+    
     const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
+        return childDef && getUpskillNodeType(childDef) === 'Objective';
     });
-
     if (hasObjectiveChild) return 'Curiosity';
+    
     return 'Objective';
   }, [upskillDefinitions]);
 
@@ -1560,9 +1566,38 @@ useEffect(() => {
   if (isLoadingPage) {
     return <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]"><Loader2 className="h-16 w-16 text-primary animate-spin mb-4" /><p className="text-muted-foreground">Loading your deep work data...</p></div>;
   }
+  
+  const handleLinkToggle = (itemId: string, itemType: 'deepwork' | 'upskill' | 'resource') => {
+    if (!currentTask) return;
+    
+    const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : itemType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
+    const currentLinks = currentTask[linkKey] || [];
+    const isLinked = currentLinks.includes(itemId);
+    
+    const newLinks = isLinked ? currentLinks.filter((id: string) => id !== itemId) : [...currentLinks, itemId];
+    
+    const setParentDefinitions = currentTask.type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
+    
+    setParentDefinitions(prev => prev.map(def => 
+        def.id === currentTask.id ? { ...def, [linkKey]: newLinks } : def
+    ));
 
-  const libraryContent = () => {
+    setNavigationStack(prev => prev.map(item =>
+        item.id === currentTask!.id ? { ...item, [linkKey]: newLinks } : item
+    ));
+};
+
+const libraryContent = () => {
     if (currentTask) {
+        const deepWorkLinkableTasks = deepWorkDefinitions.filter(def => {
+            const nodeType = getDeepWorkNodeType(def);
+            return def.category === currentTask.category && (nodeType === 'Action' || nodeType === 'Standalone');
+        });
+        const upskillLinkableTasks = upskillDefinitions.filter(def => {
+            const nodeType = getUpskillNodeType(def);
+            return def.category === currentTask.category && (nodeType === 'Visualization' || nodeType === 'Standalone');
+        });
+
         return (
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -1585,12 +1620,47 @@ useEffect(() => {
                 <div className="space-y-1">
                     <h3 className="text-xl font-bold">{currentTask.name}</h3>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('deepwork', currentTask)}>
-                            <LinkIcon className="mr-2 h-4 w-4" /> Link Deep Work
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('upskill', currentTask)}>
-                            <BookCopy className="mr-2 h-4 w-4" /> Link Upskill
-                        </Button>
+                         <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline"><LinkIcon className="mr-2 h-4 w-4" /> Link Deep Work</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64">
+                                <DropdownMenuLabel>Link Actions/Standalones</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {deepWorkLinkableTasks.map(task => (
+                                        <DropdownMenuCheckboxItem
+                                            key={task.id}
+                                            checked={(currentTask.linkedDeepWorkIds || []).includes(task.id)}
+                                            onCheckedChange={() => handleLinkToggle(task.id, 'deepwork')}
+                                        >
+                                            {task.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline"><BookCopy className="mr-2 h-4 w-4" /> Link Upskill</Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-64">
+                                <DropdownMenuLabel>Link Visualizations/Standalones</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                    {upskillLinkableTasks.map(task => (
+                                        <DropdownMenuCheckboxItem
+                                            key={task.id}
+                                            checked={(currentTask.linkedUpskillIds || []).includes(task.id)}
+                                            onCheckedChange={() => handleLinkToggle(task.id, 'upskill')}
+                                        >
+                                            {task.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask)}>
                             <Folder className="mr-2 h-4 w-4" /> Link Resource
                         </Button>
@@ -1617,14 +1687,14 @@ useEffect(() => {
                     {(currentTask.linkedDeepWorkIds || []).map(id => {
                         const def = deepWorkDefinitions.find(d => d.id === id);
                         if (!def) return null;
-                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} onCreateAndLinkChild={handleCreateAndLinkChild}/>;
+                        return <LinkedDeepWorkCard key={id} id={id} deepworkDef={def} getDeepWorkNodeType={getDeepWorkNodeType} getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes} permanentlyLoggedActionIds={permanentlyLoggedActionIds} handleAddTaskToSession={handleAddTaskToSession} handleCardClick={handleCardClick} handleToggleReadyForBranding={handleToggleReadyForBranding} handleUnlinkItem={handleUnlinkItem} handleDeleteFocusArea={handleDeleteFocusArea} handleViewProgress={handleViewProgress} deepWorkDefinitions={deepWorkDefinitions} formatDuration={formatMinutes} calculatedEstimate={calculateTotalEstimate(def)} upskillDefinitions={upskillDefinitions} resources={resources} setSelectedSubtopic={(d, type) => handleSelectFocusArea(d, type)} onOpenMindMap={(id) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomain} handleLinkProject={handleLinkProject} onCreateAndLinkChild={(parentId, type) => handleCreateAndLinkChild(parentId, type as 'deepwork' | 'upskill')} />;
                     })}
                      {(currentTask.linkedUpskillIds || []).map(id => {
                         const def = upskillDefinitions.find(d => d.id === id);
                         if (!def) return null;
                         const domain = getDomainForCategory(def.category);
                         const projectsInDomainForChild = domain ? projects.filter(p => p.domainId === domain.id) : [];
-                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea}/>;
+                        return <LinkedUpskillCard key={id} upskillDef={def} handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')} setViewMode={setViewMode} handleUnlinkItem={handleUnlinkItem} handleDeleteSubtopic={handleDeleteFocusArea} handleViewProgress={(d) => handleViewProgress(d, 'upskill')} isComplete={isUpskillObjectiveComplete(def.id)} getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} upskillDefinitions={upskillDefinitions} resources={resources} calculatedEstimate={calculateTotalEstimate(def)} setEmbedUrl={setEmbedUrl} setFloatingVideoUrl={setFloatingVideoUrl} linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} onUpdateName={handleUpdateFocusAreaName} projectsInDomain={projectsInDomainForChild} onLinkProject={(cid, pid) => {}} onEdit={setEditingFocusArea} onCreateAndLinkChild={(parentId, type) => handleCreateAndLinkChild(parentId, type as 'deepwork' | 'upskill')}/>;
                     })}
                     {(currentTask.linkedResourceIds || []).map(id => {
                         const resource = resources.find(r => r.id === id);
