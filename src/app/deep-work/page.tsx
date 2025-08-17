@@ -501,36 +501,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
   );
 }
 
-const LibraryContent = ({
-    currentTask,
-    deepWorkDefinitions,
-    upskillDefinitions,
-    resources,
-    permanentlyLoggedActionIds,
-    getDeepWorkNodeType,
-    getUpskillNodeType,
-    getDeepWorkLoggedMinutes,
-    getUpskillLoggedMinutesRecursive,
-    calculateTotalEstimate,
-    formatMinutes,
-    isUpskillObjectiveComplete,
-    handleAddTaskToSession,
-    handleCardClick,
-    handleSelectFocusArea,
-    handleToggleReadyForBranding,
-    handleUnlinkItem,
-    handleDeleteFocusArea,
-    handleViewProgress,
-    onOpenMindMap,
-    handleUpdateFocusAreaName,
-    onCreateAndLinkChild,
-    setEmbedUrl,
-    setFloatingVideoUrl,
-    handleOpenNestedPopup,
-    handleStartEditResource,
-    handleLinkProjectToTask,
-    setViewMode,
-}: {
+const LibraryContent = React.forwardRef<HTMLDivElement, {
     currentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' };
     deepWorkDefinitions: ExerciseDefinition[];
     upskillDefinitions: ExerciseDefinition[];
@@ -557,9 +528,38 @@ const LibraryContent = ({
     setFloatingVideoUrl: (url: string | null) => void;
     handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
     handleStartEditResource: (resource: Resource) => void;
-    handleLinkProjectToTask: (intentionId: string, projectId: string | null) => void;
     setViewMode: (mode: 'session' | 'library') => void;
-}) => {
+    handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+}>(({
+    currentTask,
+    deepWorkDefinitions,
+    upskillDefinitions,
+    resources,
+    permanentlyLoggedActionIds,
+    getDeepWorkNodeType,
+    getUpskillNodeType,
+    getDeepWorkLoggedMinutes,
+    getUpskillLoggedMinutesRecursive,
+    calculateTotalEstimate,
+    formatMinutes,
+    isUpskillObjectiveComplete,
+    handleAddTaskToSession,
+    handleCardClick,
+    handleSelectFocusArea,
+    handleToggleReadyForBranding,
+    handleUnlinkItem,
+    handleDeleteFocusArea,
+    handleViewProgress,
+    onOpenMindMap,
+    handleUpdateFocusAreaName,
+    onCreateAndLinkChild,
+    setEmbedUrl,
+    setFloatingVideoUrl,
+    handleOpenNestedPopup,
+    handleStartEditResource,
+    setViewMode,
+    handleOpenLinkProjectModal,
+}, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
     
@@ -611,7 +611,7 @@ const LibraryContent = ({
     };
 
     return (
-        <div className="space-y-4">
+        <div ref={ref} className="space-y-4">
             <div className="space-y-1">
                 <h3 className="text-xl font-bold">{currentTask.name}</h3>
                 <div className="flex flex-wrap items-center gap-2">
@@ -659,33 +659,21 @@ const LibraryContent = ({
                     <Button size="sm" variant="outline" onClick={() => {}}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
-                     {isHighLevelNode && (
-                        linkedProject ? (
-                            <div className="flex items-center gap-1">
-                                <Button size="sm" variant="secondary" className="gap-2">
-                                    <Briefcase className="h-4 w-4" />
-                                    {linkedProject.name}
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleLinkProjectToTask(currentTask.id, null)}><Unlink className="h-4 w-4 text-destructive"/></Button>
-                            </div>
-                        ) : (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" className="gap-2">
-                                        <Briefcase className="h-4 w-4" />
-                                        Link Project
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    {projectsInDomain.map((proj: Project) => (
-                                        <DropdownMenuItem key={proj.id} onSelect={() => handleLinkProjectToTask(currentTask.id, proj.id)}>
-                                            {proj.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                    {projectsInDomain.length === 0 && <DropdownMenuItem disabled>No projects in this domain</DropdownMenuItem>}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )
+                    {isHighLevelNode && (
+                      linkedProject ? (
+                        <div className="flex items-center gap-1">
+                          <Button size="sm" variant="secondary" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
+                            <Briefcase className="h-4 w-4" />
+                            {linkedProject.name}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleOpenLinkProjectModal(currentTask)}><Unlink className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                      ) : (
+                        <Button size="sm" variant="outline" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
+                          <Briefcase className="h-4 w-4" />
+                          Link Project
+                        </Button>
+                      )
                     )}
                 </div>
             </div>
@@ -718,7 +706,7 @@ const LibraryContent = ({
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projectsInDomainForChild}
-                            handleLinkProject={handleLinkProjectToTask}
+                            handleLinkProject={() => {}}
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
                     );
@@ -748,7 +736,7 @@ const LibraryContent = ({
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={handleLinkProjectToTask} 
+                            onLinkProject={() => {}}
                             onEdit={setEditingFocusArea} 
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
@@ -779,7 +767,7 @@ const LibraryContent = ({
             </div>
         </div>
     );
-};
+});
 LibraryContent.displayName = 'LibraryContent';
 
 function DeepWorkPageContent() {
@@ -809,7 +797,6 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
-    handleLinkProjectToTask
   } = useAuth();
   const router = useRouter();
   
@@ -865,6 +852,31 @@ function DeepWorkPageContent() {
   
   const [isLinkProjectModalOpen, setIsLinkProjectModalOpen] = useState(false);
   const [linkingTask, setLinkingTask] = useState<ExerciseDefinition | null>(null);
+  
+  const linkProjectToTask = useCallback((taskId: string, projectId: string | null) => {
+    const isDeepWork = deepWorkDefinitions.some(d => d.id === taskId);
+    const definitions = isDeepWork ? deepWorkDefinitions : upskillDefinitions;
+    const setDefinitions = isDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+
+    const taskToUpdate = definitions.find(d => d.id === taskId);
+    if (!taskToUpdate) return;
+    
+    setDefinitions(prev => 
+        prev.map(def => 
+            def.id === taskId ? { ...def, linkedProjectId: projectId || undefined } : def
+        )
+    );
+    
+    setNavigationStack(prev => 
+        prev.map(item => 
+            item.id === taskId ? { ...item, linkedProjectId: projectId || undefined } : item
+        )
+    );
+    toast({
+        title: projectId ? "Project Linked!" : "Project Unlinked!",
+        description: `Task "${taskToUpdate.name}" has been updated.`
+    });
+}, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions, toast]);
 
   const handleOpenNewFocusAreaModal = (type: 'deepwork' | 'upskill') => {
     if (!selectedMicroSkill) {
@@ -1847,7 +1859,7 @@ useEffect(() => {
   
   const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
     if (!linkingTask) return;
-    handleLinkProjectToTask(linkingTask.id, projectId);
+    linkProjectToTask(linkingTask.id, projectId);
     setIsLinkProjectModalOpen(false);
   };
   
@@ -1993,8 +2005,8 @@ useEffect(() => {
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
                                 handleStartEditResource={handleStartEditResource}
-                                handleLinkProjectToTask={handleLinkProjectToTask}
                                 setViewMode={setViewMode}
+                                handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2289,3 +2301,4 @@ export default function DeepWorkPage() {
     
 
     
+
