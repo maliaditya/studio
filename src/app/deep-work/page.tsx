@@ -285,7 +285,7 @@ function LinkedDeepWorkCard({
       }
     };
 
-    const isActionable = nodeType === 'Action' || nodeType === 'Standalone' || nodeType === 'Intention';
+    const isActionable = ['Action', 'Standalone', 'Intention'].includes(nodeType);
     const isComplete = isActionable && permanentlyLoggedActionIds.has(deepworkDef.id);
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
@@ -2233,6 +2233,8 @@ export default function DeepWorkPage() {
     
 
     
+
+
 
 
 
