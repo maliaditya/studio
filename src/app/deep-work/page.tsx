@@ -631,7 +631,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
                     {isHighLevelNode && (
-                        <DropdownMenu>
+                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button size="sm" variant={linkedProject ? "secondary" : "outline"} className="gap-2">
                                     <Briefcase className="h-4 w-4" /> 
@@ -655,6 +655,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                 {(currentTask.linkedDeepWorkIds || []).map((id: string) => {
                     const def = deepWorkDefinitions.find((d: ExerciseDefinition) => d.id === id);
                     if (!def) return null;
+                    const domain = getDomainForCategory(def.category);
+                    const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     return (
                         <LinkedDeepWorkCard 
                             key={id} 
@@ -677,7 +679,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, any>(({
                             setSelectedSubtopic={handleSelectFocusArea}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
-                            projects={projects}
+                            projects={projectsInDomainForChild}
                             handleLinkProject={handleLinkProjectToTask}
                             onCreateAndLinkChild={onCreateAndLinkChild}
                         />
@@ -1921,6 +1923,7 @@ useEffect(() => {
                             </div>
                         ) : currentTask ? (
                             <LibraryContent 
+                                ref={null}
                                 currentTask={currentTask}
                                 deepWorkDefinitions={deepWorkDefinitions}
                                 upskillDefinitions={upskillDefinitions}
@@ -2047,9 +2050,9 @@ useEffect(() => {
                                 }}>
                                     <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'deepwork' } : null)}>Deep Work</DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'upskill' } : null)}>Upskill</DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setManageLinksConfig(prev => prev ? { ...prev, type: 'resource' } : null)}>Resource</DropdownMenuItem>
+                                        <SelectItem value="deepwork">Deep Work</SelectItem>
+                                        <SelectItem value="upskill">Upskill</SelectItem>
+                                        <SelectItem value="resource">Resource</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 {manageLinksConfig.type === 'upskill' && (
@@ -2058,9 +2061,9 @@ useEffect(() => {
                                             <SelectValue placeholder="Filter by Specialization..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <DropdownMenuItem onSelect={() => setSelectedSpecializationId(null)}>All Specializations</DropdownMenuItem>
+                                            <SelectItem value="all">All Specializations</SelectItem>
                                             {coreSkills.filter(cs => cs.type === 'Specialization').map(spec => (
-                                                <DropdownMenuItem key={spec.id} onSelect={() => setSelectedSpecializationId(spec.id)}>{spec.name}</DropdownMenuItem>
+                                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -2156,9 +2159,9 @@ useEffect(() => {
                                                 <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
                                                     <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
                                                     <SelectContent>
-                                                        <DropdownMenuItem onSelect={() => setNewLinkedItemCuriosityId(null)}>None (create as new Curiosity)</DropdownMenuItem>
+                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
                                                         {curiositiesForLinking.map(curiosity => (
-                                                            <DropdownMenuItem key={curiosity.id} onSelect={() => setNewLinkedItemCuriosityId(curiosity.id)}>{curiosity.name}</DropdownMenuItem>
+                                                            <SelectItem key={curiosity.id} value={curiosity.id}>{curiosity.name}</SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
@@ -2209,7 +2212,7 @@ useEffect(() => {
                             <SelectValue placeholder="Select a project..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <DropdownMenuItem onSelect={() => handleLinkProjectToTask(linkingTask!.id, null)}>None (Unlink)</DropdownMenuItem>
+                            <SelectItem value="none">None (Unlink)</SelectItem>
                             <DropdownMenuSeparator />
                             {projectsForLinking.map(proj => (
                                 <SelectItem key={proj.id} value={proj.id}>{proj.name}</SelectItem>
@@ -2230,6 +2233,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
