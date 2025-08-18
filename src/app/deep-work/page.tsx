@@ -516,6 +516,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     linkProjectToTask: (taskId: string, projectId: string | null) => void;
     onEdit: (def: ExerciseDefinition) => void;
     handleOpenManageLinksModal: (type: 'resource', parent: ExerciseDefinition) => void;
+    handleCreateResource: (parentTask: ExerciseDefinition) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -548,6 +549,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     linkProjectToTask,
     onEdit,
     handleOpenManageLinksModal,
+    handleCreateResource,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -760,6 +762,15 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         Add New {currentTask.type === 'deepwork' ? 'Action' : 'Visualization'}
                     </p>
                 </Card>
+                 <Card
+                    onClick={() => handleCreateResource(currentTask)}
+                    className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                >
+                    <Folder className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                        Add New Resource
+                    </p>
+                </Card>
             </div>
         </div>
     );
@@ -775,7 +786,7 @@ function DeepWorkPageContent() {
     deepWorkDefinitions, setDeepWorkDefinitions,
     upskillDefinitions, setUpskillDefinitions,
     topicGoals, 
-    resources, setResources, resourceFolders,
+    resources, setResources, resourceFolders, setResourceFolders,
     setFloatingVideoUrl,
     selectedDeepWorkTask, 
     setSelectedDeepWorkTask,
@@ -794,6 +805,7 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
+    createResourceWithHierarchy,
   } = useAuth();
   const router = useRouter();
   
@@ -1710,6 +1722,9 @@ function DeepWorkPageContent() {
     }
   };
 
+  const handleCreateResource = (parentTask: ExerciseDefinition) => {
+      createResourceWithHierarchy(parentTask, 'card');
+  };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
     if (type === 'deepwork') {
@@ -1944,6 +1959,7 @@ useEffect(() => {
                                 linkProjectToTask={linkProjectToTask}
                                 onEdit={setEditingFocusArea}
                                 handleOpenManageLinksModal={(type, parent) => handleOpenManageLinksModal(type, parent)}
+                                handleCreateResource={handleCreateResource}
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2369,3 +2385,4 @@ export default function DeepWorkPage() {
 
 
     
+

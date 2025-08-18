@@ -152,6 +152,7 @@ interface AuthContextType {
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
+  createResourceWithHierarchy: (parentTask: ExerciseDefinition, type: Resource['type']) => void;
 
   
   // Resource Popups (Original system, kept for resources page)
@@ -1969,6 +1970,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const createResourceWithHierarchy = (parentTask: ExerciseDefinition, type: Resource['type']) => {
+    const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parentTask.category);
+    if (!microSkill) {
+      toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
+      return;
+    }
+  
+    const microSkillInfo = microSkill[1];
+    const { coreSkillName, skillAreaName } = microSkillInfo;
+  
+    const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
+    if (!coreSkill) return;
+  
+    const domain = skillDomains.find(d => d.id === coreSkill.domainId);
+    if (!domain) return;
+  
+    let parentFolderId: string | null = null;
+    let currentFolders = [...resourceFolders];
+  
+    const path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parentTask.name];
+  
+    path.forEach(folderName => {
+      let folder = currentFolders.find(f => f.name === folderName && f.parentId === parentFolderId);
+      if (!folder) {
+        folder = {
+          id: `folder_${Date.now()}_${Math.random()}`,
+          name: folderName,
+          parentId: parentFolderId,
+        };
+        currentFolders.push(folder);
+      }
+      parentFolderId = folder.id;
+    });
+  
+    setResourceFolders(currentFolders);
+  
+    const newResource: Resource = {
+      id: `res_card_${Date.now()}`,
+      name: 'New Resource Card',
+      folderId: parentFolderId!,
+      type: type,
+      createdAt: new Date().toISOString(),
+      points: []
+    };
+    
+    setResources(prev => [...prev, newResource]);
+  
+    // Link the new resource to the parent task
+    const setParentDefinitions = upskillDefinitions.some(d => d.id === parentTask.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
+    setParentDefinitions(prev => prev.map(def => 
+      def.id === parentTask.id 
+        ? { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] } 
+        : def
+    ));
+  
+    toast({ title: 'Resource Created', description: `A new resource card has been created and placed in the appropriate folder.` });
+  };
+
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -1998,6 +2057,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedResourceFolderId, setSelectedResourceFolderId,
     habitCards, mechanismCards,
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
+    createResourceWithHierarchy,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,
@@ -2064,6 +2124,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 
