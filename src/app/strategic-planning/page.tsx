@@ -1000,7 +1000,7 @@ function ProductizationContent() {
 }
 
 function OfferizationContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects } = useAuth();
   const { toast } = useToast();
   
   const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
@@ -1109,13 +1109,18 @@ function OfferizationContent() {
   const handleUpdateEditingRelease = (field: keyof Release, value: any) => {
     setEditingRelease(current => {
       if (!current) return null;
-      return {
-        ...current,
-        release: {
-          ...current.release,
-          [field]: value,
-        }
+      let newRelease = { ...current.release };
+      if (field === 'name') {
+          const selectedProject = projects.find(p => p.name === value);
+          newRelease = {
+              ...newRelease,
+              name: value,
+              focusAreaIds: selectedProject ? selectedProject.features.map(f => f.id) : []
+          };
+      } else {
+          newRelease = { ...newRelease, [field]: value };
       }
+      return { ...current, release: newRelease };
     });
   };
 
@@ -1254,6 +1259,8 @@ function OfferizationContent() {
     if (!editingRelease || editingRelease.specializationId !== specialization.id) return null;
     const { release } = editingRelease;
     const allMicroSkills = specialization.skillAreas.flatMap(area => area.microSkills);
+
+    const projectsInDomain = projects.filter(p => p.domainId === specialization.domainId);
     
     return (
       <Card className="mt-4 bg-muted/50">
@@ -1263,7 +1270,16 @@ function OfferizationContent() {
         <CardContent className="space-y-4">
           <div>
             <Label htmlFor="release-name">Project Name</Label>
-            <Input id="release-name" value={release.name || ''} onChange={(e) => handleUpdateEditingRelease('name', e.target.value)} placeholder="e.g., CUDA Optimization, WebGL Development"/>
+             <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
+                <SelectTrigger id="release-name">
+                    <SelectValue placeholder="Select a project..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {projectsInDomain.map(proj => (
+                        <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
           </div>
           <div>
             <Label htmlFor="release-date">EST completion date</Label>
