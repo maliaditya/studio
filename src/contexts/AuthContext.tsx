@@ -2018,15 +2018,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setResources(prev => [...prev, newResource]);
   
-    // Link the new resource to the parent task
-    const setParentDefinitions = upskillDefinitions.some(d => d.id === parentTask.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
+    const parentIsUpskill = upskillDefinitions.some(d => d.id === parentTask.id);
+    const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+    
     setParentDefinitions(prev => prev.map(def => 
       def.id === parentTask.id 
         ? { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] } 
         : def
     ));
   
-    toast({ title: 'Resource Created', description: `A new resource card has been created and placed in the appropriate folder.` });
+    toast({ title: 'Resource Created', description: `A new resource card has been created, linked, and placed in the appropriate folder.` });
   };
 
 
@@ -2125,6 +2126,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 
