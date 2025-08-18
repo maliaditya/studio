@@ -385,7 +385,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
     const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     return (
       <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')} onClick={(e) => handleOpenNestedPopup(resource.id, e)}>
+        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')} onClick={(e) => handleStartEditResource(resource)}>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <DropdownMenu>
@@ -734,7 +734,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={handleOpenLinkProjectModal}
+                            onLinkProject={() => handleOpenLinkProjectModal(def)}
                             onEdit={onEdit}
                             onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
@@ -1560,9 +1560,7 @@ function DeepWorkPageContent() {
   };
   
   const handleStartEditResource = (res: Resource) => {
-    if(currentTask && res){
-      openGeneralPopup(res.id, new MouseEvent('click'));
-    }
+    openGeneralPopup(res.id, new MouseEvent('click'));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -2388,5 +2386,6 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
