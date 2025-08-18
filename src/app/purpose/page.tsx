@@ -18,7 +18,7 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format, parseISO, isBefore, startOfToday, addDays, isAfter } from 'date-fns';
+import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,14 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
         const key = type === 'practice' ? 'practiceEquationIds' : 'applicationSpecializationIds';
         const currentIds = editedCardData[key] || [];
         const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
-        setEditedCardData({ ...editedCardData, [key]: newIds });
+        
+        // If we're in edit mode, update the local edit state.
+        if (isEditing) {
+            setEditedCardData({ ...editedCardData, [key]: newIds });
+        } else {
+            // If we're in view mode, this must be an unlink action. Update directly.
+             onUpdate({ ...cardData, [key]: newIds });
+        }
     };
 
     const handleSave = () => {
@@ -110,12 +117,24 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
                     <div className="space-y-4">
                         <div>
                             <Label className="font-semibold text-sm">Application</Label>
-                            <div className="mt-2 flex flex-wrap gap-1">
+                             <div className="mt-2 flex flex-wrap gap-1">
                                 {linkedApplications.length > 0 ? (
                                     linkedApplications.map(spec => (
-                                      <button key={spec.id} onClick={() => onSpecializationClick(spec.id)}>
-                                        <Badge key={spec.id} variant="outline" className="font-normal text-xs cursor-pointer hover:bg-accent">{spec.name}</Badge>
-                                      </button>
+                                        <div key={spec.id} className="relative group/spec">
+                                            <Badge 
+                                                variant="outline" 
+                                                className="font-normal text-xs cursor-pointer hover:bg-accent pr-7" 
+                                                onClick={() => onSpecializationClick(spec.id)}
+                                            >
+                                                {spec.name}
+                                            </Badge>
+                                            <button 
+                                                onClick={() => handleLinkToggle('application', spec.id)}
+                                                className="absolute top-1/2 right-0.5 -translate-y-1/2 h-5 w-5 rounded-full bg-muted/50 hover:bg-destructive/20 text-destructive opacity-0 group-hover/spec:opacity-100 transition-opacity"
+                                            >
+                                                <Unlink className="h-3 w-3 mx-auto"/>
+                                            </button>
+                                        </div>
                                     ))
                                 ) : (
                                     <p className="text-xs text-muted-foreground">No specializations linked.</p>
@@ -898,5 +917,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
-
 
