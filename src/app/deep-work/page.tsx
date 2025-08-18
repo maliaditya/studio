@@ -848,6 +848,11 @@ function DeepWorkPageContent() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor));
+
+  const onOpenMindMap = (id: string) => {
+    setMindMapRootFocusAreaId(id);
+    setIsMindMapModalOpen(true);
+  };
   
   const handleOpenNewFocusAreaModal = (type: 'deepwork' | 'upskill') => {
     if (!selectedMicroSkill) {
@@ -1547,15 +1552,18 @@ function DeepWorkPageContent() {
 
     if (!over) {
         if (active.data.current?.type === 'subtask') {
-            const { itemType, subtaskId } = active.data.current;
-            const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
-            const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-            
-            setDefs((prev: ExerciseDefinition[]) => prev.map(def => ({
-                ...def,
-                [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId)
-            })));
-            
+            const { itemType, subtaskId, parentId } = active.data.current;
+
+            // Unlink from old parent
+            if (parentId) {
+                const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === parentId);
+                const setOldDefs = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+                const oldLinkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+                
+                setOldDefs((prev: ExerciseDefinition[]) => prev.map(def => 
+                    def.id === parentId ? { ...def, [oldLinkKey]: (def[oldLinkKey] || []).filter((id: string) => id !== subtaskId) } : def
+                ));
+            }
             toast({ title: "Promoted to Top-Level", description: "Subtask has been unlinked and is now a top-level item." });
         }
         return;
@@ -1563,18 +1571,13 @@ function DeepWorkPageContent() {
     
     if (active.id === over.id) return;
 
-    const activeData = active.data.current;
-    const overData = over.data.current;
-    if (!activeData || !overData) return;
+    const activeId = active.data.current?.subtaskId || active.data.current?.id;
+    const activeType = active.data.current?.itemType;
+    const oldParentId = active.data.current?.parentId;
+    const targetId = over.data.current?.id;
+    const targetType = over.data.current?.type;
 
-    const activeId = activeData.subtaskId || activeData.id.replace('card-deepwork-', '').replace('card-upskill-', '');
-    const activeType = activeData.itemType;
-    const oldParentId = activeData.parentId;
-    const targetId = overData.id.replace('card-deepwork-', '').replace('card-upskill-', '');
-
-    if (overData.type === 'card' && activeId !== targetId) {
-        
-        // --- Unlink from old parent (if any) ---
+    if (targetType === 'card') {
         if (oldParentId) {
             const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
             const setOldDefs = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
@@ -1585,7 +1588,6 @@ function DeepWorkPageContent() {
             ));
         }
 
-        // --- Link to new parent ---
         const newParentIsDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
         const setNewDefs = newParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
         const newLinkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
@@ -1650,7 +1652,7 @@ function DeepWorkPageContent() {
       if (!parentDef) return;
 
       const newDef: ExerciseDefinition = {
-          id: `def_${Date.now()}_${type}_${Math.random().toString(36).replace('.', '')}`,
+          id: `def_${Date.now()}_${type}_${Math.random().toString(36).substring(2, 9)}`,
           name: 'New Task',
           category: parentDef.category,
       };
@@ -1841,10 +1843,7 @@ useEffect(() => {
                     onSelectProject={(project) => { if(project) handleSelectRecentItem(project as Project & { type: 'project' }) }}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
-                    onOpenMindMap={(id) => {
-                      setMindMapRootFocusAreaId(id);
-                      setIsMindMapModalOpen(true);
-                    }}
+                    onOpenMindMap={onOpenMindMap}
                     onEditFocusArea={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
@@ -1929,7 +1928,7 @@ useEffect(() => {
                                 handleUnlinkItem={handleUnlinkItem}
                                 handleDeleteFocusArea={handleDeleteFocusArea}
                                 handleViewProgress={handleViewProgress}
-                                onOpenMindMap={(id: string) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}}
+                                onOpenMindMap={onOpenMindMap}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
                                 handleCreateAndLinkChild={handleCreateAndLinkChild}
                                 setEmbedUrl={setEmbedUrl}
@@ -2297,10 +2296,7 @@ useEffect(() => {
                             calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
                             upskillDefinitions={upskillDefinitions}
                             resources={resources}
-                            onOpenMindMap={(id: string) => {
-                              setMindMapRootFocusAreaId(id);
-                              setIsMindMapModalOpen(true);
-                            }}
+                            onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projects}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
@@ -2367,6 +2363,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
