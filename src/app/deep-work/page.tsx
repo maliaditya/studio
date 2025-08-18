@@ -60,7 +60,7 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { Progress } from '@/components/ui/progress';
 import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
-import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useRouter } from 'next/navigation';
@@ -1545,54 +1545,57 @@ function DeepWorkPageContent() {
     setActiveId(null);
     const { active, over } = event;
 
-    if (active.id === over?.id || !over) return;
+    if (!over) {
+        if (active.data.current?.type === 'subtask') {
+            const { itemType, subtaskId, parentId } = active.data.current;
+            const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
+            const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+            
+            setDefs((prev: ExerciseDefinition[]) => prev.map(def => {
+                if (def.id === parentId) {
+                    return { ...def, [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId) };
+                }
+                return def;
+            }));
+            
+            toast({ title: "Promoted to Top-Level", description: "Subtask has been unlinked and is now a top-level item." });
+        }
+        return;
+    }
     
+    if (active.id === over.id) return;
+
     const activeData = active.data.current;
     const overData = over.data.current;
+    if (!activeData || !overData) return;
 
-    const activeId = activeData?.itemType === 'subtask' ? activeData.subtaskId : active.id.toString().replace(`card-${activeData?.itemType}-`, '');
-    const activeType = activeData?.itemType;
-    const oldParentId = activeData?.parentId;
+    const activeId = activeData.subtaskId || activeData.id;
+    const activeType = activeData.itemType;
+    const oldParentId = activeData.parentId;
+    const targetId = overData.id;
 
-    const targetId = over.id.toString().replace(`card-${overData?.itemType}-`, '');
-    const targetType = overData?.itemType;
-    
-    if (!activeId || !activeType || !targetId || !targetType) return;
-    
-    const linkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    if (overData.type === 'card' && activeId !== targetId) {
+        // --- Unlink from old parent (if any) ---
+        if (oldParentId) {
+            const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
+            const setOldDefs = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+            const oldLinkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+            
+            setOldDefs((prev: ExerciseDefinition[]) => prev.map(def => 
+                def.id === oldParentId ? { ...def, [oldLinkKey]: (def[oldLinkKey] || []).filter((id: string) => id !== activeId) } : def
+            ));
+        }
 
-    const setDefs = (definitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>, callback: (items: ExerciseDefinition[]) => ExerciseDefinition[]) => {
-        definitions(callback);
-    };
-
-    // Unlink from old parent
-    if (oldParentId) {
-        const isOldParentDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
-        const setOldParentDefs = isOldParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+        // --- Link to new parent ---
+        const newParentIsDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
+        const setNewDefs = newParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+        const newLinkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
         
-        setOldParentDefs(prev => prev.map(def => {
-            if (def.id === oldParentId) {
-                const newLinks = (def[linkKey as keyof ExerciseDefinition] as string[] || []).filter(id => id !== activeId);
-                return { ...def, [linkKey]: newLinks };
-            }
-            return def;
-        }));
-    }
+        setNewDefs((prev: ExerciseDefinition[]) => prev.map(def =>
+            def.id === targetId ? { ...def, [newLinkKey]: [...(def[newLinkKey] || []), activeId] } : def
+        ));
 
-    // Link to new parent if dropped on another card
-    if (overData?.type === 'card') {
-        const isNewParentDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
-        const setNewParentDefs = isNewParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
-
-        setNewParentDefs(prev => prev.map(def => {
-            if (def.id === targetId) {
-                const newLinks = [...(def[linkKey as keyof ExerciseDefinition] as string[] || []), activeId];
-                return { ...def, [linkKey]: newLinks };
-            }
-            return def;
-        }));
-
-        toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
+        toast({ title: "Task Re-linked!", description: `Item moved to a new parent.` });
     }
   };
 
@@ -1648,7 +1651,7 @@ function DeepWorkPageContent() {
       if (!parentDef) return;
 
       const newDef: ExerciseDefinition = {
-          id: `def_${Date.now()}_${type}_${Math.random().toString().replace('.', '')}`,
+          id: `def_${Date.now()}_${type}_${Math.random().toString(36).replace('.', '')}`,
           name: 'New Task',
           category: parentDef.category,
       };
@@ -1724,19 +1727,20 @@ function DeepWorkPageContent() {
   };
 
   const filteredRecentItems = useMemo(() => {
-    return recentItems.filter(item => {
-        if (item.type === 'project') return true;
-        
-        let nodeType: string | undefined;
-        if ('category' in item && item.type === 'deepwork') {
-          nodeType = getDeepWorkNodeType(item as ExerciseDefinition);
-        } else if ('category' in item && item.type === 'upskill') {
-          nodeType = getUpskillNodeType(item as ExerciseDefinition);
-        }
+    const isIntentionOrCuriosity = (item: ExerciseDefinition, type: 'deepwork' | 'upskill') => {
+      const nodeType = type === 'deepwork' ? getDeepWorkNodeType(item) : getUpskillNodeType(item);
+      return nodeType === 'Intention' || nodeType === 'Curiosity';
+    };
 
-        return nodeType === 'Intention' || nodeType === 'Curiosity';
+    return recentItems.filter(item => {
+      if (item.type === 'project') return true;
+      if (item.type === 'deepwork' || item.type === 'upskill') {
+        return isIntentionOrCuriosity(item as ExerciseDefinition, item.type);
+      }
+      return false;
     });
   }, [recentItems, getDeepWorkNodeType, getUpskillNodeType]);
+
 
   const handleBreadcrumbClick = (index: number) => {
     setNavigationStack(prev => prev.slice(0, index + 1));
@@ -1778,19 +1782,25 @@ useEffect(() => {
   }
 }, [currentTask, microSkillMap, coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedMicroSkill]);
 
-  const allDefinitions = useMemo(() => [...deepWorkDefinitions, ...upskillDefinitions, ...resources], [deepWorkDefinitions, upskillDefinitions, resources]);
+  const allDefinitions = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions, resources]);
   const activeDragItem = useMemo(() => {
     if (!activeId) return null;
-    return allDefinitions.find(item => 
-        `card-deepwork-${item.id}` === activeId || 
-        `card-upskill-${item.id}` === activeId || 
-        `card-resource-${item.id}` === activeId ||
-        (activeId.startsWith('subtask') && activeId.includes(item.id))
-    );
+    const parsedId = activeId.toString().startsWith('subtask-') ? activeId.toString().split('-')[2] : activeId.toString().replace(/^card-(deepwork|upskill|resource)-/, '');
+    return allDefinitions.get(parsedId);
   }, [activeId, allDefinitions]);
   
+  const allChildIds = useMemo(() => {
+      const childIds = new Set<string>();
+      [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
+          (def.linkedDeepWorkIds || []).forEach(id => childIds.add(id));
+          (def.linkedUpskillIds || []).forEach(id => childIds.add(id));
+          (def.linkedResourceIds || []).forEach(id => childIds.add(id));
+      });
+      return childIds;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
   return (
-    <DndContext sensors={sensors} onDragStart={(e) => setActiveId(e.active.id.toString())} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={(e) => setActiveId(e.active.id.toString())} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
@@ -1932,7 +1942,70 @@ useEffect(() => {
                                 linkProjectToTask={linkProjectToTask}
                             />
                         ) : (
-                          <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
+                           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => (
+                                    <LinkedDeepWorkCard 
+                                        key={def.id} 
+                                        deepworkDef={def}
+                                        getDeepWorkNodeType={getDeepWorkNodeType}
+                                        getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
+                                        permanentlyLoggedActionIds={permanentlyLoggedActionIds}
+                                        handleAddTaskToSession={handleAddTaskToSession}
+                                        handleCardClick={handleCardClick}
+                                        handleToggleReadyForBranding={handleToggleReadyForBranding}
+                                        handleUnlinkItem={handleUnlinkItem}
+                                        handleDeleteFocusArea={handleDeleteFocusArea}
+                                        handleViewProgress={handleViewProgress}
+                                        deepWorkDefinitions={deepWorkDefinitions}
+                                        formatDuration={formatMinutes}
+                                        calculatedEstimate={calculateTotalEstimate(def)}
+                                        upskillDefinitions={upskillDefinitions}
+                                        resources={resources}
+                                        onOpenMindMap={onOpenMindMap}
+                                        onUpdateName={handleUpdateFocusAreaName}
+                                        projects={projects}
+                                        handleOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                        handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                    />
+                                ))}
+                                {upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => (
+                                    <LinkedUpskillCard 
+                                        key={def.id} 
+                                        upskillDef={def}
+                                        handleAddTaskToSession={handleAddTaskToSession} 
+                                        setSelectedSubtopic={setSelectedUpskillTask}
+                                        setViewMode={setViewMode}
+                                        handleUnlinkItem={handleUnlinkItem} 
+                                        handleDeleteSubtopic={handleDeleteFocusArea}
+                                        handleViewProgress={(d) => handleViewProgress(d, 'upskill')} 
+                                        isComplete={isUpskillObjectiveComplete(def.id)} 
+                                        getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} 
+                                        upskillDefinitions={upskillDefinitions} 
+                                        resources={resources} 
+                                        calculatedEstimate={calculateTotalEstimate(def)} 
+                                        setEmbedUrl={setEmbedUrl} 
+                                        setFloatingVideoUrl={setFloatingVideoUrl} 
+                                        linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
+                                        onUpdateName={handleUpdateFocusAreaName} 
+                                        projectsInDomain={projects} 
+                                        onLinkProject={handleOpenLinkProjectModal}
+                                        onEdit={setEditingFocusArea} 
+                                        onCreateAndLinkChild={handleCreateAndLinkChild}
+                                    />
+                                ))}
+                                {selectedMicroSkill && (
+                                    <Card
+                                        onClick={() => handleOpenNewFocusAreaModal('deepwork')}
+                                        className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
+                                    >
+                                        <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                                            Add New Task
+                                        </p>
+                                    </Card>
+                                )}
+                                {!selectedMicroSkill && <div className="col-span-3 text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>}
+                           </div>
                         )}
                     </CardContent>
                 </Card>
@@ -2295,6 +2368,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
