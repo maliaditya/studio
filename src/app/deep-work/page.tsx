@@ -391,7 +391,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
             <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); handleStartEditResource(resource); }}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
@@ -734,7 +734,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={() => {}}
+                            onLinkProject={handleOpenLinkProjectModal}
                             onEdit={onEdit}
                             onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
@@ -798,6 +798,7 @@ function DeepWorkPageContent() {
     setProjects,
     microSkillMap,
     handleOpenNestedPopup,
+    openGeneralPopup,
     scheduleTaskFromMindMap,
     recentItems,
     addToRecents,
@@ -1559,7 +1560,9 @@ function DeepWorkPageContent() {
   };
   
   const handleStartEditResource = (res: Resource) => {
-    router.push('/resources');
+    if(currentTask && res){
+      openGeneralPopup(res.id, new MouseEvent('click'));
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -2344,7 +2347,7 @@ useEffect(() => {
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={[]} 
-                            onLinkProject={() => {}} 
+                            onLinkProject={handleOpenLinkProjectModal}
                             onEdit={setEditingFocusArea} 
                             onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
@@ -2385,4 +2388,5 @@ export default function DeepWorkPage() {
 
 
     
+
 
