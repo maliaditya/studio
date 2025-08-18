@@ -11,8 +11,8 @@ import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule } from '@/types/workout';
-import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO } from 'date-fns';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan } from '@/types/workout';
+import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -41,6 +41,9 @@ interface WeightGoalCardProps {
   upskillDefinitions: ExerciseDefinition[];
   onOpenIntentionPopup: (intentionId: string) => void;
   metaRules: MetaRule[];
+  productizationPlans: Record<string, ProductizationPlan>;
+  offerizationPlans: Record<string, ProductizationPlan>;
+  projects: any[];
 }
 
 const weightChartConfig = {
@@ -80,7 +83,10 @@ export function WeightGoalCard({
     deepWorkDefinitions,
     upskillDefinitions,
     onOpenIntentionPopup,
-    metaRules
+    metaRules,
+    productizationPlans,
+    offerizationPlans,
+    projects
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
@@ -105,6 +111,29 @@ export function WeightGoalCard({
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
 
+    const activeProjectIds = useMemo(() => {
+        const activeIds = new Set<string>();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        projects.forEach(project => {
+            const hasProductPlan = !!productizationPlans[project.name];
+            const hasActiveOffer = Object.values(offerizationPlans).some(plan => 
+                plan.releases?.some(release => {
+                    if (release.name !== project.name) return false;
+                    try {
+                        return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                    } catch { return false; }
+                })
+            );
+            if (hasProductPlan || hasActiveOffer) {
+                activeIds.add(project.id);
+            }
+        });
+
+        return activeIds;
+    }, [projects, productizationPlans, offerizationPlans]);
+
     const linkedDeepWorkChildIds = useMemo(() => {
         return new Set<string>(
             (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
@@ -118,10 +147,18 @@ export function WeightGoalCard({
                                (def.linkedUpskillIds?.length ?? 0) > 0 ||
                                (def.linkedResourceIds?.length ?? 0) > 0;
                 const isChild = linkedDeepWorkChildIds.has(def.id);
-                return isParent && !isChild;
+                const isIntention = isParent && !isChild;
+                
+                if (!isIntention) return false;
+
+                // An intention is active if it's not linked to any project, OR if it's linked to at least one active project.
+                const linkedProjects = def.linkedProjectIds || [];
+                if (linkedProjects.length === 0) return true; 
+
+                return linkedProjects.some(projectId => activeProjectIds.has(projectId));
             })
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [deepWorkDefinitions, linkedDeepWorkChildIds]);
+    }, [deepWorkDefinitions, linkedDeepWorkChildIds, activeProjectIds]);
 
     useEffect(() => {
         if (!areDetailsSet) {

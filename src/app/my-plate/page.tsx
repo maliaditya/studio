@@ -1063,6 +1063,9 @@ function MyPlatePageContent() {
                   upskillDefinitions={upskillDefinitions}
                   onOpenIntentionPopup={openIntentionPopup}
                   metaRules={metaRules}
+                  offerizationPlans={offerizationPlans}
+                  productizationPlans={productizationPlans}
+                  projects={projects}
                 />
               </div>
             </div>
