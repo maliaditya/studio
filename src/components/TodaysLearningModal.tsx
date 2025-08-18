@@ -24,7 +24,7 @@ import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAfter, parseISO, startOfToday } from 'date-fns';
+import { isAfter, parseISO, startOfToday, format } from 'date-fns';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -77,9 +77,8 @@ export function TodaysLearningModal({
 
 
   const filteredProjects = useMemo(() => {
+    const today = startOfToday();
     return projects.filter(project => {
-        const today = startOfToday();
-
         // Condition 1: Project has a product plan.
         if (productizationPlans && productizationPlans[project.id]) {
             return true;
