@@ -33,7 +33,7 @@ import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TaskContextModal } from '@/components/TaskContextModal';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -97,6 +97,7 @@ function MyPlatePageContent() {
     workoutMode, workoutPlans, exerciseDefinitions,
     upskillDefinitions, topicGoals, deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
+    projects,
     productizationPlans,
     offerizationPlans,
     openIntentionPopup,
