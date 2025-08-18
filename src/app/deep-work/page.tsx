@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -127,48 +126,45 @@ const isObsidianUrl = (url: string): boolean => {
     }
 };
 
-const DraggableSubtaskItem: React.FC<{ 
-    childId: string;
-    childName: string;
-    isLogged: boolean;
-    type: 'deepwork' | 'upskill' | 'resource';
-  }> = ({ childId, childName, isLogged, type }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `subtask-${type}-${childId}`,
-        data: {
-          type: 'subtask',
-          itemType: type,
-          subtaskId: childId,
-        }
-    });
-  
-    const style = transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 100,
-        backgroundColor: 'hsl(var(--card))',
-        padding: '2px 4px',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    } : undefined;
-  
-    return (
-        <div 
-            ref={setNodeRef} 
-            style={style} 
-            className={cn(
-                "text-xs text-muted-foreground truncate transition-transform flex items-center gap-1", 
-                isLogged && "line-through text-muted-foreground/70",
-                isDragging && "opacity-50 scale-90"
-            )} 
-            title={childName}
-        >
-          <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
-          <span>
-             {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
-          </span>
-        </div>
-    );
+const DraggableSubtaskItem: React.FC<{
+  childId: string;
+  childName: string;
+  isLogged: boolean;
+  type: 'deepwork' | 'upskill' | 'resource';
+}> = ({ childId, childName, isLogged, type }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `subtask-${type}-${childId}`,
+    data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName },
+  });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    zIndex: 100,
+    backgroundColor: 'hsl(var(--card))',
+    padding: '2px 4px',
+    borderRadius: '4px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "text-xs text-muted-foreground truncate transition-transform flex items-center gap-1 cursor-grab active:cursor-grabbing",
+        isLogged && "line-through text-muted-foreground/70",
+        isDragging && "opacity-50 scale-90"
+      )}
+      title={childName}
+    >
+      <span>-</span>
+      <span>{childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}</span>
+    </div>
+  );
 };
+
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -249,9 +245,9 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 }, ref) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `card-deepwork-${deepworkDef.id}`,
-        data: { type: 'card', itemType: 'deepwork', definition: deepworkDef }
+        data: { type: 'card', itemType: 'deepwork', definition: deepworkDef, id: deepworkDef.id }
     });
-    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: `card-deepwork-${deepworkDef.id}` });
+    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: `card-deepwork-${deepworkDef.id}`, data: { type: 'card', itemType: 'deepwork', definition: deepworkDef, id: deepworkDef.id } });
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
 
@@ -747,7 +743,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             projectsInDomain={projectsInDomainForChild} 
                             onLinkProject={() => {}}
                             onEdit={setEditingFocusArea} 
-                            onCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
                 })}
@@ -900,7 +896,6 @@ function DeepWorkPageContent() {
   const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
     if (!linkingTask || !projectId) return;
     linkProjectToTask(linkingTask.id, projectId);
-    setIsLinkProjectModalOpen(false);
   };
   
   const handleOpenLinkProjectModal = (task: ExerciseDefinition) => {
@@ -1558,77 +1553,51 @@ function DeepWorkPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
-    if (!over || active.id === over.id) {
-        // If dropped nowhere, promote subtask to top-level
-        if (active.data.current?.type === 'subtask') {
-            const { itemType, subtaskId } = active.data.current;
-            const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
-            const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-
-            setDefs(prevDefs => prevDefs.map(def => {
-                if ((def[linkKey] || []).includes(subtaskId)) {
-                    return { ...def, [linkKey]: (def[linkKey] || []).filter((id:string) => id !== subtaskId) };
-                }
-                return def;
-            }));
-            toast({ title: "Unlinked!", description: `Item is now a top-level task.` });
-        }
-        return;
-    }
-
-    const activeId = active.id.toString().split('-').pop();
-    const overId = over.id.toString().split('-').pop();
-
-    if (!activeId || !overId) return;
-
-    const activeType = active.data.current?.itemType as 'deepwork' | 'upskill' | 'resource';
-    
-    // Find the definition sets for both source and target
-    const sourceIsDeepWork = deepWorkDefinitions.some(d => d.id === activeId);
-    const targetIsDeepWork = deepWorkDefinitions.some(d => d.id === overId);
-    
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    
-    // Find old parent and remove link
-    const oldParent = allDefs.find(def => 
-        (def.linkedDeepWorkIds || []).includes(activeId) ||
-        (def.linkedUpskillIds || []).includes(activeId) ||
-        (def.linkedResourceIds || []).includes(activeId)
-    );
-
-    if (oldParent) {
-        if (oldParent.id.startsWith('def_deep')) {
-            setDeepWorkDefinitions(prev => prev.map(def => def.id === oldParent.id ? {
-                ...def,
-                linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== activeId),
-                linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== activeId),
-                linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== activeId)
-            } : def));
-        } else {
-             setUpskillDefinitions(prev => prev.map(def => def.id === oldParent.id ? {
-                ...def,
-                linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== activeId),
-                linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== activeId),
-                linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== activeId)
-            } : def));
+    const activeId = active.data.current?.id;
+    const activeType = active.data.current?.itemType;
+    const overId = over?.data.current?.id;
+    const overType = over?.data.current?.itemType;
+  
+    if (!over || activeId === overId) return;
+  
+    const allDefs = {
+        deepwork: { definitions: deepWorkDefinitions, setDefinitions: setDeepWorkDefinitions, linkKey: 'linkedDeepWorkIds' },
+        upskill: { definitions: upskillDefinitions, setDefinitions: setUpskillDefinitions, linkKey: 'linkedUpskillIds' },
+        resource: { definitions: resources, setDefinitions: setResources, linkKey: 'linkedResourceIds' }
+    };
+  
+    // --- Step 1: Unlink the dragged item from its original parent ---
+    let oldParent: ExerciseDefinition | undefined;
+    for (const type of Object.keys(allDefs) as ('deepwork' | 'upskill')[]) {
+        oldParent = allDefs[type].definitions.find(def => (def[activeType === 'deepwork' ? 'linkedDeepWorkIds' : activeType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds'] || []).includes(activeId));
+        if (oldParent) {
+            allDefs[type].setDefinitions(prev => prev.map(def => 
+                def.id === oldParent!.id ? {
+                    ...def,
+                    [allDefs[activeType].linkKey]: (def[allDefs[activeType].linkKey] || []).filter((id: string) => id !== activeId)
+                } : def
+            ));
+            break;
         }
     }
     
-    // Add to new parent
-    const linkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : activeType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-    
-    if (targetIsDeepWork) {
-      setDeepWorkDefinitions(prev => prev.map(def =>
-        def.id === overId ? { ...def, [linkKey]: [...(def[linkKey] || []), activeId] } : def
-      ));
+    // --- Step 2: Handle the drop action ---
+    if (over.data.current?.type === 'card') {
+        // Dropped onto another card - link as child
+        const targetDef = allDefs[overType].definitions.find(def => def.id === overId);
+        if (targetDef) {
+            allDefs[overType].setDefinitions(prev => prev.map(def => 
+                def.id === overId ? {
+                    ...def,
+                    [allDefs[activeType].linkKey]: [...(def[allDefs[activeType].linkKey] || []), activeId]
+                } : def
+            ));
+            toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
+        }
     } else {
-       setUpskillDefinitions(prev => prev.map(def =>
-        def.id === overId ? { ...def, [linkKey]: [...(def[linkKey] || []), activeId] } : def
-      ));
+        // Dropped outside a card - it becomes a top-level item (already unlinked)
+        toast({ title: "Promoted!", description: `Item is now a top-level task.` });
     }
-    
-    toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
   };
 
 
@@ -1722,8 +1691,13 @@ function DeepWorkPageContent() {
 
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
-    addToRecents({ ...def, type });
     
+    const nodeType = type === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
+
+    if (nodeType === 'Intention' || nodeType === 'Curiosity') {
+        addToRecents({ ...def, type });
+    }
+
     const existingIndex = navigationStack.findIndex(item => item.id === def.id);
     if (existingIndex !== -1) {
         setNavigationStack(prev => prev.slice(0, existingIndex + 1));
@@ -1731,6 +1705,7 @@ function DeepWorkPageContent() {
         setNavigationStack(prev => [...prev, { ...def, type }]);
     }
   };
+
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
     if (type === 'deepwork') {
@@ -1847,7 +1822,7 @@ useEffect(() => {
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
                     selectedProject={selectedProject}
-                    onSelectProject={(project) => handleSelectRecentItem(project as Project & { type: 'project' })}
+                    onSelectProject={(project) => { if(project) handleSelectRecentItem(project as Project & { type: 'project' }) }}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={(id) => {
@@ -2248,6 +2223,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
