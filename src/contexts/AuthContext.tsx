@@ -152,7 +152,7 @@ interface AuthContextType {
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
-  createResourceWithHierarchy: (parentTask: ExerciseDefinition, type: Resource['type']) => void;
+  createResourceWithHierarchy: (parentTask: ExerciseDefinition, type: Resource['type']) => ExerciseDefinition | undefined;
 
   
   // Resource Popups (Original system, kept for resources page)
@@ -1971,21 +1971,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const createResourceWithHierarchy = (parentTask: ExerciseDefinition, type: Resource['type']) => {
+  const createResourceWithHierarchy = (parentTask: ExerciseDefinition, type: Resource['type']): ExerciseDefinition | undefined => {
     const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parentTask.category);
     if (!microSkill) {
       toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
-      return;
+      return undefined;
     }
   
     const microSkillInfo = microSkill[1];
     const { coreSkillName, skillAreaName } = microSkillInfo;
   
     const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
-    if (!coreSkill) return;
+    if (!coreSkill) return undefined;
   
     const domain = skillDomains.find(d => d.id === coreSkill.domainId);
-    if (!domain) return;
+    if (!domain) return undefined;
   
     let parentFolderId: string | null = null;
     let currentFolders = [...resourceFolders];
@@ -2021,13 +2021,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const parentIsUpskill = upskillDefinitions.some(d => d.id === parentTask.id);
     const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
     
-    setParentDefinitions(prev => prev.map(def => 
-      def.id === parentTask.id 
-        ? { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] } 
-        : def
-    ));
+    let updatedParentTask: ExerciseDefinition | undefined;
+    
+    setParentDefinitions(prev => {
+      const newDefs = prev.map(def => {
+        if (def.id === parentTask.id) {
+          updatedParentTask = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
+          return updatedParentTask;
+        } 
+        return def;
+      });
+      return newDefs;
+    });
   
     toast({ title: 'Resource Created', description: `A new resource card has been created, linked, and placed in the appropriate folder.` });
+    
+    return updatedParentTask;
   };
 
 
@@ -2126,6 +2135,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 

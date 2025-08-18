@@ -303,13 +303,13 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
-                <CardHeader className="pb-3 flex-grow">
+                <CardHeader className="pb-3 flex-grow" onDoubleClick={() => setIsEditingName(true)}>
                     <div className="flex items-center gap-2">
                         {getIcon()}
                         {isEditingName ? (
                             <Input value={currentName} onChange={(e) => setCurrentName(e.target.value)} onBlur={handleNameSave} onKeyDown={(e) => e.key === 'Enter' && handleNameSave()} autoFocus className="text-base font-semibold h-8" />
                         ) : (
-                            <CardTitle className="text-base cursor-pointer" onDoubleClick={() => setIsEditingName(true)}>
+                            <CardTitle className="text-base">
                                 <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
                                     {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
@@ -442,7 +442,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
 
   return (
     <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-        <Card className="relative group transition-all duration-300 hover:shadow-xl">
+        <Card className="relative group transition-all duration-300 hover:shadow-xl" onClick={(e) => handleStartEditResource(resource)}>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                 {embedLinkForModal ? (
@@ -1724,7 +1724,12 @@ function DeepWorkPageContent() {
   };
 
   const handleCreateResource = (parentTask: ExerciseDefinition) => {
-      createResourceWithHierarchy(parentTask, 'card');
+    const updatedTask = createResourceWithHierarchy(parentTask, 'card');
+    if (updatedTask) {
+        setNavigationStack(prev => prev.map(item =>
+            item.id === updatedTask.id ? { ...item, ...updatedTask } : item
+        ));
+    }
   };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
@@ -2386,6 +2391,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
