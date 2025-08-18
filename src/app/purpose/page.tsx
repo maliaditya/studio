@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle, Target, Book, Clock, Banknote } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIconLucide, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle, Target, Book, Clock, Banknote, Unlink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogPortal, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -194,6 +194,16 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
                 <div className="space-y-4">
                     <div>
                         <Label className="font-semibold text-sm">Application</Label>
+                        <div className="space-y-1 mt-1">
+                            {applicationsInEdit.map(spec => (
+                                <div key={spec.id} className="flex items-center justify-between p-1 rounded-md bg-muted/50">
+                                    <span className="text-xs font-medium pl-1">{spec.name}</span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleLinkToggle('application', spec.id)}>
+                                        <Unlink className="h-3 w-3 text-destructive"/>
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant="outline" size="sm" className="w-full mt-1">
@@ -217,11 +227,6 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
                                 </ScrollArea>
                             </PopoverContent>
                         </Popover>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                            {applicationsInEdit.map(spec => (
-                                <Badge key={spec.id} variant="outline" className="font-normal">{spec.name}</Badge>
-                            ))}
-                        </div>
                     </div>
                      <div>
                         <Label className="font-semibold text-sm">Expected Outcome</Label>
@@ -309,7 +314,6 @@ function PurposePageContent() {
 
     const [isSpecPopupOpen, setIsSpecPopupOpen] = useState(false);
     const [popupContent, setPopupContent] = useState<{ title: string; projects: Project[] }>({ title: '', projects: [] });
-
 
     useEffect(() => {
         if (purposeData) {
@@ -894,4 +898,5 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
