@@ -1262,102 +1262,6 @@ function OfferizationContent() {
   };
 
 
-  const renderProjectForm = (specialization: CoreSkill) => {
-    if (!editingRelease || editingRelease.specializationId !== specialization.id) return null;
-    const { release } = editingRelease;
-    const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
-
-    const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
-    
-    return (
-      <Card className="mt-4 bg-muted/50">
-        <CardHeader>
-          <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Project' : 'Edit Project'}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="release-name">Project Name</Label>
-             <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
-                <SelectTrigger id="release-name">
-                    <SelectValue placeholder="Select a project..." />
-                </SelectTrigger>
-                <SelectContent>
-                    {projectsInDomain.map(proj => (
-                        <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="release-date">EST completion date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Select a date'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={release.launchDate ? parseISO(release.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingRelease('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
-              </PopoverContent>
-            </Popover>
-          </div>
-           <div>
-            <Label htmlFor="release-desc">Description</Label>
-            <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?"/>
-          </div>
-          <div>
-            <Label>Included Micro-Skills</Label>
-            <div className="space-y-2 mt-2 p-3 border rounded-md">
-                <div className='grid grid-cols-2 gap-2 mb-2'>
-                    <Select value={selectedSpecForMicro?.id || ''} onValueChange={specId => {
-                        setSelectedSpecForMicro(coreSkills.find(s => s.id === specId) || null);
-                        setSelectedSkillAreaForMicro(null);
-                    }}>
-                        <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                        <SelectContent>
-                            {coreSkills.filter(s => s.type === 'Specialization').map(spec => (
-                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={selectedSkillAreaForMicro?.id || ''} onValueChange={areaId => {
-                        const area = selectedSpecForMicro?.skillAreas.find(a => a.id === areaId) || null;
-                        setSelectedSkillAreaForMicro(area);
-                    }} disabled={!selectedSpecForMicro}>
-                        <SelectTrigger><SelectValue placeholder="Select Skill Area..." /></SelectTrigger>
-                        <SelectContent>
-                            {(selectedSpecForMicro?.skillAreas || []).map(area => (
-                                <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <ScrollArea className="max-h-36">
-                    <div className="space-y-2">
-                        {allMicroSkills.length > 0 ? allMicroSkills.map(ms => (
-                            <div key={ms.id} className="flex items-center space-x-2">
-                            <Checkbox 
-                                id={`ms-${ms.id}`} 
-                                checked={(release.focusAreaIds || []).includes(ms.id)}
-                                onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
-                            />
-                            <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
-                            </div>
-                        )) : <p className="text-xs text-muted-foreground text-center">Select a skill area to see micro-skills.</p>}
-                    </div>
-                </ScrollArea>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
-            <Button onClick={handleSaveRelease}>Save Project</Button>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1536,7 +1440,16 @@ function OfferizationContent() {
                               </Card>
                           ))}
 
-                          {editingRelease?.specializationId === spec.id ? renderProjectForm(spec) : (
+                          {editingRelease?.specializationId === spec.id ? (
+                            <ProjectForm 
+                                specialization={spec} 
+                                editingRelease={editingRelease} 
+                                handleUpdateEditingRelease={handleUpdateEditingRelease} 
+                                handleToggleFocusAreaInRelease={handleToggleFocusAreaInRelease} 
+                                handleSaveRelease={handleSaveRelease}
+                                setEditingRelease={setEditingRelease}
+                            />
+                          ) : (
                               <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(spec.id)}>
                                   <PlusCircle className="mr-2 h-4 w-4" /> Add Project
                               </Button>
@@ -1648,6 +1561,112 @@ function OfferizationContent() {
     </>
   );
 }
+
+const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingRelease, handleToggleFocusAreaInRelease, handleSaveRelease, setEditingRelease }: {
+    specialization: CoreSkill,
+    editingRelease: { specializationId: string; release: Partial<Release> },
+    handleUpdateEditingRelease: (field: keyof Release, value: any) => void,
+    handleToggleFocusAreaInRelease: (microSkillId: string) => void,
+    handleSaveRelease: () => void,
+    setEditingRelease: React.Dispatch<React.SetStateAction<{ specializationId: string; release: Partial<Release> } | null>>,
+}) => {
+    const { projects, coreSkills } = useAuth();
+    const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(specialization);
+    const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+
+    const { release } = editingRelease;
+    const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
+    const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
+    
+    return (
+        <Card className="mt-4 bg-muted/50">
+            <CardHeader>
+                <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Project' : 'Edit Project'}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <Label htmlFor="release-name">Project Name</Label>
+                    <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
+                        <SelectTrigger id="release-name">
+                            <SelectValue placeholder="Select a project..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {projectsInDomain.map(proj => (
+                                <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <Label htmlFor="release-date">EST completion date</Label>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Select a date'}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={release.launchDate ? parseISO(release.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingRelease('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+                <div>
+                    <Label htmlFor="release-desc">Description</Label>
+                    <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?" />
+                </div>
+                <div>
+                    <Label>Included Micro-Skills</Label>
+                    <div className="space-y-2 mt-2 p-3 border rounded-md">
+                        <div className='grid grid-cols-2 gap-2 mb-2'>
+                            <Select value={selectedSpecForMicro?.id || ''} onValueChange={specId => {
+                                setSelectedSpecForMicro(coreSkills.find(s => s.id === specId) || null);
+                                setSelectedSkillAreaForMicro(null);
+                            }}>
+                                <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                                <SelectContent>
+                                    {coreSkills.filter(s => s.type === 'Specialization').map(spec => (
+                                        <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={selectedSkillAreaForMicro?.id || ''} onValueChange={areaId => {
+                                const area = selectedSpecForMicro?.skillAreas.find(a => a.id === areaId) || null;
+                                setSelectedSkillAreaForMicro(area);
+                            }} disabled={!selectedSpecForMicro}>
+                                <SelectTrigger><SelectValue placeholder="Select Skill Area..." /></SelectTrigger>
+                                <SelectContent>
+                                    {(selectedSpecForMicro?.skillAreas || []).map(area => (
+                                        <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <ScrollArea className="max-h-36">
+                            <div className="space-y-2">
+                                {allMicroSkills.length > 0 ? allMicroSkills.map(ms => (
+                                    <div key={ms.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`ms-${ms.id}`}
+                                            checked={(release.focusAreaIds || []).includes(ms.id)}
+                                            onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
+                                        />
+                                        <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
+                                    </div>
+                                )) : <p className="text-xs text-muted-foreground text-center">Select a skill area to see micro-skills.</p>}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
+                    <Button onClick={handleSaveRelease}>Save Project</Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 function OffersContent() {
   const { offerizationPlans } = useAuth();
