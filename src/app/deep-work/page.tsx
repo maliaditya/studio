@@ -530,6 +530,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource: (resource: Resource) => void;
     setViewMode: (mode: 'session' | 'library') => void;
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+    linkProjectToTask: (taskId: string, projectId: string | null) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -559,6 +560,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleStartEditResource,
     setViewMode,
     handleOpenLinkProjectModal,
+    linkProjectToTask,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -662,17 +664,29 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
                     {isHighLevelNode && (
-                      <Button size="sm" variant="outline" className="gap-2" onClick={() => handleOpenLinkProjectModal(currentTask)}>
-                        <Briefcase className="h-4 w-4" />
-                        {linkedProjects.length > 0 ? `${linkedProjects.length} Linked Project(s)` : "Link Project"}
-                      </Button>
+                        <div className="flex items-center gap-1">
+                          <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button size="sm" variant="outline" className="gap-2">
+                                        <Briefcase className="h-4 w-4" />
+                                        {linkedProjects.length > 0 ? `${linkedProjects.length} Linked Project(s)` : "Link Project"}
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {projectsInDomain.map(proj => (
+                                        <DropdownMenuCheckboxItem
+                                            key={proj.id}
+                                            checked={linkedProjects.some(p => p.id === proj.id)}
+                                            onCheckedChange={() => linkProjectToTask(currentTask.id, proj.id)}
+                                        >
+                                            {proj.name}
+                                        </DropdownMenuCheckboxItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                     )}
                 </div>
-                {linkedProjects.length > 0 && (
-                    <div className="flex flex-wrap gap-2 pt-2">
-                      {linkedProjects.map(p => <Badge key={p.id} variant="secondary">{p.name}</Badge>)}
-                    </div>
-                )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {(currentTask.linkedDeepWorkIds || []).map((id: string) => {
@@ -794,6 +808,7 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
+    linkProjectToTask,
   } = useAuth();
   const router = useRouter();
   
@@ -850,43 +865,6 @@ function DeepWorkPageContent() {
   const [isLinkProjectModalOpen, setIsLinkProjectModalOpen] = useState(false);
   const [linkingTask, setLinkingTask] = useState<ExerciseDefinition | null>(null);
   
-  const linkProjectToTask = useCallback((taskId: string, projectId: string) => {
-    const isDeepWork = deepWorkDefinitions.some(d => d.id === taskId);
-    const definitions = isDeepWork ? deepWorkDefinitions : upskillDefinitions;
-    const setDefinitions = isDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
-
-    const taskToUpdate = definitions.find(d => d.id === taskId);
-    if (!taskToUpdate) return;
-    
-    setDefinitions(prev => 
-        prev.map(def => {
-            if (def.id === taskId) {
-                const currentLinkedIds = def.linkedProjectIds || [];
-                const isLinked = currentLinkedIds.includes(projectId);
-                const newLinkedIds = isLinked 
-                    ? currentLinkedIds.filter(id => id !== projectId)
-                    : [...currentLinkedIds, projectId];
-                return { ...def, linkedProjectIds: newLinkedIds };
-            }
-            return def;
-        })
-    );
-    
-    setNavigationStack(prev => 
-        prev.map(item => {
-            if (item.id === taskId) {
-                const currentLinkedIds = item.linkedProjectIds || [];
-                const isLinked = currentLinkedIds.includes(projectId);
-                const newLinkedIds = isLinked 
-                    ? currentLinkedIds.filter(id => id !== projectId)
-                    : [...currentLinkedIds, projectId];
-                return { ...item, linkedProjectIds: newLinkedIds };
-            }
-            return item;
-        })
-    );
-  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-
   const handleOpenNewFocusAreaModal = (type: 'deepwork' | 'upskill') => {
     if (!selectedMicroSkill) {
         toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
@@ -1826,6 +1804,21 @@ function DeepWorkPageContent() {
     handleCardClick(item as ExerciseDefinition);
   };
 
+  const filteredRecentItems = useMemo(() => {
+    return recentItems.filter(item => {
+        if (item.type === 'project') return true;
+        if (item.type === 'deepwork') {
+            const nodeType = getDeepWorkNodeType(item as ExerciseDefinition);
+            return nodeType === 'Intention';
+        }
+        if (item.type === 'upskill') {
+            const nodeType = getUpskillNodeType(item as ExerciseDefinition);
+            return nodeType === 'Curiosity';
+        }
+        return false;
+    });
+  }, [recentItems, getDeepWorkNodeType, getUpskillNodeType]);
+
   const handleBreadcrumbClick = (index: number) => {
     setNavigationStack(prev => prev.slice(0, index + 1));
   };
@@ -1882,9 +1875,9 @@ useEffect(() => {
                         <CardTitle className="flex items-center gap-2"><History />Recents</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {recentItems.length > 0 ? (
+                        {filteredRecentItems.length > 0 ? (
                             <ul className="space-y-1">
-                                {recentItems.map(item => (
+                                {filteredRecentItems.map(item => (
                                     <li key={item.id}>
                                         <Button
                                             variant="ghost"
@@ -2016,6 +2009,7 @@ useEffect(() => {
                                 handleStartEditResource={handleStartEditResource}
                                 setViewMode={setViewMode}
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                linkProjectToTask={linkProjectToTask}
                             />
                         ) : (
                           <div className="text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>
@@ -2265,23 +2259,25 @@ useEffect(() => {
         }}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Link "{linkingTask?.name}" to a Project</DialogTitle>
+                    <DialogTitle>Link "{linkingTask?.name}" to Projects</DialogTitle>
                     <DialogDescription>
                         Select projects from the same domain to create strategic links.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
-                    {projectsForLinking.map(proj => (
-                         <div key={proj.id} className="flex items-center space-x-2">
-                            <Checkbox
-                                id={`proj-check-${proj.id}`}
-                                checked={(linkingTask?.linkedProjectIds || []).includes(proj.id)}
-                                onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
-                            />
-                            <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
-                        </div>
-                    ))}
-                    {projectsForLinking.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects in this domain.</p>}
+                    <ScrollArea className="h-60">
+                        {projectsForLinking.map(proj => (
+                            <div key={proj.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`proj-check-${proj.id}`}
+                                    checked={(linkingTask?.linkedProjectIds || []).includes(proj.id)}
+                                    onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
+                                />
+                                <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
+                            </div>
+                        ))}
+                        {projectsForLinking.length === 0 && <p className="text-sm text-muted-foreground text-center">No projects in this domain.</p>}
+                    </ScrollArea>
                 </div>
             </DialogContent>
         </Dialog>
@@ -2313,3 +2309,4 @@ export default function DeepWorkPage() {
 
 
     
+
