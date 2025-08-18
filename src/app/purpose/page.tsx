@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -12,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, PillarCardData } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, PillarCardData, ProjectPlan } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
@@ -30,10 +31,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
-const PillarCard = ({ cardData, onUpdate, onDelete }: {
+const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     cardData: PillarCardData;
     onUpdate: (updatedCard: PillarCardData) => void;
     onDelete: (cardId: string) => void;
+    onSpecializationClick: (specId: string) => void;
 }) => {
     const { specializations, allEquations } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
@@ -75,13 +77,17 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
     if (!isEditing) {
         return (
             <Card className="flex flex-col">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-base">Pillar Card</CardTitle>
-                    <div className="flex items-center">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditing(true)}>
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
+                    <div className="flex-grow">
+                        <CardTitle className="text-base font-semibold text-foreground">
+                            {cardData.principle || "Untitled Principle"}
+                        </CardTitle>
+                    </div>
+                    <div className="flex items-center flex-shrink-0 -mr-2 -mt-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsEditing(true)}>
                             <Edit className="h-4 w-4"/>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(cardData.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onDelete(cardData.id)}>
                             <Trash2 className="h-4 w-4"/>
                         </Button>
                     </div>
@@ -89,17 +95,11 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
                     <div className="space-y-4">
                         <div>
-                            <Label className="font-semibold text-sm">Principle</Label>
-                            <p className="text-sm mt-1 text-muted-foreground whitespace-pre-wrap min-h-[4rem]">
-                                {cardData.principle || 'Not set.'}
-                            </p>
-                        </div>
-                        <div>
                             <Label className="font-semibold text-sm">Practices</Label>
-                            <div className="mt-2 space-y-1">
+                            <div className="mt-2 flex flex-wrap gap-1">
                                 {linkedPractices.length > 0 ? (
                                     linkedPractices.map(eq => (
-                                        <Badge key={eq.id} variant="secondary" className="mr-1 mb-1 font-normal text-xs">{eq.outcome}</Badge>
+                                        <Badge key={eq.id} variant="secondary" className="font-normal text-xs">{eq.outcome}</Badge>
                                     ))
                                 ) : (
                                     <p className="text-xs text-muted-foreground">No practices linked.</p>
@@ -110,10 +110,12 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                     <div className="space-y-4">
                         <div>
                             <Label className="font-semibold text-sm">Application</Label>
-                            <div className="mt-2 space-y-1">
+                            <div className="mt-2 flex flex-wrap gap-1">
                                 {linkedApplications.length > 0 ? (
                                     linkedApplications.map(spec => (
-                                        <Badge key={spec.id} variant="secondary" className="mr-1 mb-1 font-normal text-xs">{spec.name}</Badge>
+                                      <button key={spec.id} onClick={() => onSpecializationClick(spec.id)}>
+                                        <Badge key={spec.id} variant="outline" className="font-normal text-xs cursor-pointer hover:bg-accent">{spec.name}</Badge>
+                                      </button>
                                     ))
                                 ) : (
                                     <p className="text-xs text-muted-foreground">No specializations linked.</p>
@@ -122,7 +124,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                         </div>
                         <div>
                             <Label className="font-semibold text-sm">Expected Outcome</Label>
-                            <p className="text-sm mt-1 text-muted-foreground whitespace-pre-wrap min-h-[4rem]">
+                            <p className="text-sm mt-1 text-muted-foreground whitespace-pre-wrap">
                                 {cardData.outcome || 'Not set.'}
                             </p>
                         </div>
@@ -144,8 +146,13 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
     return (
         <Card className="flex flex-col ring-2 ring-primary">
              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Editing Pillar Card</CardTitle>
-                <div className="flex items-center">
+                <Textarea 
+                    value={editedCardData.principle}
+                    onChange={e => handleTextChange('principle', e.target.value)}
+                    placeholder="Principle..."
+                    className="text-base font-semibold border-0 shadow-none focus-visible:ring-0 resize-none p-0"
+                />
+                <div className="flex items-center flex-shrink-0 -mr-2 -mt-2">
                     <Button variant="ghost" size="sm" onClick={handleCancel}>Cancel</Button>
                     <Button size="sm" onClick={handleSave}><Save className="mr-2 h-4 w-4"/>Save</Button>
                 </div>
@@ -153,15 +160,6 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
                 <div className="space-y-4">
                     <div>
-                        <Label className="font-semibold text-sm">Principle</Label>
-                        <Textarea 
-                            value={editedCardData.principle}
-                            onChange={e => handleTextChange('principle', e.target.value)}
-                            placeholder="Core belief or truth..."
-                            className="mt-1 h-24"
-                        />
-                    </div>
-                     <div>
                         <Label className="font-semibold text-sm">Practices</Label>
                         <Popover>
                             <PopoverTrigger asChild>
@@ -186,9 +184,9 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                                 </ScrollArea>
                             </PopoverContent>
                         </Popover>
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                             {practicesInEdit.map(eq => (
-                                <Badge key={eq.id} variant="secondary" className="mr-1 mb-1 font-normal">{eq.outcome}</Badge>
+                                <Badge key={eq.id} variant="secondary" className="font-normal">{eq.outcome}</Badge>
                             ))}
                         </div>
                     </div>
@@ -219,9 +217,9 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                                 </ScrollArea>
                             </PopoverContent>
                         </Popover>
-                        <div className="mt-2 space-y-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                             {applicationsInEdit.map(spec => (
-                                <Badge key={spec.id} variant="secondary" className="mr-1 mb-1 font-normal">{spec.name}</Badge>
+                                <Badge key={spec.id} variant="outline" className="font-normal">{spec.name}</Badge>
                             ))}
                         </div>
                     </div>
@@ -231,7 +229,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                             value={editedCardData.outcome}
                             onChange={e => handleTextChange('outcome', e.target.value)}
                             placeholder="The desired result..."
-                             className="mt-1 h-24"
+                             className="mt-1"
                         />
                     </div>
                 </div>
@@ -280,10 +278,9 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
 
 function PurposePageContent() {
     const { 
-        purposeStatement, 
-        setPurposeStatement,
-        specializationPurposes,
-        setSpecializationPurposes,
+        purposeData, 
+        setPurposeData,
+        specializations,
         coreSkills,
         setCoreSkills,
         projects,
@@ -297,28 +294,47 @@ function PurposePageContent() {
         openRuleDetailPopup, ruleDetailPopup,
         pillarEquations, setPillarEquations,
         habitCards,
-        pillarCards, addPillarCard, updatePillarCard, deletePillarCard,
+        addPillarCard, updatePillarCard, deletePillarCard,
+        offerizationPlans
     } = useAuth();
     const { toast } = useToast();
 
     const [isEditingPurpose, setIsEditingPurpose] = useState(false);
-    const [purposeInput, setPurposeInput] = useState(purposeStatement);
+    const [purposeInput, setPurposeInput] = useState('');
     
     const [editingMetaRuleId, setEditingMetaRuleId] = useState<string | null>(null);
     const [editedMetaRuleText, setEditedMetaRuleText] = useState('');
     
     const [equationPopupState, setEquationPopupState] = useState<{ pillar: string; equation?: HabitEquation; isOpen: boolean }>({ pillar: '', isOpen: false });
 
-    useEffect(() => {
-        setPurposeInput(purposeStatement);
-    }, [purposeStatement]);
+    const [isSpecPopupOpen, setIsSpecPopupOpen] = useState(false);
+    const [popupContent, setPopupContent] = useState<{ title: string; projects: Project[] }>({ title: '', projects: [] });
 
-    const specializations = React.useMemo(() => {
-        return coreSkills.filter(skill => skill.type === 'Specialization');
-    }, [coreSkills]);
+
+    useEffect(() => {
+        if (purposeData) {
+            setPurposeInput(purposeData.statement);
+        }
+    }, [purposeData]);
+
+    const handleSpecializationClick = (specId: string) => {
+        const spec = specializations.find(s => s.id === specId);
+        if (!spec) return;
+
+        const linkedProjects = projects.filter(proj => {
+            const plan = offerizationPlans[spec.id];
+            return plan?.releases?.some(rel => rel.name === proj.name);
+        });
+
+        setPopupContent({
+            title: spec.name,
+            projects: linkedProjects
+        });
+        setIsSpecPopupOpen(true);
+    };
 
     const handleSavePurpose = () => {
-        setPurposeStatement(purposeInput);
+        setPurposeData(prev => ({ ...prev, statement: purposeInput }));
         setIsEditingPurpose(false);
         toast({ title: "Purpose Updated", description: "Your central purpose has been saved." });
     };
@@ -476,7 +492,7 @@ function PurposePageContent() {
                             <Textarea
                                 value={purposeInput}
                                 onChange={(e) => setPurposeInput(e.target.value)}
-                                placeholder="“Mind like a fort, Body like steel, Heart like a garden, Spirit like the sun.”"
+                                placeholder="“Mind like a fort, Body like a steel, Heart like a garden, Spirit like the sun.”"
                                 className="min-h-[100px] text-base"
                                 autoFocus
                             />
@@ -489,8 +505,8 @@ function PurposePageContent() {
                             </div>
                         </div>
                     ) : (
-                        <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeStatement); setIsEditingPurpose(true); }}>
-                            {purposeStatement || "Click to define your purpose..."}
+                        <p className="text-lg text-muted-foreground whitespace-pre-wrap min-h-[5rem] cursor-pointer" onClick={() => { setPurposeInput(purposeData?.statement || ''); setIsEditingPurpose(true); }}>
+                            {purposeData?.statement || "Click to define your purpose..."}
                         </p>
                     )}
                 </CardContent>
@@ -504,8 +520,8 @@ function PurposePageContent() {
                     <Button onClick={addPillarCard}><PlusCircle className="mr-2 h-4 w-4" />Add Pillar Card</Button>
                 </div>
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {pillarCards?.map(card => (
-                        <PillarCard key={card.id} cardData={card} onUpdate={updatePillarCard} onDelete={deletePillarCard} />
+                    {purposeData?.pillarCards?.map(card => (
+                        <PillarCard key={card.id} cardData={card} onUpdate={updatePillarCard} onDelete={deletePillarCard} onSpecializationClick={handleSpecializationClick} />
                     ))}
                  </div>
             </div>
@@ -778,6 +794,24 @@ function PurposePageContent() {
                     metaRules={metaRules}
                 />
             )}
+            <Dialog open={isSpecPopupOpen} onOpenChange={setIsSpecPopupOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Projects for "{popupContent.title}"</DialogTitle>
+                </DialogHeader>
+                <div className="py-4">
+                  {popupContent.projects.length > 0 ? (
+                    <ul className="space-y-2">
+                      {popupContent.projects.map(p => (
+                        <li key={p.id} className="p-2 rounded-md border bg-muted/30">{p.name}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-center text-muted-foreground">You need to work on this. No projects are currently linked to this specialization in your offerization plan.</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
         </div>
     );
 }
@@ -860,3 +894,4 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
