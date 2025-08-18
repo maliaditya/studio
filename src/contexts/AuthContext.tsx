@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -243,7 +243,7 @@ interface AuthContextType {
   skillAcquisitionPlans: SkillAcquisitionPlan[];
   setSkillAcquisitionPlans: React.Dispatch<React.SetStateAction<SkillAcquisitionPlan[]>>;
 
-  // New Pillar Cards State (Placeholder for now)
+  // New Pillar Cards State
   addPillarCard: () => void;
   updatePillarCard: (updatedCard: PillarCardData) => void;
   deletePillarCard: (cardId: string) => void;
@@ -1659,8 +1659,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             level = 0;
             parentId = undefined;
-            x = window.innerWidth / 2 - popupWidth / 2;
-            y = window.innerHeight / 2 - popupHeight / 2;
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            x = (screenWidth - popupWidth) / 2;
+            y = (screenHeight - popupHeight) / 2;
         }
         
         newPopups.set(resourceId, { 
@@ -1988,24 +1990,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!domain) return undefined;
   
     let parentFolderId: string | null = null;
-    let currentFolders = [...resourceFolders];
+    let finalFolders = [...resourceFolders];
   
     const path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parentTask.name];
   
     path.forEach(folderName => {
-      let folder = currentFolders.find(f => f.name === folderName && f.parentId === parentFolderId);
+      let folder = finalFolders.find(f => f.name === folderName && f.parentId === parentFolderId);
       if (!folder) {
         folder = {
           id: `folder_${Date.now()}_${Math.random()}`,
           name: folderName,
           parentId: parentFolderId,
         };
-        currentFolders.push(folder);
+        finalFolders.push(folder);
       }
       parentFolderId = folder.id;
     });
   
-    setResourceFolders(currentFolders);
+    setResourceFolders(finalFolders);
   
     const newResource: Resource = {
       id: `res_card_${Date.now()}`,
@@ -2135,6 +2137,8 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
+
 
 
 
