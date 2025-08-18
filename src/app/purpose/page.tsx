@@ -36,16 +36,32 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
     onDelete: (cardId: string) => void;
 }) => {
     const { specializations, allEquations } = useAuth();
-    
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedCardData, setEditedCardData] = useState<PillarCardData>(cardData);
+
+    useEffect(() => {
+        setEditedCardData(cardData);
+    }, [cardData]);
+
     const handleTextChange = (field: 'principle' | 'outcome', value: string) => {
-        onUpdate({ ...cardData, [field]: value });
+        setEditedCardData({ ...editedCardData, [field]: value });
     };
 
     const handleLinkToggle = (type: 'practice' | 'application', id: string) => {
         const key = type === 'practice' ? 'practiceEquationIds' : 'applicationSpecializationIds';
-        const currentIds = cardData[key] || [];
+        const currentIds = editedCardData[key] || [];
         const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
-        onUpdate({ ...cardData, [key]: newIds });
+        setEditedCardData({ ...editedCardData, [key]: newIds });
+    };
+
+    const handleSave = () => {
+        onUpdate(editedCardData);
+        setIsEditing(false);
+    };
+
+    const handleCancel = () => {
+        setEditedCardData(cardData); // Reset changes
+        setIsEditing(false);
     };
 
     const linkedPractices = (cardData.practiceEquationIds || [])
@@ -56,21 +72,90 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
         .map(id => specializations.find(spec => spec.id === id))
         .filter((spec): spec is CoreSkill => !!spec);
 
+    if (!isEditing) {
+        return (
+            <Card className="flex flex-col">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-base">Pillar Card</CardTitle>
+                    <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditing(true)}>
+                            <Edit className="h-4 w-4"/>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(cardData.id)}>
+                            <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
+                    <div className="space-y-4">
+                        <div>
+                            <Label className="font-semibold text-sm">Principle</Label>
+                            <p className="text-sm mt-1 text-muted-foreground whitespace-pre-wrap min-h-[4rem]">
+                                {cardData.principle || 'Not set.'}
+                            </p>
+                        </div>
+                        <div>
+                            <Label className="font-semibold text-sm">Practices</Label>
+                            <div className="mt-2 space-y-1">
+                                {linkedPractices.length > 0 ? (
+                                    linkedPractices.map(eq => (
+                                        <Badge key={eq.id} variant="secondary" className="mr-1 mb-1 font-normal text-xs">{eq.outcome}</Badge>
+                                    ))
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">No practices linked.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <Label className="font-semibold text-sm">Application</Label>
+                            <div className="mt-2 space-y-1">
+                                {linkedApplications.length > 0 ? (
+                                    linkedApplications.map(spec => (
+                                        <Badge key={spec.id} variant="secondary" className="mr-1 mb-1 font-normal text-xs">{spec.name}</Badge>
+                                    ))
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">No specializations linked.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div>
+                            <Label className="font-semibold text-sm">Expected Outcome</Label>
+                            <p className="text-sm mt-1 text-muted-foreground whitespace-pre-wrap min-h-[4rem]">
+                                {cardData.outcome || 'Not set.'}
+                            </p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    // Edit mode
+    const practicesInEdit = (editedCardData.practiceEquationIds || [])
+        .map(id => allEquations.find(eq => eq.id === id))
+        .filter((eq): eq is HabitEquation => !!eq);
+
+    const applicationsInEdit = (editedCardData.applicationSpecializationIds || [])
+        .map(id => specializations.find(spec => spec.id === id))
+        .filter((spec): spec is CoreSkill => !!spec);
+
     return (
-        <Card className="flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Pillar Card</CardTitle>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(cardData.id)}>
-                    <Trash2 className="h-4 w-4"/>
-                </Button>
+        <Card className="flex flex-col ring-2 ring-primary">
+             <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base">Editing Pillar Card</CardTitle>
+                <div className="flex items-center">
+                    <Button variant="ghost" size="sm" onClick={handleCancel}>Cancel</Button>
+                    <Button size="sm" onClick={handleSave}><Save className="mr-2 h-4 w-4"/>Save</Button>
+                </div>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
-                {/* Left Column */}
                 <div className="space-y-4">
                     <div>
                         <Label className="font-semibold text-sm">Principle</Label>
                         <Textarea 
-                            value={cardData.principle}
+                            value={editedCardData.principle}
                             onChange={e => handleTextChange('principle', e.target.value)}
                             placeholder="Core belief or truth..."
                             className="mt-1 h-24"
@@ -91,7 +176,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                                             <div key={eq.id} className="flex items-center space-x-2">
                                                 <Checkbox 
                                                     id={`eq-${cardData.id}-${eq.id}`}
-                                                    checked={(cardData.practiceEquationIds || []).includes(eq.id)}
+                                                    checked={(editedCardData.practiceEquationIds || []).includes(eq.id)}
                                                     onCheckedChange={() => handleLinkToggle('practice', eq.id)}
                                                 />
                                                 <Label htmlFor={`eq-${cardData.id}-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
@@ -102,13 +187,12 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                             </PopoverContent>
                         </Popover>
                         <div className="mt-2 space-y-1">
-                            {linkedPractices.map(eq => (
+                            {practicesInEdit.map(eq => (
                                 <Badge key={eq.id} variant="secondary" className="mr-1 mb-1 font-normal">{eq.outcome}</Badge>
                             ))}
                         </div>
                     </div>
                 </div>
-                 {/* Right Column */}
                 <div className="space-y-4">
                     <div>
                         <Label className="font-semibold text-sm">Application</Label>
@@ -125,7 +209,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                                             <div key={spec.id} className="flex items-center space-x-2">
                                                 <Checkbox 
                                                     id={`spec-${cardData.id}-${spec.id}`}
-                                                    checked={(cardData.applicationSpecializationIds || []).includes(spec.id)}
+                                                    checked={(editedCardData.applicationSpecializationIds || []).includes(spec.id)}
                                                     onCheckedChange={() => handleLinkToggle('application', spec.id)}
                                                 />
                                                 <Label htmlFor={`spec-${cardData.id}-${spec.id}`} className="font-normal w-full cursor-pointer">{spec.name}</Label>
@@ -136,7 +220,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                             </PopoverContent>
                         </Popover>
                         <div className="mt-2 space-y-1">
-                            {linkedApplications.map(spec => (
+                            {applicationsInEdit.map(spec => (
                                 <Badge key={spec.id} variant="secondary" className="mr-1 mb-1 font-normal">{spec.name}</Badge>
                             ))}
                         </div>
@@ -144,7 +228,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete }: {
                      <div>
                         <Label className="font-semibold text-sm">Expected Outcome</Label>
                         <Textarea 
-                            value={cardData.outcome}
+                            value={editedCardData.outcome}
                             onChange={e => handleTextChange('outcome', e.target.value)}
                             placeholder="The desired result..."
                              className="mt-1 h-24"
@@ -420,7 +504,7 @@ function PurposePageContent() {
                     <Button onClick={addPillarCard}><PlusCircle className="mr-2 h-4 w-4" />Add Pillar Card</Button>
                 </div>
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {pillarCards.map(card => (
+                    {pillarCards?.map(card => (
                         <PillarCard key={card.id} cardData={card} onUpdate={updatePillarCard} onDelete={deletePillarCard} />
                     ))}
                  </div>
