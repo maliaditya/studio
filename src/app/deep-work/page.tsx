@@ -1758,13 +1758,33 @@ function DeepWorkPageContent() {
   };
 
   const handleSelectRecentItem = (item: (ExerciseDefinition | Project) & { type: string }) => {
-    setSelectedMicroSkill(null);
     if (item.type === 'project') {
       handleProjectSelect(item as Project);
       return;
     }
     
-    handleCardClick(item as ExerciseDefinition);
+    const task = item as ExerciseDefinition;
+    
+    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === task.category);
+    if (microSkill) {
+        const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+        if (coreSkill) {
+            setSelectedDomainId(coreSkill.domainId);
+            setSelectedSkillId(coreSkill.id);
+            const skillArea = coreSkill.skillAreas.find(sa => sa.name === microSkill.skillAreaName);
+            if (skillArea) {
+                const fullMicroSkill = skillArea.microSkills.find(ms => ms.name === microSkill.microSkillName);
+                if (fullMicroSkill) {
+                    onSelectMicroSkill(fullMicroSkill);
+                }
+            }
+        }
+    } else {
+        onSelectMicroSkill(null);
+        setSelectedSkillId(null);
+        setSelectedDomainId(null);
+    }
+    handleCardClick(task);
   };
 
   const filteredRecentItems = useMemo(() => {
@@ -1801,27 +1821,6 @@ function DeepWorkPageContent() {
         setNavigationStack([]);
     }
 }, [selectedDeepWorkTask, selectedUpskillTask]);
-
-useEffect(() => {
-  if (currentTask) {
-    const { category } = currentTask;
-    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
-    if (microSkill) {
-      const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
-      if (coreSkill) {
-        setSelectedDomainId(coreSkill.domainId);
-        setSelectedSkillId(coreSkill.id);
-        const skillArea = coreSkill.skillAreas.find(sa => sa.name === microSkill.skillAreaName);
-        if (skillArea) {
-          const fullMicroSkill = skillArea.microSkills.find(ms => ms.name === microSkill.microSkillName);
-          if (fullMicroSkill) {
-            setSelectedMicroSkill(fullMicroSkill);
-          }
-        }
-      }
-    }
-  }
-}, [currentTask, microSkillMap, coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedMicroSkill]);
 
   const allDefinitions = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions, resources]);
   const activeDragItem = useMemo(() => {
@@ -1876,7 +1875,7 @@ useEffect(() => {
 
                  <SkillLibrary
                     selectedMicroSkill={selectedMicroSkill}
-                    onSelectMicroSkill={setSelectedMicroSkill}
+                    onSelectMicroSkill={onSelectMicroSkill}
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
                     selectedProject={selectedProject}
@@ -2407,6 +2406,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
