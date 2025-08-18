@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1547,16 +1547,14 @@ function DeepWorkPageContent() {
 
     if (!over) {
         if (active.data.current?.type === 'subtask') {
-            const { itemType, subtaskId, parentId } = active.data.current;
+            const { itemType, subtaskId } = active.data.current;
             const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
             const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
             
-            setDefs((prev: ExerciseDefinition[]) => prev.map(def => {
-                if (def.id === parentId) {
-                    return { ...def, [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId) };
-                }
-                return def;
-            }));
+            setDefs((prev: ExerciseDefinition[]) => prev.map(def => ({
+                ...def,
+                [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId)
+            })));
             
             toast({ title: "Promoted to Top-Level", description: "Subtask has been unlinked and is now a top-level item." });
         }
@@ -1569,12 +1567,13 @@ function DeepWorkPageContent() {
     const overData = over.data.current;
     if (!activeData || !overData) return;
 
-    const activeId = activeData.subtaskId || activeData.id;
+    const activeId = activeData.subtaskId || activeData.id.replace('card-deepwork-', '').replace('card-upskill-', '');
     const activeType = activeData.itemType;
     const oldParentId = activeData.parentId;
-    const targetId = overData.id;
+    const targetId = overData.id.replace('card-deepwork-', '').replace('card-upskill-', '');
 
     if (overData.type === 'card' && activeId !== targetId) {
+        
         // --- Unlink from old parent (if any) ---
         if (oldParentId) {
             const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
@@ -1790,13 +1789,13 @@ useEffect(() => {
   }, [activeId, allDefinitions]);
   
   const allChildIds = useMemo(() => {
-      const childIds = new Set<string>();
-      [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
-          (def.linkedDeepWorkIds || []).forEach(id => childIds.add(id));
-          (def.linkedUpskillIds || []).forEach(id => childIds.add(id));
-          (def.linkedResourceIds || []).forEach(id => childIds.add(id));
-      });
-      return childIds;
+    const childIds = new Set<string>();
+    [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
+        (def.linkedDeepWorkIds || []).forEach(id => childIds.add(id));
+        (def.linkedUpskillIds || []).forEach(id => childIds.add(id));
+        (def.linkedResourceIds || []).forEach(id => childIds.add(id));
+    });
+    return childIds;
   }, [deepWorkDefinitions, upskillDefinitions]);
 
   return (
@@ -2368,6 +2367,8 @@ export default function DeepWorkPage() {
 
 
     
+
+
 
 
 
