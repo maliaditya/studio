@@ -730,7 +730,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             projectsInDomain={projectsInDomainForChild} 
                             onLinkProject={() => {}}
                             onEdit={setEditingFocusArea} 
-                            handleCreateAndLinkChild={handleCreateAndLinkChild}
+                            onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
                 })}
@@ -1544,74 +1544,95 @@ function DeepWorkPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over } = event;
-    if (!over) {
+    
+    if (active.id === over?.id) return;
+
+    if (over === null) {
       if (active.data.current?.type === 'subtask') {
         const { itemType, subtaskId, parentId } = active.data.current;
         const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
         const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-        
-        setDefs(prev => prev.map(def => 
+
+        setDefs(prev => prev.map(def =>
           def.id === parentId ? { ...def, [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId) } : def
         ));
         toast({ title: "Promoted!", description: "Item is now a top-level task." });
       }
       return;
     }
-
-    if (active.id === over.id) return;
     
     let activeId: string;
     let activeType: 'deepwork' | 'upskill' | 'resource';
-    let parentId: string | undefined;
+    let oldParentId: string | undefined;
 
     if (active.data.current?.type === 'subtask') {
         activeId = active.data.current.subtaskId;
         activeType = active.data.current.itemType;
-        parentId = active.data.current.parentId;
+        oldParentId = active.data.current.parentId;
     } else {
         activeId = active.data.current?.id;
         activeType = active.data.current?.itemType;
+        
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+        const oldParentDef = allDefs.find(def => 
+            (def.linkedDeepWorkIds?.includes(activeId)) || 
+            (def.linkedUpskillIds?.includes(activeId)) ||
+            (def.linkedResourceIds?.includes(activeId))
+        );
+        oldParentId = oldParentDef?.id;
     }
     
     const targetId = over.data.current?.id;
     const targetType = over.data.current?.itemType;
 
-    if (!activeId || !activeType || !targetId || !targetType) return;
+    if (!activeId || !activeType || !targetId || !targetType || over.data.current?.type !== 'card') {
+      return;
+    }
     
     const allSetters = {
         deepwork: setDeepWorkDefinitions,
         upskill: setUpskillDefinitions,
         resource: setResources,
     };
-    const allLinkKeys = {
+
+    const linkKeys = {
         deepwork: 'linkedDeepWorkIds' as const,
         upskill: 'linkedUpskillIds' as const,
         resource: 'linkedResourceIds' as const,
     };
+    
+    const activeLinkKey = linkKeys[activeType];
+
+    const updateState = (setter: React.Dispatch<React.SetStateAction<any[]>>, callback: (item: any) => any) => {
+        setter(prev => prev.map(callback));
+    };
 
     // 1. Unlink from old parent
-    if (parentId) {
-      const oldParentType = deepWorkDefinitions.some(d => d.id === parentId) ? 'deepwork' : 'upskill';
-      allSetters[oldParentType](prev => prev.map(def => {
-        if (def.id === parentId) {
-          const newLinks = (def[allLinkKeys[activeType]] || []).filter((id: string) => id !== activeId);
-          return { ...def, [allLinkKeys[activeType]]: newLinks };
-        }
-        return def;
-      }));
+    if (oldParentId) {
+        const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
+        const oldParentSetter = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+        
+        updateState(oldParentSetter, (def: ExerciseDefinition) => {
+            if (def.id === oldParentId) {
+                const newLinks = (def[activeLinkKey] || []).filter((id: string) => id !== activeId);
+                return { ...def, [activeLinkKey]: newLinks };
+            }
+            return def;
+        });
     }
     
     // 2. Link to new parent
-    if (over.data.current?.type === 'card') {
-      allSetters[targetType](prev => prev.map(def => {
+    const targetSetter = targetType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
+    
+    updateState(targetSetter, (def: ExerciseDefinition) => {
         if (def.id === targetId) {
-          const newLinks = [...(def[allLinkKeys[activeType]] || []), activeId];
-          return { ...def, [allLinkKeys[activeType]]: newLinks };
+            const newLinks = [...(def[activeLinkKey] || []), activeId];
+            return { ...def, [activeLinkKey]: newLinks };
         }
         return def;
-      }));
-      toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
-    }
+    });
+
+    toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
   };
 
 
@@ -2222,22 +2243,58 @@ useEffect(() => {
         </Dialog>
         </div>
         <DragOverlay>
-            {activeId ? (
+            {activeId && activeDragItem ? (
                 <div className="pointer-events-none">
                     {activeId.startsWith('card-deepwork-') && (
                         <LinkedDeepWorkCard 
                             ref={null}
-                            deepworkDef={deepWorkDefinitions.find(d => `card-deepwork-${d.id}` === activeId)!}
-                            {...({} as any)} // Dummy props
+                            deepworkDef={activeDragItem as ExerciseDefinition}
+                            getDeepWorkNodeType={getDeepWorkNodeType}
+                            getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
+                            permanentlyLoggedActionIds={permanentlyLoggedActionIds}
+                            handleAddTaskToSession={handleAddTaskToSession}
+                            handleCardClick={handleCardClick}
+                            handleToggleReadyForBranding={handleToggleReadyForBranding}
+                            handleUnlinkItem={handleUnlinkItem}
+                            handleDeleteFocusArea={handleDeleteFocusArea}
+                            handleViewProgress={handleViewProgress}
+                            deepWorkDefinitions={deepWorkDefinitions}
+                            formatDuration={formatMinutes}
+                            calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
+                            upskillDefinitions={upskillDefinitions}
+                            resources={resources}
+                            onOpenMindMap={onOpenMindMap}
+                            onUpdateName={handleUpdateFocusAreaName}
+                            projects={projects}
+                            handleOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            handleCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     )}
                     {activeId.startsWith('card-upskill-') && (
                          <LinkedUpskillCard 
-                            upskillDef={upskillDefinitions.find(d => `card-upskill-${d.id}` === activeId)!}
-                            {...({} as any)} // Dummy props
+                            upskillDef={activeDragItem as ExerciseDefinition}
+                            handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} 
+                            setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')}
+                            setViewMode={setViewMode}
+                            handleUnlinkItem={handleUnlinkItem} 
+                            handleDeleteSubtopic={handleDeleteFocusArea}
+                            handleViewProgress={(d) => handleViewProgress(d, 'upskill')} 
+                            isComplete={isUpskillObjectiveComplete(activeDragItem.id)} 
+                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} 
+                            upskillDefinitions={upskillDefinitions} 
+                            resources={resources} 
+                            calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)} 
+                            setEmbedUrl={setEmbedUrl} 
+                            setFloatingVideoUrl={setFloatingVideoUrl} 
+                            linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
+                            onUpdateName={handleUpdateFocusAreaName} 
+                            projectsInDomain={[]} 
+                            onLinkProject={() => {}} 
+                            onEdit={setEditingFocusArea} 
+                            onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     )}
-                    {activeId.startsWith('subtask-') && activeDragItem && (
+                    {activeId.startsWith('subtask-') && (
                         <div className="bg-card text-xs text-muted-foreground truncate flex items-center gap-1 p-1 rounded-md shadow-lg">
                             <span>-</span>
                             <span>{(activeDragItem as ExerciseDefinition).name}</span>
@@ -2273,6 +2330,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
