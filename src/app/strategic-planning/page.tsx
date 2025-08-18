@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -1011,6 +1011,10 @@ function OfferizationContent() {
 
   const [editingOffer, setEditingOffer] = useState<{ specializationId: string; offer: Partial<Offer> } | null>(null);
   
+  // New state for hierarchical selection in the modal
+  const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(null);
+  const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+
   const specializations = useMemo(() => {
     const plannedSpecializationIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
     return coreSkills.filter(skill => skill.type === 'Specialization' && plannedSpecializationIds.has(skill.id));
@@ -1100,10 +1104,13 @@ function OfferizationContent() {
   };
 
   const handleStartEditingRelease = (specializationId: string, release?: Release) => {
+    const spec = coreSkills.find(s => s.id === specializationId);
     setEditingRelease({
         specializationId,
         release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
     });
+    setSelectedSpecForMicro(spec || null);
+    setSelectedSkillAreaForMicro(null);
   };
 
   const handleUpdateEditingRelease = (field: keyof Release, value: any) => {
@@ -1258,9 +1265,9 @@ function OfferizationContent() {
   const renderProjectForm = (specialization: CoreSkill) => {
     if (!editingRelease || editingRelease.specializationId !== specialization.id) return null;
     const { release } = editingRelease;
-    const allMicroSkills = specialization.skillAreas.flatMap(area => area.microSkills);
+    const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
 
-    const projectsInDomain = projects.filter(p => p.domainId === specialization.domainId);
+    const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
     
     return (
       <Card className="mt-4 bg-muted/50">
@@ -1301,17 +1308,45 @@ function OfferizationContent() {
           </div>
           <div>
             <Label>Included Micro-Skills</Label>
-            <div className="space-y-2 mt-2 rounded-md border p-3 max-h-48 overflow-y-auto">
-              {allMicroSkills.map(ms => (
-                <div key={ms.id} className="flex items-center space-x-2">
-                  <Checkbox 
-                    id={`ms-${ms.id}`} 
-                    checked={(release.focusAreaIds || []).includes(ms.id)}
-                    onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
-                  />
-                  <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
+            <div className="space-y-2 mt-2 p-3 border rounded-md">
+                <div className='grid grid-cols-2 gap-2 mb-2'>
+                    <Select value={selectedSpecForMicro?.id || ''} onValueChange={specId => {
+                        setSelectedSpecForMicro(coreSkills.find(s => s.id === specId) || null);
+                        setSelectedSkillAreaForMicro(null);
+                    }}>
+                        <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                        <SelectContent>
+                            {coreSkills.filter(s => s.type === 'Specialization').map(spec => (
+                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={selectedSkillAreaForMicro?.id || ''} onValueChange={areaId => {
+                        const area = selectedSpecForMicro?.skillAreas.find(a => a.id === areaId) || null;
+                        setSelectedSkillAreaForMicro(area);
+                    }} disabled={!selectedSpecForMicro}>
+                        <SelectTrigger><SelectValue placeholder="Select Skill Area..." /></SelectTrigger>
+                        <SelectContent>
+                            {(selectedSpecForMicro?.skillAreas || []).map(area => (
+                                <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
-              ))}
+                <ScrollArea className="max-h-36">
+                    <div className="space-y-2">
+                        {allMicroSkills.length > 0 ? allMicroSkills.map(ms => (
+                            <div key={ms.id} className="flex items-center space-x-2">
+                            <Checkbox 
+                                id={`ms-${ms.id}`} 
+                                checked={(release.focusAreaIds || []).includes(ms.id)}
+                                onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
+                            />
+                            <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
+                            </div>
+                        )) : <p className="text-xs text-muted-foreground text-center">Select a skill area to see micro-skills.</p>}
+                    </div>
+                </ScrollArea>
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -1494,7 +1529,7 @@ function OfferizationContent() {
                                   <p className="font-medium text-foreground">Micro-Skills:</p>
                                   <ul className="list-disc list-inside text-muted-foreground">
                                   {(release.focusAreaIds || []).map((id, index) => (
-                                      <li key={`${id}-${index}`}>{microSkillMap.get(id) || 'Unknown Micro-Skill'}</li>
+                                      <li key={`${id}-${index}`}>{microSkillMap.get(id)?.name || 'Unknown Micro-Skill'}</li>
                                   ))}
                                   </ul>
                               </CardContent>
