@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical, PackageCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -30,6 +31,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 
 
@@ -70,6 +72,7 @@ export function SkillLibrary({
     handleExpansionChange, 
     upskillDefinitions, 
     deepWorkDefinitions,
+    setDeepWorkDefinitions,
     selectedDomainId, setSelectedDomainId,
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId
@@ -78,8 +81,8 @@ export function SkillLibrary({
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
-  const [contextMenuTaskId, setContextMenuTaskId] = useState<string | null>(null);
-
+  const [contextMenuTask, setContextMenuTask] = useState<ExerciseDefinition | null>(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 
   const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
   const selectedCoreSkill = coreSkills.find(s => s.id === selectedSkillId);
@@ -133,37 +136,46 @@ export function SkillLibrary({
   const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
 
   const getDeepWorkNodeType = (def: ExerciseDefinition) => {
-    const hasTaskChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    
-    if (!hasTaskChildren) {
-        const isChildOfTask = deepWorkDefinitions.some(parent => 
-            (parent.linkedDeepWorkIds || []).includes(def.id)
-        );
-        return isChildOfTask ? 'Action' : 'Standalone';
+    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
+    if (!hasChildren) {
+        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+        return isChild ? 'Action' : 'Standalone';
     }
+    
+    const hasActionableChild = (def.linkedDeepWorkIds || []).some(childId => {
+        const childDef = deepWorkDefinitions.find(d => d.id === childId);
+        return childDef && getDeepWorkNodeType(childDef).match(/Action|Standalone/);
+    });
+    if (hasActionableChild) return 'Objective';
 
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        return childDef && ((childDef.linkedDeepWorkIds?.length ?? 0) > 0 || (childDef.linkedUpskillIds?.length ?? 0) > 0);
+        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
     });
+    if (hasObjectiveChild) return 'Intention';
 
-    return hasObjectiveChild ? 'Intention' : 'Objective';
+    return 'Objective';
   };
   
   const getUpskillNodeType = (def: ExerciseDefinition) => {
-     const hasTaskChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-
-    if (!hasTaskChildren) {
+    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+    if (!hasChildren) {
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
-      
+    
+    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        return childDef && getUpskillNodeType(childDef).match(/Visualization|Standalone/);
+    });
+    if (hasActionableChild) return 'Objective';
+    
     const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && (childDef.linkedUpskillIds?.length ?? 0) > 0;
+        return childDef && getUpskillNodeType(childDef) === 'Objective';
     });
-
     if (hasObjectiveChild) return 'Curiosity';
+    
     return 'Objective';
   };
 
@@ -178,6 +190,12 @@ export function SkillLibrary({
         case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
         default: return <Briefcase className="mr-2 h-4 w-4" />;
     }
+  };
+  
+  const handleToggleReadyForBranding = (defId: string) => {
+    setDeepWorkDefinitions(prev => prev.map(def =>
+      def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
+    ));
   };
   
   const renderHeader = () => {
@@ -220,14 +238,15 @@ export function SkillLibrary({
                     const isLinkable = nodeType === 'Intention' || nodeType === 'Curiosity';
 
                     return (
-                        <DropdownMenu key={task.id} open={contextMenuTaskId === task.id} onOpenChange={(open) => {
-                            if (!open) setContextMenuTaskId(null);
+                        <DropdownMenu key={task.id} open={contextMenuTask?.id === task.id} onOpenChange={(isOpen) => {
+                            if (!isOpen) setContextMenuTask(null);
                         }}>
                             <DropdownMenuTrigger asChild>
                                 <div
                                     onContextMenu={(e) => {
                                         e.preventDefault();
-                                        setContextMenuTaskId(task.id);
+                                        setContextMenuPosition({ x: e.clientX, y: e.clientY });
+                                        setContextMenuTask(task);
                                     }}
                                     className="flex items-center justify-between group/task rounded-md hover:bg-muted"
                                 >
@@ -242,7 +261,10 @@ export function SkillLibrary({
                                       />
                                     ) : (
                                       <button
-                                        onDoubleClick={() => onEditFocusArea(task)}
+                                        onDoubleClick={() => {
+                                            setEditingFocusAreaId(task.id);
+                                            setEditingName(task.name);
+                                        }}
                                         onClick={() => {
                                             onSelectFocusArea(task, libraryView);
                                             if (nodeType === 'Intention' || nodeType === 'Curiosity') {
@@ -273,14 +295,26 @@ export function SkillLibrary({
                                     </div>
                                 </div>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent>
+                            <DropdownMenuContent
+                                style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x }}
+                                onCloseAutoFocus={(e) => e.preventDefault()}
+                            >
                                 <DropdownMenuItem onSelect={() => onEditFocusArea(task)}>
                                     <Edit3 className="mr-2 h-4 w-4" /> Edit
                                 </DropdownMenuItem>
                                 {isLinkable && (
-                                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}>
-                                        <Briefcase className="mr-2 h-4 w-4" /> Link Project
-                                    </DropdownMenuItem>
+                                    <>
+                                        <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}>
+                                            <Briefcase className="mr-2 h-4 w-4" /> Link Project
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuCheckboxItem
+                                            checked={task.isReadyForBranding}
+                                            onCheckedChange={() => handleToggleReadyForBranding(task.id)}
+                                        >
+                                            <PackageCheck className="mr-2 h-4 w-4" /> Ready for Branding
+                                        </DropdownMenuCheckboxItem>
+                                    </>
                                 )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive">
