@@ -1,5 +1,3 @@
-
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -59,9 +57,9 @@ export function TodaysLearningModal({
   const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<string[]>([]);
   
   // State for deep work selection flow
-  const [selectionStep, setSelectionStep] = useState<'topic' | 'objective' | 'action'>('topic');
-  const [selectedDeepWorkTopic, setSelectedDeepWorkTopic] = useState<string | null>(null);
-  const [selectedDeepWorkObjective, setSelectedDeepWorkObjective] = useState<ExerciseDefinition | null>(null);
+  const [deepWorkSelectionStep, setDeepWorkSelectionStep] = useState<'project' | 'intention' | 'action'>('project');
+  const [selectedDeepWorkProject, setSelectedDeepWorkProject] = useState<Project | null>(null);
+  const [selectedDeepWorkIntention, setSelectedDeepWorkIntention] = useState<ExerciseDefinition | null>(null);
 
   // State for upskill selection flow
   const [upskillSelectionStep, setUpskillSelectionStep] = useState<'project' | 'curiosity' | 'visualization'>('project');
@@ -72,9 +70,9 @@ export function TodaysLearningModal({
   useEffect(() => {
     if (isOpen) {
       if (pageType === 'deepwork') {
-        setSelectionStep('topic');
-        setSelectedDeepWorkTopic(null);
-        setSelectedDeepWorkObjective(null);
+        setDeepWorkSelectionStep('project');
+        setSelectedDeepWorkProject(null);
+        setSelectedDeepWorkIntention(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       } else if (pageType === 'upskill') {
         setUpskillSelectionStep('project');
@@ -208,35 +206,53 @@ export function TodaysLearningModal({
 
 
   // ----- DEEPWORK-SPECIFIC LOGIC -----
-  const deepWorkTopics = useMemo(() => {
-    if (pageType !== 'deepwork') return [];
-    return [...new Set(deepWorkDefinitions.map(def => def.category))].sort();
-  }, [deepWorkDefinitions, pageType]);
+  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
 
-  const objectivesForTopic = useMemo(() => {
-    if (!selectedDeepWorkTopic || pageType !== 'deepwork') return [];
-    
-    return deepWorkDefinitions.filter(objectiveDef => {
-        if (objectiveDef.category !== selectedDeepWorkTopic) return false;
+  const getActionsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
+      const visited = new Set<string>();
+      const actions: ExerciseDefinition[] = [];
+      const queue: string[] = [nodeId];
+
+      while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          if (visited.has(currentId)) continue;
+          visited.add(currentId);
+  
+          const node = deepWorkDefinitions.find(d => d.id === currentId);
+          if (!node) continue;
+  
+          const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+  
+          if (!isParent) { // It's an Action
+              actions.push(node);
+          } else { // It's an Intention or Objective, so recurse
+              (node.linkedDeepWorkIds || []).forEach(childId => {
+                  if (!visited.has(childId)) queue.push(childId);
+              });
+          }
+      }
+      return actions.sort((a,b) => a.name.localeCompare(b.name));
+  }, [deepWorkDefinitions]);
+
+  const intentionsForProject = useMemo(() => {
+    if (!selectedDeepWorkProject || pageType !== 'deepwork') return [];
+
+    return (deepWorkDefinitions || []).filter(def => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        const isIntention = isParent && !isChild;
+
+        if (!isIntention) return false;
         
-        // It must have children to be considered an objective.
-        if ((objectiveDef.linkedDeepWorkIds?.length ?? 0) === 0) return false;
-
-        // At least one of its children must be an "Action" (a task with no children).
-        return objectiveDef.linkedDeepWorkIds!.some(childId => {
-            const childDef = deepWorkDefinitions.find(d => d.id === childId);
-            return childDef && (childDef.linkedDeepWorkIds?.length ?? 0) === 0;
-        });
+        // This is a simplified check. A more robust check might trace up the project hierarchy.
+        return (def.linkedProjectIds || []).includes(selectedDeepWorkProject.id);
     }).sort((a,b) => a.name.localeCompare(b.name));
-}, [deepWorkDefinitions, selectedDeepWorkTopic, pageType]);
+  }, [deepWorkDefinitions, selectedDeepWorkProject, pageType, linkedDeepWorkChildIds]);
 
-  const actionsForObjective = useMemo(() => {
-      if (!selectedDeepWorkObjective || pageType !== 'deepwork') return [];
-      const childIds = new Set(selectedDeepWorkObjective.linkedDeepWorkIds || []);
-      return deepWorkDefinitions.filter(
-          def => childIds.has(def.id) && (def.linkedDeepWorkIds?.length ?? 0) === 0
-      ).sort((a,b) => a.name.localeCompare(b.name));
-  }, [deepWorkDefinitions, selectedDeepWorkObjective, pageType]);
+  const actionsForIntention = useMemo(() => {
+    if (!selectedDeepWorkIntention || pageType !== 'deepwork') return [];
+    return getActionsRecursive(selectedDeepWorkIntention.id);
+  }, [selectedDeepWorkIntention, pageType, getActionsRecursive]);
 
 
   const pageInfo = {
@@ -278,69 +294,63 @@ export function TodaysLearningModal({
             {pageType === 'deepwork' ? (
                 <div className="space-y-4">
                     <div className="flex items-center text-sm text-muted-foreground mb-4">
-                      <button
-                        onClick={() => {
-                          setSelectionStep('topic');
-                          setSelectedDeepWorkTopic(null);
-                          setSelectedDeepWorkObjective(null);
-                        }}
-                        className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
-                        disabled={selectionStep === 'topic'}
-                      >
-                        Topics
-                      </button>
-                      {selectedDeepWorkTopic && (
-                        <>
-                          <ChevronRight className="h-4 w-4 mx-1" />
-                          <button
-                            onClick={() => {
-                              setSelectionStep('objective');
-                              setSelectedDeepWorkObjective(null);
-                            }}
+                        <button
+                            onClick={() => { setDeepWorkSelectionStep('project'); setSelectedDeepWorkProject(null); setSelectedDeepWorkIntention(null); }}
                             className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed"
-                            disabled={selectionStep === 'objective'}
-                          >
-                            {selectedDeepWorkTopic}
-                          </button>
-                        </>
-                      )}
-                      {selectedDeepWorkObjective && (
-                        <>
-                          <ChevronRight className="h-4 w-4 mx-1" />
-                          <span className="font-medium text-foreground truncate" title={selectedDeepWorkObjective.name}>{selectedDeepWorkObjective.name}</span>
-                        </>
-                      )}
+                            disabled={deepWorkSelectionStep === 'project'}
+                        >
+                            Projects
+                        </button>
+                        {selectedDeepWorkProject && (
+                            <>
+                                <ChevronRight className="h-4 w-4 mx-1" />
+                                <button
+                                    onClick={() => { setDeepWorkSelectionStep('intention'); setSelectedDeepWorkIntention(null); }}
+                                    className="hover:text-foreground disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:cursor-not-allowed truncate max-w-[150px]"
+                                    disabled={deepWorkSelectionStep === 'intention'}
+                                    title={selectedDeepWorkProject.name}
+                                >
+                                    {selectedDeepWorkProject.name}
+                                </button>
+                            </>
+                        )}
+                        {selectedDeepWorkIntention && (
+                            <>
+                                <ChevronRight className="h-4 w-4 mx-1" />
+                                <span className="font-medium text-foreground truncate max-w-[150px]" title={selectedDeepWorkIntention.name}>{selectedDeepWorkIntention.name}</span>
+                            </>
+                        )}
                     </div>
-                    {selectionStep === 'topic' && (
+                    {deepWorkSelectionStep === 'project' && (
                         <div className="space-y-2">
-                            {deepWorkTopics.map(topic => (
-                                <button key={topic} onClick={() => { setSelectedDeepWorkTopic(topic); setSelectionStep('objective'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <span className="font-medium">{topic}</span>
+                            {projects.map(project => (
+                                <button key={project.id} onClick={() => { setSelectedDeepWorkProject(project); setDeepWorkSelectionStep('intention'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                    <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
                             ))}
                         </div>
                     )}
-                    {selectionStep === 'objective' && (
+                    {deepWorkSelectionStep === 'intention' && (
                         <div className="space-y-2">
-                           {objectivesForTopic.length > 0 ? objectivesForTopic.map(obj => (
-                                <button key={obj.id} onClick={() => { setSelectedDeepWorkObjective(obj); setSelectionStep('action'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                           {intentionsForProject.length > 0 ? intentionsForProject.map(intention => (
+                                <button key={intention.id} onClick={() => { setSelectedDeepWorkIntention(intention); setDeepWorkSelectionStep('action'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <div className='flex items-center gap-2 min-w-0'>
-                                        <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                        <span className="font-medium truncate">{obj.name}</span>
+                                        <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                                        <span className="font-medium truncate">{intention.name}</span>
                                     </div>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
-                            )) : <p className="text-sm text-center text-muted-foreground py-4">No objectives with actions found in this topic.</p>}
+                            )) : <p className="text-sm text-center text-muted-foreground py-4">No Intentions linked to this project.</p>}
                         </div>
                     )}
-                    {selectionStep === 'action' && (
-                        <div className="space-y-2">
-                           {actionsForObjective.length > 0 ? (
+                    {deepWorkSelectionStep === 'action' && (
+                         <div className="space-y-2">
+                           {actionsForIntention.length > 0 ? (
                                 <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {actionsForObjective.map(action => (
+                                {actionsForIntention.map(action => (
                                     <div key={action.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={action.definitionId} id={`action-radio-${action.id}`} />
+                                        <RadioGroupItem value={action.id} id={`action-radio-${action.id}`} />
                                         <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
                                             <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                             {action.name}
@@ -348,7 +358,7 @@ export function TodaysLearningModal({
                                     </div>
                                 ))}
                                 </RadioGroup>
-                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actions found for this objective.</p>}
+                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable tasks found for this intention.</p>}
                         </div>
                     )}
                 </div>
