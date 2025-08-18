@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -117,8 +116,14 @@ export function WeightGoalCard({
         today.setHours(0, 0, 0, 0);
 
         projects.forEach(project => {
-            const hasProductPlan = !!productizationPlans[project.name];
-            const hasActiveOffer = Object.values(offerizationPlans).some(plan => 
+            // Check productization plans
+            if (productizationPlans && productizationPlans[project.name]) {
+                activeIds.add(project.id);
+                return; // Go to next project if already added
+            }
+
+            // Check offerization plans
+            const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
                 plan.releases?.some(release => {
                     if (release.name !== project.name) return false;
                     try {
@@ -126,7 +131,7 @@ export function WeightGoalCard({
                     } catch { return false; }
                 })
             );
-            if (hasProductPlan || hasActiveOffer) {
+            if (isOfferedAndActive) {
                 activeIds.add(project.id);
             }
         });
@@ -151,10 +156,9 @@ export function WeightGoalCard({
                 
                 if (!isIntention) return false;
 
-                // An intention is active if it's not linked to any project, OR if it's linked to at least one active project.
                 const linkedProjects = def.linkedProjectIds || [];
-                if (linkedProjects.length === 0) return true; 
-
+                if (linkedProjects.length === 0) return false; 
+                
                 return linkedProjects.some(projectId => activeProjectIds.has(projectId));
             })
             .sort((a, b) => a.name.localeCompare(b.name));
