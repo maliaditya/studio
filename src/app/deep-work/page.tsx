@@ -254,6 +254,10 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal,
     onCreateAndLinkChild,
 }, ref) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+        id: id,
+        data: { type: 'card', itemType: 'deepwork' }
+    });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
@@ -266,7 +270,11 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
             ref.current = node;
         }
         setDroppableNodeRef(node);
+        setNodeRef(node);
     };
+    
+    const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+
 
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
@@ -300,10 +308,10 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         .filter((p): p is Project => !!p);
     
     return (
-        <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
+        <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
+                    <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                     <AddToSessionPopover definition={deepworkDef} onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} />
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleCardClick(deepworkDef)}><ArrowRight className="h-4 w-4" /></Button>
                     <DropdownMenu>
@@ -881,7 +889,7 @@ function DeepWorkPageContent() {
     return skillDomains.find(sd => sd.id === coreSkill.domainId);
   }, [microSkillMap, coreSkills, skillDomains]);
 
-  const linkProjectToTask = (taskId: string, projectId: string | null) => {
+  const linkProjectToTask = (taskId: string, projectId: string) => {
     const isUpskillTask = upskillDefinitions.some(d => d.id === taskId);
     const definitions = isUpskillTask ? upskillDefinitions : deepWorkDefinitions;
     const setDefinitions = isUpskillTask ? setUpskillDefinitions : setDeepWorkDefinitions;
@@ -901,7 +909,7 @@ function DeepWorkPageContent() {
   };
 
   const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
-    if (!linkingTask) return;
+    if (!linkingTask || !projectId) return;
     linkProjectToTask(linkingTask.id, projectId);
   };
   
@@ -1555,44 +1563,53 @@ function DeepWorkPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
-    
-    const draggedId = active.id.toString();
+    if (!over || active.id === over.id) return;
+
+    const draggedId = active.id.toString().startsWith('subtask-') ? active.data.current?.id : active.id;
     const targetId = over.id.toString();
+    const draggedItemType = active.data.current?.itemType as 'deepwork' | 'upskill' | 'resource';
+    const sourceParentId = active.data.current?.parentId;
 
-    if (draggedId === targetId) return;
-
-    if (active.data.current?.type === 'card') {
-        const draggedItemType = active.data.current?.itemType as 'deepwork' | 'upskill' | 'resource' | undefined;
-        if (!draggedItemType) return;
-        
-        // Find the definition for the target card
-        const targetDef = deepWorkDefinitions.find(d => d.id === targetId) || upskillDefinitions.find(d => d.id === targetId);
-        if (!targetDef) return;
-
-        // Unlink from old parent
-        setDeepWorkDefinitions(prev => prev.map(def => ({ ...def, linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== draggedId), linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== draggedId), linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== draggedId) })));
-        setUpskillDefinitions(prev => prev.map(def => ({ ...def, linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== draggedId), linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== draggedId) })));
-
-        // Link to new parent
-        const setTargetDefinitions = upskillDefinitions.some(d => d.id === targetId) ? setUpskillDefinitions : setDeepWorkDefinitions;
-        setTargetDefinitions(prev => prev.map(def => {
-            if (def.id === targetId) {
-                let updatedDef = { ...def };
-                if (draggedItemType === 'deepwork') {
-                    updatedDef.linkedDeepWorkIds = [...(updatedDef.linkedDeepWorkIds || []), draggedId];
-                } else if (draggedItemType === 'upskill') {
-                    updatedDef.linkedUpskillIds = [...(updatedDef.linkedUpskillIds || []), draggedId];
-                } else if (draggedItemType === 'resource') {
-                    updatedDef.linkedResourceIds = [...(updatedDef.linkedResourceIds || []), draggedId];
-                }
-                return updatedDef;
+    const unlink = (definitions: ExerciseDefinition[], setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
+        setDefinitions(prev => prev.map(def => {
+            if (def.id === sourceParentId) {
+                const newDef = { ...def };
+                if (newDef.linkedDeepWorkIds) newDef.linkedDeepWorkIds = newDef.linkedDeepWorkIds.filter(id => id !== draggedId);
+                if (newDef.linkedUpskillIds) newDef.linkedUpskillIds = newDef.linkedUpskillIds.filter(id => id !== draggedId);
+                if (newDef.linkedResourceIds) newDef.linkedResourceIds = newDef.linkedResourceIds.filter(id => id !== draggedId);
+                return newDef;
             }
             return def;
         }));
-        
-        toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
+    };
+    
+    if (sourceParentId) {
+        unlink(deepWorkDefinitions, setDeepWorkDefinitions);
+        unlink(upskillDefinitions, setUpskillDefinitions);
     }
+    
+    const link = (definitions: ExerciseDefinition[], setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>, linkKey: keyof ExerciseDefinition) => {
+        setDefinitions(prev => prev.map(def => {
+            if (def.id === targetId) {
+                const newLinks = [...((def[linkKey] as string[]) || []), draggedId];
+                return { ...def, [linkKey]: newLinks };
+            }
+            return def;
+        }));
+    };
+    
+    const targetIsDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
+    
+    if (targetIsDeepWork) {
+        if (draggedItemType === 'deepwork') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedDeepWorkIds');
+        if (draggedItemType === 'upskill') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedUpskillIds');
+        if (draggedItemType === 'resource') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedResourceIds');
+    } else { // Target is Upskill
+        if (draggedItemType === 'upskill') link(upskillDefinitions, setUpskillDefinitions, 'linkedUpskillIds');
+        if (draggedItemType === 'resource') link(upskillDefinitions, setUpskillDefinitions, 'linkedResourceIds');
+    }
+    
+    toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
   };
 
 
@@ -2224,5 +2241,6 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
