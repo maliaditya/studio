@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isAfter } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -1433,7 +1433,7 @@ function OfferizationContent() {
                                   <p className="font-medium text-foreground">Micro-Skills:</p>
                                   <ul className="list-disc list-inside text-muted-foreground">
                                   {(release.focusAreaIds || []).map((id, index) => (
-                                      <li key={`${id}-${index}`}>{microSkillMap.get(id)?.name || 'Unknown Micro-Skill'}</li>
+                                      <li key={`${id}-${index}`}>{microSkillMap.get(id)?.microSkillName || 'Unknown Micro-Skill'}</li>
                                   ))}
                                   </ul>
                               </CardContent>
