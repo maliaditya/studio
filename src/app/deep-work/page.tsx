@@ -133,8 +133,7 @@ const DraggableSubtaskItem: React.FC<{
     childName: string;
     isLogged: boolean;
     type: 'deepwork' | 'upskill' | 'resource';
-    onClick: () => void;
-  }> = ({ childId, parentId, childName, isLogged, type, onClick }) => {
+  }> = ({ childId, parentId, childName, isLogged, type }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `subtask-${childId}-from-${parentId}`,
         data: {
@@ -166,7 +165,7 @@ const DraggableSubtaskItem: React.FC<{
             title={childName}
         >
           <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
-          <span onClick={onClick} className="cursor-pointer hover:text-foreground">
+          <span className="hover:text-foreground">
              {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
           </span>
         </div>
@@ -224,7 +223,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     calculatedEstimate: number;
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
-    setSelectedSubtopic: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
     onOpenMindMap: (id: string) => void;
     onUpdateName: (id: string, newName: string) => void;
     projects: Project[];
@@ -247,7 +245,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     calculatedEstimate,
     upskillDefinitions,
     resources,
-    setSelectedSubtopic,
     onOpenMindMap,
     onUpdateName,
     projects,
@@ -256,12 +253,11 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 }, ref) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: id,
-        data: { type: 'card', itemType: 'deepwork' }
+        data: { type: 'card', itemType: 'deepwork', definition: deepworkDef }
     });
     const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id });
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
-    const router = useRouter();
 
     const setCombinedRefs = (node: HTMLElement | null) => {
         if (typeof ref === 'function') {
@@ -356,17 +352,17 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                             const childDef = deepWorkDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" onClick={() => handleCardClick(childDef)}/>;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" />;
                         })}
                         {(deepworkDef.linkedUpskillIds || []).map(childId => {
                             const childDef = upskillDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" onClick={() => setSelectedSubtopic(childDef, 'upskill')}/>;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="upskill" />;
                         })}
                         {(deepworkDef.linkedResourceIds || []).map(childId => {
                             const childDef = resources.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => router.push('/resources')}/>;
+                            return <DraggableSubtaskItem key={childId} childId={childId} parentId={deepworkDef.id} childName={childDef.name} isLogged={false} type="resource" />;
                         })}
                     </div>
                 </CardContent>
@@ -721,7 +717,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             calculatedEstimate={calculateTotalEstimate(def)}
                             upskillDefinitions={upskillDefinitions}
                             resources={resources}
-                            setSelectedSubtopic={handleSelectFocusArea}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projectsInDomainForChild}
@@ -816,6 +811,7 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
+    linkProjectToTask,
   } = useAuth();
   const router = useRouter();
   
@@ -889,28 +885,10 @@ function DeepWorkPageContent() {
     return skillDomains.find(sd => sd.id === coreSkill.domainId);
   }, [microSkillMap, coreSkills, skillDomains]);
 
-  const linkProjectToTask = (taskId: string, projectId: string) => {
-    const isUpskillTask = upskillDefinitions.some(d => d.id === taskId);
-    const definitions = isUpskillTask ? upskillDefinitions : deepWorkDefinitions;
-    const setDefinitions = isUpskillTask ? setUpskillDefinitions : setDeepWorkDefinitions;
-
-    setDefinitions(prev => prev.map(def => {
-        if (def.id === taskId) {
-            const currentLinked = def.linkedProjectIds || [];
-            const isLinked = currentLinked.includes(projectId!);
-            if (isLinked) {
-                return { ...def, linkedProjectIds: currentLinked.filter(id => id !== projectId) };
-            } else {
-                return { ...def, linkedProjectIds: [...currentLinked, projectId!] };
-            }
-        }
-        return def;
-    }));
-  };
-
   const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
-    if (!linkingTask || !projectId) return;
+    if (!linkingTask) return;
     linkProjectToTask(linkingTask.id, projectId);
+    setIsLinkProjectModalOpen(false);
   };
   
   const projectsForLinking = useMemo(() => {
@@ -1563,53 +1541,73 @@ function DeepWorkPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const draggedId = active.id.toString().startsWith('subtask-') ? active.data.current?.id : active.id;
-    const targetId = over.id.toString();
-    const draggedItemType = active.data.current?.itemType as 'deepwork' | 'upskill' | 'resource';
-    const sourceParentId = active.data.current?.parentId;
-
-    const unlink = (definitions: ExerciseDefinition[], setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
-        setDefinitions(prev => prev.map(def => {
-            if (def.id === sourceParentId) {
+  
+    // If nothing to drop on, or dropping on itself, do nothing
+    if (!over || active.id === over.id) {
+      // If it's a subtask dropped into nothing, unlink it
+      if (active.data.current?.type === 'subtask' && !over) {
+        const { id: childId, parentId, itemType } = active.data.current;
+        const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
+  
+        setDefs(prevDefs => prevDefs.map(def => {
+          if (def.id === parentId) {
+            const newDef = { ...def };
+            if (itemType === 'deepwork' && newDef.linkedDeepWorkIds) {
+              newDef.linkedDeepWorkIds = newDef.linkedDeepWorkIds.filter(id => id !== childId);
+            } else if (itemType === 'upskill' && newDef.linkedUpskillIds) {
+              newDef.linkedUpskillIds = newDef.linkedUpskillIds.filter(id => id !== childId);
+            }
+            return newDef;
+          }
+          return def;
+        }));
+  
+        toast({ title: "Unlinked!", description: `Task is now a top-level item.` });
+      }
+      return;
+    }
+  
+    const draggedItemType = active.data.current?.type;
+    const targetItemType = over.data.current?.type;
+  
+    // Handle card-on-card drop or subtask-on-card drop
+    if (targetItemType === 'card' && (draggedItemType === 'card' || draggedItemType === 'subtask')) {
+      const draggedId = draggedItemType === 'card' ? active.id : active.data.current?.id;
+      const targetId = over.id as string;
+  
+      const draggedItemDefType = active.data.current?.itemType as 'deepwork' | 'upskill' | 'resource';
+      
+      // Unlink from old parent if it's a subtask
+      if (draggedItemType === 'subtask') {
+        const { parentId, itemType } = active.data.current;
+        const setParentDefs = upskillDefinitions.some(d => d.id === parentId) ? setUpskillDefinitions : setDeepWorkDefinitions;
+        
+        setParentDefs(prevDefs => prevDefs.map(def => {
+            if (def.id === parentId) {
                 const newDef = { ...def };
-                if (newDef.linkedDeepWorkIds) newDef.linkedDeepWorkIds = newDef.linkedDeepWorkIds.filter(id => id !== draggedId);
-                if (newDef.linkedUpskillIds) newDef.linkedUpskillIds = newDef.linkedUpskillIds.filter(id => id !== draggedId);
-                if (newDef.linkedResourceIds) newDef.linkedResourceIds = newDef.linkedResourceIds.filter(id => id !== draggedId);
+                if (itemType === 'deepwork') newDef.linkedDeepWorkIds = (newDef.linkedDeepWorkIds || []).filter(id => id !== draggedId);
+                else if (itemType === 'upskill') newDef.linkedUpskillIds = (newDef.linkedUpskillIds || []).filter(id => id !== draggedId);
+                else if (itemType === 'resource') newDef.linkedResourceIds = (newDef.linkedResourceIds || []).filter(id => id !== draggedId);
                 return newDef;
             }
             return def;
         }));
-    };
-    
-    if (sourceParentId) {
-        unlink(deepWorkDefinitions, setDeepWorkDefinitions);
-        unlink(upskillDefinitions, setUpskillDefinitions);
+      }
+  
+      // Link to new parent
+      const setTargetDefs = upskillDefinitions.some(d => d.id === targetId) ? setUpskillDefinitions : setDeepWorkDefinitions;
+      const linkKey = draggedItemDefType === 'deepwork' ? 'linkedDeepWorkIds' : (draggedItemDefType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds');
+      
+      setTargetDefs(prevDefs => prevDefs.map(def => {
+          if (def.id === targetId) {
+              const newLinks = [...((def as any)[linkKey] || []), draggedId];
+              return { ...def, [linkKey]: newLinks };
+          }
+          return def;
+      }));
+  
+      toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
     }
-    
-    const link = (definitions: ExerciseDefinition[], setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>, linkKey: keyof ExerciseDefinition) => {
-        setDefinitions(prev => prev.map(def => {
-            if (def.id === targetId) {
-                const newLinks = [...((def[linkKey] as string[]) || []), draggedId];
-                return { ...def, [linkKey]: newLinks };
-            }
-            return def;
-        }));
-    };
-    
-    const targetIsDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
-    
-    if (targetIsDeepWork) {
-        if (draggedItemType === 'deepwork') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedDeepWorkIds');
-        if (draggedItemType === 'upskill') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedUpskillIds');
-        if (draggedItemType === 'resource') link(deepWorkDefinitions, setDeepWorkDefinitions, 'linkedResourceIds');
-    } else { // Target is Upskill
-        if (draggedItemType === 'upskill') link(upskillDefinitions, setUpskillDefinitions, 'linkedUpskillIds');
-        if (draggedItemType === 'resource') link(upskillDefinitions, setUpskillDefinitions, 'linkedResourceIds');
-    }
-    
-    toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
   };
 
 
@@ -1931,7 +1929,7 @@ useEffect(() => {
                                 handleViewProgress={handleViewProgress}
                                 onOpenMindMap={(id: string) => {setMindMapRootFocusAreaId(id); setIsMindMapModalOpen(true)}}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
-                                onCreateAndLinkChild={handleCreateAndLinkChild}
+                                onCreateAndLinkChild={onCreateAndLinkChild}
                                 setEmbedUrl={setEmbedUrl}
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
@@ -2200,7 +2198,7 @@ useEffect(() => {
                                 <Checkbox
                                     id={`proj-check-${proj.id}`}
                                     checked={(linkingTask?.linkedProjectIds || []).includes(proj.id)}
-                                    onCheckedChange={() => handleLinkProjectToTaskFromModal(proj.id)}
+                                    onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
                                 />
                                 <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
                             </div>
@@ -2241,6 +2239,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
