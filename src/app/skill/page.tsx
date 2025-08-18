@@ -575,10 +575,30 @@ function SkillPageContent() {
                                             </div>
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-4">Projects</h4>
                                             {domainProjects.map(p => (
-                                                <Button key={p.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedProjectId === p.id && "bg-accent font-semibold")} onClick={() => handleSelectProject(p.id)}>
-                                                    <Briefcase className="mr-2 h-4 w-4"/>
-                                                    {p.name}
-                                                </Button>
+                                                <div key={p.id} className="group flex items-center justify-between pl-2 rounded-md hover:bg-muted">
+                                                    <Button variant="ghost" size="sm" className={cn("flex-grow justify-start", selectedProjectId === p.id && "bg-accent font-semibold")} onClick={() => handleSelectProject(p.id)}>
+                                                        <Briefcase className="mr-2 h-4 w-4"/>
+                                                        {p.name}
+                                                    </Button>
+                                                    <div className="flex items-center opacity-0 group-hover:opacity-100">
+                                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingProject(p)}><Edit className="h-4 w-4"/></Button>
+                                                        <AlertDialog>
+                                                            <AlertDialogTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                                            </AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>This will permanently delete the "{p.name}" project.</AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                    <AlertDialogAction onClick={() => handleDeleteProject(p.id)}>Delete</AlertDialogAction>
+                                                                </AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                        </AlertDialog>
+                                                    </div>
+                                                </div>
                                             ))}
                                              <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Project" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}/>
@@ -977,5 +997,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
