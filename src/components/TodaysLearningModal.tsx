@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -10,7 +11,7 @@ import {
   DialogFooter
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ExerciseDefinition, WorkoutExercise, Project } from '@/types/workout';
+import type { ExerciseDefinition, WorkoutExercise, Project, ProductizationPlan } from '@/types/workout';
 import { BookOpenCheck, Briefcase, Share2, Save, PlusCircle, ChevronRight, Flashlight, Focus, Frame, ArrowLeft, Bolt, Flag, Lightbulb } from 'lucide-react';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
@@ -22,6 +23,7 @@ import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAfter, parseISO } from 'date-fns';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -34,6 +36,9 @@ interface TodaysLearningModalProps {
   deepWorkDefinitions?: ExerciseDefinition[];
   upskillDefinitions?: ExerciseDefinition[];
   setDeepWorkDefinitions?: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+  projects?: Project[];
+  offerizationPlans?: Record<string, ProductizationPlan>;
+  productizationPlans?: Record<string, ProductizationPlan>;
 }
 
 export function TodaysLearningModal({
@@ -47,9 +52,12 @@ export function TodaysLearningModal({
   deepWorkDefinitions = [],
   upskillDefinitions = [],
   setDeepWorkDefinitions,
+  projects = [],
+  offerizationPlans = {},
+  productizationPlans = {},
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
-  const { projects, coreSkills, microSkillMap } = useAuth();
+  const { microSkillMap } = useAuth();
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for branding bundle creation
@@ -66,6 +74,39 @@ export function TodaysLearningModal({
   const [selectedUpskillProject, setSelectedUpskillProject] = useState<Project | null>(null);
   const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
 
+
+  const filteredProjects = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+
+    return projects.filter(project => {
+        // Check Productization Plans
+        const productPlan = productizationPlans[project.id];
+        if (productPlan) {
+            return true; // Any project with a product plan is valid
+        }
+
+        // Check Offerization Plans
+        const offerPlan = Object.values(offerizationPlans).find(plan => 
+            plan.releases?.some(release => release.name === project.name)
+        );
+        if (offerPlan && offerPlan.releases) {
+            const hasFutureRelease = offerPlan.releases.some(release => {
+                try {
+                    const releaseDate = parseISO(release.launchDate);
+                    return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                } catch {
+                    return false;
+                }
+            });
+            if (hasFutureRelease) {
+                return true;
+            }
+        }
+        
+        return false;
+    });
+  }, [projects, productizationPlans, offerizationPlans]);
 
   useEffect(() => {
     if (isOpen) {
@@ -323,7 +364,7 @@ export function TodaysLearningModal({
                     </div>
                     {deepWorkSelectionStep === 'project' && (
                         <div className="space-y-2">
-                            {projects.map(project => (
+                            {filteredProjects.map(project => ( 
                                 <button key={project.id} onClick={() => { setSelectedDeepWorkProject(project); setDeepWorkSelectionStep('intention'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
@@ -468,7 +509,7 @@ export function TodaysLearningModal({
                     </div>
                      {upskillSelectionStep === 'project' && (
                         <div className="space-y-2">
-                            {projects.map(project => (
+                            {filteredProjects.map(project => (
                                 <button key={project.id} onClick={() => { setSelectedUpskillProject(project); setUpskillSelectionStep('curiosity'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />

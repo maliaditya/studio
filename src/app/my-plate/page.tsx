@@ -1129,6 +1129,9 @@ function MyPlatePageContent() {
               deepWorkDefinitions={deepWorkDefinitions}
               upskillDefinitions={upskillDefinitions}
               setDeepWorkDefinitions={setDeepWorkDefinitions}
+              projects={projects}
+              offerizationPlans={offerizationPlans}
+              productizationPlans={productizationPlans}
           />
         )}
 
