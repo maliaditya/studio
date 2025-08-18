@@ -359,9 +359,10 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 });
 LinkedDeepWorkCard.displayName = 'LinkedDeepWorkCard';
 
-function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
+  handleDelete: (id: string) => void;
   setEmbedUrl: (url: string | null) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
@@ -392,7 +393,9 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); handleStartEditResource(resource); }}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => handleDelete(resource.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -446,7 +449,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                 {embedLinkForModal ? (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setEmbedUrl(embedLinkForModal)}><Expand className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setEmbedUrl(embedLinkForModal); }}><Expand className="h-4 w-4" /></Button>
                 ) : (
                     resource.link ? <Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><a href={resource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a></Button> : null
                 )}
@@ -454,7 +457,9 @@ function LinkedResourceItem({ resource, handleUnlinkItem, setEmbedUrl, handleOpe
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuItem onSelect={() => handleStartEditResource(resource)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-destructive"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => handleDelete(resource.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
                     </DropdownMenuContent>
                  </DropdownMenu>
             </div>
@@ -503,6 +508,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleToggleReadyForBranding: (id: string) => void;
     handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
     handleDeleteFocusArea: (id: string) => void;
+    handleDeleteResource: (id: string) => void;
     handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
     onOpenMindMap: (id: string) => void;
     handleUpdateFocusAreaName: (id: string, newName: string) => void;
@@ -536,6 +542,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleToggleReadyForBranding,
     handleUnlinkItem,
     handleDeleteFocusArea,
+    handleDeleteResource,
     handleViewProgress,
     onOpenMindMap,
     handleUpdateFocusAreaName,
@@ -746,7 +753,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         <LinkedResourceItem 
                             key={id} 
                             resource={resource} 
-                            handleUnlinkItem={(type: 'upskill' | 'resource', id: string) => handleUnlinkItem(type, id)} 
+                            handleUnlinkItem={(type: 'upskill' | 'resource', id: string) => handleUnlinkItem(type, id)}
+                            handleDelete={handleDeleteResource}
                             setEmbedUrl={setEmbedUrl} 
                             handleOpenNestedPopup={handleOpenNestedPopup} 
                             handleStartEditResource={handleStartEditResource} 
@@ -807,6 +815,7 @@ function DeepWorkPageContent() {
     setSelectedDomainId,
     setSelectedSkillId,
     createResourceWithHierarchy,
+    deleteResource,
   } = useAuth();
   const router = useRouter();
   
@@ -1185,6 +1194,12 @@ function DeepWorkPageContent() {
         toast({ title: "Success", description: `Task "${defToDelete.name}" removed.` });
     }
   };
+  
+  const handleDeleteResource = (id: string) => {
+    deleteResource(id);
+    toast({ title: "Success", description: "Resource removed." });
+  };
+
 
   const handleUpdateFocusAreaName = (id: string, newName: string) => {
     const isDeepWork = deepWorkDefinitions.some(d => d.id === id);
@@ -1952,6 +1967,7 @@ useEffect(() => {
                                 handleToggleReadyForBranding={handleToggleReadyForBranding}
                                 handleUnlinkItem={handleUnlinkItem}
                                 handleDeleteFocusArea={handleDeleteFocusArea}
+                                handleDeleteResource={handleDeleteResource}
                                 handleViewProgress={handleViewProgress}
                                 onOpenMindMap={onOpenMindMap}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
@@ -1964,7 +1980,7 @@ useEffect(() => {
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                 linkProjectToTask={linkProjectToTask}
                                 onEdit={setEditingFocusArea}
-                                handleOpenManageLinksModal={(type, parent) => handleOpenManageLinksModal(type, parent)}
+                                handleOpenManageLinksModal={handleOpenManageLinksModal}
                                 handleCreateResource={handleCreateResource}
                             />
                         ) : (
@@ -2014,7 +2030,7 @@ useEffect(() => {
                                         linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
                                         onUpdateName={handleUpdateFocusAreaName} 
                                         projectsInDomain={projects} 
-                                        onLinkProject={handleOpenLinkProjectModal}
+                                        onLinkProject={() => handleOpenLinkProjectModal(def)}
                                         onEdit={setEditingFocusArea} 
                                         onCreateAndLinkChild={handleCreateAndLinkChild}
                                     />
@@ -2350,7 +2366,7 @@ useEffect(() => {
                             linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={[]} 
-                            onLinkProject={handleOpenLinkProjectModal}
+                            onLinkProject={() => handleOpenLinkProjectModal(activeDragItem as ExerciseDefinition)}
                             onEdit={setEditingFocusArea} 
                             onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
@@ -2391,6 +2407,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 

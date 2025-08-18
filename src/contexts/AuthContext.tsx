@@ -141,6 +141,7 @@ interface AuthContextType {
   setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
+  deleteResource: (resourceId: string) => void;
   pinnedFolderIds: Set<string>;
   setPinnedFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   activeResourceTabIds: string[];
@@ -252,7 +253,7 @@ interface AuthContextType {
 
 
   // New global map
-  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
 
   // New state for selected subtopic/focus area
   selectedUpskillTask: ExerciseDefinition | null;
@@ -2040,6 +2041,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     return updatedParentTask;
   };
+  
+  const deleteResource = (resourceId: string) => {
+    // Remove the resource itself
+    setResources(prev => prev.filter(r => r.id !== resourceId));
+
+    // Unlink from any parent tasks
+    const unlinkFromDefs = (definitions: ExerciseDefinition[]) => 
+        definitions.map(def => ({
+            ...def,
+            linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== resourceId)
+        }));
+    
+    setDeepWorkDefinitions(unlinkFromDefs);
+    setUpskillDefinitions(unlinkFromDefs);
+  };
 
 
   const value: AuthContextType = {
@@ -2064,7 +2080,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     addFeatureToRelease,
     copyOffer,
     resourceFolders, setResourceFolders,
-    resources, setResources,
+    resources, setResources, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
@@ -2137,6 +2153,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 
