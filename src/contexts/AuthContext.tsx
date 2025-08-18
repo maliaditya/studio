@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -244,6 +244,16 @@ interface AuthContextType {
   skillAcquisitionPlans: SkillAcquisitionPlan[];
   setSkillAcquisitionPlans: React.Dispatch<React.SetStateAction<SkillAcquisitionPlan[]>>;
 
+  // New Pillar Cards State
+  pillarCards: PillarCardData[];
+  setPillarCards: React.Dispatch<React.SetStateAction<PillarCardData[]>>;
+  addPillarCard: () => void;
+  updatePillarCard: (updatedCard: PillarCardData) => void;
+  deletePillarCard: (cardId: string) => void;
+  specializations: CoreSkill[];
+  allEquations: HabitEquation[];
+
+
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
 
@@ -396,6 +406,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
   const [pillarEquations, setPillarEquations] = useState<Record<string, HabitEquation[]>>({});
   const [skillAcquisitionPlans, setSkillAcquisitionPlans] = useState<SkillAcquisitionPlan[]>([]);
+  const [pillarCards, setPillarCards] = useState<PillarCardData[]>([]);
 
 
   // Persisted task state
@@ -428,7 +439,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const habitCards = useMemo(() => resources.filter(r => r.type === 'habit'), [resources]);
   const mechanismCards = useMemo(() => resources.filter(r => r.type === 'mechanism'), [resources]);
+  
+  const specializations = useMemo(() => coreSkills.filter(s => s.type === 'Specialization'), [coreSkills]);
+  const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
+  const addPillarCard = () => {
+    const newCard: PillarCardData = {
+        id: `pillar_${Date.now()}`,
+        principle: '',
+        practiceEquationIds: [],
+        applicationSpecializationIds: [],
+        outcome: ''
+    };
+    setPillarCards(prev => [...prev, newCard]);
+  };
+
+  const updatePillarCard = (updatedCard: PillarCardData) => {
+    setPillarCards(prev => prev.map(card => card.id === updatedCard.id ? updatedCard : card));
+  };
+
+  const deletePillarCard = (cardId: string) => {
+    setPillarCards(prev => prev.filter(card => card.id !== cardId));
+  };
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -540,6 +572,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
       try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
       try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
+      try { const d = loadItem(`pillar_cards_${username}`); setPillarCards(d ? JSON.parse(d) : []); } catch(e) { setPillarCards([]); }
 
       try {
         const upskillTask = loadItem(`selected_upskill_task_${username}`); if (upskillTask) setSelectedUpskillTask(JSON.parse(upskillTask));
@@ -592,6 +625,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setPurposeStatement(''); setSpecializationPurposes({});
       setPatterns([]); setMetaRules([]); setPillarEquations({});
       setSkillAcquisitionPlans([]);
+      setPillarCards([]);
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setSelectedMicroSkill(null);
@@ -653,6 +687,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
       localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
       localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
+      localStorage.setItem(`pillar_cards_${username}`, JSON.stringify(pillarCards));
       
       if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
       if (selectedDeepWorkTask) localStorage.setItem(`selected_deepwork_task_${username}`, JSON.stringify(selectedDeepWorkTask)); else localStorage.removeItem(`selected_deepwork_task_${username}`);
@@ -685,7 +720,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pistons,
     skillDomains, coreSkills, projects,
     companies, positions,
-    purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+    purposeStatement, specializationPurposes, patterns, metaRules, pillarEquations, skillAcquisitionPlans, pillarCards,
     currentUser, loading, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
     expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
     autoSuggestions, activeFocusSession, recentItems
@@ -872,6 +907,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMetaRules(data.metaRules || []);
     setPillarEquations(data.pillarEquations || {});
     setSkillAcquisitionPlans(data.skillAcquisitionPlans || []);
+    setPillarCards(data.pillarCards || []);
     
     setAutoSuggestions(data.autoSuggestions || {});
     setRecentItems(data.recentItems || []);
@@ -936,7 +972,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       skillDomains, coreSkills, projects,
       companies, positions,
       purposeData: { statement: purposeStatement, specializationPurposes },
-      patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+      patterns, metaRules, pillarEquations, skillAcquisitionPlans, pillarCards,
       expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
       selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
       autoSuggestions,
@@ -2006,6 +2042,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     metaRules, setMetaRules,
     pillarEquations, setPillarEquations,
     skillAcquisitionPlans, setSkillAcquisitionPlans,
+    pillarCards, setPillarCards, addPillarCard, updatePillarCard, deletePillarCard,
+    specializations, allEquations,
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
@@ -2038,6 +2076,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 

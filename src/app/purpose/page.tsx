@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, PillarCardData } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +29,132 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon } from 'lucide-react';
+
+const PillarCard = ({ cardData, onUpdate, onDelete }: {
+    cardData: PillarCardData;
+    onUpdate: (updatedCard: PillarCardData) => void;
+    onDelete: (cardId: string) => void;
+}) => {
+    const { specializations, allEquations } = useAuth();
+    
+    const handleTextChange = (field: 'principle' | 'outcome', value: string) => {
+        onUpdate({ ...cardData, [field]: value });
+    };
+
+    const handleLinkToggle = (type: 'practice' | 'application', id: string) => {
+        const key = type === 'practice' ? 'practiceEquationIds' : 'applicationSpecializationIds';
+        const currentIds = cardData[key] || [];
+        const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
+        onUpdate({ ...cardData, [key]: newIds });
+    };
+
+    const linkedPractices = (cardData.practiceEquationIds || [])
+        .map(id => allEquations.find(eq => eq.id === id))
+        .filter((eq): eq is HabitEquation => !!eq);
+
+    const linkedApplications = (cardData.applicationSpecializationIds || [])
+        .map(id => specializations.find(spec => spec.id === id))
+        .filter((spec): spec is CoreSkill => !!spec);
+
+    return (
+        <Card className="flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base">Pillar Card</CardTitle>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(cardData.id)}>
+                    <Trash2 className="h-4 w-4"/>
+                </Button>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
+                {/* Left Column */}
+                <div className="space-y-4">
+                    <div>
+                        <Label className="font-semibold text-sm">Principle</Label>
+                        <Textarea 
+                            value={cardData.principle}
+                            onChange={e => handleTextChange('principle', e.target.value)}
+                            placeholder="Core belief or truth..."
+                            className="mt-1 h-24"
+                        />
+                    </div>
+                     <div>
+                        <Label className="font-semibold text-sm">Practices</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="w-full mt-1">
+                                    <PlusCircle className="mr-2 h-4 w-4"/> Link Rule Equation
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                                <ScrollArea className="h-60">
+                                    <div className="space-y-2 p-1">
+                                        {allEquations.map(eq => (
+                                            <div key={eq.id} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`eq-${cardData.id}-${eq.id}`}
+                                                    checked={(cardData.practiceEquationIds || []).includes(eq.id)}
+                                                    onCheckedChange={() => handleLinkToggle('practice', eq.id)}
+                                                />
+                                                <Label htmlFor={`eq-${cardData.id}-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </PopoverContent>
+                        </Popover>
+                        <div className="mt-2 space-y-1">
+                            {linkedPractices.map(eq => (
+                                <Badge key={eq.id} variant="secondary" className="mr-1 mb-1 font-normal">{eq.outcome}</Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                 {/* Right Column */}
+                <div className="space-y-4">
+                    <div>
+                        <Label className="font-semibold text-sm">Application</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" size="sm" className="w-full mt-1">
+                                    <PlusCircle className="mr-2 h-4 w-4"/> Link Specialization
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                                <ScrollArea className="h-60">
+                                    <div className="space-y-2 p-1">
+                                        {specializations.map(spec => (
+                                            <div key={spec.id} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`spec-${cardData.id}-${spec.id}`}
+                                                    checked={(cardData.applicationSpecializationIds || []).includes(spec.id)}
+                                                    onCheckedChange={() => handleLinkToggle('application', spec.id)}
+                                                />
+                                                <Label htmlFor={`spec-${cardData.id}-${spec.id}`} className="font-normal w-full cursor-pointer">{spec.name}</Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </PopoverContent>
+                        </Popover>
+                        <div className="mt-2 space-y-1">
+                            {linkedApplications.map(spec => (
+                                <Badge key={spec.id} variant="secondary" className="mr-1 mb-1 font-normal">{spec.name}</Badge>
+                            ))}
+                        </div>
+                    </div>
+                     <div>
+                        <Label className="font-semibold text-sm">Expected Outcome</Label>
+                        <Textarea 
+                            value={cardData.outcome}
+                            onChange={e => handleTextChange('outcome', e.target.value)}
+                            placeholder="The desired result..."
+                             className="mt-1 h-24"
+                        />
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
 
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
@@ -87,6 +213,7 @@ function PurposePageContent() {
         openRuleDetailPopup, ruleDetailPopup,
         pillarEquations, setPillarEquations,
         habitCards,
+        pillarCards, addPillarCard, updatePillarCard, deletePillarCard,
     } = useAuth();
     const { toast } = useToast();
 
@@ -285,20 +412,20 @@ function PurposePageContent() {
                 </CardContent>
             </Card>
 
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-3 text-xl">
-                        <DollarSign className="h-6 w-6 text-primary" />
-                        Monetization
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-lg text-muted-foreground">
-                        Monetization can happen if you have a skill that serves a product that reduces strain on human body or mind in work which he needs to do every day manually. Products either assist or automate, so to earn money you need a skill that serve such a product.
-                    </p>
-                </CardContent>
-            </Card>
-            
+            <Separator />
+
+             <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold">Pillar Cards</h2>
+                    <Button onClick={addPillarCard}><PlusCircle className="mr-2 h-4 w-4" />Add Pillar Card</Button>
+                </div>
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {pillarCards.map(card => (
+                        <PillarCard key={card.id} cardData={card} onUpdate={updatePillarCard} onDelete={deletePillarCard} />
+                    ))}
+                 </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {pillars.map(pillar => {
                     const allPillarNames = [pillar.name, ...pillar.attributes];

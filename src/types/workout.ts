@@ -439,6 +439,14 @@ export interface Position {
 }
 
 // Purpose & Patterns Data
+export interface PillarCardData {
+  id: string;
+  principle: string;
+  practiceEquationIds: string[];
+  applicationSpecializationIds: string[];
+  outcome: string;
+}
+
 export interface HabitEquation {
   id: string;
   metaRuleIds: string[];
