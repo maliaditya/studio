@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -77,34 +76,32 @@ export function TodaysLearningModal({
 
 
   const filteredProjects = useMemo(() => {
-    const today = startOfToday();
-    return projects.filter(project => {
-        // Condition 1: Project has a product plan.
-        if (productizationPlans && productizationPlans[project.id]) {
-            return true;
-        }
+    if (!projects) return [];
 
-        // Condition 2: Project is linked in an offerization plan with a future release.
-        if (offerizationPlans) {
-            const isOffered = Object.values(offerizationPlans).some(plan => 
-                plan.releases?.some(release => {
-                    if (release.name !== project.name) return false;
-                    try {
-                        const releaseDate = parseISO(release.launchDate);
-                        return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-                    } catch {
-                        return false;
-                    }
-                })
-            );
-            if (isOffered) {
-                return true;
-            }
-        }
+    return projects.filter(project => {
+        // Check if the project is part of any offerization plan with a future release
+        const isOfferedAndActive = Object.values(offerizationPlans).some(plan =>
+            plan.releases?.some(release => {
+                if (release.name !== project.name) return false;
+                try {
+                    const releaseDate = parseISO(release.launchDate);
+                    const today = startOfToday();
+                    return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                } catch {
+                    return false;
+                }
+            })
+        );
+        
+        if(isOfferedAndActive) return true;
+
+        // Check if the project has a product plan
+        const hasProductPlan = productizationPlans && productizationPlans[project.name];
+        if(hasProductPlan) return true;
         
         return false;
     });
-  }, [projects, productizationPlans, offerizationPlans]);
+  }, [projects, offerizationPlans, productizationPlans]);
 
   useEffect(() => {
     if (isOpen) {
