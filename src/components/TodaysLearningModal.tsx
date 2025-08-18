@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -23,7 +24,7 @@ import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAfter, parseISO } from 'date-fns';
+import { isAfter, parseISO, startOfToday } from 'date-fns';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
@@ -76,30 +77,28 @@ export function TodaysLearningModal({
 
 
   const filteredProjects = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
-
     return projects.filter(project => {
-        // Check Productization Plans
-        const productPlan = productizationPlans[project.id];
-        if (productPlan) {
-            return true; // Any project with a product plan is valid
+        const today = startOfToday();
+
+        // Condition 1: Project has a product plan.
+        if (productizationPlans && productizationPlans[project.id]) {
+            return true;
         }
 
-        // Check Offerization Plans
-        const offerPlan = Object.values(offerizationPlans).find(plan => 
-            plan.releases?.some(release => release.name === project.name)
-        );
-        if (offerPlan && offerPlan.releases) {
-            const hasFutureRelease = offerPlan.releases.some(release => {
-                try {
-                    const releaseDate = parseISO(release.launchDate);
-                    return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-                } catch {
-                    return false;
-                }
-            });
-            if (hasFutureRelease) {
+        // Condition 2: Project is linked in an offerization plan with a future release.
+        if (offerizationPlans) {
+            const isOffered = Object.values(offerizationPlans).some(plan => 
+                plan.releases?.some(release => {
+                    if (release.name !== project.name) return false;
+                    try {
+                        const releaseDate = parseISO(release.launchDate);
+                        return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                    } catch {
+                        return false;
+                    }
+                })
+            );
+            if (isOffered) {
                 return true;
             }
         }
