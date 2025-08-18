@@ -514,6 +514,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     setViewMode: (mode: 'session' | 'library') => void;
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     linkProjectToTask: (taskId: string, projectId: string | null) => void;
+    onEdit: (def: ExerciseDefinition) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -544,6 +545,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     setViewMode,
     handleOpenLinkProjectModal,
     linkProjectToTask,
+    onEdit,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -729,7 +731,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             onUpdateName={handleUpdateFocusAreaName} 
                             projectsInDomain={projectsInDomainForChild} 
                             onLinkProject={() => {}}
-                            onEdit={setEditingFocusArea} 
+                            onEdit={onEdit}
                             onCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
@@ -1938,6 +1940,7 @@ useEffect(() => {
                                 setViewMode={setViewMode}
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                 linkProjectToTask={linkProjectToTask}
+                                onEdit={setEditingFocusArea}
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2363,6 +2366,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
