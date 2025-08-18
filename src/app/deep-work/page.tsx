@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback } from 'react';
@@ -1553,23 +1554,23 @@ function DeepWorkPageContent() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    const activeId = active.data.current?.id;
+    if (!over || active.id === over.id) return;
+
+    const activeId = active.data.current?.subtaskId || active.data.current?.id;
     const activeType = active.data.current?.itemType;
-    const overId = over?.data.current?.id;
-    const overType = over?.data.current?.itemType;
-  
-    if (!over || activeId === overId) return;
-  
+    const overId = over.data.current?.id;
+    const overType = over.data.current?.itemType;
+
     const allDefs = {
-        deepwork: { definitions: deepWorkDefinitions, setDefinitions: setDeepWorkDefinitions, linkKey: 'linkedDeepWorkIds' },
-        upskill: { definitions: upskillDefinitions, setDefinitions: setUpskillDefinitions, linkKey: 'linkedUpskillIds' },
-        resource: { definitions: resources, setDefinitions: setResources, linkKey: 'linkedResourceIds' }
+        deepwork: { definitions: deepWorkDefinitions, setDefinitions: setDeepWorkDefinitions, linkKey: 'linkedDeepWorkIds' as const },
+        upskill: { definitions: upskillDefinitions, setDefinitions: setUpskillDefinitions, linkKey: 'linkedUpskillIds' as const },
+        resource: { definitions: resources, setDefinitions: setResources, linkKey: 'linkedResourceIds' as const }
     };
-  
-    // --- Step 1: Unlink the dragged item from its original parent ---
+    
+    // Unlink from old parent
     let oldParent: ExerciseDefinition | undefined;
-    for (const type of Object.keys(allDefs) as ('deepwork' | 'upskill')[]) {
-        oldParent = allDefs[type].definitions.find(def => (def[activeType === 'deepwork' ? 'linkedDeepWorkIds' : activeType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds'] || []).includes(activeId));
+    for (const type of ['deepwork', 'upskill'] as const) {
+        oldParent = allDefs[type].definitions.find(def => (def[allDefs[activeType].linkKey] || []).includes(activeId));
         if (oldParent) {
             allDefs[type].setDefinitions(prev => prev.map(def => 
                 def.id === oldParent!.id ? {
@@ -1580,13 +1581,13 @@ function DeepWorkPageContent() {
             break;
         }
     }
-    
-    // --- Step 2: Handle the drop action ---
-    if (over.data.current?.type === 'card') {
-        // Dropped onto another card - link as child
-        const targetDef = allDefs[overType].definitions.find(def => def.id === overId);
+
+    // Link to new parent or promote
+    if (over.data.current?.type === 'card' && overId) {
+        // Dropped on a card
+        const targetDef = allDefs[overType].definitions.find((def: any) => def.id === overId);
         if (targetDef) {
-            allDefs[overType].setDefinitions(prev => prev.map(def => 
+            allDefs[overType].setDefinitions(prev => prev.map((def: any) => 
                 def.id === overId ? {
                     ...def,
                     [allDefs[activeType].linkKey]: [...(def[allDefs[activeType].linkKey] || []), activeId]
@@ -1652,7 +1653,7 @@ function DeepWorkPageContent() {
       if (!parentDef) return;
 
       const newDef: ExerciseDefinition = {
-          id: `def_${type}_${Date.now()}`,
+          id: `def_${Date.now()}_${type}_${Math.random()}`.replace('.', ''),
           name: 'New Task',
           category: parentDef.category,
       };
@@ -2223,6 +2224,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
