@@ -1643,6 +1643,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!resource) return newPopups;
         
         const popupWidth = 512;
+        const popupHeight = 400; // Approximate height for calculation
         let x, y, level, parentId;
 
         if (parentPopupState && parentRect) {
@@ -1658,8 +1659,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             level = 0;
             parentId = undefined;
-            x = event.clientX;
-            y = event.clientY;
+            x = window.innerWidth / 2 - popupWidth / 2;
+            y = window.innerHeight / 2 - popupHeight / 2;
         }
         
         newPopups.set(resourceId, { 
@@ -2124,6 +2125,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 
