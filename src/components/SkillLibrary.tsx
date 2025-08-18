@@ -245,7 +245,6 @@ export function SkillLibrary({
                                 <div
                                     onContextMenu={(e) => {
                                         e.preventDefault();
-                                        setContextMenuPosition({ x: e.clientX, y: e.clientY });
                                         setContextMenuTask(task);
                                     }}
                                     className="flex items-center justify-between group/task rounded-md hover:bg-muted"
@@ -296,7 +295,7 @@ export function SkillLibrary({
                                 </div>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
-                                style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x }}
+                                className="w-48"
                                 onCloseAutoFocus={(e) => e.preventDefault()}
                             >
                                 <DropdownMenuItem onSelect={() => onEditFocusArea(task)}>
