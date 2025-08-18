@@ -309,7 +309,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {isEditingName ? (
                             <Input value={currentName} onChange={(e) => setCurrentName(e.target.value)} onBlur={handleNameSave} onKeyDown={(e) => e.key === 'Enter' && handleNameSave()} autoFocus className="text-base font-semibold h-8" />
                         ) : (
-                            <CardTitle className="text-base cursor-pointer" onClick={() => setIsEditingName(true)}>
+                            <CardTitle className="text-base cursor-pointer" onDoubleClick={() => setIsEditingName(true)}>
                                 <TooltipProvider><Tooltip><TooltipTrigger asChild>
                                 <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
                                     {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
@@ -515,6 +515,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     linkProjectToTask: (taskId: string, projectId: string | null) => void;
     onEdit: (def: ExerciseDefinition) => void;
+    handleOpenManageLinksModal: (type: 'resource', parent: ExerciseDefinition) => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -546,6 +547,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal,
     linkProjectToTask,
     onEdit,
+    handleOpenManageLinksModal,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
@@ -645,7 +647,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             </ScrollArea>
                         </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button size="sm" variant="outline" onClick={() => {}}>
+                    <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
                     {isHighLevelNode && (
@@ -1941,6 +1943,7 @@ useEffect(() => {
                                 handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                 linkProjectToTask={linkProjectToTask}
                                 onEdit={setEditingFocusArea}
+                                handleOpenManageLinksModal={(type, parent) => handleOpenManageLinksModal(type, parent)}
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2366,20 +2369,3 @@ export default function DeepWorkPage() {
 
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
