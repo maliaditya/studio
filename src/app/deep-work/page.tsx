@@ -1544,95 +1544,56 @@ function DeepWorkPageContent() {
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over } = event;
-    
-    if (active.id === over?.id) return;
 
-    if (over === null) {
-      if (active.data.current?.type === 'subtask') {
-        const { itemType, subtaskId, parentId } = active.data.current;
-        const setDefs = itemType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
-        const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-
-        setDefs(prev => prev.map(def =>
-          def.id === parentId ? { ...def, [linkKey]: (def[linkKey] || []).filter((id: string) => id !== subtaskId) } : def
-        ));
-        toast({ title: "Promoted!", description: "Item is now a top-level task." });
-      }
-      return;
-    }
+    if (active.id === over?.id || !over) return;
     
-    let activeId: string;
-    let activeType: 'deepwork' | 'upskill' | 'resource';
-    let oldParentId: string | undefined;
+    const activeData = active.data.current;
+    const overData = over.data.current;
 
-    if (active.data.current?.type === 'subtask') {
-        activeId = active.data.current.subtaskId;
-        activeType = active.data.current.itemType;
-        oldParentId = active.data.current.parentId;
-    } else {
-        activeId = active.data.current?.id;
-        activeType = active.data.current?.itemType;
-        
-        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const oldParentDef = allDefs.find(def => 
-            (def.linkedDeepWorkIds?.includes(activeId)) || 
-            (def.linkedUpskillIds?.includes(activeId)) ||
-            (def.linkedResourceIds?.includes(activeId))
-        );
-        oldParentId = oldParentDef?.id;
-    }
-    
-    const targetId = over.data.current?.id;
-    const targetType = over.data.current?.itemType;
+    const activeId = activeData?.itemType === 'subtask' ? activeData.subtaskId : active.id.toString().replace(`card-${activeData?.itemType}-`, '');
+    const activeType = activeData?.itemType;
+    const oldParentId = activeData?.parentId;
 
-    if (!activeId || !activeType || !targetId || !targetType || over.data.current?.type !== 'card') {
-      return;
-    }
+    const targetId = over.id.toString().replace(`card-${overData?.itemType}-`, '');
+    const targetType = overData?.itemType;
     
-    const allSetters = {
-        deepwork: setDeepWorkDefinitions,
-        upskill: setUpskillDefinitions,
-        resource: setResources,
+    if (!activeId || !activeType || !targetId || !targetType) return;
+    
+    const linkKey = activeType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+
+    const setDefs = (definitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>, callback: (items: ExerciseDefinition[]) => ExerciseDefinition[]) => {
+        definitions(callback);
     };
 
-    const linkKeys = {
-        deepwork: 'linkedDeepWorkIds' as const,
-        upskill: 'linkedUpskillIds' as const,
-        resource: 'linkedResourceIds' as const,
-    };
-    
-    const activeLinkKey = linkKeys[activeType];
-
-    const updateState = (setter: React.Dispatch<React.SetStateAction<any[]>>, callback: (item: any) => any) => {
-        setter(prev => prev.map(callback));
-    };
-
-    // 1. Unlink from old parent
+    // Unlink from old parent
     if (oldParentId) {
-        const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
-        const oldParentSetter = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+        const isOldParentDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
+        const setOldParentDefs = isOldParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
         
-        updateState(oldParentSetter, (def: ExerciseDefinition) => {
+        setOldParentDefs(prev => prev.map(def => {
             if (def.id === oldParentId) {
-                const newLinks = (def[activeLinkKey] || []).filter((id: string) => id !== activeId);
-                return { ...def, [activeLinkKey]: newLinks };
+                const newLinks = (def[linkKey as keyof ExerciseDefinition] as string[] || []).filter(id => id !== activeId);
+                return { ...def, [linkKey]: newLinks };
             }
             return def;
-        });
+        }));
     }
-    
-    // 2. Link to new parent
-    const targetSetter = targetType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
-    
-    updateState(targetSetter, (def: ExerciseDefinition) => {
-        if (def.id === targetId) {
-            const newLinks = [...(def[activeLinkKey] || []), activeId];
-            return { ...def, [activeLinkKey]: newLinks };
-        }
-        return def;
-    });
 
-    toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
+    // Link to new parent if dropped on another card
+    if (overData?.type === 'card') {
+        const isNewParentDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
+        const setNewParentDefs = isNewParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
+
+        setNewParentDefs(prev => prev.map(def => {
+            if (def.id === targetId) {
+                const newLinks = [...(def[linkKey as keyof ExerciseDefinition] as string[] || []), activeId];
+                return { ...def, [linkKey]: newLinks };
+            }
+            return def;
+        }));
+
+        toast({ title: "Re-linked!", description: `Item is now a sub-task.` });
+    }
   };
 
 
@@ -1687,7 +1648,7 @@ function DeepWorkPageContent() {
       if (!parentDef) return;
 
       const newDef: ExerciseDefinition = {
-          id: `def_${Date.now()}_${type}_${Math.random()}`.replace('.', ''),
+          id: `def_${Date.now()}_${type}_${Math.random().toString().replace('.', '')}`,
           name: 'New Task',
           category: parentDef.category,
       };
@@ -1939,6 +1900,7 @@ useEffect(() => {
                             </div>
                         ) : currentTask ? (
                             <LibraryContent 
+                                ref={null}
                                 currentTask={currentTask}
                                 deepWorkDefinitions={deepWorkDefinitions}
                                 upskillDefinitions={upskillDefinitions}
@@ -2263,7 +2225,10 @@ useEffect(() => {
                             calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
                             upskillDefinitions={upskillDefinitions}
                             resources={resources}
-                            onOpenMindMap={onOpenMindMap}
+                            onOpenMindMap={(id: string) => {
+                              setMindMapRootFocusAreaId(id);
+                              setIsMindMapModalOpen(true);
+                            }}
                             onUpdateName={handleUpdateFocusAreaName}
                             projects={projects}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
@@ -2330,6 +2295,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
