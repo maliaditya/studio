@@ -457,6 +457,7 @@ export interface HabitEquation {
 export interface PurposeData {
   statement: string;
   specializationPurposes: Record<string, string>; // Key is CoreSkill ID
+  pillarCards?: PillarCardData[];
 }
 
 // Pattern Recognition Types
@@ -465,6 +466,7 @@ export interface PatternPhrase {
   text: string;
   mechanismCardId: string;
   mechanismCardName?: string;
+  linkedMechanisms?: string[];
 }
 
 export interface Pattern {
@@ -589,4 +591,9 @@ export interface TaskContextPopupState {
   y: number;
   level: number;
   parentId?: string;
+}
+
+export interface PathNode {
+  id: string;
+  text: string;
 }

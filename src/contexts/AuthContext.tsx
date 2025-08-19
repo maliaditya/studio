@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -60,32 +61,19 @@ interface AuthContextType {
   globalVolume: number;
   setGlobalVolume: React.Dispatch<React.SetStateAction<number>>;
   
-  // Save Status
-  localChangeCount: number;
-
   // Shared health state
   weightLogs: WeightLog[];
-  setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
   goalWeight: number | null;
-  setGoalWeight: React.Dispatch<React.SetStateAction<number | null>>;
   height: number | null;
-  setHeight: React.Dispatch<React.SetStateAction<number | null>>;
   dateOfBirth: string | null;
-  setDateOfBirth: React.Dispatch<React.SetStateAction<string | null>>;
   gender: Gender | null;
-  setGender: React.Dispatch<React.SetStateAction<Gender | null>>;
   dietPlan: UserDietPlan;
-  setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
 
   // Global Schedule & Agenda State
   schedule: FullSchedule;
-  setSchedule: React.Dispatch<React.SetStateAction<FullSchedule>>;
   dailyPurposes: Record<string, string>;
-  setDailyPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   isAgendaDocked: boolean;
-  setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
-  setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
@@ -94,67 +82,44 @@ interface AuthContextType {
 
   // Focus Timer
   activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
-  setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number } | null>>;
-
 
   // Global Logs State
   allUpskillLogs: DatedWorkout[];
-  setAllUpskillLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allDeepWorkLogs: DatedWorkout[];
-  setAllDeepWorkLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allWorkoutLogs: DatedWorkout[];
-  setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   brandingLogs: DatedWorkout[];
-  setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
-  setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
-  setWorkoutMode: React.Dispatch<React.SetStateAction<WorkoutMode>>;
   workoutPlanRotation: boolean;
-  setWorkoutPlanRotation: React.Dispatch<React.SetStateAction<boolean>>;
   workoutPlans: AllWorkoutPlans;
-  setWorkoutPlans: React.Dispatch<React.SetStateAction<AllWorkoutPlans>>;
   exerciseDefinitions: ExerciseDefinition[];
-  setExerciseDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   
   upskillDefinitions: ExerciseDefinition[];
-  setUpskillDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   topicGoals: Record<string, TopicGoal>;
-  setTopicGoals: React.Dispatch<React.SetStateAction<Record<string, TopicGoal>>>;
 
   deepWorkDefinitions: ExerciseDefinition[];
-  setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   
   leadGenDefinitions: ExerciseDefinition[];
-  setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   
   productizationPlans: Record<string, ProductizationPlan>;
-  setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   offerizationPlans: Record<string, ProductizationPlan>;
-  setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   
   copyOffer: (topic: string, offerId: string) => void;
 
   // Resources
   resourceFolders: ResourceFolder[];
-  setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   resources: Resource[];
-  setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
   deleteResource: (resourceId: string) => void;
   pinnedFolderIds: Set<string>;
-  setPinnedFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   activeResourceTabIds: string[];
-  setActiveResourceTabIds: React.Dispatch<React.SetStateAction<string[]>>;
   selectedResourceFolderId: string | null;
-  setSelectedResourceFolderId: React.Dispatch<React.SetStateAction<string | null>>;
   habitCards: Resource[];
   mechanismCards: Resource[];
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
-  setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
   createResourceWithHierarchy: (parentTask: ExerciseDefinition, type: Resource['type']) => ExerciseDefinition | undefined;
 
   
@@ -188,7 +153,6 @@ interface AuthContextType {
   closeTaskContextPopup: (taskId: string) => void;
   handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
 
-
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -198,11 +162,9 @@ interface AuthContextType {
   
   // Canvas
   canvasLayout: CanvasLayout;
-  setCanvasLayout: React.Dispatch<React.SetStateAction<CanvasLayout>>;
 
   // Mindset
   mindsetCards: MindsetCard[];
-  setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
   addMindsetCard: (title: string) => void;
   deleteMindsetCard: (cardId: string) => void;
 
@@ -210,18 +172,14 @@ interface AuthContextType {
   isPistonsHeadOpen: boolean;
   setIsPistonsHeadOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pistons: PistonsCategoryData;
-  setPistons: React.Dispatch<React.SetStateAction<PistonsCategoryData>>;
   pistonsInitialState: PistonsInitialState | null;
   openPistonsFor: (initialState: PistonsInitialState) => void;
   deleteDesire: (desireId: string) => void;
   
   // Skill Page
   skillDomains: SkillDomain[];
-  setSkillDomains: React.Dispatch<React.SetStateAction<SkillDomain[]>>;
   coreSkills: CoreSkill[];
-  setCoreSkills: React.Dispatch<React.SetStateAction<CoreSkill[]>>;
   projects: Project[];
-  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   handleUpdateSkillArea: (skillId: string, areaId: string, name: string, purpose: string) => void;
   handleDeleteSkillArea: (skillId: string, areaId: string) => void;
   handleAddMicroSkill: (coreSkillId: string, areaId: string, name: string) => void;
@@ -230,28 +188,23 @@ interface AuthContextType {
 
   // Professional Experience
   companies: Company[];
-  setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
   positions: Position[];
-  setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
   
   // Purpose & Patterns Data
   purposeData: PurposeData;
-  setPurposeData: React.Dispatch<React.SetStateAction<PurposeData>>;
   patterns: Pattern[];
-  setPatterns: React.Dispatch<React.SetStateAction<Pattern[]>>;
   metaRules: MetaRule[];
-  setMetaRules: React.Dispatch<React.SetStateAction<MetaRule[]>>;
   pillarEquations: Record<string, HabitEquation[]>;
-  setPillarEquations: React.Dispatch<React.SetStateAction<Record<string, HabitEquation[]>>>;
   skillAcquisitionPlans: SkillAcquisitionPlan[];
-  setSkillAcquisitionPlans: React.Dispatch<React.SetStateAction<SkillAcquisitionPlan[]>>;
-
-  // New Pillar Cards State
   addPillarCard: () => void;
   updatePillarCard: (updatedCard: PillarCardData) => void;
   deletePillarCard: (cardId: string) => void;
   specializations: CoreSkill[];
   allEquations: HabitEquation[];
+
+  // Path Diagram Data
+  pathNodes: PathNode[];
+  setPathNodes: React.Dispatch<React.SetStateAction<PathNode[]>>;
 
 
   // New global map
@@ -259,32 +212,27 @@ interface AuthContextType {
 
   // New state for selected subtopic/focus area
   selectedUpskillTask: ExerciseDefinition | null;
-  setSelectedUpskillTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedDeepWorkTask: ExerciseDefinition | null;
-  setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedMicroSkill: MicroSkill | null;
-  setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
 
 
   // Sidebar persistence
   expandedItems: string[];
   handleExpansionChange: (value: string[]) => void;
   selectedDomainId: string | null;
-  setSelectedDomainId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedSkillId: string | null;
-  setSelectedSkillId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedProjectId: string | null;
-  setSelectedProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedCompanyId: string | null;
-  setSelectedCompanyId: React.Dispatch<React.SetStateAction<string | null>>;
 
   // Auto Suggestion
   autoSuggestions: Record<string, AutoSuggestionEntry[]>;
-  setAutoSuggestions: React.Dispatch<React.SetStateAction<Record<string, AutoSuggestionEntry[]>>>;
   
   // Recents
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
+
+  // Universal updater
+  updateData: (setter: React.Dispatch<React.SetStateAction<any>>, value: any) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -303,7 +251,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const prevUser = usePrevious(currentUser);
   
   const [isLoadingState, setIsLoadingState] = useState(true);
-  const [localChangeCount, setLocalChangeCount] = useState(0);
 
   // Health State
   const [weightLogs, setWeightLogsState] = useState<WeightLog[]>([]);
@@ -409,22 +356,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Recents State
   const [recentItems, setRecentItemsState] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
 
-  const saveDataToLocalStorage = (username: string, data: any) => {
-    try {
-      localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data.main));
-      localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(data.ui));
-      if (localChangeCount > 0) {
-        setLocalChangeCount(0); // Reset on successful cloud push or manual save
-      }
-    } catch (e) {
-      console.error("Failed to save data to localStorage", e);
-      toast({
-        title: "Save Failed",
-        description: "Could not save your changes to the browser.",
-        variant: "destructive",
-      });
-    }
-  };
+  // Path Diagram State
+  const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
 
   const getAllUserData = useCallback(() => {
     return {
@@ -437,6 +370,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
+        pathNodes,
       },
       ui: {
         pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
@@ -447,79 +381,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pathNodes
   ]);
 
-  useEffect(() => {
-    if (isLoadingState) return;
+  const saveDataToLocalStorage = useCallback((username: string) => {
+    const allData = getAllUserData();
+    try {
+      localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(allData.main));
+      localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(allData.ui));
+    } catch (e) {
+      console.error("Failed to save data to localStorage", e);
+      toast({
+        title: "Save Failed",
+        description: "Could not save your changes to the browser.",
+        variant: "destructive",
+      });
+    }
+  }, [getAllUserData, toast]);
 
+  const updateData = useCallback((setter: React.Dispatch<React.SetStateAction<any>>, value: any) => {
     const username = getCurrentLocalUser()?.username;
     if (!username) return;
 
+    setter(value);
+    
+  }, []);
+
+  useEffect(() => {
+    if (isLoadingState || !currentUser?.username) return;
+
     const allData = getAllUserData();
-    saveDataToLocalStorage(username, allData);
-    setLocalChangeCount(prev => prev + 1);
+    localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
+    localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
 
   }, [
-      getAllUserData, isLoadingState,
-      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+      getAllUserData, isLoadingState, currentUser,
+      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pathNodes
   ]);
-
-  const setWeightLogs = setWeightLogsState;
-  const setGoalWeight = setGoalWeightState;
-  const setHeight = setHeightState;
-  const setDateOfBirth = setDateOfBirthState;
-  const setGender = setGenderState;
-  const setDietPlan = setDietPlanState;
-  const setSchedule = setScheduleState;
-  const setDailyPurposes = setDailyPurposesState;
-  const setIsAgendaDocked = setIsAgendaDockedState;
-  const setActivityDurations = setActivityDurationsState;
-  const setAllUpskillLogs = setAllUpskillLogsState;
-  const setAllDeepWorkLogs = setAllDeepWorkLogsState;
-  const setAllWorkoutLogs = setAllWorkoutLogsState;
-  const setAllBrandingLogs = setAllBrandingLogsState;
-  const setAllLeadGenLogs = setAllLeadGenLogsState;
-  const setWorkoutMode = setWorkoutModeState;
-  const setWorkoutPlanRotation = setWorkoutPlanRotationState;
-  const setWorkoutPlans = setWorkoutPlansState;
-  const setExerciseDefinitions = setExerciseDefinitionsState;
-  const setUpskillDefinitions = setUpskillDefinitionsState;
-  const setTopicGoals = setTopicGoalsState;
-  const setDeepWorkDefinitions = setDeepWorkDefinitionsState;
-  const setLeadGenDefinitions = setLeadGenDefinitionsState;
-  const setProductizationPlans = setProductizationPlansState;
-  const setOfferizationPlans = setOfferizationPlansState;
-  const setResources = setResourcesState;
-  const setResourceFolders = setResourceFoldersState;
-  const setPinnedFolderIds = setPinnedFolderIdsState;
-  const setActiveResourceTabIds = setActiveResourceTabIdsState;
-  const setSelectedResourceFolderId = setSelectedResourceFolderIdState;
-  const setLastSelectedHabitFolder = setLastSelectedHabitFolderState;
-  const setActiveFocusSession = setActiveFocusSessionState;
-  const setCanvasLayout = setCanvasLayoutState;
-  const setMindsetCards = setMindsetCardsState;
-  const setPistons = setPistonsState;
-  const setSkillDomains = setSkillDomainsState;
-  const setCoreSkills = setCoreSkillsState;
-  const setProjects = setProjectsState;
-  const setCompanies = setCompaniesState;
-  const setPositions = setPositionsState;
-  const setPurposeData = setPurposeDataState;
-  const setPatterns = setPatternsState;
-  const setMetaRules = setMetaRulesState;
-  const setPillarEquations = setPillarEquationsState;
-  const setSkillAcquisitionPlans = setSkillAcquisitionPlansState;
-  const setSelectedUpskillTask = setSelectedUpskillTaskState;
-  const setSelectedDeepWorkTask = setSelectedDeepWorkTaskState;
-  const setSelectedMicroSkill = setSelectedMicroSkillState;
-  const setExpandedItems = setExpandedItemsState;
-  const setSelectedDomainId = setSelectedDomainIdState;
-  const setSelectedSkillId = setSelectedSkillIdState;
-  const setSelectedProjectId = setSelectedProjectIdState;
-  const setSelectedCompanyId = setSelectedCompanyIdState;
-  const setAutoSuggestions = setAutoSuggestionsState;
-  const setRecentItems = setRecentItemsState;
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -590,6 +488,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPillarEquationsState(mainData.pillarEquations || {});
     setSkillAcquisitionPlansState(mainData.skillAcquisitionPlans || []);
     setAutoSuggestionsState(mainData.autoSuggestions || {});
+    setPathNodes(mainData.pathNodes || []);
     
     // Set UI State
     setPinnedFolderIdsState(new Set(uiState.pinnedFolderIds || []));
@@ -643,6 +542,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setExpandedItemsState([]); setSelectedDomainIdState(null); setSelectedSkillIdState(null); setSelectedProjectIdState(null); setSelectedCompanyIdState(null);
       setAutoSuggestionsState({});
       setRecentItemsState([]);
+      setPathNodes([]);
     }
   }, [currentUser]);
 
@@ -752,12 +652,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
+      setScheduleState(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
       toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
 
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+  }, [currentUser, isScheduleLoaded, schedule, setScheduleState, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -856,7 +756,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error(result.error || 'Failed to push data.');
         }
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
-        setLocalChangeCount(0);
     } catch (error) {
         console.error("Push to cloud failed:", error);
         toast({
@@ -972,7 +871,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
   
             // Save both main data and UI state to localStorage
-            saveDataToLocalStorage(username, importedData);
+            localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(importedData.main));
+            localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(importedData.ui));
   
             toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
             setTimeout(() => window.location.reload(), 1500);
@@ -991,7 +891,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
+    setScheduleState(prev => {
       const daySchedule = { ...(prev[todayKey] || {}) };
       const activities = daySchedule[slotName] || [];
       if (activities.length > 0) {
@@ -1005,7 +905,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleLogLearning = (activity: Activity, progress: number, duration: number) => {
     const isUpskill = activity.type === 'upskill';
-    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+    const logsUpdater = isUpskill ? setAllUpskillLogsState : setAllDeepWorkLogsState;
     const todayKey = format(new Date(), 'yyyy-MM-dd');
 
     let updateSucceeded = false;
@@ -1090,7 +990,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completed: false,
     };
     
-    setSchedule(prev => {
+    setScheduleState(prev => {
         const newTodaySchedule = { ...(prev[todayKey] || {}) };
         const currentActivities = newTodaySchedule[targetSlot] || [];
         newTodaySchedule[targetSlot] = [...currentActivities, newActivity as Activity];
@@ -1111,17 +1011,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     switch (activityType) {
         case 'upskill':
             definition = upskillDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllUpskillLogs;
+            logsUpdater = setAllUpskillLogsState;
             logSource = allUpskillLogs;
             break;
         case 'deepwork':
             definition = deepWorkDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllDeepWorkLogs;
+            logsUpdater = setAllDeepWorkLogsState;
             logSource = allDeepWorkLogs;
             break;
         case 'branding':
             definition = deepWorkDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllBrandingLogs;
+            logsUpdater = setAllBrandingLogsState;
             logSource = brandingLogs;
             break;
         default:
@@ -1176,7 +1076,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         taskIds: [exerciseInstance.id],
     };
     
-    setSchedule(prev => {
+    setScheduleState(prev => {
         const newSchedule = { ...prev };
         const daySchedule = { ...(newSchedule[todayKey] || {}) };
         const activitiesInSlot = daySchedule[slotName] || [];
@@ -1206,9 +1106,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         category: topic as ExerciseCategory,
     };
 
-    setDeepWorkDefinitions(prev => [...prev, newFeatureDef]);
+    setDeepWorkDefinitionsState(prev => [...prev, newFeatureDef]);
 
-    const plansUpdater = type === 'product' ? setProductizationPlans : setOfferizationPlans;
+    const plansUpdater = type === 'product' ? setProductizationPlansState : setOfferizationPlansState;
 
     plansUpdater(prevPlans => {
         const newPlans = { ...prevPlans };
@@ -1237,7 +1137,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const copyOffer = (topic: string, offerId: string) => {
-    setOfferizationPlans(prev => {
+    setOfferizationPlansState(prev => {
         const newPlans = { ...prev };
         const currentPlan = newPlans[topic];
         if (!currentPlan || !currentPlan.offers) return prev;
@@ -1262,7 +1162,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateWorkoutInLog = (dateKey: string, updatedWorkout: DatedWorkout) => {
-    setAllWorkoutLogs(prevLogs => {
+    setAllWorkoutLogsState(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
       if (existingLogIndex > -1) {
         const newLogs = [...prevLogs];
@@ -1322,7 +1222,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
       const exerciseName = existingWorkout.exercises.find(ex => ex.id === exerciseId)?.name;
       if (updatedExercises.length === 0) { 
-        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+        setAllWorkoutLogsState(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       } else {
         updateWorkoutInLog(dateKey, { ...existingWorkout, exercises: updatedExercises });
       }
@@ -1362,7 +1262,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const updatedWorkout = { ...workoutLog, exercises: updatedExercises };
 
-    setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
+    setAllWorkoutLogsState(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
 
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
@@ -1376,15 +1276,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         { id: `point_${Date.now()}`, text: 'New step' }
       ]
     };
-    setMindsetCards(prev => [...prev, newCard]);
+    setMindsetCardsState(prev => [...prev, newCard]);
   };
   
   const deleteDesire = (desireId: string) => {
-    setDeepWorkDefinitions(prev => prev.filter(def => def.id !== desireId));
+    setDeepWorkDefinitionsState(prev => prev.filter(def => def.id !== desireId));
   };
   
   const deleteMindsetCard = (cardId: string) => {
-    setMindsetCards(prev => prev.filter(card => card.id !== cardId));
+    setMindsetCardsState(prev => prev.filter(card => card.id !== cardId));
   };
 
   const openPistonsFor = (initialState: PistonsInitialState) => {
@@ -1393,7 +1293,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleUpdateResource = (updatedResource: Resource) => {
-    setResources(prev =>
+    setResourcesState(prev =>
       prev.map(res => res.id === updatedResource.id ? updatedResource : res)
     );
   };
@@ -1520,7 +1420,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onOpenNestedPopup={handleOpenNestedPopup}
       />
     )
-  }, [resources, handleClosePopup, handleUpdateResource, handleOpenNestedPopup]);
+  }, [resources, handleClosePopup, handleOpenNestedPopup]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -1550,7 +1450,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleUpdateSkillArea = (skillId: string, areaId: string, name: string, purpose: string) => {
-    setCoreSkills(prev => prev.map(s => {
+    setCoreSkillsState(prev => prev.map(s => {
         if (s.id === skillId) {
             return { ...s, skillAreas: s.skillAreas.map(a => a.id === areaId ? { ...a, name, purpose } : a) };
         }
@@ -1559,12 +1459,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleDeleteSkillArea = (skillId: string, areaId: string) => {
-     setCoreSkills(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
+     setCoreSkillsState(prev => prev.map(s => s.id === skillId ? { ...s, skillAreas: s.skillAreas.filter(a => a.id !== areaId) } : s));
   };
   
   const handleAddMicroSkill = (coreSkillId: string, areaId: string, name: string) => {
     if (!name.trim()) { toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" }); return; }
-    setCoreSkills(prev => prev.map(s => {
+    setCoreSkillsState(prev => prev.map(s => {
       if (s.id === coreSkillId) {
         return { ...s, skillAreas: s.skillAreas.map(area => {
             if (area.id === areaId) {
@@ -1580,7 +1480,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleUpdateMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string, name: string) => {
-    setCoreSkills(prev => prev.map(s => {
+    setCoreSkillsState(prev => prev.map(s => {
         if (s.id === coreSkillId) {
             return { ...s, skillAreas: s.skillAreas.map(area => {
                 if (area.id === areaId) {
@@ -1594,7 +1494,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleDeleteMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string) => {
-    setCoreSkills(prev => prev.map(s => {
+    setCoreSkillsState(prev => prev.map(s => {
         if (s.id === coreSkillId) {
             return { ...s, skillAreas: s.skillAreas.map(area => {
                 if (area.id === areaId) {
@@ -1609,8 +1509,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleExpansionChange = useCallback((value: string[]) => {
-    setExpandedItems(value);
-  }, [setExpandedItems]);
+    setExpandedItemsState(value);
+  }, []);
   
   const openIntentionPopup = (intentionId: string) => {
     setIntentionPopups(prev => {
@@ -1701,7 +1601,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             y = timerRect.top;
         }
         
-        newPopups.set(activityId, { activityId, x, y, parentId, level });
+        newPopups.set(activityId, { activityId, x, y, level, parentId });
         return newPopups;
     });
   };
@@ -1756,11 +1656,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       trigger: { action: thought.text },
       createdAt: new Date().toISOString(),
     };
-    setResources(prev => [...prev, newHabit]);
+    setResourcesState(prev => [...prev, newHabit]);
   };
   
   const updateActivity = (updatedActivity: Activity) => {
-    setSchedule(prev => {
+    setScheduleState(prev => {
         const newSchedule = { ...prev };
         let found = false;
         for (const dateKey in newSchedule) {
@@ -1782,12 +1682,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addToRecents = useCallback((item: (ExerciseDefinition | Project) & { type: string }) => {
-    setRecentItems(prev => {
+    setRecentItemsState(prev => {
         const newItems = prev.filter(i => i.id !== item.id);
         newItems.unshift(item);
         return newItems.slice(0, 6);
     });
-  }, [setRecentItems]);
+  }, []);
 
   const createResourceWithHierarchy = (parentTask: ExerciseDefinition, type: Resource['type']): ExerciseDefinition | undefined => {
     const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parentTask.category);
@@ -1823,7 +1723,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       parentFolderId = folder.id;
     });
   
-    setResourceFolders(finalFolders);
+    setResourceFoldersState(finalFolders);
   
     const newResource: Resource = {
       id: `res_card_${Date.now()}`,
@@ -1834,10 +1734,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       points: []
     };
     
-    setResources(prev => [...prev, newResource]);
+    setResourcesState(prev => [...prev, newResource]);
   
     const parentIsUpskill = upskillDefinitions.some(d => d.id === parentTask.id);
-    const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+    const setParentDefinitions = parentIsUpskill ? setUpskillDefinitionsState : setDeepWorkDefinitionsState;
     
     let updatedParentTask: ExerciseDefinition | undefined;
     
@@ -1859,7 +1759,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const deleteResource = (resourceId: string) => {
     // Remove the resource itself
-    setResources(prev => prev.filter(r => r.id !== resourceId));
+    setResourcesState(prev => prev.filter(r => r.id !== resourceId));
 
     // Unlink from any parent tasks
     const unlinkFromDefs = (definitions: ExerciseDefinition[]) => 
@@ -1868,8 +1768,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== resourceId)
         }));
     
-    setDeepWorkDefinitions(unlinkFromDefs);
-    setUpskillDefinitions(unlinkFromDefs);
+    setDeepWorkDefinitionsState(unlinkFromDefs);
+    setUpskillDefinitionsState(unlinkFromDefs);
   };
   
   const microSkillMap = useMemo(() => {
@@ -1910,21 +1810,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       applicationSpecializationIds: [],
       outcome: 'Expected Outcome'
     };
-    setPurposeData(prev => ({
+    setPurposeDataState(prev => ({
         ...prev,
         pillarCards: [...(prev.pillarCards || []), newCard]
     }));
   };
   
   const updatePillarCard = (updatedCard: PillarCardData) => {
-    setPurposeData(prev => ({
+    setPurposeDataState(prev => ({
       ...prev,
       pillarCards: (prev.pillarCards || []).map(c => c.id === updatedCard.id ? updatedCard : c)
     }));
   };
   
   const deletePillarCard = (cardId: string) => {
-    setPurposeData(prev => ({
+    setPurposeDataState(prev => ({
       ...prev,
       pillarCards: (prev.pillarCards || []).filter(c => c.id !== cardId)
     }));
@@ -1938,27 +1838,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
-    localChangeCount,
-    weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+    schedule, dailyPurposes, isAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
-    activeFocusSession, setActiveFocusSession,
-    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
-    workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
-    upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions,
-    leadGenDefinitions, setLeadGenDefinitions,
-    productizationPlans, setProductizationPlans,
-    offerizationPlans, setOfferizationPlans,
+    activeFocusSession,
+    allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+    workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions,
+    upskillDefinitions, topicGoals,
+    deepWorkDefinitions,
+    leadGenDefinitions,
+    productizationPlans, offerizationPlans,
     addFeatureToRelease,
     copyOffer,
-    resourceFolders, setResourceFolders,
-    resources, setResources, deleteResource,
-    pinnedFolderIds, setPinnedFolderIds,
-    activeResourceTabIds, setActiveResourceTabIds,
-    selectedResourceFolderId, setSelectedResourceFolderId,
+    resourceFolders,
+    resources, deleteResource,
+    pinnedFolderIds,
+    activeResourceTabIds,
+    selectedResourceFolderId,
     habitCards, mechanismCards,
-    createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
+    createHabitFromThought, lastSelectedHabitFolder,
     createResourceWithHierarchy,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
@@ -1971,40 +1869,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
-    canvasLayout, setCanvasLayout,
-    mindsetCards, setMindsetCards, addMindsetCard, deleteMindsetCard,
+    canvasLayout,
+    mindsetCards, addMindsetCard, deleteMindsetCard,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
-    pistons, setPistons,
+    pistons,
     pistonsInitialState, openPistonsFor,
     deleteDesire,
-    skillDomains, setSkillDomains,
-    coreSkills, setCoreSkills,
-    projects, setProjects,
+    skillDomains,
+    coreSkills,
+    projects,
     handleUpdateSkillArea,
     handleDeleteSkillArea,
     handleAddMicroSkill,
     handleUpdateMicroSkill,
     handleDeleteMicroSkill,
-    companies, setCompanies,
-    positions, setPositions,
-    purposeData, setPurposeData,
-    patterns, setPatterns,
-    metaRules, setMetaRules,
-    pillarEquations, setPillarEquations,
-    skillAcquisitionPlans, setSkillAcquisitionPlans,
+    companies,
+    positions,
+    purposeData,
+    patterns,
+    metaRules,
+    pillarEquations,
+    skillAcquisitionPlans,
     addPillarCard, updatePillarCard, deletePillarCard,
     specializations, allEquations,
-    selectedUpskillTask, setSelectedUpskillTask,
-    selectedDeepWorkTask, setSelectedDeepWorkTask,
-    selectedMicroSkill, setSelectedMicroSkill,
+    pathNodes, setPathNodes,
+    selectedUpskillTask,
+    selectedDeepWorkTask,
+    selectedMicroSkill,
     microSkillMap,
     expandedItems, handleExpansionChange,
-    selectedDomainId, setSelectedDomainId,
-    selectedSkillId, setSelectedSkillId,
-    selectedProjectId, setSelectedProjectId,
-    selectedCompanyId, setSelectedCompanyId,
-    autoSuggestions, setAutoSuggestions,
+    selectedDomainId,
+    selectedSkillId,
+    selectedProjectId,
+    selectedCompanyId,
+    autoSuggestions,
     recentItems, addToRecents,
+    updateData,
   };
 
   return (
