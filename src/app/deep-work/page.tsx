@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -989,11 +990,11 @@ function DeepWorkPageContent() {
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const hasUpskillChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
     
-    if (!hasChildren) {
-        const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-        return isChild ? 'Visualization' : 'Standalone';
+    if (!hasUpskillChildren) {
+        const isChildOfUpskill = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+        return isChildOfUpskill ? 'Visualization' : 'Standalone';
     }
     
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
