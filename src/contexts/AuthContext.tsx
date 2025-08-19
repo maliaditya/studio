@@ -305,13 +305,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // This flag prevents saving data to localStorage until the initial load is complete.
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [localChangeCount, setLocalChangeCount] = useState(0);
-  const incrementChangeCount = () => {
-    if (!isLoadingState) {
-      setLocalChangeCount(c => c + 1);
-    }
-  };
-  const resetChangeCount = () => setLocalChangeCount(0);
-
 
   // Health State
   const [weightLogs, setWeightLogsState] = useState<WeightLog[]>([]);
@@ -321,14 +314,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [gender, setGenderState] = useState<Gender | null>(null);
   const [dietPlan, setDietPlanState] = useState<UserDietPlan>([]);
   
-  const setWeightLogs = (value: React.SetStateAction<WeightLog[]>) => { setWeightLogsState(value); incrementChangeCount(); };
-  const setGoalWeight = (value: React.SetStateAction<number | null>) => { setGoalWeightState(value); incrementChangeCount(); };
-  const setHeight = (value: React.SetStateAction<number | null>) => { setHeightState(value); incrementChangeCount(); };
-  const setDateOfBirth = (value: React.SetStateAction<string | null>) => { setDateOfBirthState(value); incrementChangeCount(); };
-  const setGender = (value: React.SetStateAction<Gender | null>) => { setGenderState(value); incrementChangeCount(); };
-  const setDietPlan = (value: React.SetStateAction<UserDietPlan>) => { setDietPlanState(value); incrementChangeCount(); };
-
-
   // Schedule & Logs
   const [schedule, setScheduleState] = useState<FullSchedule>({});
   const [dailyPurposes, setDailyPurposesState] = useState<Record<string, string>>({});
@@ -339,16 +324,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [allWorkoutLogs, setAllWorkoutLogsState] = useState<DatedWorkout[]>([]);
   const [brandingLogs, setAllBrandingLogsState] = useState<DatedWorkout[]>([]);
   const [allLeadGenLogs, setAllLeadGenLogsState] = useState<DatedWorkout[]>([]);
-  
-  const setSchedule = (value: React.SetStateAction<FullSchedule>) => { setScheduleState(value); incrementChangeCount(); };
-  const setDailyPurposes = (value: React.SetStateAction<Record<string, string>>) => { setDailyPurposesState(value); incrementChangeCount(); };
-  const setIsAgendaDocked = (value: React.SetStateAction<boolean>) => { setIsAgendaDockedState(value); incrementChangeCount(); };
-  const setActivityDurations = (value: React.SetStateAction<Record<string, string>>) => { setActivityDurationsState(value); incrementChangeCount(); };
-  const setAllUpskillLogs = (value: React.SetStateAction<DatedWorkout[]>) => { setAllUpskillLogsState(value); incrementChangeCount(); };
-  const setAllDeepWorkLogs = (value: React.SetStateAction<DatedWorkout[]>) => { setAllDeepWorkLogsState(value); incrementChangeCount(); };
-  const setAllWorkoutLogs = (value: React.SetStateAction<DatedWorkout[]>) => { setAllWorkoutLogsState(value); incrementChangeCount(); };
-  const setAllBrandingLogs = (value: React.SetStateAction<DatedWorkout[]>) => { setAllBrandingLogsState(value); incrementChangeCount(); };
-  const setAllLeadGenLogs = (value: React.SetStateAction<DatedWorkout[]>) => { setAllLeadGenLogsState(value); incrementChangeCount(); };
   
   // Data Definitions & Plans
   const [workoutMode, setWorkoutModeState] = useState<WorkoutMode>('two-muscle');
@@ -362,17 +337,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [productizationPlans, setProductizationPlansState] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlansState] = useState<Record<string, ProductizationPlan>>({});
   
-  const setWorkoutMode = (value: React.SetStateAction<WorkoutMode>) => { setWorkoutModeState(value); incrementChangeCount(); };
-  const setWorkoutPlanRotation = (value: React.SetStateAction<boolean>) => { setWorkoutPlanRotationState(value); incrementChangeCount(); };
-  const setWorkoutPlans = (value: React.SetStateAction<AllWorkoutPlans>) => { setWorkoutPlansState(value); incrementChangeCount(); };
-  const setExerciseDefinitions = (value: React.SetStateAction<ExerciseDefinition[]>) => { setExerciseDefinitionsState(value); incrementChangeCount(); };
-  const setUpskillDefinitions = (value: React.SetStateAction<ExerciseDefinition[]>) => { setUpskillDefinitionsState(value); incrementChangeCount(); };
-  const setTopicGoals = (value: React.SetStateAction<Record<string, TopicGoal>>) => { setTopicGoalsState(value); incrementChangeCount(); };
-  const setDeepWorkDefinitions = (value: React.SetStateAction<ExerciseDefinition[]>) => { setDeepWorkDefinitionsState(value); incrementChangeCount(); };
-  const setLeadGenDefinitions = (value: React.SetStateAction<ExerciseDefinition[]>) => { setLeadGenDefinitionsState(value); incrementChangeCount(); };
-  const setProductizationPlans = (value: React.SetStateAction<Record<string, ProductizationPlan>>) => { setProductizationPlansState(value); incrementChangeCount(); };
-  const setOfferizationPlans = (value: React.SetStateAction<Record<string, ProductizationPlan>>) => { setOfferizationPlansState(value); incrementChangeCount(); };
-
   // Resources State
   const [resources, setResourcesState] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFoldersState] = useState<ResourceFolder[]>([]);
@@ -380,14 +344,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [activeResourceTabIds, setActiveResourceTabIdsState] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderIdState] = useState<string | null>(null);
   const [lastSelectedHabitFolder, setLastSelectedHabitFolderState] = useState<string | null>(null);
-  
-  const setResources = (value: React.SetStateAction<Resource[]>) => { setResourcesState(value); incrementChangeCount(); };
-  const setResourceFolders = (value: React.SetStateAction<ResourceFolder[]>) => { setResourceFoldersState(value); incrementChangeCount(); };
-  const setPinnedFolderIds = (value: React.SetStateAction<Set<string>>) => { setPinnedFolderIdsState(value); incrementChangeCount(); };
-  const setActiveResourceTabIds = (value: React.SetStateAction<string[]>) => { setActiveResourceTabIdsState(value); incrementChangeCount(); };
-  const setSelectedResourceFolderId = (value: React.SetStateAction<string | null>) => { setSelectedResourceFolderIdState(value); incrementChangeCount(); };
-  const setLastSelectedHabitFolder = (value: React.SetStateAction<string | null>) => { setLastSelectedHabitFolderState(value); incrementChangeCount(); };
-
 
   // Resource Popups (Original system, kept for resources page)
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
@@ -412,46 +368,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedSkillId, setSelectedSkillIdState] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyIdState] = useState<string | null>(null);
-
-  const setExpandedItems = (value: React.SetStateAction<string[]>) => { setExpandedItemsState(value); incrementChangeCount(); };
-  const setSelectedDomainId = (value: React.SetStateAction<string | null>) => { setSelectedDomainIdState(value); incrementChangeCount(); };
-  const setSelectedSkillId = (value: React.SetStateAction<string | null>) => { setSelectedSkillIdState(value); incrementChangeCount(); };
-  const setSelectedProjectId = (value: React.SetStateAction<string | null>) => { setSelectedProjectIdState(value); incrementChangeCount(); };
-  const setSelectedCompanyId = (value: React.SetStateAction<string | null>) => { setSelectedCompanyIdState(value); incrementChangeCount(); };
-
+  
   // Focus Session
   const [activeFocusSession, setActiveFocusSessionState] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
-  const setActiveFocusSession = (value: React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number; } | null>) => { setActiveFocusSessionState(value); incrementChangeCount(); };
-
 
   // Canvas State
   const [canvasLayout, setCanvasLayoutState] = useState<CanvasLayout>({ nodes: [], edges: [] });
-  const setCanvasLayout = (value: React.SetStateAction<CanvasLayout>) => { setCanvasLayoutState(value); incrementChangeCount(); };
 
   // Mindset State
   const [mindsetCards, setMindsetCardsState] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
-  const setMindsetCards = (value: React.SetStateAction<MindsetCard[]>) => { setMindsetCardsState(value); incrementChangeCount(); };
   
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistonsState] = useState<PistonsCategoryData>({});
   const [pistonsInitialState, setPistonsInitialState] = useState<PistonsInitialState | null>(null);
-  const setPistons = (value: React.SetStateAction<PistonsCategoryData>) => { setPistonsState(value); incrementChangeCount(); };
   
   // Skill Page State
   const [skillDomains, setSkillDomainsState] = useState<SkillDomain[]>([]);
   const [coreSkills, setCoreSkillsState] = useState<CoreSkill[]>([]);
   const [projects, setProjectsState] = useState<Project[]>([]);
 
-  const setSkillDomains = (value: React.SetStateAction<SkillDomain[]>) => { setSkillDomainsState(value); incrementChangeCount(); };
-  const setCoreSkills = (value: React.SetStateAction<CoreSkill[]>) => { setCoreSkillsState(value); incrementChangeCount(); };
-  const setProjects = (value: React.SetStateAction<Project[]>) => { setProjectsState(value); incrementChangeCount(); };
-  
   // Professional Experience
   const [companies, setCompaniesState] = useState<Company[]>([]);
   const [positions, setPositionsState] = useState<Position[]>([]);
-  const setCompanies = (value: React.SetStateAction<Company[]>) => { setCompaniesState(value); incrementChangeCount(); };
-  const setPositions = (value: React.SetStateAction<Position[]>) => { setPositionsState(value); incrementChangeCount(); };
   
   // Purpose & Patterns Data
   const [purposeData, setPurposeDataState] = useState<PurposeData>({ statement: '', specializationPurposes: {}, pillarCards: [] });
@@ -459,30 +398,132 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [metaRules, setMetaRulesState] = useState<MetaRule[]>([]);
   const [pillarEquations, setPillarEquationsState] = useState<Record<string, HabitEquation[]>>({});
   const [skillAcquisitionPlans, setSkillAcquisitionPlansState] = useState<SkillAcquisitionPlan[]>([]);
-  
-  const setPurposeData = (value: React.SetStateAction<PurposeData>) => { setPurposeDataState(value); incrementChangeCount(); };
-  const setPatterns = (value: React.SetStateAction<Pattern[]>) => { setPatternsState(value); incrementChangeCount(); };
-  const setMetaRules = (value: React.SetStateAction<MetaRule[]>) => { setMetaRulesState(value); incrementChangeCount(); };
-  const setPillarEquations = (value: React.SetStateAction<Record<string, HabitEquation[]>>) => { setPillarEquationsState(value); incrementChangeCount(); };
-  const setSkillAcquisitionPlans = (value: React.SetStateAction<SkillAcquisitionPlan[]>) => { setSkillAcquisitionPlansState(value); incrementChangeCount(); };
-
 
   // Persisted task state
   const [selectedUpskillTask, setSelectedUpskillTaskState] = useState<ExerciseDefinition | null>(null);
   const [selectedDeepWorkTask, setSelectedDeepWorkTaskState] = useState<ExerciseDefinition | null>(null);
   const [selectedMicroSkill, setSelectedMicroSkillState] = useState<MicroSkill | null>(null);
-  const setSelectedUpskillTask = (value: React.SetStateAction<ExerciseDefinition | null>) => { setSelectedUpskillTaskState(value); incrementChangeCount(); };
-  const setSelectedDeepWorkTask = (value: React.SetStateAction<ExerciseDefinition | null>) => { setSelectedDeepWorkTaskState(value); incrementChangeCount(); };
-  const setSelectedMicroSkill = (value: React.SetStateAction<MicroSkill | null>) => { setSelectedMicroSkillState(value); incrementChangeCount(); };
-
 
   // Auto Suggestion State
   const [autoSuggestions, setAutoSuggestionsState] = useState<Record<string, AutoSuggestionEntry[]>>({});
-  const setAutoSuggestions = (value: React.SetStateAction<Record<string, AutoSuggestionEntry[]>>) => { setAutoSuggestionsState(value); incrementChangeCount(); };
 
   // Recents State
   const [recentItems, setRecentItemsState] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
-  const setRecentItems = (value: React.SetStateAction<Array<(ExerciseDefinition | Project) & { type: string }>>) => { setRecentItemsState(value); incrementChangeCount(); };
+
+  const saveData = useCallback(() => {
+    const username = getCurrentLocalUser()?.username;
+    if (!username || isLoadingState) return;
+
+    const allUserData = {
+        weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+        schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+        workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+        resources, resourceFolders,
+        canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+        purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+        autoSuggestions,
+    };
+    localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(allUserData));
+
+    const uiStateData = {
+        pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+        activeFocusSession, isAgendaDocked,
+        recentItems,
+    };
+    localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(uiStateData));
+
+    setLocalChangeCount(prev => prev + 1); // This now just serves to show the save status, not trigger a save.
+  }, [
+      isLoadingState,
+      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+      schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+      workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+      deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+      resources, resourceFolders,
+      canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+      purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+      autoSuggestions,
+      pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+      selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+      selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+      activeFocusSession, isAgendaDocked,
+      recentItems
+  ]);
+
+  const useSavableState = <T,>(setter: React.Dispatch<React.SetStateAction<T>>): React.Dispatch<React.SetStateAction<T>> => {
+      return useCallback((valueOrFn) => {
+          setter(prev => {
+              const newValue = typeof valueOrFn === 'function' ? (valueOrFn as (prevState: T) => T)(prev) : valueOrFn;
+              // We call save directly in the next render cycle via useEffect
+              return newValue;
+          });
+      }, [setter]);
+  };
+  
+  useEffect(() => {
+    if (!isLoadingState) {
+        saveData();
+    }
+  }, [saveData, isLoadingState]);
+  
+  const setWeightLogs = useSavableState(setWeightLogsState);
+  const setGoalWeight = useSavableState(setGoalWeightState);
+  const setHeight = useSavableState(setHeightState);
+  const setDateOfBirth = useSavableState(setDateOfBirthState);
+  const setGender = useSavableState(setGenderState);
+  const setDietPlan = useSavableState(setDietPlanState);
+  const setSchedule = useSavableState(setScheduleState);
+  const setDailyPurposes = useSavableState(setDailyPurposesState);
+  const setIsAgendaDocked = useSavableState(setIsAgendaDockedState);
+  const setActivityDurations = useSavableState(setActivityDurationsState);
+  const setAllUpskillLogs = useSavableState(setAllUpskillLogsState);
+  const setAllDeepWorkLogs = useSavableState(setAllDeepWorkLogsState);
+  const setAllWorkoutLogs = useSavableState(setAllWorkoutLogsState);
+  const setAllBrandingLogs = useSavableState(setAllBrandingLogsState);
+  const setAllLeadGenLogs = useSavableState(setAllLeadGenLogsState);
+  const setWorkoutMode = useSavableState(setWorkoutModeState);
+  const setWorkoutPlanRotation = useSavableState(setWorkoutPlanRotationState);
+  const setWorkoutPlans = useSavableState(setWorkoutPlansState);
+  const setExerciseDefinitions = useSavableState(setExerciseDefinitionsState);
+  const setUpskillDefinitions = useSavableState(setUpskillDefinitionsState);
+  const setTopicGoals = useSavableState(setTopicGoalsState);
+  const setDeepWorkDefinitions = useSavableState(setDeepWorkDefinitionsState);
+  const setLeadGenDefinitions = useSavableState(setLeadGenDefinitionsState);
+  const setProductizationPlans = useSavableState(setProductizationPlansState);
+  const setOfferizationPlans = useSavableState(setOfferizationPlansState);
+  const setResources = useSavableState(setResourcesState);
+  const setResourceFolders = useSavableState(setResourceFoldersState);
+  const setPinnedFolderIds = useSavableState(setPinnedFolderIdsState);
+  const setActiveResourceTabIds = useSavableState(setActiveResourceTabIdsState);
+  const setSelectedResourceFolderId = useSavableState(setSelectedResourceFolderIdState);
+  const setLastSelectedHabitFolder = useSavableState(setLastSelectedHabitFolderState);
+  const setActiveFocusSession = useSavableState(setActiveFocusSessionState);
+  const setCanvasLayout = useSavableState(setCanvasLayoutState);
+  const setMindsetCards = useSavableState(setMindsetCardsState);
+  const setPistons = useSavableState(setPistonsState);
+  const setSkillDomains = useSavableState(setSkillDomainsState);
+  const setCoreSkills = useSavableState(setCoreSkillsState);
+  const setProjects = useSavableState(setProjectsState);
+  const setCompanies = useSavableState(setCompaniesState);
+  const setPositions = useSavableState(setPositionsState);
+  const setPurposeData = useSavableState(setPurposeDataState);
+  const setPatterns = useSavableState(setPatternsState);
+  const setMetaRules = useSavableState(setMetaRulesState);
+  const setPillarEquations = useSavableState(setPillarEquationsState);
+  const setSkillAcquisitionPlans = useSavableState(setSkillAcquisitionPlansState);
+  const setSelectedUpskillTask = useSavableState(setSelectedUpskillTaskState);
+  const setSelectedDeepWorkTask = useSavableState(setSelectedDeepWorkTaskState);
+  const setSelectedMicroSkill = useSavableState(setSelectedMicroSkillState);
+  const setExpandedItems = useSavableState(setExpandedItemsState);
+  const setSelectedDomainId = useSavableState(setSelectedDomainIdState);
+  const setSelectedSkillId = useSavableState(setSelectedSkillIdState);
+  const setSelectedProjectId = useSavableState(setSelectedProjectIdState);
+  const setSelectedCompanyId = useSavableState(setSelectedCompanyIdState);
+  const setAutoSuggestions = useSavableState(setAutoSuggestionsState);
+  const setRecentItems = useSavableState(setRecentItemsState);
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -600,7 +641,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to parse UI state:", e);
     }
     
-    setLocalChangeCount(0);
     // Finished loading
     setTimeout(() => setIsLoadingState(false), 100); 
   }
@@ -636,53 +676,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setExpandedItemsState([]); setSelectedDomainIdState(null); setSelectedSkillIdState(null); setSelectedProjectIdState(null); setSelectedCompanyIdState(null);
       setAutoSuggestionsState({});
       setRecentItemsState([]);
-      setLocalChangeCount(0);
     }
   }, [currentUser]);
 
   useEffect(() => {
-    if (isLoadingState) return;
-
-    const username = currentUser?.username;
-    if (username) {
-        const allUserData = {
-            weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
-            schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-            workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-            deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-            resources, resourceFolders,
-            canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
-            purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-            autoSuggestions,
-        };
-        localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(allUserData));
-        const uiStateData = {
-            pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-            selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
-            selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-            activeFocusSession, isAgendaDocked,
-            recentItems,
-        };
-        localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiStateData));
+    if (prevUser && !currentUser) {
+      setTimeout(() => {
+        toast({ title: "Logged Out", description: "You have been successfully logged out." });
+      }, 0);
     }
-  }, [
-      currentUser, isLoadingState,
-      weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
-      schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-      workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-      deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-      resources, resourceFolders,
-      canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
-      purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-      autoSuggestions,
-      // UI states that should also trigger a save of everything
-      pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-      selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
-      selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-      activeFocusSession, isAgendaDocked,
-      recentItems
-  ]);
-  
+  }, [currentUser, prevUser, toast]);
   
   useEffect(() => {
     const root = window.document.documentElement;
@@ -788,26 +791,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
-
-  const loadDataIntoLocalStorage = (data: any, username: string) => {
-    // This now directly sets the state, the main useEffect will handle saving to localStorage
-    const setters: Record<string, (value: any) => void> = {
-      weightLogs: setWeightLogsState, goalWeight: setGoalWeightState, height: setHeightState, dateOfBirth: setDateOfBirthState, gender: setGenderState, dietPlan: setDietPlanState,
-      schedule: setScheduleState, dailyPurposes: setDailyPurposesState, allUpskillLogs: setAllUpskillLogsState, allDeepWorkLogs: setAllDeepWorkLogsState, allWorkoutLogs: setAllWorkoutLogsState, brandingLogs: setAllBrandingLogsState, allLeadGenLogs: setAllLeadGenLogsState,
-      workoutMode: setWorkoutModeState, workoutPlanRotation: setWorkoutPlanRotationState, workoutPlans: setWorkoutPlansState, exerciseDefinitions: setExerciseDefinitionsState, upskillDefinitions: setUpskillDefinitionsState, topicGoals: setTopicGoalsState,
-      deepWorkDefinitions: setDeepWorkDefinitionsState, leadGenDefinitions: setLeadGenDefinitionsState, productizationPlans: setProductizationPlansState, offerizationPlans: setOfferizationPlansState,
-      resources: setResourcesState, resourceFolders: setResourceFoldersState,
-      canvasLayout: setCanvasLayoutState, mindsetCards: setMindsetCardsState, pistons: setPistonsState, skillDomains: setSkillDomainsState, coreSkills: setCoreSkillsState, projects: setProjectsState, companies: setCompaniesState, positions: setPositionsState,
-      purposeData: setPurposeDataState, patterns: setPatternsState, metaRules: setMetaRulesState, pillarEquations: setPillarEquationsState, skillAcquisitionPlans: setSkillAcquisitionPlansState,
-      autoSuggestions: setAutoSuggestionsState,
-    };
-    
-    for (const key in setters) {
-      if (data[key] !== undefined) {
-        setters[key](data[key]);
-      }
-    }
-  };
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -962,17 +945,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        loadDataIntoLocalStorage(data, username);
-
-        if (!isDemo) {
-          toast({
-            title: "Sync Successful",
-            description: "Data pulled from the cloud. The app will now reload.",
-          });
-          setTimeout(() => {
-              window.location.reload();
-          }, 1500);
-        }
+        localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data));
+        
+        toast({
+          title: "Sync Successful",
+          description: "Data pulled from the cloud. The app will now reload.",
+        });
+        setTimeout(() => {
+            window.location.reload();
+        }, 1500);
 
     } catch (error) {
         console.error("Pull from cloud failed:", error);
@@ -1030,7 +1011,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const data = JSON.parse(text);
                     const username = currentUser!.username;
                     
-                    // Directly save to localStorage and then reload
                     localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data));
 
                     toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
@@ -2097,3 +2077,6 @@ const usePrevious = <T,>(value: T) => {
 
 
 
+
+
+    
