@@ -1,14 +1,14 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Release } from '@/types/workout';
+import type { Release, ExerciseDefinition } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 
 interface ProductivitySnapshotProps {
@@ -39,18 +39,66 @@ interface ProductivitySnapshotProps {
 
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
   const router = useRouter();
-  const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
+  const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
-  const { microSkillMap } = useAuth();
+  const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
 
   const microSkillsForRelease = React.useMemo(() => {
     if (!selectedReleaseInfo || !selectedReleaseInfo.release.focusAreaIds) {
       return [];
     }
     return selectedReleaseInfo.release.focusAreaIds
-      .map(id => microSkillMap.get(id)?.microSkillName)
-      .filter((name): name is string => !!name);
-  }, [selectedReleaseInfo, microSkillMap]);
+      .map(id => {
+        const info = microSkillMap.get(id);
+        const curiosities = upskillDefinitions.filter(def => def.category === info?.microSkillName && (def.linkedUpskillIds?.length ?? 0 > 0));
+        const intentions = deepWorkDefinitions.filter(def => def.category === info?.microSkillName && (def.linkedDeepWorkIds?.length ?? 0 > 0));
+        
+        return {
+            id,
+            name: info?.microSkillName,
+            curiosities,
+            intentions
+        };
+      })
+      .filter((skill): skill is { id: string; name: string; curiosities: ExerciseDefinition[], intentions: ExerciseDefinition[] } => !!skill.name);
+  }, [selectedReleaseInfo, microSkillMap, upskillDefinitions, deepWorkDefinitions]);
+
+  const isMicroSkillComplete = (skill: { curiosities: ExerciseDefinition[], intentions: ExerciseDefinition[] }) => {
+    const allChildTasks: { id: string; type: 'upskill' | 'deepwork' }[] = [];
+
+    const getDescendants = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedUpskillIds' | 'linkedDeepWorkIds', type: 'upskill' | 'deepwork') => {
+        const queue: string[] = [startNodeId];
+        const visited = new Set<string>();
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if(visited.has(currentId)) continue;
+            visited.add(currentId);
+            const node = defs.find(d => d.id === currentId);
+            if(node) {
+                const childIds = node[linkKey] || [];
+                if(childIds.length === 0 && !allChildTasks.some(t => t.id === node.id)) {
+                    allChildTasks.push({ id: node.id, type });
+                }
+                childIds.forEach(childId => {
+                    if(!visited.has(childId)) queue.push(childId);
+                });
+            }
+        }
+    }
+
+    skill.curiosities.forEach(c => getDescendants(c.id, upskillDefinitions, 'linkedUpskillIds', 'upskill'));
+    skill.intentions.forEach(i => getDescendants(i.id, deepWorkDefinitions, 'linkedDeepWorkIds', 'deepwork'));
+    
+    if (allChildTasks.length === 0) return false;
+
+    const loggedTaskIds = new Set([
+        ...allDeepWorkLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId)),
+        ...allUpskillLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId))
+    ]);
+
+    return allChildTasks.every(task => loggedTaskIds.has(task.id));
+  };
+
 
   const learningItems = Object.entries(stats.learningStats);
   const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
@@ -231,7 +279,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                               className="flex flex-col justify-between p-3 rounded-md bg-muted/30 border-b-0 h-[100px] cursor-pointer" 
                               onClick={() => {
                                 setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
-                                setIsAddFeatureModalOpen(true);
+                                setIsProjectDetailsModalOpen(true);
                               }}
                             >
                                 <div className="flex justify-between items-start">
@@ -311,28 +359,50 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
       </Card>
 
       {selectedReleaseInfo && (
-        <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
-          <DialogContent>
+        <Dialog open={isProjectDetailsModalOpen} onOpenChange={setIsProjectDetailsModalOpen}>
+          <DialogContent className="sm:max-w-xl">
             <DialogHeader>
-              <DialogTitle>Release Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
-              <DialogDescription>
-                This view shows the required micro-skills for this release based on your project plan.
-              </DialogDescription>
+              <DialogTitle>Project Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
             </DialogHeader>
-            
-            {microSkillsForRelease.length > 0 && (
-                <div className="space-y-2 py-4">
-                    <Label className="font-semibold">Associated Micro-Skills</Label>
-                    <div className="flex flex-wrap gap-1 p-2 rounded-md border bg-muted/50">
-                        {microSkillsForRelease.map((skillName, index) => (
-                            <Badge key={index} variant="secondary">{skillName}</Badge>
-                        ))}
-                    </div>
-                </div>
-            )}
-            
+            <div className="py-4 space-y-4">
+              <div>
+                  <Label className="font-semibold">Associated Micro-Skills</Label>
+                  <div className="mt-2 space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {microSkillsForRelease.map((skill) => {
+                       const isComplete = isMicroSkillComplete(skill);
+                       return(
+                          <Card key={skill.id} className={cn("transition-colors", isComplete && "bg-green-100 dark:bg-green-900/30")}>
+                            <CardHeader className="p-3">
+                              <CardTitle className={cn("text-base", isComplete && "line-through text-muted-foreground")}>{skill.name}</CardTitle>
+                            </CardHeader>
+                            {(skill.curiosities.length > 0 || skill.intentions.length > 0) && (
+                               <CardContent className="p-3 pt-0 text-xs text-muted-foreground space-y-2">
+                                {skill.curiosities.length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Flashlight className="h-3.5 w-3.5"/>Curiosities</h4>
+                                    <ul className="list-disc list-inside pl-2">
+                                        {skill.curiosities.map(c => <li key={c.id}>{c.name}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+                                {skill.intentions.length > 0 && (
+                                  <div>
+                                    <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Lightbulb className="h-3.5 w-3.5"/>Intentions</h4>
+                                     <ul className="list-disc list-inside pl-2">
+                                        {skill.intentions.map(i => <li key={i.id}>{i.name}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+                              </CardContent>
+                            )}
+                          </Card>
+                       )
+                    })}
+                  </div>
+              </div>
+            </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Close</Button>
+              <Button variant="outline" onClick={() => setIsProjectDetailsModalOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
