@@ -150,6 +150,7 @@ function PathPageContent() {
                       }}
                     >
                       <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
+                          <div className="flex-grow" /> {/* Spacer */}
                           <p className="text-lg font-bold leading-tight" title={item.release.name}>
                             {item.release.name}
                           </p>
