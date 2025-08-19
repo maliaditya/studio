@@ -990,14 +990,12 @@ function DeepWorkPageContent() {
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const hasResources = (def.linkedResourceIds?.length ?? 0) > 0;
-
+    
     if (!hasChildren) {
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
     
-    // If it has children, it's a parent type. Ignore resources for this check.
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
         if (!childDef) return false;
@@ -1013,7 +1011,7 @@ function DeepWorkPageContent() {
     });
     if (hasObjectiveChild) return 'Curiosity';
     
-    return 'Objective'; // Default parent type
+    return 'Objective';
   }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
@@ -1920,7 +1918,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={onToggleReadyForBranding}
+                    onToggleReadyForBranding={handleToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
@@ -2457,5 +2455,7 @@ export default function DeepWorkPage() {
 
 
 
+
+    
 
     
