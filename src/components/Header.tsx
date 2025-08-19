@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -12,6 +13,7 @@ import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
+import { SaveStatusWidget } from './SaveStatusWidget';
 
 export function Header() {
   const { 
@@ -75,6 +77,7 @@ export function Header() {
           </div>
           
           <div className="flex items-center gap-4">
+            {currentUser && <SaveStatusWidget />}
             <Button
               onClick={() => setIsSupportModalOpen(true)}
               variant="secondary"

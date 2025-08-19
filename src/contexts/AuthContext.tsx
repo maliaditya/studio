@@ -61,6 +61,10 @@ interface AuthContextType {
   globalVolume: number;
   setGlobalVolume: React.Dispatch<React.SetStateAction<number>>;
   
+  // Save Status
+  localChangeCount: number;
+  resetChangeCount: () => void;
+
   // Shared health state
   weightLogs: WeightLog[];
   setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
@@ -253,7 +257,7 @@ interface AuthContextType {
 
 
   // New global map
-  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
 
   // New state for selected subtopic/focus area
   selectedUpskillTask: ExerciseDefinition | null;
@@ -308,6 +312,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   const prevUser = usePrevious(currentUser);
+  
+  // Change Counter
+  const [localChangeCount, setLocalChangeCount] = useState(0);
+  const isInitialLoad = useRef(true);
 
   // Health State
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
@@ -484,6 +492,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser, prevUser, toast]);
 
+  const resetChangeCount = useCallback(() => {
+    setLocalChangeCount(0);
+  }, []);
+
+  const allData = useMemo(() => {
+    return [
+        weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+        schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+        workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+        resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+        canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+        purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+        autoSuggestions, recentItems, activeFocusSession, isAgendaDocked
+    ];
+  }, [
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+    schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+    workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+    deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+    canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+    purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+    selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+    selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+    autoSuggestions, recentItems, activeFocusSession, isAgendaDocked
+  ]);
+
+  useEffect(() => {
+    if (isInitialLoad.current) {
+        isInitialLoad.current = false;
+        return;
+    }
+    setLocalChangeCount(prev => prev + 1);
+  }, [allData]);
+
+
   useEffect(() => {
     if (currentUser?.username) {
       const username = currentUser.username;
@@ -600,6 +647,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               localStorage.removeItem(`focus_session_${username}`);
           }
       }
+      resetChangeCount();
+      isInitialLoad.current = true; // Mark initial load as complete
     } else {
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({}); setDailyPurposes({});
@@ -627,8 +676,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
       setAutoSuggestions({});
       setRecentItems([]);
+      setLocalChangeCount(0);
     }
-  }, [currentUser]);
+  }, [currentUser, resetChangeCount]);
 
   useEffect(() => {
     if (currentUser?.username && !loading) {
@@ -703,22 +753,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem(`focus_session_${username}`);
       }
     }
-  }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, 
-    schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-    exerciseDefinitions, workoutMode, workoutPlanRotation, workoutPlans, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions,
-    productizationPlans, offerizationPlans,
-    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-    canvasLayout,
-    mindsetCards,
-    pistons,
-    skillDomains, coreSkills, projects,
-    companies, positions,
-    purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-    currentUser, loading, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
-    expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    autoSuggestions, activeFocusSession, recentItems
-  ]);
+  }, [allData, currentUser, loading]);
 
 
   useEffect(() => {
@@ -902,6 +937,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setAutoSuggestions(data.autoSuggestions || {});
     setRecentItems(data.recentItems || []);
+
+    resetChangeCount();
   };
   
   const register = async (username: string, password: string) => {
@@ -992,6 +1029,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error(result.error || 'Failed to push data.');
         }
         toast({ title: "Success", description: "Demo data has been saved to the cloud." });
+        resetChangeCount();
     } catch (error) {
         console.error("Push to cloud for demo user failed:", error);
         toast({
@@ -1030,6 +1068,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             throw new Error(result.error || 'Failed to push data.');
         }
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
+        resetChangeCount();
     } catch (error) {
         console.error("Push to cloud failed:", error);
         toast({
@@ -2066,6 +2105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
+    localChangeCount, resetChangeCount,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
@@ -2152,7 +2192,6 @@ export const useAuth = (): AuthContextType => {
 
     
 
-    
 
 
 
