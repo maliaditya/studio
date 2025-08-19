@@ -75,9 +75,7 @@ function PathPageContent() {
   }, [upcomingReleases]);
 
   const getIcon = (type: 'product' | 'service') => {
-    return type === 'product'
-      ? <Package className="h-6 w-6 text-primary" />
-      : <Briefcase className="h-6 w-6 text-primary" />;
+    return <Package className="h-6 w-6 text-primary" />;
   }
 
   return (
