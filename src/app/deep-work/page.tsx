@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -993,24 +992,28 @@ function DeepWorkPageContent() {
     const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
     const hasResources = (def.linkedResourceIds?.length ?? 0) > 0;
 
-    if (!hasChildren || hasResources) {
+    if (!hasChildren) {
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
     
+    // If it has children, it's a parent type. Ignore resources for this check.
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && getUpskillNodeType(childDef).match(/Visualization|Standalone/);
+        if (!childDef) return false;
+        const nodeType = getUpskillNodeType(childDef);
+        return nodeType === 'Visualization' || nodeType === 'Standalone';
     });
     if (hasActionableChild) return 'Objective';
     
     const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
         const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && getUpskillNodeType(childDef) === 'Objective';
+        if (!childDef) return false;
+        return getUpskillNodeType(childDef) === 'Objective';
     });
     if (hasObjectiveChild) return 'Curiosity';
     
-    return 'Objective';
+    return 'Objective'; // Default parent type
   }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
@@ -1638,7 +1641,7 @@ function DeepWorkPageContent() {
             
             setOldDefs((prev: ExerciseDefinition[]) => prev.map(def => 
                 def.id === oldParentId ? { ...def, [oldLinkKey]: (def[oldLinkKey] || []).filter((id: string) => id !== activeId) } : def
-            ));
+                ));
         }
 
         const newParentIsDeepWork = deepWorkDefinitions.some(d => d.id === targetId);
@@ -1917,7 +1920,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={handleToggleReadyForBranding}
+                    onToggleReadyForBranding={onToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
@@ -2422,6 +2425,21 @@ export default function DeepWorkPage() {
 }
     
 
+
+
+
+
+
+
+
+
+
+    
+
+    
+
+
+
     
 
 
@@ -2433,25 +2451,11 @@ export default function DeepWorkPage() {
 
 
 
+
+
+
+
+
+
+
     
-
-    
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
