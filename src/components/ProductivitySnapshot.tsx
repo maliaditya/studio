@@ -41,16 +41,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const router = useRouter();
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
-  const [newFeatureName, setNewFeatureName] = useState('');
-  const { addFeatureToRelease, microSkillMap } = useAuth();
-
-  const handleAddFeature = () => {
-    if (selectedReleaseInfo) {
-      addFeatureToRelease(selectedReleaseInfo.release, selectedReleaseInfo.topic, newFeatureName, selectedReleaseInfo.type);
-      setNewFeatureName('');
-      // Keep the modal open after adding
-    }
-  };
+  const { microSkillMap } = useAuth();
 
   const microSkillsForRelease = React.useMemo(() => {
     if (!selectedReleaseInfo || !selectedReleaseInfo.release.focusAreaIds) {
@@ -323,38 +314,22 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         <Dialog open={isAddFeatureModalOpen} onOpenChange={setIsAddFeatureModalOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Manage Features for "{selectedReleaseInfo.release.name}"</DialogTitle>
+              <DialogTitle>Release Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                {selectedReleaseInfo.release.description || 'Break down this release into smaller, actionable tasks.'}
+                This view shows the required micro-skills for this release based on your project plan.
               </DialogDescription>
             </DialogHeader>
             
             {microSkillsForRelease.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 py-4">
                     <Label className="font-semibold">Associated Micro-Skills</Label>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 p-2 rounded-md border bg-muted/50">
                         {microSkillsForRelease.map((skillName, index) => (
                             <Badge key={index} variant="secondary">{skillName}</Badge>
                         ))}
                     </div>
                 </div>
             )}
-
-            <div className="pt-2">
-                <Label htmlFor="feature-name" className="text-sm font-medium">Add New Feature</Label>
-                <div className="flex gap-2 mt-1">
-                    <Input
-                        id="feature-name"
-                        value={newFeatureName}
-                        onChange={(e) => setNewFeatureName(e.target.value)}
-                        placeholder="e.g., Implement user authentication"
-                        autoFocus
-                        onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
-                        className="flex-grow"
-                    />
-                    <Button onClick={handleAddFeature}>Add</Button>
-                </div>
-            </div>
             
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddFeatureModalOpen(false)}>Close</Button>
