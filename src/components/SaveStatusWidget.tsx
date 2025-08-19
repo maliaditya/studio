@@ -8,8 +8,8 @@ import { UploadCloud, CheckCircle2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 export function SaveStatusWidget() {
-  const { localChangeCount, pushDataToCloud } = useAuth();
-  const showPrompt = localChangeCount > 50;
+  const { localChangeCount, pushDataToCloud, settings } = useAuth();
+  const showPrompt = localChangeCount > (settings.autoPushLimit || 50);
 
   if (showPrompt) {
     return (

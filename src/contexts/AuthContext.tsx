@@ -39,6 +39,12 @@ interface ResourcePopupProps {
   popupState: PopupState;
 }
 
+interface UserSettings {
+  carryForward: boolean;
+  autoPush: boolean;
+  autoPushLimit: number;
+}
+
 interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
@@ -50,6 +56,7 @@ interface AuthContextType {
   exportData: () => void;
   importData: () => void;
   localChangeCount: number;
+  settings: UserSettings;
   isDemoTokenModalOpen: boolean;
   setIsDemoTokenModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pushDemoDataWithToken: (token: string) => Promise<void>;
@@ -319,6 +326,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const prevUser = usePrevious(currentUser);
   
   const [isLoadingState, setIsLoadingState] = useState(true);
+  const [settings, setSettings] = useState<UserSettings>({ 
+    carryForward: false,
+    autoPush: false,
+    autoPushLimit: 100,
+  });
 
   // Health State
   const [weightLogs, setWeightLogs] = useTrackedState<WeightLog[]>([]);
@@ -574,6 +586,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (currentUser?.username) {
         setLocalChangeCount(0);
+        const settingsKey = `lifeos_settings_${currentUser.username}`;
+        const storedSettings = localStorage.getItem(settingsKey);
+        if (storedSettings) {
+          setSettings(JSON.parse(storedSettings));
+        }
         loadState(currentUser.username);
     } else {
       // Clear all state when logging out
@@ -632,27 +649,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
+  const pushDataToCloud = async () => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+        return;
+    }
+
+    const username = currentUser.username;
+
+    if (username === 'demo') {
+        setIsDemoTokenModalOpen(true);
+        return;
+    }
+    
+    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
+    try {
+        const allUserData = getAllUserData().main; // Only push main data
+        const requestBody = { username, data: allUserData };
+        const response = await fetch('/api/blob-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to push data.');
+        }
+        setLocalChangeCount(0); // Reset change count on successful push
+        toast({ title: "Success", description: "Your data has been saved to the cloud." });
+    } catch (error) {
+        console.error("Push to cloud failed:", error);
+        toast({
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
-    
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
-    const storedSettings = localStorage.getItem(settingsKey);
-    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, autoPush: false, autoPushLimit: 100 };
     
     if (settings.autoPush && localChangeCount >= settings.autoPushLimit) {
         if (currentUser.username !== 'demo') {
             pushDataToCloud();
         }
     }
-  }, [localChangeCount, currentUser, isScheduleLoaded]);
+  }, [localChangeCount, currentUser, isScheduleLoaded, settings.autoPush, settings.autoPushLimit]);
 
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
     
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
-    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
-    if (!settings.carryForward) return;
+    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
+    if (!currentSettings.carryForward) return;
 
     const today = new Date();
     const todayDateKey = format(today, 'yyyy-MM-dd');
@@ -803,44 +854,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-
-  const pushDataToCloud = async () => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-        return;
-    }
-
-    const username = currentUser.username;
-
-    if (username === 'demo') {
-        setIsDemoTokenModalOpen(true);
-        return;
-    }
-    
-    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
-    try {
-        const allUserData = getAllUserData().main; // Only push main data
-        const requestBody = { username, data: allUserData };
-        const response = await fetch('/api/blob-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to push data.');
-        }
-        setLocalChangeCount(0); // Reset change count on successful push
-        toast({ title: "Success", description: "Your data has been saved to the cloud." });
-    } catch (error) {
-        console.error("Push to cloud failed:", error);
-        toast({
-            title: "Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-        });
-    }
-  };
 
   const pullDataFromCloud = async (usernameOverride?: string) => {
     const username = usernameOverride || currentUser?.username;
@@ -1957,6 +1970,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
+    settings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
