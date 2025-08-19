@@ -106,6 +106,7 @@ function MyPlatePageContent() {
     setIsAudioPlaying,
     openTaskContextPopup,
     metaRules,
+    coreSkills,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -731,7 +732,11 @@ function MyPlatePageContent() {
     
         const allReleasesWithDetails: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
     
-        const processPlan = (plan: ProductizationPlan, topic: string, type: 'product' | 'service') => {
+        const processPlan = (plan: ProductizationPlan, topicId: string, type: 'product' | 'service') => {
+            const topicName = type === 'product'
+              ? (projects.find(p => p.id === topicId)?.name || topicId)
+              : (coreSkills.find(s => s.id === topicId)?.name || topicId);
+
             if (plan.releases) {
                 plan.releases.forEach(release => {
                     const featureNames = (release.focusAreaIds || [])
@@ -750,7 +755,7 @@ function MyPlatePageContent() {
                     });
 
                     allReleasesWithDetails.push({ 
-                        topic, 
+                        topic: topicName, 
                         release: { 
                             ...release, 
                             features: featureNames,
@@ -764,13 +769,13 @@ function MyPlatePageContent() {
         };
     
         if (productizationPlans) {
-            Object.entries(productizationPlans).forEach(([topic, plan]) => {
-                processPlan(plan, topic, 'product');
+            Object.entries(productizationPlans).forEach(([topicId, plan]) => {
+                processPlan(plan, topicId, 'product');
             });
         }
         if (offerizationPlans) {
-            Object.entries(offerizationPlans).forEach(([topic, plan]) => {
-                processPlan(plan, topic, 'service');
+            Object.entries(offerizationPlans).forEach(([topicId, plan]) => {
+                processPlan(plan, topicId, 'service');
             });
         }
     
@@ -837,7 +842,7 @@ function MyPlatePageContent() {
           totalHoursData, todayHoursData,
           upcomingReleases: getUpcomingReleases(),
       };
-  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans]);
+  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans, projects, coreSkills]);
     
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
