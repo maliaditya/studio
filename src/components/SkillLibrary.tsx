@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -113,7 +114,7 @@ export function SkillLibrary({
     onDeleteFocusArea,
     onUpdateFocusAreaName,
     onOpenMindMap,
-    onEditFocusArea,
+    onEdit,
     addToRecents,
     onOpenLinkProjectModal,
     onToggleReadyForBranding,
@@ -125,7 +126,7 @@ export function SkillLibrary({
     onSelectProject: (project: Project | null) => void;
     onUpdateFocusAreaName: (id: string, newName: string) => void;
     onOpenMindMap: (id: string) => void;
-    onEditFocusArea: (def: ExerciseDefinition) => void;
+    onEdit: (def: ExerciseDefinition) => void;
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onToggleReadyForBranding: (defId: string) => void;
 }) {
@@ -457,7 +458,7 @@ export function SkillLibrary({
                     <div/>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                    <DropdownMenuItem onSelect={() => onEditFocusArea(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onEdit(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => onOpenMindMap(contextMenuTask.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                     {libraryView === 'deepwork' && (

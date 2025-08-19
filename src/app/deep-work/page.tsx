@@ -1897,7 +1897,7 @@ function DeepWorkPageContent() {
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={onOpenMindMap}
-                    onEditFocusArea={setEditingFocusArea}
+                    onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
                     onToggleReadyForBranding={handleToggleReadyForBranding}
@@ -2421,6 +2421,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
