@@ -949,7 +949,9 @@ function DeepWorkPageContent() {
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (!hasChildren) {
+    const hasResources = (def.linkedResourceIds?.length ?? 0) > 0;
+    
+    if (!hasChildren || hasResources) {
         const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
         return isChild ? 'Action' : 'Standalone';
     }
@@ -972,7 +974,9 @@ function DeepWorkPageContent() {
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (!hasChildren) {
+    const hasResources = (def.linkedResourceIds?.length ?? 0) > 0;
+
+    if (!hasChildren || hasResources) {
         const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
         return isChild ? 'Visualization' : 'Standalone';
     }
@@ -1184,7 +1188,7 @@ function DeepWorkPageContent() {
     } else {
         defToDelete = upskillDefinitions.find(d => d.id === id);
         setUpskillDefinitions(prev => prev.filter(def => def.id !== id).map(d => ({...d, linkedUpskillIds: (d.linkedUpskillIds || []).filter(linkedId => linkedId !== id)})));
-        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
+        setAllUpskillLogs(prevLogs => prevLogs.map(log => ({ ...log, exercises: log.exercises.filter(ex => ex.definitionId !== id) })));
     }
 
     if (defToDelete) {
@@ -1742,7 +1746,7 @@ function DeepWorkPageContent() {
     const updatedTask = createResourceWithHierarchy(parentTask, 'card');
     if (updatedTask) {
         setNavigationStack(prev => prev.map(item =>
-            item.id === updatedTask.id ? { ...item, ...updatedTask } : item
+            item.id === updatedTask!.id ? { ...item, ...updatedTask } : item
         ));
     }
   };
@@ -2414,6 +2418,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
