@@ -1000,7 +1000,7 @@ function ProductizationContent() {
 }
 
 function OfferizationContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap } = useAuth();
   const { toast } = useToast();
   
   const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
@@ -1122,7 +1122,7 @@ function OfferizationContent() {
           newRelease = {
               ...newRelease,
               name: value,
-              focusAreaIds: selectedProject ? selectedProject.features.map(f => f.id) : []
+              focusAreaIds: selectedProject ? selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)) : []
           };
       } else {
           newRelease = { ...newRelease, [field]: value };
@@ -1271,8 +1271,6 @@ function OfferizationContent() {
           const gapAnalysis = plan.gapAnalysis;
           const releases = plan.releases || [];
           const offers = plan.offers || [];
-
-          const microSkillMap = new Map(spec.skillAreas.flatMap(area => area.microSkills).map(ms => [ms.id, ms.name]));
           
           return (
               <Card key={spec.id} className="flex flex-col">
@@ -1432,9 +1430,9 @@ function OfferizationContent() {
                                   {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
                                   <p className="font-medium text-foreground">Micro-Skills:</p>
                                   <ul className="list-disc list-inside text-muted-foreground">
-                                  {(release.focusAreaIds || []).map((id, index) => (
-                                      <li key={`${id}-${index}`}>{microSkillMap.get(id)?.microSkillName || 'Unknown Micro-Skill'}</li>
-                                  ))}
+                                    {(release.focusAreaIds || []).map((id, index) => (
+                                        <li key={`${id}-${index}`}>{microSkillMap.get(id)?.microSkillName || 'Unknown Micro-Skill'}</li>
+                                    ))}
                                   </ul>
                               </CardContent>
                               </Card>
@@ -1669,18 +1667,17 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
 
 
 function OffersContent() {
-  const { offerizationPlans } = useAuth();
-  const router = useRouter();
+  const { offerizationPlans, coreSkills, copyOffer } = useAuth();
   const { toast } = useToast();
   const offersContainerRef = React.useRef<HTMLDivElement>(null);
 
   const allOffers = useMemo(() => {
     return Object.entries(offerizationPlans || {})
       .flatMap(([topicId, plan]) => {
-          const spec = useAuth().coreSkills.find(cs => cs.id === topicId);
+          const spec = coreSkills.find(cs => cs.id === topicId);
           return (plan.offers || []).map(offer => ({ ...offer, topic: spec?.name || topicId }))
       });
-  }, [offerizationPlans, useAuth().coreSkills]);
+  }, [offerizationPlans, coreSkills]);
 
   const renderTextAsList = (text: string) => {
     if (!text || text.trim() === '') {
