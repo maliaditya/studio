@@ -364,44 +364,42 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <DialogHeader>
               <DialogTitle>Project Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                {selectedReleaseInfo.release.description || "No description provided."}
+                This view shows all associated micro-skills for this release, along with their linked curiosities and intentions.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
-              <div>
-                  <Label className="font-semibold">Associated Micro-Skills</Label>
-                  <div className="mt-2 space-y-3 max-h-96 overflow-y-auto pr-2">
-                    {microSkillsForRelease.map((skill) => {
-                       const isComplete = isMicroSkillComplete(skill);
-                       return(
-                          <Card key={skill.id} className={cn("transition-colors", isComplete && "bg-green-100 dark:bg-green-900/30")}>
-                            <CardHeader className="p-3">
-                              <CardTitle className={cn("text-base", isComplete && "line-through text-muted-foreground")}>{skill.name}</CardTitle>
-                            </CardHeader>
-                            {(skill.curiosities.length > 0 || skill.intentions.length > 0) && (
-                               <CardContent className="p-3 pt-0 text-xs text-muted-foreground space-y-2">
-                                {skill.curiosities.length > 0 && (
-                                  <div>
-                                    <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Flashlight className="h-3.5 w-3.5"/>Curiosities</h4>
-                                    <ul className="list-disc list-inside pl-2">
-                                        {skill.curiosities.map(c => <li key={c.id}>{c.name}</li>)}
-                                    </ul>
-                                  </div>
-                                )}
-                                {skill.intentions.length > 0 && (
-                                  <div>
-                                    <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Lightbulb className="h-3.5 w-3.5"/>Intentions</h4>
-                                     <ul className="list-disc list-inside pl-2">
-                                        {skill.intentions.map(i => <li key={i.id}>{i.name}</li>)}
-                                    </ul>
-                                  </div>
-                                )}
-                              </CardContent>
+            <div className="py-4">
+              <Label className="font-semibold">Associated Micro-Skills</Label>
+              <div className="mt-2 space-y-3 max-h-96 overflow-y-auto pr-2">
+                {microSkillsForRelease.map((skill) => {
+                   const isComplete = isMicroSkillComplete(skill);
+                   return(
+                      <Card key={skill.id} className={cn("transition-colors", isComplete && "bg-muted/50 dark:bg-muted/30")}>
+                        <CardHeader className="p-3">
+                          <CardTitle className={cn("text-base", isComplete && "line-through text-muted-foreground")}>{skill.name}</CardTitle>
+                        </CardHeader>
+                        {(skill.curiosities.length > 0 || skill.intentions.length > 0) && (
+                           <CardContent className="p-3 pt-0 text-xs text-muted-foreground space-y-2">
+                            {skill.curiosities.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Flashlight className="h-3.5 w-3.5"/>Curiosities</h4>
+                                <ul className="list-disc list-inside pl-2">
+                                    {skill.curiosities.map(c => <li key={c.id}>{c.name}</li>)}
+                                </ul>
+                              </div>
                             )}
-                          </Card>
-                       )
-                    })}
-                  </div>
+                            {skill.intentions.length > 0 && (
+                              <div>
+                                <h4 className="font-semibold text-foreground flex items-center gap-1.5"><Lightbulb className="h-3.5 w-3.5"/>Intentions</h4>
+                                 <ul className="list-disc list-inside pl-2">
+                                    {skill.intentions.map(i => <li key={i.id}>{i.name}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </CardContent>
+                        )}
+                      </Card>
+                   )
+                })}
               </div>
             </div>
             <DialogFooter>
