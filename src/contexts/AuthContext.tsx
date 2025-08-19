@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
+import { ContentViewPopup } from '@/components/ContentViewPopup';
 
 
 interface ResourcePopupProps {
@@ -184,6 +185,12 @@ interface AuthContextType {
   openTaskContextPopup: (activityId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => void;
   closeTaskContextPopup: (taskId: string) => void;
   handleTaskContextPopupDragEnd: (event: DragEndEvent) => void;
+  
+  // Content Viewer Popup
+  contentViewPopups: Map<string, ContentViewPopupState>;
+  openContentViewPopup: (contentId: string, resource: Resource, point: ResourcePoint, event: React.MouseEvent) => void;
+  closeContentViewPopup: (contentId: string) => void;
+  handleContentViewPopupDragEnd: (event: DragEndEvent) => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -368,6 +375,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Task Context Popup
   const [taskContextPopups, setTaskContextPopups] = useTrackedState<Map<string, TaskContextPopupState>>(new Map());
+  
+  // Content Viewer Popup
+  const [contentViewPopups, setContentViewPopups] = useTrackedState<Map<string, ContentViewPopupState>>(new Map());
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useTrackedState<string[]>([]);
@@ -1712,6 +1722,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
     }
   };
+  
+  const openContentViewPopup = (contentId: string, resource: Resource, point: ResourcePoint, event: React.MouseEvent) => {
+    setContentViewPopups(prev => {
+        const newPopups = new Map(prev);
+        const popupWidth = 896;
+        const x = window.innerWidth / 2 - popupWidth / 2;
+        const y = event.clientY;
+
+        newPopups.set(contentId, {
+            id: contentId,
+            resource,
+            point,
+            x, y,
+        });
+        return newPopups;
+    });
+  };
+  
+  const closeContentViewPopup = (contentId: string) => {
+    setContentViewPopups(prev => {
+        const newPopups = new Map(prev);
+        newPopups.delete(contentId);
+        return newPopups;
+    });
+  };
+  
+  const handleContentViewPopupDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    const contentId = active.id as string;
+    setContentViewPopups(prev => {
+        const newPopups = new Map(prev);
+        const popup = newPopups.get(contentId);
+        if (popup) {
+            newPopups.set(contentId, {
+                ...popup,
+                x: popup.x + delta.x,
+                y: popup.y + delta.y
+            });
+        }
+        return newPopups;
+    });
+  };
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
@@ -1934,6 +1986,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    contentViewPopups, openContentViewPopup, closeContentViewPopup, handleContentViewPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
@@ -1996,13 +2049,6 @@ const usePrevious = <T,>(value: T) => {
   });
   return ref.current;
 };
-
     
-
-
-
-    
-
-
 
     
