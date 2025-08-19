@@ -33,6 +33,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from './ui/checkbox';
 
 
 interface SkillLibraryProps {
@@ -48,6 +49,7 @@ interface SkillLibraryProps {
   onEditFocusArea: (def: ExerciseDefinition) => void;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
   onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+  onToggleReadyForBranding: (defId: string) => void;
 }
 
 const TaskItem = ({ 
@@ -62,6 +64,7 @@ const TaskItem = ({
     addToRecents,
     libraryView,
     onOpenLinkProjectModal,
+    onToggleReadyForBranding,
   }: {
     task: ExerciseDefinition,
     allDefinitions: Map<string, ExerciseDefinition>,
@@ -74,6 +77,7 @@ const TaskItem = ({
     addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void,
     libraryView: 'deepwork' | 'upskill';
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+    onToggleReadyForBranding: (defId: string) => void;
   }) => {
     const { linkedDeepWorkIds = [], linkedUpskillIds = [] } = task;
     const childIds = libraryView === 'deepwork' ? linkedDeepWorkIds : linkedUpskillIds;
@@ -87,7 +91,9 @@ const TaskItem = ({
                 <button
                     onClick={() => {
                         onSelectFocusArea(task, libraryView);
-                        addToRecents({ ...task, type: libraryView });
+                        if (isIntentionOrCuriosity) {
+                            addToRecents({ ...task, type: libraryView });
+                        }
                     }}
                     className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
                 >
@@ -106,6 +112,12 @@ const TaskItem = ({
                             <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
                             {isIntentionOrCuriosity && (
                               <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                            )}
+                            {libraryView === 'deepwork' && !isIntentionOrCuriosity && (
+                                <DropdownMenuItem onSelect={() => onToggleReadyForBranding(task.id)}>
+                                    <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
+                                    <span>Mark as Ready for Branding</span>
+                                </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
@@ -129,6 +141,7 @@ const TaskItem = ({
                             addToRecents={addToRecents}
                             libraryView={libraryView}
                             onOpenLinkProjectModal={onOpenLinkProjectModal}
+                            onToggleReadyForBranding={onToggleReadyForBranding}
                         />
                     ))}
                 </div>
@@ -151,6 +164,7 @@ export function SkillLibrary({
     onEditFocusArea,
     addToRecents,
     onOpenLinkProjectModal,
+    onToggleReadyForBranding,
 }: SkillLibraryProps) {
   const { 
     skillDomains, 
@@ -280,12 +294,6 @@ export function SkillLibrary({
     }
   };
   
-  const handleToggleReadyForBranding = (defId: string) => {
-    setDeepWorkDefinitions(prev => prev.map(def =>
-      def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
-    ));
-  };
-  
   const renderHeader = () => {
     let title = "Library";
     if (selectedMicroSkill) title = selectedMicroSkill.name;
@@ -334,6 +342,7 @@ export function SkillLibrary({
                             addToRecents={addToRecents}
                             libraryView={libraryView}
                             onOpenLinkProjectModal={onOpenLinkProjectModal}
+                            onToggleReadyForBranding={onToggleReadyForBranding}
                         />
                     )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
                 </div>

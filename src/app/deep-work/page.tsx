@@ -1776,6 +1776,7 @@ function DeepWorkPageContent() {
     }
     
     const task = item as ExerciseDefinition;
+    const taskType = item.type as 'deepwork' | 'upskill';
     
     const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === task.category);
     if (microSkill) {
@@ -1796,7 +1797,8 @@ function DeepWorkPageContent() {
         setSelectedSkillId(null);
         setSelectedDomainId(null);
     }
-    handleCardClick(task);
+
+    handleSelectFocusArea(task, taskType);
   };
 
   const filteredRecentItems = useMemo(() => {
@@ -1808,7 +1810,7 @@ function DeepWorkPageContent() {
     return recentItems.filter(item => {
       if (item.type === 'project') return true;
       if (item.type === 'deepwork' || item.type === 'upskill') {
-        return isIntentionOrCuriosity(item as ExerciseDefinition, item.type);
+        return isIntentionOrCuriosity(item as ExerciseDefinition, item.type as 'deepwork' | 'upskill');
       }
       return false;
     });
@@ -1898,6 +1900,7 @@ function DeepWorkPageContent() {
                     onEditFocusArea={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                    onToggleReadyForBranding={handleToggleReadyForBranding}
                 />
               {currentTask && (
                   <Card>
@@ -2418,6 +2421,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
