@@ -298,7 +298,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                     <div className="flex justify-between items-center">
                                         <span>Logged / Est.</span>
                                         <span className="font-mono font-medium text-foreground">
-                                            {loggedHours.toFixed(1)}h / {estimatedHours > 0 ? `${estimatedHours}h` : 'N/A'}
+                                            {loggedHours.toFixed(1)}h / {estimatedHours > 0 ? `${estimatedHours.toFixed(1)}h` : 'N/A'}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center">
@@ -363,6 +363,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Project Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
+              <DialogDescription>
+                {selectedReleaseInfo.release.description || "No description provided."}
+              </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div>
