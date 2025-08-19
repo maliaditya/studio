@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Trash2, ArrowUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PathNode } from '@/types/workout';
+
+const NODE_DIAMETER = 192; // Corresponds to w-48 and h-48
+const HORIZONTAL_SPACING = 300;
+const VERTICAL_SPACING = 150;
 
 function PathPageContent() {
   const { pathNodes, setPathNodes } = useAuth();
@@ -44,10 +48,27 @@ function PathPageContent() {
     ));
     setEditingNodeId(null);
   };
+  
+  const nodePositions = useMemo(() => {
+    const positions = new Map<string, { x: number; y: number }>();
+    pathNodes.forEach((node, index) => {
+      const isLeft = index % 2 === 0;
+      const x = isLeft ? HORIZONTAL_SPACING / 2 : HORIZONTAL_SPACING * 1.5;
+      const y = (pathNodes.length - 1 - index) * VERTICAL_SPACING + NODE_DIAMETER / 2;
+      positions.set(node.id, { x, y });
+    });
+    return positions;
+  }, [pathNodes]);
+  
+  const svgSize = useMemo(() => {
+    const height = pathNodes.length * VERTICAL_SPACING + NODE_DIAMETER;
+    const width = HORIZONTAL_SPACING * 2 + NODE_DIAMETER;
+    return { width: Math.max(width, 800), height: Math.max(height, 600) };
+  }, [pathNodes]);
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-8 overflow-hidden relative pb-24">
-      <div className="w-full max-w-4xl">
+    <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-8 overflow-auto relative pb-24">
+      <div className="w-full max-w-4xl flex items-center justify-center">
         {pathNodes.length === 0 ? (
           <div className="text-center absolute inset-0 flex flex-col items-center justify-center">
              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-700 rounded-lg">
@@ -64,62 +85,86 @@ function PathPageContent() {
             </div>
           </div>
         ) : (
-            <div className="relative space-y-[-100px] mb-20">
-            {pathNodes.map((node, index) => {
-                const isLeft = index % 2 === 0;
-                const hasNext = index < pathNodes.length - 1;
+            <svg width={svgSize.width} height={svgSize.height} className="overflow-visible">
+                <defs>
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="hsl(210 40% 96.1% / 0.5)" />
+                    </marker>
+                </defs>
+                {/* Render Connectors */}
+                {pathNodes.slice(0, -1).map((node, index) => {
+                    const startPos = nodePositions.get(node.id);
+                    const endPos = nodePositions.get(pathNodes[index + 1].id);
 
-                return (
-                <div key={node.id} className="relative h-64">
-                    {/* Circle Container */}
-                    <div className={cn("absolute flex items-center w-1/2", isLeft ? "left-0" : "right-0")}>
-                        <div className="relative w-48 h-48 bg-gray-800 border-2 border-gray-600 rounded-full flex items-center justify-center text-center p-4 shadow-2xl">
-                            {editingNodeId === node.id ? (
-                            <Textarea
-                                value={editText}
-                                onChange={handleTextChange}
-                                onBlur={() => handleSaveText(node.id)}
-                                autoFocus
-                                className="bg-transparent text-white border-none focus-visible:ring-0 text-center resize-none text-lg"
-                            />
-                            ) : (
-                            <p className="text-lg cursor-pointer" onClick={() => handleTextClick(node)}>
-                                {node.text}
-                            </p>
-                            )}
-                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-red-500 opacity-50 hover:opacity-100" onClick={() => handleDeleteNode(node.id)}>
-                                <Trash2 className="h-4 w-4"/>
-                            </Button>
-                        </div>
-                    </div>
+                    if (!startPos || !endPos) return null;
 
-                    {/* Connectors */}
-                    {hasNext && (
-                        <>
-                            {/* Horizontal Line */}
-                            <div className={cn("absolute top-1/2 -translate-y-1/2 h-0.5 bg-gray-500 w-1/4", isLeft ? "left-1/2" : "right-1/2")} />
-                            
-                            {/* Vertical Line */}
-                            <div className={cn("absolute h-[100px] w-0.5 bg-gray-500", isLeft ? "left-3/4" : "left-1/4")} style={{ top: 'calc(50% - 1px)' }}/>
-                            
-                            {/* Arrowhead */}
-                             <div className={cn(
-                                "absolute w-0 h-0 border-x-8 border-x-transparent", 
-                                isLeft ? "left-3/4 bottom-[calc(50%-100px)] -translate-x-1/2 border-t-[16px] border-t-gray-500" : "left-1/4 top-[calc(50%+100px)] -translate-x-1/2 border-b-[16px] border-b-gray-500"
-                            )}></div>
-                        </>
-                    )}
-                </div>
-                );
-            })}
-            </div>
+                    const dx = endPos.x - startPos.x;
+                    const dy = endPos.y - startPos.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const offsetX = (dx / dist) * (NODE_DIAMETER / 2 + 10); // +10 for arrowhead
+                    const offsetY = (dy / dist) * (NODE_DIAMETER / 2 + 10);
+
+                    return (
+                        <line
+                            key={`line-${node.id}`}
+                            x1={startPos.x}
+                            y1={startPos.y}
+                            x2={endPos.x - offsetX}
+                            y2={endPos.y - offsetY}
+                            stroke="hsl(210 40% 96.1% / 0.5)"
+                            strokeWidth="2"
+                            markerEnd="url(#arrowhead)"
+                        />
+                    );
+                })}
+            </svg>
         )}
       </div>
+
+      {/* Render Nodes on top of SVG */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{ width: `${svgSize.width}px`, height: `${svgSize.height}px` }}>
+        {pathNodes.map((node) => {
+          const pos = nodePositions.get(node.id);
+          if (!pos) return null;
+          return (
+            <div
+              key={node.id}
+              className="absolute flex items-center justify-center text-center p-4 shadow-2xl"
+              style={{
+                left: pos.x - NODE_DIAMETER / 2,
+                top: pos.y - NODE_DIAMETER / 2,
+                width: NODE_DIAMETER,
+                height: NODE_DIAMETER,
+              }}
+            >
+              <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex items-center justify-center">
+                  {editingNodeId === node.id ? (
+                    <Textarea
+                      value={editText}
+                      onChange={handleTextChange}
+                      onBlur={() => handleSaveText(node.id)}
+                      autoFocus
+                      className="bg-transparent text-white border-none focus-visible:ring-0 text-center resize-none text-lg p-2"
+                    />
+                  ) : (
+                    <p className="text-lg cursor-pointer p-2" onClick={() => handleTextClick(node)}>
+                      {node.text}
+                    </p>
+                  )}
+                  <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-red-500 opacity-50 hover:opacity-100" onClick={() => handleDeleteNode(node.id)}>
+                      <Trash2 className="h-4 w-4"/>
+                  </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="fixed bottom-8">
             <Button onClick={handleAddNode} variant="outline" className="bg-gray-800 border-gray-600 hover:bg-gray-700 shadow-lg">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Step
             </Button>
-        </div>
+      </div>
     </div>
   );
 }
