@@ -42,11 +42,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const [isAddFeatureModalOpen, setIsAddFeatureModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const [newFeatureName, setNewFeatureName] = useState('');
-  const { addFeatureToRelease } = useAuth();
-
-  const learningItems = Object.entries(stats.learningStats);
-  const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
-  const roadmapItems = stats.upcomingReleases || [];
+  const { addFeatureToRelease, microSkillMap } = useAuth();
 
   const handleAddFeature = () => {
     if (selectedReleaseInfo) {
@@ -55,6 +51,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
       // Keep the modal open after adding
     }
   };
+
+  const microSkillsForRelease = React.useMemo(() => {
+    if (!selectedReleaseInfo || !selectedReleaseInfo.release.focusAreaIds) {
+      return [];
+    }
+    return selectedReleaseInfo.release.focusAreaIds
+      .map(id => microSkillMap.get(id)?.microSkillName)
+      .filter((name): name is string => !!name);
+  }, [selectedReleaseInfo, microSkillMap]);
+
+  const learningItems = Object.entries(stats.learningStats);
+  const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
+  const roadmapItems = stats.upcomingReleases || [];
 
   return (
     <>
@@ -318,7 +327,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <DialogDescription>
                 {selectedReleaseInfo.release.description
                   ? `Goal: ${selectedReleaseInfo.release.description}`
-                  : 'Add features to this release. Each feature will become a new Deep Work task under the same topic.'
+                  : "Break down this release into smaller, actionable features. This will create new Deep Work tasks."
                 }
               </DialogDescription>
             </DialogHeader>
@@ -356,21 +365,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 </div>
             )}
             
-            {selectedReleaseInfo.release.features && selectedReleaseInfo.release.features.length > 0 && (
+             {microSkillsForRelease.length > 0 && (
                 <div className="space-y-2">
-                    <Label className="font-semibold">Current Features</Label>
-                    <ScrollArea className="h-24 w-full rounded-md border p-2">
-                        <ul className="space-y-1">
-                            {selectedReleaseInfo.release.features.map((feature, index) => (
-                                <li key={index} className="text-sm text-muted-foreground">{feature}</li>
-                            ))}
-                        </ul>
-                    </ScrollArea>
+                    <Label className="font-semibold">Associated Micro-Skills</Label>
+                    <div className="flex flex-wrap gap-1">
+                        {microSkillsForRelease.map((skillName, index) => (
+                            <Badge key={index} variant="secondary">{skillName}</Badge>
+                        ))}
+                    </div>
                 </div>
             )}
 
             <div className="pt-2">
-                <Label htmlFor="feature-name" className="text-sm font-medium">New Feature Name</Label>
+                <Label htmlFor="feature-name" className="text-sm font-medium">Add New Feature</Label>
                 <div className="flex gap-2 mt-1">
                     <Input
                         id="feature-name"
