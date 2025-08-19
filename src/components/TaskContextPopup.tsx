@@ -10,7 +10,6 @@ import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, Ta
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { useDraggable } from '@dnd-kit/core';
 import { format, formatDistanceStrict } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
@@ -36,43 +35,13 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         id: `task-context-popup-${popupState.activityId}`,
     });
 
-    const [position, setPosition] = useState({ x: 0, y: 0 });
-
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const CONTEXT_POPUP_WIDTH = 600;
-            const MARGIN = 16;
-
-            // This logic assumes a reference element might not exist, providing a fallback.
-            // In a real scenario, you'd want a more robust way to get the reference point.
-            const timerRect = document.querySelector(`[data-activity-id="${popupState.activityId}"]`)?.getBoundingClientRect();
-            
-            let x: number, y: number;
-
-            if (timerRect) {
-                x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-                if (x < MARGIN) {
-                    x = timerRect.right + MARGIN;
-                }
-                y = timerRect.top;
-            } else {
-                // Fallback position if the timer element isn't found
-                x = window.innerWidth / 2 - CONTEXT_POPUP_WIDTH / 2;
-                y = window.innerHeight / 2 - 250; // Approximate half height
-            }
-
-            setPosition({ x, y });
-        }
-    }, [popupState.activityId]);
-
-
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: position.y,
-        left: position.x,
+        top: popupState.y,
+        left: popupState.x,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
-        zIndex: 101 + popupState.level,
+        zIndex: 101 + (popupState.level || 0),
     };
     
     const activityInfo = useMemo(() => {
@@ -197,7 +166,6 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         }
     }, [activityInfo, activeFocusSession]);
 
-
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         closeTaskContextPopup(popupState.activityId);
@@ -241,9 +209,9 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                             )}
                             {project && (
                                 <div className="flex items-center gap-3">
-                                    <Badge variant="outline" className="flex-shrink-0">Project</Badge>
-                                    <p className="font-medium truncate">{project.name}</p>
-                                </div>
+                                <Badge variant="outline" className="flex-shrink-0">Project</Badge>
+                                <p className="font-medium truncate">{project.name}</p>
+                            </div>
                             )}
                         </div>
 
