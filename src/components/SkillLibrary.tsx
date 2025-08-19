@@ -50,6 +50,79 @@ interface SkillLibraryProps {
   onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
 }
 
+const TaskItem = ({ 
+    task, 
+    allDefinitions, 
+    level = 0,
+    getIcon,
+    onSelectFocusArea,
+    onOpenMindMap,
+    onEditFocusArea,
+    onDeleteFocusArea,
+    addToRecents,
+    libraryView
+  }: {
+    task: ExerciseDefinition,
+    allDefinitions: Map<string, ExerciseDefinition>,
+    level?: number,
+    getIcon: (def: ExerciseDefinition) => React.ReactNode,
+    onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void,
+    onOpenMindMap: (focusAreaId: string) => void,
+    onEditFocusArea: (def: ExerciseDefinition) => void,
+    onDeleteFocusArea: (defId: string) => void,
+    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void,
+    libraryView: 'deepwork' | 'upskill'
+  }) => {
+    const { linkedDeepWorkIds = [], linkedUpskillIds = [] } = task;
+    const childIds = libraryView === 'deepwork' ? linkedDeepWorkIds : linkedUpskillIds;
+    const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [name, setName] = useState(task.name);
+
+    return (
+        <div style={{ marginLeft: `${level * 16}px` }}>
+            <div className="flex items-center justify-between group/task rounded-md hover:bg-muted">
+                <button
+                    onClick={() => {
+                        onSelectFocusArea(task, libraryView);
+                        addToRecents({ ...task, type: libraryView });
+                    }}
+                    className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
+                >
+                    {getIcon(task)}
+                    <span className="truncate" title={task.name}>{task.name}</span>
+                </button>
+                <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
+                        <GitMerge className="h-3 w-3" />
+                    </Button>
+                </div>
+            </div>
+            {children.length > 0 && (
+                <div className="border-l-2 ml-2 pl-2">
+                    {children.map(child => (
+                        <TaskItem
+                            key={child.id}
+                            task={child}
+                            allDefinitions={allDefinitions}
+                            level={level + 1}
+                            getIcon={getIcon}
+                            onSelectFocusArea={onSelectFocusArea}
+                            onOpenMindMap={onOpenMindMap}
+                            onEditFocusArea={onEditFocusArea}
+                            onDeleteFocusArea={onDeleteFocusArea}
+                            addToRecents={addToRecents}
+                            libraryView={libraryView}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 export function SkillLibrary({ 
     selectedMicroSkill, 
     onSelectMicroSkill,
@@ -219,114 +292,39 @@ export function SkillLibrary({
   
   const renderContent = () => {
     if (selectedMicroSkill) {
-      const allTasks = definitions.filter(def => def.category === selectedMicroSkill.name);
+        const allTasksForMicroSkill = definitions.filter(def => def.category === selectedMicroSkill.name);
+        const allDefsMap = new Map(definitions.map(def => [def.id, def]));
+        const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
+        const topLevelTasks = allTasksForMicroSkill.filter(task => !childIdSet.has(task.id));
       
-      const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
-      const filteredTasks = allTasks.filter(task => !childIdSet.has(task.id));
-      
-      return (
-        <div className="space-y-1">
-           <div className="flex items-center justify-between group">
-              <h3 className="font-semibold text-base py-2 flex items-center gap-2"><Activity className="h-4 w-4"/>Micro-Skill: {selectedMicroSkill.name}</h3>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
-                  <PlusCircle className="h-4 w-4 text-green-500" />
-              </Button>
+        return (
+            <div className="space-y-1">
+                <div className="flex items-center justify-between group">
+                    <h3 className="font-semibold text-base py-2 flex items-center gap-2"><Activity className="h-4 w-4"/>Micro-Skill: {selectedMicroSkill.name}</h3>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
+                        <PlusCircle className="h-4 w-4 text-green-500" />
+                    </Button>
+                </div>
+                <div className="space-y-1">
+                    {topLevelTasks.length > 0 ? topLevelTasks.map(task => (
+                        <TaskItem
+                            key={task.id}
+                            task={task}
+                            allDefinitions={allDefsMap}
+                            getIcon={getIcon}
+                            onSelectFocusArea={onSelectFocusArea}
+                            onOpenMindMap={onOpenMindMap}
+                            onEditFocusArea={onEditFocusArea}
+                            onDeleteFocusArea={onDeleteFocusArea}
+                            addToRecents={addToRecents}
+                            libraryView={libraryView}
+                        />
+                    )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
+                </div>
             </div>
-            <div className="pl-4 space-y-1">
-                {filteredTasks.length > 0 ? filteredTasks.map(task => {
-                    const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
-                    const isLinkable = nodeType === 'Intention' || nodeType === 'Curiosity';
-
-                    return (
-                        <DropdownMenu key={task.id} open={contextMenuTask?.id === task.id} onOpenChange={(isOpen) => {
-                            if (!isOpen) setContextMenuTask(null);
-                        }}>
-                            <DropdownMenuTrigger asChild>
-                                <div
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        setContextMenuTask(task);
-                                    }}
-                                    className="flex items-center justify-between group/task rounded-md hover:bg-muted"
-                                >
-                                    {editingFocusAreaId === task.id ? (
-                                      <Input
-                                        value={editingName}
-                                        onChange={(e) => setEditingName(e.target.value)}
-                                        onBlur={handleSaveName}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                                        className="h-8"
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <button
-                                        onDoubleClick={() => {
-                                            setEditingFocusAreaId(task.id);
-                                            setEditingName(task.name);
-                                        }}
-                                        onClick={() => {
-                                            onSelectFocusArea(task, libraryView);
-                                            if (nodeType === 'Intention' || nodeType === 'Curiosity') {
-                                                addToRecents({ ...task, type: libraryView });
-                                            }
-                                        }}
-                                        className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
-                                      >
-                                        {getIcon(task)}
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <span className="truncate" title={task.name}>
-                                                        {task.name.length > 25 ? `${task.name.substring(0, 25)}...` : task.name}
-                                                    </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>{task.name}</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                      </button>
-                                    )}
-                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
-                                            <GitMerge className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                                className="w-48"
-                                onCloseAutoFocus={(e) => e.preventDefault()}
-                            >
-                                <DropdownMenuItem onSelect={() => onEditFocusArea(task)}>
-                                    <Edit3 className="mr-2 h-4 w-4" /> Edit
-                                </DropdownMenuItem>
-                                {isLinkable && (
-                                    <>
-                                        <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}>
-                                            <Briefcase className="mr-2 h-4 w-4" /> Link Project
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuCheckboxItem
-                                            checked={task.isReadyForBranding}
-                                            onCheckedChange={() => handleToggleReadyForBranding(task.id)}
-                                        >
-                                            <PackageCheck className="mr-2 h-4 w-4" /> Ready for Branding
-                                        </DropdownMenuCheckboxItem>
-                                    </>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive">
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    );
-                }) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
-            </div>
-        </div>
-      )
+        );
     }
+
 
     if (selectedCoreSkill) {
       return (
