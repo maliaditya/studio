@@ -70,68 +70,66 @@ const TaskItem: React.FC<TaskItemProps> = ({
     const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
 
     const isIntentionOrCuriosity = (task.linkedDeepWorkIds && task.linkedDeepWorkIds.length > 0) || (task.linkedUpskillIds && task.linkedUpskillIds.length > 0);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-    const handleContextMenu = (e: React.MouseEvent) => {
-        e.preventDefault();
-        setIsMenuOpen(true);
-    };
 
     return (
-        <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-            <div style={{ marginLeft: `${level * 16}px` }}>
-                <div onContextMenu={handleContextMenu} className="group/task rounded-md hover:bg-muted cursor-pointer">
-                    <button
-                        onClick={() => {
-                            onSelectFocusArea(task, libraryView);
-                            if (isIntentionOrCuriosity) {
-                                addToRecents({ ...task, type: libraryView });
-                            }
-                        }}
-                        className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0 w-full"
-                    >
-                        {getIcon(task)}
-                        <span className="truncate" title={task.name}>{task.name}</span>
-                    </button>
-                </div>
-                
-                <DropdownMenuContent align="start" onContextMenu={(e) => e.preventDefault()}>
-                    <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
-                    {libraryView === 'deepwork' && (
-                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onToggleReadyForBranding(task.id); }}>
-                            <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
-                            <span>Mark as Ready for Branding</span>
-                        </DropdownMenuItem>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
-                </DropdownMenuContent>
-
-                {children.length > 0 && (
-                    <div className="border-l-2 ml-2 pl-2">
-                        {children.map(child => (
-                            <TaskItem
-                                key={child.id}
-                                task={child}
-                                allDefinitions={allDefinitions}
-                                level={level + 1}
-                                getIcon={getIcon}
-                                onSelectFocusArea={onSelectFocusArea}
-                                addToRecents={addToRecents}
-                                libraryView={libraryView}
-                                onDeleteFocusArea={onDeleteFocusArea}
-                                onOpenMindMap={onOpenMindMap}
-                                onEdit={onEdit}
-                                onOpenLinkProjectModal={onOpenLinkProjectModal}
-                                onToggleReadyForBranding={onToggleReadyForBranding}
-                            />
-                        ))}
-                    </div>
-                )}
+        <div style={{ marginLeft: `${level * 16}px` }}>
+            <div className="group/task rounded-md hover:bg-muted flex items-center justify-between">
+                <button
+                    onClick={() => {
+                        onSelectFocusArea(task, libraryView);
+                        if (isIntentionOrCuriosity) {
+                            addToRecents({ ...task, type: libraryView });
+                        }
+                    }}
+                    className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
+                >
+                    {getIcon(task)}
+                    <span className="truncate" title={task.name}>{task.name}</span>
+                </button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/task:opacity-100 flex-shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                        <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                        {libraryView === 'deepwork' && (
+                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onToggleReadyForBranding(task.id); }}>
+                                <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
+                                <span>Mark as Ready for Branding</span>
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-        </DropdownMenu>
+            
+            {children.length > 0 && (
+                <div className="border-l-2 ml-2 pl-2">
+                    {children.map(child => (
+                        <TaskItem
+                            key={child.id}
+                            task={child}
+                            allDefinitions={allDefinitions}
+                            level={level + 1}
+                            getIcon={getIcon}
+                            onSelectFocusArea={onSelectFocusArea}
+                            addToRecents={addToRecents}
+                            libraryView={libraryView}
+                            onDeleteFocusArea={onDeleteFocusArea}
+                            onOpenMindMap={onOpenMindMap}
+                            onEdit={onEdit}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
+                            onToggleReadyForBranding={onToggleReadyForBranding}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
     );
 };
 
