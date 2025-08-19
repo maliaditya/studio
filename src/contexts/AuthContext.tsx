@@ -317,6 +317,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [localChangeCount, setLocalChangeCount] = useState(0);
   const isInitialLoad = useRef(true);
 
+  const incrementChangeCount = useCallback(() => {
+    if (!isInitialLoad.current) {
+        setLocalChangeCount(prev => prev + 1);
+    }
+  }, []);
+
+  const resetChangeCount = useCallback(() => {
+    setLocalChangeCount(0);
+  }, []);
+
   // Health State
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
   const [goalWeight, setGoalWeight] = useState<number | null>(null);
@@ -425,6 +435,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Recents State
   const [recentItems, setRecentItems] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
 
+  const coreData = useMemo(() => {
+    return {
+        weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+        schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+        workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+        resources, resourceFolders,
+        canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+        purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+        autoSuggestions,
+        recentItems,
+    };
+  }, [
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
+    schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
+    workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
+    deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+    resources, resourceFolders,
+    canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+    purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+    autoSuggestions, recentItems
+  ]);
+
+  const uiStateData = useMemo(() => {
+    return {
+        pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+        activeFocusSession, isAgendaDocked
+    };
+  }, [
+    pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+    selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+    selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+    activeFocusSession, isAgendaDocked
+  ]);
+
+  useEffect(() => {
+    if (isInitialLoad.current) return;
+    incrementChangeCount();
+  }, [coreData, incrementChangeCount]);
+  
+  useEffect(() => {
+    if (!currentUser?.username || loading) return;
+    localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiStateData));
+  }, [uiStateData, currentUser, loading]);
+
+
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
     coreSkills.forEach(coreSkill => {
@@ -459,6 +517,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         pillarCards: [...(prev.pillarCards || []), newCard]
     }));
+    incrementChangeCount();
   };
 
   const updatePillarCard = (updatedCard: PillarCardData) => {
@@ -466,6 +525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         pillarCards: (prev.pillarCards || []).map(card => card.id === updatedCard.id ? updatedCard : card)
     }));
+    incrementChangeCount();
   };
 
   const deletePillarCard = (cardId: string) => {
@@ -473,6 +533,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         pillarCards: (prev.pillarCards || []).filter(card => card.id !== cardId)
     }));
+    incrementChangeCount();
   };
 
   useEffect(() => {
@@ -492,165 +553,114 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser, prevUser, toast]);
 
-  const incrementChangeCount = useCallback(() => {
-    if (!isInitialLoad.current) {
-        setLocalChangeCount(prev => prev + 1);
+  
+  const loadState = (username: string) => {
+    const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
+    
+    try { const d = loadItem(`weightLogs_${username}`); setWeightLogs(d ? JSON.parse(d) : []); } catch (e) { setWeightLogs([]); }
+    try { const d = loadItem(`dietPlan_${username}`); setDietPlan(d ? JSON.parse(d) : []); } catch (e) { setDietPlan([]); }
+    const storedGoal = loadItem(`goalWeight_${username}`, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal)); else setGoalWeight(null);
+    const storedHeight = loadItem(`height_${username}`, false); if (storedHeight) setHeight(parseFloat(storedHeight)); else setHeight(null);
+    const storedDob = loadItem(`dateOfBirth_${username}`, false); if (storedDob) setDateOfBirth(storedDob); else setDateOfBirth(null);
+    const storedGender = loadItem(`gender_${username}`, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender); else setGender(null);
+
+    try { const d = localStorage.getItem(`lifeos_schedule_${username}`); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
+    try { const d = localStorage.getItem(`lifeos_daily_purposes_${username}`); setDailyPurposes(d ? JSON.parse(d) : {}); } catch (e) { setDailyPurposes({}); }
+    try { const d = localStorage.getItem(`upskill_logs_${username}`); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
+    try { const d = localStorage.getItem(`deepwork_logs_${username}`); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
+    try { const d = localStorage.getItem(`allWorkoutLogs_${username}`); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
+    try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
+    try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
+    
+    const storedMode = loadItem(`workoutMode_${username}`, false);
+    if (storedMode === 'one-muscle' || storedMode === 'two-muscle') setWorkoutMode(storedMode as WorkoutMode); else setWorkoutMode('two-muscle');
+    const storedRotation = loadItem(`workoutPlanRotation_${username}`, false); setWorkoutPlanRotation(storedRotation === null ? true : storedRotation === 'true');
+    try { const d = loadItem(`workoutPlans_${username}`); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
+    try { const d = loadItem(`exerciseDefinitions_${username}`); setExerciseDefinitions(d ? JSON.parse(d) : DEFAULT_EXERCISE_DEFINITIONS); } catch (e) { setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS); }
+    try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
+    try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
+    try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
+    try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
+    try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
+    try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
+
+    const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
+    let currentFolders: ResourceFolder[] = [];
+    if (storedFolders) {
+      currentFolders = JSON.parse(storedFolders);
     }
-  }, []);
+    const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
+    if (!hasQuickAccess) {
+      const quickAccessFolder: ResourceFolder = {
+        id: `folder_quick_access_${Date.now()}`,
+        name: 'Quick Access',
+        parentId: null,
+        icon: 'Zap'
+      };
+      currentFolders.push(quickAccessFolder);
+    }
+    setResourceFolders(currentFolders);
 
-  const resetChangeCount = useCallback(() => {
-    setLocalChangeCount(0);
-  }, []);
+    const storedResources = localStorage.getItem(`resources_${username}`);
+    if (storedResources) {
+        setResources(JSON.parse(storedResources));
+    } else {
+        setResources([]);
+    }
+    
+    try { const d = loadItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
+    try { const d = loadItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
+    try { const d = loadItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
+    
+    try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
+    try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
+    try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
 
-  const coreData = useMemo(() => {
-    return [
-        weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
-        schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-        workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-        resources, resourceFolders,
-        canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
-        purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-        autoSuggestions,
-    ];
-  }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
-    schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
-    workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-    deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-    resources, resourceFolders,
-    canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
-    purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-    autoSuggestions
-  ]);
-  
-  const uiStateData = useMemo(() => {
-    return {
-        pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
-        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-        recentItems, activeFocusSession, isAgendaDocked
-    };
-  }, [
-    pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-    selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
-    selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    recentItems, activeFocusSession, isAgendaDocked
-  ]);
+    try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
+    try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
+    
+    try { const d = loadItem(`purpose_data_${username}`); setPurposeData(d ? JSON.parse(d) : { statement: '', specializationPurposes: {}, pillarCards: [] }); } catch(e) { setPurposeData({ statement: '', specializationPurposes: {}, pillarCards: [] }); }
+    try { const d = loadItem(`patterns_${username}`); setPatterns(d ? JSON.parse(d) : []); } catch(e) { setPatterns([]); }
+    try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
+    try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
+    try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
+    
+    try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
+    
+    try {
+      const uiStateString = localStorage.getItem(`lifeos_ui_state_${username}`);
+      if (uiStateString) {
+        const uiState = JSON.parse(uiStateString);
+        setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
+        setActiveResourceTabIds(uiState.activeResourceTabIds || []);
+        setSelectedResourceFolderId(uiState.selectedResourceFolderId || null);
+        setLastSelectedHabitFolder(uiState.lastSelectedHabitFolder || null);
+        setSelectedUpskillTask(uiState.selectedUpskillTask || null);
+        setSelectedDeepWorkTask(uiState.selectedDeepWorkTask || null);
+        setSelectedMicroSkill(uiState.selectedMicroSkill || null);
+        setExpandedItems(uiState.expandedItems || []);
+        setSelectedDomainId(uiState.selectedDomainId || null);
+        setSelectedSkillId(uiState.selectedSkillId || null);
+        setSelectedProjectId(uiState.selectedProjectId || null);
+        setSelectedCompanyId(uiState.selectedCompanyId || null);
+        setRecentItems(uiState.recentItems || []);
+        setActiveFocusSession(uiState.activeFocusSession || null);
+        setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
+      }
+    } catch (e) {
+      console.error("Failed to parse UI state:", e);
+    }
 
-  useEffect(() => {
-    if (isInitialLoad.current) return;
-    incrementChangeCount();
-  }, [coreData, incrementChangeCount]);
-  
-  useEffect(() => {
-    if (!currentUser?.username || loading) return;
-    localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiStateData));
-  }, [uiStateData, currentUser, loading]);
-
+    resetChangeCount();
+  }
 
   useEffect(() => {
     if (currentUser?.username) {
-      const username = currentUser.username;
-      const loadItem = (key: string, isJson: boolean = true) => localStorage.getItem(key);
-      
-      try { const d = loadItem(`weightLogs_${username}`); setWeightLogs(d ? JSON.parse(d) : []); } catch (e) { setWeightLogs([]); }
-      try { const d = loadItem(`dietPlan_${username}`); setDietPlan(d ? JSON.parse(d) : []); } catch (e) { setDietPlan([]); }
-      const storedGoal = loadItem(`goalWeight_${username}`, false); if (storedGoal) setGoalWeight(parseFloat(storedGoal)); else setGoalWeight(null);
-      const storedHeight = loadItem(`height_${username}`, false); if (storedHeight) setHeight(parseFloat(storedHeight)); else setHeight(null);
-      const storedDob = loadItem(`dateOfBirth_${username}`, false); if (storedDob) setDateOfBirth(storedDob); else setDateOfBirth(null);
-      const storedGender = loadItem(`gender_${username}`, false); if (storedGender === 'male' || storedGender === 'female') setGender(storedGender as Gender); else setGender(null);
-
-      try { const d = localStorage.getItem(`lifeos_schedule_${username}`); setSchedule(d ? JSON.parse(d) : {}); } catch (e) { setSchedule({}); }
-      try { const d = localStorage.getItem(`lifeos_daily_purposes_${username}`); setDailyPurposes(d ? JSON.parse(d) : {}); } catch (e) { setDailyPurposes({}); }
-      try { const d = localStorage.getItem(`upskill_logs_${username}`); setAllUpskillLogs(d ? JSON.parse(d) : []); } catch (e) { setAllUpskillLogs([]); }
-      try { const d = localStorage.getItem(`deepwork_logs_${username}`); setAllDeepWorkLogs(d ? JSON.parse(d) : []); } catch (e) { setAllDeepWorkLogs([]); }
-      try { const d = localStorage.getItem(`allWorkoutLogs_${username}`); setAllWorkoutLogs(d ? JSON.parse(d) : []); } catch (e) { setAllWorkoutLogs([]); }
-      try { const d = localStorage.getItem(`branding_logs_${username}`); setAllBrandingLogs(d ? JSON.parse(d) : []); } catch (e) { setAllBrandingLogs([]); }
-      try { const d = localStorage.getItem(`leadgen_logs_${username}`); setAllLeadGenLogs(d ? JSON.parse(d) : []); } catch (e) { setAllLeadGenLogs([]); }
-      
-      const storedMode = loadItem(`workoutMode_${username}`, false);
-      if (storedMode === 'one-muscle' || storedMode === 'two-muscle') setWorkoutMode(storedMode as WorkoutMode); else setWorkoutMode('two-muscle');
-      const storedRotation = loadItem(`workoutPlanRotation_${username}`, false); setWorkoutPlanRotation(storedRotation === null ? true : storedRotation === 'true');
-      try { const d = loadItem(`workoutPlans_${username}`); setWorkoutPlans(d ? JSON.parse(d) : INITIAL_PLANS); } catch (e) { setWorkoutPlans(INITIAL_PLANS); }
-      try { const d = loadItem(`exerciseDefinitions_${username}`); setExerciseDefinitions(d ? JSON.parse(d) : DEFAULT_EXERCISE_DEFINITIONS); } catch (e) { setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS); }
-      try { const d = loadItem(`upskill_definitions_${username}`); setUpskillDefinitions(d ? JSON.parse(d) : []); } catch (e) { setUpskillDefinitions([]); }
-      try { const d = loadItem(`upskill_topic_goals_${username}`); setTopicGoals(d ? JSON.parse(d) : {}); } catch (e) { setTopicGoals({}); }
-      try { const d = loadItem(`deepwork_definitions_${username}`); setDeepWorkDefinitions(d ? JSON.parse(d) : []); } catch (e) { setDeepWorkDefinitions([]); }
-      try { const d = loadItem(`leadgen_definitions_${username}`); setLeadGenDefinitions(d ? JSON.parse(d) : LEAD_GEN_DEFINITIONS); } catch (e) { setLeadGenDefinitions(LEAD_GEN_DEFINITIONS); }
-      try { const d = loadItem(`productization_plans_${username}`); setProductizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setProductizationPlans({}); }
-      try { const d = loadItem(`offerization_plans_${username}`); setOfferizationPlans(d ? JSON.parse(d) : {}); } catch (e) { setOfferizationPlans({}); }
-
-      const storedFolders = localStorage.getItem(`resourceFolders_${username}`);
-      let currentFolders: ResourceFolder[] = [];
-      if (storedFolders) {
-        currentFolders = JSON.parse(storedFolders);
-      }
-      const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
-      if (!hasQuickAccess) {
-        const quickAccessFolder: ResourceFolder = {
-          id: `folder_quick_access_${Date.now()}`,
-          name: 'Quick Access',
-          parentId: null,
-          icon: 'Zap'
-        };
-        currentFolders.push(quickAccessFolder);
-      }
-      setResourceFolders(currentFolders);
-
-      const storedResources = localStorage.getItem(`resources_${username}`);
-      if (storedResources) {
-          setResources(JSON.parse(storedResources));
-      } else {
-          setResources([]);
-      }
-      
-      try { const d = loadItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
-      try { const d = loadItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
-      try { const d = loadItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
-      
-      try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
-      try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
-      try { const d = loadItem(`projects_${username}`); setProjects(d ? JSON.parse(d) : []); } catch (e) { setProjects([]); }
-
-      try { const d = loadItem(`companies_${username}`); setCompanies(d ? JSON.parse(d) : []); } catch (e) { setCompanies([]); }
-      try { const d = loadItem(`positions_${username}`); setPositions(d ? JSON.parse(d) : []); } catch (e) { setPositions([]); }
-      
-      try { const d = loadItem(`purpose_data_${username}`); setPurposeData(d ? JSON.parse(d) : { statement: '', specializationPurposes: {}, pillarCards: [] }); } catch(e) { setPurposeData({ statement: '', specializationPurposes: {}, pillarCards: [] }); }
-      try { const d = loadItem(`patterns_${username}`); setPatterns(d ? JSON.parse(d) : []); } catch(e) { setPatterns([]); }
-      try { const d = loadItem(`meta_rules_${username}`); setMetaRules(d ? JSON.parse(d) : []); } catch(e) { setMetaRules([]); }
-      try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
-      try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
-      
-      try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
-      
-      try {
-        const uiStateString = localStorage.getItem(`lifeos_ui_state_${username}`);
-        if (uiStateString) {
-          const uiState = JSON.parse(uiStateString);
-          setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
-          setActiveResourceTabIds(uiState.activeResourceTabIds || []);
-          setSelectedResourceFolderId(uiState.selectedResourceFolderId || null);
-          setLastSelectedHabitFolder(uiState.lastSelectedHabitFolder || null);
-          setSelectedUpskillTask(uiState.selectedUpskillTask || null);
-          setSelectedDeepWorkTask(uiState.selectedDeepWorkTask || null);
-          setSelectedMicroSkill(uiState.selectedMicroSkill || null);
-          setExpandedItems(uiState.expandedItems || []);
-          setSelectedDomainId(uiState.selectedDomainId || null);
-          setSelectedSkillId(uiState.selectedSkillId || null);
-          setSelectedProjectId(uiState.selectedProjectId || null);
-          setSelectedCompanyId(uiState.selectedCompanyId || null);
-          setRecentItems(uiState.recentItems || []);
-          setActiveFocusSession(uiState.activeFocusSession || null);
-          setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
-        }
-      } catch (e) {
-        console.error("Failed to parse UI state:", e);
-      }
-
-      resetChangeCount();
-      isInitialLoad.current = true; // Mark initial load as complete
+        isInitialLoad.current = true;
+        loadState(currentUser.username);
+        setTimeout(() => { isInitialLoad.current = false; }, 500); // Give it a moment to stabilize
     } else {
+      // Clear all state when logging out
       setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
       setSchedule({}); setDailyPurposes({});
       setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
@@ -679,64 +689,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setRecentItems([]);
       setLocalChangeCount(0);
     }
-  }, [currentUser, resetChangeCount]);
+  }, [currentUser]);
 
   useEffect(() => {
-    if (currentUser?.username && !loading) {
-      const username = currentUser.username;
-      
-      const saveData = () => {
-        const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
-        
-        localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
-        localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
-        if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
-        if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
-        if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
-        if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
-        
-        localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
-        localStorage.setItem(`lifeos_daily_purposes_${username}`, JSON.stringify(dailyPurposes));
-        localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
-        localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
-        localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
-        localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
-        localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
-
-        localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
-        localStorage.setItem(`workoutMode_${username}`, workoutMode);
-        localStorage.setItem(`workoutPlanRotation_${username}`, String(workoutPlanRotation));
-        localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
-        localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
-        localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
-        localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
-        localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
-        localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
-        localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
-
-        localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
-        localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
-        
-        localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
-        localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
-        localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
-        localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
-        localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
-        localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
-
-        localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
-        localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
-
-        localStorage.setItem(`purpose_data_${username}`, JSON.stringify(purposeData));
-        localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
-        localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
-        localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
-        localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
-        
-        localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
-      };
-      
-      saveData();
+    if (!loading && !isInitialLoad.current) {
+        const username = currentUser?.username;
+        if (username) {
+            localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(coreData));
+        }
     }
   }, [coreData, currentUser, loading]);
 
@@ -844,85 +804,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, incrementChangeCount]);
 
   const loadDataIntoLocalStorage = (data: any, username: string) => {
     if (!data) return;
 
-    setExerciseDefinitions(data.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
-    setWorkoutPlans(data.workoutPlans || INITIAL_PLANS);
-    setAllWorkoutLogs(data.allWorkoutLogs || []);
-    setWorkoutMode(data.workoutMode || 'two-muscle');
-    setWorkoutPlanRotation(data.workoutPlanRotation === null || data.workoutPlanRotation === undefined ? true : data.workoutPlanRotation);
-    
-    setUpskillDefinitions(data.upskillDefinitions || []);
-    setAllUpskillLogs(data.upskillLogs || []);
-    setTopicGoals(data.upskillTopicGoals || {});
-    
-    setDeepWorkDefinitions(data.deepWorkDefinitions || []);
-    setAllDeepWorkLogs(data.deepWorkLogs || []);
-    
-    setAllBrandingLogs(data.brandingLogs || []);
-
-    setLeadGenDefinitions(data.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
-    setAllLeadGenLogs(data.allLeadGenLogs || []);
-    
-    setProductizationPlans(data.productizationPlans || {});
-    setOfferizationPlans(data.offerizationPlans || {});
-
-    setSchedule(data.schedule || {});
-    setDailyPurposes(data.dailyPurposes || {});
-
-    setDietPlan(data.dietPlan || []);
-    setWeightLogs(data.weightLogs || []);
-    setGoalWeight(data.goalWeight ? parseFloat(data.goalWeight) : null);
-    setHeight(data.height ? parseFloat(data.height) : null);
-    setDateOfBirth(data.dateOfBirth || null);
-    setGender(data.gender || null);
-    
-    const storedFolders = data.resourceFolders;
-    let currentFolders: ResourceFolder[] = [];
-    if (storedFolders) {
-      currentFolders = storedFolders;
-    }
-    const hasQuickAccess = currentFolders.some(f => f.name === 'Quick Access' && !f.parentId);
-    if (!hasQuickAccess) {
-      const quickAccessFolder: ResourceFolder = {
-        id: `folder_quick_access_${Date.now()}`,
-        name: 'Quick Access',
-        parentId: null,
-        icon: 'Zap'
-      };
-      currentFolders.push(quickAccessFolder);
-    }
-    setResourceFolders(currentFolders);
-    setResources(data.resources || []);
-    setPinnedFolderIds(data.pinnedFolderIds ? new Set(data.pinnedFolderIds) : new Set());
-    setActiveResourceTabIds(data.activeResourceTabIds || []);
-    setSelectedResourceFolderId(data.selectedResourceFolderId || null);
-    setLastSelectedHabitFolder(data.lastSelectedHabitFolder || null);
-
-
-    setCanvasLayout(data.canvasLayout || { nodes: [], edges: [] });
-    setMindsetCards(data.mindsetCards || DEFAULT_MINDSET_CARDS);
-    
-    setPistons(data.pistons || {});
-
-    setSkillDomains(data.skillDomains || []);
-    setCoreSkills(data.coreSkills || []);
-    setProjects(data.projects || []);
-    setCompanies(data.companies || []);
-    setPositions(data.positions || []);
-    
-    setPurposeData(data.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
-    setPatterns(data.patterns || []);
-    setMetaRules(data.metaRules || []);
-    setPillarEquations(data.pillarEquations || {});
-    setSkillAcquisitionPlans(data.skillAcquisitionPlans || []);
-    
-    setAutoSuggestions(data.autoSuggestions || {});
-    setRecentItems(data.recentItems || []);
-
+    loadState(username);
     resetChangeCount();
   };
   
@@ -965,32 +852,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAllUserData = () => {
-    const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
-    return {
-      exerciseDefinitions, workoutPlans, allWorkoutLogs, workoutMode, workoutPlanRotation,
-      upskillDefinitions, upskillLogs: allUpskillLogs, upskillTopicGoals: topicGoals,
-      deepWorkDefinitions, deepWorkLogs: allDeepWorkLogs,
-      brandingLogs,
-      leadGenDefinitions, allLeadGenLogs,
-      productizationPlans,
-      offerizationPlans,
-      schedule,
-      dailyPurposes,
-      dietPlan, weightLogs, goalWeight, height, dateOfBirth, gender,
-      resources: resourcesToSave, resourceFolders, pinnedFolderIds: Array.from(pinnedFolderIds),
-      activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-      canvasLayout,
-      mindsetCards,
-      pistons,
-      skillDomains, coreSkills, projects,
-      companies, positions,
-      purposeData: purposeData,
-      patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-      expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-      selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill,
-      autoSuggestions,
-      recentItems,
-    };
+    return coreData;
   }
 
   const pushDemoDataWithToken = async (token: string) => {
@@ -2174,3 +2036,4 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
  
+
