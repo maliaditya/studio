@@ -124,8 +124,9 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject, onEdit, onCreateAndLinkChild }: {
+export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject, onEdit, onCreateAndLinkChild }: {
   upskillDef: ExerciseDefinition;
+  nodeType: string;
   handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
   setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
   setViewMode: (mode: 'session' | 'library') => void;
@@ -165,18 +166,7 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
   };
   
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
-
-  const isParent = (upskillDef.linkedUpskillIds?.length ?? 0) > 0 || (upskillDef.linkedResourceIds?.length ?? 0) > 0;
-  const isChild = linkedUpskillChildIds.has(upskillDef.id);
   
-  const getNodeType = () => {
-    if (isParent) {
-      return isChild ? 'Objective' : 'Curiosity';
-    }
-    return isChild ? 'Visualization' : 'Standalone';
-  };
-  const nodeType = getNodeType();
-
   const getIcon = () => {
     switch(nodeType) {
         case 'Curiosity': return <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />;
@@ -188,6 +178,7 @@ export function LinkedUpskillCard({ upskillDef, handleAddTaskToSession, setSelec
   };
 
   const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
+  const isParent = nodeType === 'Curiosity' || nodeType === 'Objective';
   const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
   
   const formatMinutes = (minutes: number) => {

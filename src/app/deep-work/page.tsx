@@ -737,6 +737,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         <LinkedUpskillCard 
                             key={id} 
                             upskillDef={def} 
+                            nodeType={getUpskillNodeType(def)}
                             handleAddTaskToSession={(def: ExerciseDefinition, slot: string) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} 
                             setSelectedSubtopic={(d: ExerciseDefinition | null) => handleSelectFocusArea(d, 'upskill')}
                             setViewMode={setViewMode}
@@ -991,25 +992,25 @@ function DeepWorkPageContent() {
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const hasUpskillChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-
+  
     if (!hasUpskillChildren) {
       const isChildOfUpskill = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
       return isChildOfUpskill ? 'Visualization' : 'Standalone';
     }
-
+  
+    // An Objective MUST have a direct child that is actionable (Visualization or Standalone)
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
       const childDef = upskillDefinitions.find(d => d.id === childId);
       if (!childDef) return false;
-      // An actionable child is a leaf node in its own branch.
       const nodeType = getUpskillNodeType(childDef);
       return nodeType === 'Visualization' || nodeType === 'Standalone';
     });
-
+  
     if (hasActionableChild) {
       return 'Objective';
     }
     
-    // If it has children but none are actionable (i.e., they are all Objectives or Curiosities), it's a Curiosity.
+    // If it has children but none are directly actionable, it's a Curiosity.
     return 'Curiosity';
   }, [upskillDefinitions]);
 
@@ -2047,6 +2048,7 @@ function DeepWorkPageContent() {
                                     <LinkedUpskillCard 
                                         key={def.id} 
                                         upskillDef={def}
+                                        nodeType={getUpskillNodeType(def)}
                                         handleAddTaskToSession={handleAddTaskToSession} 
                                         setSelectedSubtopic={setSelectedUpskillTask}
                                         setViewMode={setViewMode}
@@ -2383,6 +2385,7 @@ function DeepWorkPageContent() {
                     {activeId.startsWith('card-upskill-') && (
                          <LinkedUpskillCard 
                             upskillDef={activeDragItem as ExerciseDefinition}
+                            nodeType={getUpskillNodeType(activeDragItem as ExerciseDefinition)}
                             handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} 
                             setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')}
                             setViewMode={setViewMode}
@@ -2458,4 +2461,5 @@ export default function DeepWorkPage() {
     
 
     
+
 
