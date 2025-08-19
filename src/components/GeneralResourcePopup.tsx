@@ -17,6 +17,8 @@ import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -321,7 +323,9 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
                 ) : point.type === 'markdown' ? (
                     <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
                 ) : point.type === 'code' ? (
-                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                        {point.text || ""}
+                    </SyntaxHighlighter>
                 ) : point.type === 'link' ? (
                      <div className="flex-grow min-w-0">
                         <span 
