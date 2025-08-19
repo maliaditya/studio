@@ -74,7 +74,7 @@ const TaskItem = ({
     onOpenMindMap: (focusAreaId: string) => void,
     onEditFocusArea: (def: ExerciseDefinition) => void,
     onDeleteFocusArea: (defId: string) => void,
-    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void,
+    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
     libraryView: 'deepwork' | 'upskill';
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onToggleReadyForBranding: (defId: string) => void;
