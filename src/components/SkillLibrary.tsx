@@ -73,7 +73,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
 
     return (
         <div style={{ marginLeft: `${level * 16}px` }}>
-            <div className="group/task rounded-md hover:bg-muted flex items-center justify-between">
+            <div className="group/task rounded-md hover:bg-muted flex items-start justify-between">
                 <button
                     onClick={() => {
                         onSelectFocusArea(task, libraryView);
@@ -84,7 +84,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
                     className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
                 >
                     {getIcon(task)}
-                    <span className="truncate" title={task.name}>{task.name}</span>
+                    <span className="whitespace-normal" title={task.name}>{task.name}</span>
                 </button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -248,25 +248,24 @@ export function SkillLibrary({
   };
   
   const getUpskillNodeType = (def: ExerciseDefinition) => {
-    const hasChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (!hasChildren) {
-        const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-        return isChild ? 'Visualization' : 'Standalone';
-    }
-    
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && getUpskillNodeType(childDef).match(/Visualization|Standalone/);
+      const childDef = upskillDefinitions.find(d => d.id === childId);
+      if (!childDef) return false;
+      const nodeType = getUpskillNodeType(childDef);
+      return nodeType === 'Visualization' || nodeType === 'Standalone';
     });
-    if (hasActionableChild) return 'Objective';
-    
-    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        return childDef && getUpskillNodeType(childDef) === 'Objective';
-    });
-    if (hasObjectiveChild) return 'Curiosity';
-    
-    return 'Objective';
+
+    if (hasActionableChild) {
+      return 'Objective';
+    }
+
+    const hasChildren = (def.linkedUpskillIds || []).length > 0;
+    if (hasChildren) {
+      return 'Curiosity';
+    }
+
+    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+    return isLinkedAsChild ? 'Visualization' : 'Standalone';
   };
 
   const getIcon = (def: ExerciseDefinition) => {
