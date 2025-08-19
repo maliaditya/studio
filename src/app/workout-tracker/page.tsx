@@ -790,7 +790,7 @@ function WorkoutPageContent() {
               <div>
                 <WorkoutHeatmap
                   title="Workout Activity"
-                  description="Your workout consistency over the last year. Click a square to view that day's log."
+                  description="Your consistency over the last year. Click a square to view that day's log."
                   graphDescription="Your probability of working out, based on recent consistency."
                   allWorkoutLogs={allWorkoutLogs}
                   onDateSelect={(date) => setSelectedDate(parse(date, 'yyyy-MM-dd', new Date()))}
@@ -847,7 +847,7 @@ function WorkoutPageContent() {
         onLogWeight={handleLogWeight}
         onUpdateWeightLog={handleUpdateWeightLog}
         onDeleteWeightLog={handleDeleteWeightLog}
-        onSetGoalWeight={onSetGoalWeight}
+        onSetGoalWeight={handleSetGoalWeight}
         onSetHeight={handleSetHeight}
         onSetDateOfBirth={handleSetDateOfBirth}
         onSetGender={handleSetGender}
