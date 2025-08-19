@@ -76,13 +76,6 @@ function PathPageContent() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 text-white p-8">
-      <div className="w-full max-w-4xl mx-auto text-center mb-12">
-        <h1 className="text-4xl font-bold tracking-tight">Your Strategic Path</h1>
-        <p className="mt-4 text-lg text-gray-400">
-          A visual timeline of your upcoming product and service releases, ordered by launch date.
-        </p>
-      </div>
-
       <div className="flex-grow flex items-center justify-center overflow-auto relative">
         {upcomingReleases.length === 0 ? (
           <div className="text-center">
