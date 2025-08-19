@@ -76,7 +76,7 @@ function PathPageContent() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900 text-white p-8">
-      <div className="flex-grow flex items-center justify-center overflow-auto relative">
+        <div className="flex-grow flex items-center justify-center overflow-auto relative">
         {upcomingReleases.length === 0 ? (
           <div className="text-center">
              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-700 rounded-lg">
@@ -143,9 +143,11 @@ function PathPageContent() {
                       <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
                         ({item.topic})
                       </p>
-                      <p className="text-xs text-gray-300 mt-2 leading-tight line-clamp-3" title={item.release.description}>
-                        {item.release.description}
-                      </p>
+                       <div className="flex-grow min-h-0 flex items-center justify-center">
+                        <p className="text-xs text-gray-300 mt-2 leading-tight line-clamp-3" title={item.release.description}>
+                            {item.release.description}
+                        </p>
+                      </div>
                       <div className="mt-auto pt-2 text-xs text-yellow-400">
                         <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
                         <p>({item.release.daysRemaining} days)</p>
