@@ -32,7 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
-import { Checkbox } from '@/components/ui/checkbox';
+import { Checkbox } from './ui/checkbox';
 
 
 interface TaskItemProps {
@@ -457,22 +457,17 @@ export function SkillLibrary({
                     <div/>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                    <DropdownMenuItem onSelect={() => onEditFocusArea(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onEditFocusArea(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => onOpenMindMap(contextMenuTask.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                    {((contextMenuTask.linkedDeepWorkIds && contextMenuTask.linkedDeepWorkIds.length > 0) || (contextMenuTask.linkedUpskillIds && contextMenuTask.linkedUpskillIds.length > 0)) && (
-                      <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
-                    )}
+                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                     {libraryView === 'deepwork' && (
                         <DropdownMenuItem onSelect={() => onToggleReadyForBranding(contextMenuTask.id)}>
                             <Checkbox className="mr-2" checked={!!contextMenuTask.isReadyForBranding} />
                             <span>Mark as Ready for Branding</span>
                         </DropdownMenuItem>
                     )}
-                     {libraryView === 'upskill' && (
-                        <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
-                    )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(contextMenuTask.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(contextMenuTask.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
