@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -63,6 +62,7 @@ interface AuthContextType {
   
   // Save Status
   localChangeCount: number;
+  incrementChangeCount: () => void;
   resetChangeCount: () => void;
 
   // Shared health state
@@ -492,43 +492,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser, prevUser, toast]);
 
+  const incrementChangeCount = useCallback(() => {
+    if (!isInitialLoad.current) {
+        setLocalChangeCount(prev => prev + 1);
+    }
+  }, []);
+
   const resetChangeCount = useCallback(() => {
     setLocalChangeCount(0);
   }, []);
 
-  const allData = useMemo(() => {
+  const coreData = useMemo(() => {
     return [
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
         workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
         deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-        resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+        resources, resourceFolders,
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
-        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-        autoSuggestions, recentItems, activeFocusSession, isAgendaDocked
+        autoSuggestions,
     ];
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
     schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
     workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
     deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
-    resources, resourceFolders, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+    resources, resourceFolders,
     canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
     purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
+    autoSuggestions
+  ]);
+  
+  const uiStateData = useMemo(() => {
+    return {
+        pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
+        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+        selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
+        recentItems, activeFocusSession, isAgendaDocked
+    };
+  }, [
+    pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
     selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
     selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    autoSuggestions, recentItems, activeFocusSession, isAgendaDocked
+    recentItems, activeFocusSession, isAgendaDocked
   ]);
 
   useEffect(() => {
-    if (isInitialLoad.current) {
-        isInitialLoad.current = false;
-        return;
-    }
-    setLocalChangeCount(prev => prev + 1);
-  }, [allData]);
+    if (isInitialLoad.current) return;
+    incrementChangeCount();
+  }, [coreData, incrementChangeCount]);
+  
+  useEffect(() => {
+    if (!currentUser?.username || loading) return;
+    localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiStateData));
+  }, [uiStateData, currentUser, loading]);
 
 
   useEffect(() => {
@@ -587,22 +605,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setResources([]);
       }
       
-      try {
-        const pinnedIds = loadItem(`pinned_folder_ids_${username}`);
-        setPinnedFolderIds(pinnedIds ? new Set(JSON.parse(pinnedIds)) : new Set());
-      } catch (e) {
-        setPinnedFolderIds(new Set());
-      }
-
-      try { const d = loadItem(`activeResourceTabIds_${username}`); setActiveResourceTabIds(d ? JSON.parse(d) : []); } catch (e) { setActiveResourceTabIds([]); }
-      const storedSelectedFolder = loadItem(`selectedResourceFolderId_${username}`, false);
-      setSelectedResourceFolderId(storedSelectedFolder || null);
-      const storedLastHabitFolder = loadItem(`last_selected_habit_folder_${username}`, false);
-      setLastSelectedHabitFolder(storedLastHabitFolder || null);
-
-      try { const d = localStorage.getItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
-      try { const d = localStorage.getItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
-      try { const d = localStorage.getItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
+      try { const d = loadItem(`canvas_layout_${username}`); setCanvasLayout(d ? JSON.parse(d) : { nodes: [], edges: [] }); } catch (e) { setCanvasLayout({ nodes: [], edges: [] }); }
+      try { const d = loadItem(`mindset_cards_${username}`); setMindsetCards(d ? JSON.parse(d) : DEFAULT_MINDSET_CARDS); } catch (e) { setMindsetCards(DEFAULT_MINDSET_CARDS); }
+      try { const d = loadItem(`pistons_data_${username}`); setPistons(d ? JSON.parse(d) : {}); } catch (e) { setPistons({}); }
       
       try { const d = loadItem(`skill_domains_${username}`); setSkillDomains(d ? JSON.parse(d) : []); } catch (e) { setSkillDomains([]); }
       try { const d = loadItem(`core_skills_${username}`); setCoreSkills(d ? JSON.parse(d) : []); } catch (e) { setCoreSkills([]); }
@@ -617,36 +622,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try { const d = loadItem(`pillar_equations_${username}`); setPillarEquations(d ? JSON.parse(d) : {}); } catch(e) { setPillarEquations({}); }
       try { const d = loadItem(`skill_acquisition_plans_${username}`); setSkillAcquisitionPlans(d ? JSON.parse(d) : []); } catch(e) { setSkillAcquisitionPlans([]); }
       
-      try {
-        const upskillTask = loadItem(`selected_upskill_task_${username}`); if (upskillTask) setSelectedUpskillTask(JSON.parse(upskillTask));
-        const deepWorkTask = loadItem(`selected_deepwork_task_${username}`); if (deepWorkTask) setSelectedDeepWorkTask(JSON.parse(deepWorkTask));
-        const microSkill = loadItem(`selected_micro_skill_${username}`); if (microSkill) setSelectedMicroSkill(JSON.parse(microSkill));
-      } catch (e) {
-        setSelectedUpskillTask(null);
-        setSelectedDeepWorkTask(null);
-        setSelectedMicroSkill(null);
-      }
-      
-      try { const d = loadItem(`expanded_items_${username}`); setExpandedItems(d ? JSON.parse(d) : []); } catch (e) { setExpandedItems([]); }
-      const storedDomain = loadItem(`selected_domain_${username}`, false); setSelectedDomainId(storedDomain || null);
-      const storedSkill = loadItem(`selected_skill_${username}`, false); setSelectedSkillId(storedSkill || null);
-      const storedProject = loadItem(`selected_project_${username}`, false); setSelectedProjectId(storedProject || null);
-      const storedCompany = loadItem(`selected_companyId_${username}`, false); setSelectedCompanyId(storedCompany || null);
-
       try { const d = loadItem(`auto_suggestions_${username}`); setAutoSuggestions(d ? JSON.parse(d) : {}); } catch (e) { setAutoSuggestions({}); }
-      try { const d = loadItem(`recent_items_${username}`); setRecentItems(d ? JSON.parse(d) : []); } catch(e) { setRecentItems([]); }
-
-      // Load active focus session from localStorage
-      const savedSession = localStorage.getItem(`focus_session_${username}`);
-      if (savedSession) {
-          try {
-              const parsedSession = JSON.parse(savedSession);
-              setActiveFocusSession(parsedSession);
-          } catch (error) {
-              console.error("Failed to parse saved focus session", error);
-              localStorage.removeItem(`focus_session_${username}`);
-          }
+      
+      try {
+        const uiStateString = localStorage.getItem(`lifeos_ui_state_${username}`);
+        if (uiStateString) {
+          const uiState = JSON.parse(uiStateString);
+          setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
+          setActiveResourceTabIds(uiState.activeResourceTabIds || []);
+          setSelectedResourceFolderId(uiState.selectedResourceFolderId || null);
+          setLastSelectedHabitFolder(uiState.lastSelectedHabitFolder || null);
+          setSelectedUpskillTask(uiState.selectedUpskillTask || null);
+          setSelectedDeepWorkTask(uiState.selectedDeepWorkTask || null);
+          setSelectedMicroSkill(uiState.selectedMicroSkill || null);
+          setExpandedItems(uiState.expandedItems || []);
+          setSelectedDomainId(uiState.selectedDomainId || null);
+          setSelectedSkillId(uiState.selectedSkillId || null);
+          setSelectedProjectId(uiState.selectedProjectId || null);
+          setSelectedCompanyId(uiState.selectedCompanyId || null);
+          setRecentItems(uiState.recentItems || []);
+          setActiveFocusSession(uiState.activeFocusSession || null);
+          setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
+        }
+      } catch (e) {
+        console.error("Failed to parse UI state:", e);
       }
+
       resetChangeCount();
       isInitialLoad.current = true; // Mark initial load as complete
     } else {
@@ -683,77 +684,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (currentUser?.username && !loading) {
       const username = currentUser.username;
-      const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
-      localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
-      localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
-      if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
-      if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
-      if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
-      if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
       
-      localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
-      localStorage.setItem(`lifeos_daily_purposes_${username}`, JSON.stringify(dailyPurposes));
-      localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
-      localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
-      localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
-      localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
-      localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
+      const saveData = () => {
+        const resourcesToSave = resources.map(({ audioUrl, ...rest }) => rest);
+        
+        localStorage.setItem(`weightLogs_${username}`, JSON.stringify(weightLogs));
+        localStorage.setItem(`dietPlan_${username}`, JSON.stringify(dietPlan));
+        if (goalWeight !== null) localStorage.setItem(`goalWeight_${username}`, goalWeight.toString()); else localStorage.removeItem(`goalWeight_${username}`);
+        if (height !== null) localStorage.setItem(`height_${username}`, height.toString()); else localStorage.removeItem(`height_${username}`);
+        if (dateOfBirth) localStorage.setItem(`dateOfBirth_${username}`, dateOfBirth); else localStorage.removeItem(`dateOfBirth_${username}`);
+        if (gender) localStorage.setItem(`gender_${username}`, gender); else localStorage.removeItem(`gender_${username}`);
+        
+        localStorage.setItem(`lifeos_schedule_${username}`, JSON.stringify(schedule));
+        localStorage.setItem(`lifeos_daily_purposes_${username}`, JSON.stringify(dailyPurposes));
+        localStorage.setItem(`upskill_logs_${username}`, JSON.stringify(allUpskillLogs));
+        localStorage.setItem(`deepwork_logs_${username}`, JSON.stringify(allDeepWorkLogs));
+        localStorage.setItem(`allWorkoutLogs_${username}`, JSON.stringify(allWorkoutLogs));
+        localStorage.setItem(`branding_logs_${username}`, JSON.stringify(brandingLogs));
+        localStorage.setItem(`leadgen_logs_${username}`, JSON.stringify(allLeadGenLogs));
 
-      localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
-      localStorage.setItem(`workoutMode_${username}`, workoutMode);
-      localStorage.setItem(`workoutPlanRotation_${username}`, String(workoutPlanRotation));
-      localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
-      localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
-      localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
-      localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
-      localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
-      localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
-      localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
+        localStorage.setItem(`exerciseDefinitions_${username}`, JSON.stringify(exerciseDefinitions));
+        localStorage.setItem(`workoutMode_${username}`, workoutMode);
+        localStorage.setItem(`workoutPlanRotation_${username}`, String(workoutPlanRotation));
+        localStorage.setItem(`workoutPlans_${username}`, JSON.stringify(workoutPlans));
+        localStorage.setItem(`upskill_definitions_${username}`, JSON.stringify(upskillDefinitions));
+        localStorage.setItem(`upskill_topic_goals_${username}`, JSON.stringify(topicGoals));
+        localStorage.setItem(`deepwork_definitions_${username}`, JSON.stringify(deepWorkDefinitions));
+        localStorage.setItem(`leadgen_definitions_${username}`, JSON.stringify(leadGenDefinitions));
+        localStorage.setItem(`productization_plans_${username}`, JSON.stringify(productizationPlans));
+        localStorage.setItem(`offerization_plans_${username}`, JSON.stringify(offerizationPlans));
 
-      localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
-      localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
-      localStorage.setItem(`pinned_folder_ids_${username}`, JSON.stringify(Array.from(pinnedFolderIds)));
-      localStorage.setItem(`activeResourceTabIds_${username}`, JSON.stringify(activeResourceTabIds));
-      if (selectedResourceFolderId) localStorage.setItem(`selectedResourceFolderId_${username}`, selectedResourceFolderId); else localStorage.removeItem(`selectedResourceFolderId_${username}`);
-      if (lastSelectedHabitFolder) localStorage.setItem(`last_selected_habit_folder_${username}`, lastSelectedHabitFolder); else localStorage.removeItem(`last_selected_habit_folder_${username}`);
+        localStorage.setItem(`resources_${username}`, JSON.stringify(resourcesToSave));
+        localStorage.setItem(`resourceFolders_${username}`, JSON.stringify(resourceFolders));
+        
+        localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
+        localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
+        localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
+        localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
+        localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
+        localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
 
-      localStorage.setItem(`canvas_layout_${username}`, JSON.stringify(canvasLayout));
-      localStorage.setItem(`mindset_cards_${username}`, JSON.stringify(mindsetCards));
-      localStorage.setItem(`pistons_data_${username}`, JSON.stringify(pistons));
-      localStorage.setItem(`skill_domains_${username}`, JSON.stringify(skillDomains));
-      localStorage.setItem(`core_skills_${username}`, JSON.stringify(coreSkills));
-      localStorage.setItem(`projects_${username}`, JSON.stringify(projects));
+        localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
+        localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
 
-      localStorage.setItem(`companies_${username}`, JSON.stringify(companies));
-      localStorage.setItem(`positions_${username}`, JSON.stringify(positions));
-
-      localStorage.setItem(`purpose_data_${username}`, JSON.stringify(purposeData));
-      localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
-      localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
-      localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
-      localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
+        localStorage.setItem(`purpose_data_${username}`, JSON.stringify(purposeData));
+        localStorage.setItem(`patterns_${username}`, JSON.stringify(patterns));
+        localStorage.setItem(`meta_rules_${username}`, JSON.stringify(metaRules));
+        localStorage.setItem(`pillar_equations_${username}`, JSON.stringify(pillarEquations));
+        localStorage.setItem(`skill_acquisition_plans_${username}`, JSON.stringify(skillAcquisitionPlans));
+        
+        localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
+      };
       
-      if (selectedUpskillTask) localStorage.setItem(`selected_upskill_task_${username}`, JSON.stringify(selectedUpskillTask)); else localStorage.removeItem(`selected_upskill_task_${username}`);
-      if (selectedDeepWorkTask) localStorage.setItem(`selected_deepwork_task_${username}`, JSON.stringify(selectedDeepWorkTask)); else localStorage.removeItem(`selected_deepwork_task_${username}`);
-      if (selectedMicroSkill) localStorage.setItem(`selected_micro_skill_${username}`, JSON.stringify(selectedMicroSkill)); else localStorage.removeItem(`selected_micro_skill_${username}`);
-      
-      localStorage.setItem(`expanded_items_${username}`, JSON.stringify(expandedItems));
-      if (selectedDomainId) localStorage.setItem(`selected_domain_${username}`, selectedDomainId); else localStorage.removeItem(`selected_domain_${username}`);
-      if (selectedSkillId) localStorage.setItem(`selected_skill_${username}`, selectedSkillId); else localStorage.removeItem(`selected_skill_${username}`);
-      if (selectedProjectId) localStorage.setItem(`selected_project_${username}`, selectedProjectId); else localStorage.removeItem(`selected_project_${username}`);
-      if (selectedCompanyId) localStorage.setItem(`selected_companyId_${username}`, selectedCompanyId); else localStorage.removeItem(`selected_companyId_${username}`);
-
-      localStorage.setItem(`auto_suggestions_${username}`, JSON.stringify(autoSuggestions));
-      localStorage.setItem(`recent_items_${username}`, JSON.stringify(recentItems));
-
-      // Persist active focus session
-      if (activeFocusSession) {
-          localStorage.setItem(`focus_session_${username}`, JSON.stringify(activeFocusSession));
-      } else {
-          localStorage.removeItem(`focus_session_${username}`);
-      }
+      saveData();
     }
-  }, [allData, currentUser, loading]);
+  }, [coreData, currentUser, loading]);
 
 
   useEffect(() => {
@@ -2105,7 +2090,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
-    localChangeCount, resetChangeCount,
+    localChangeCount, incrementChangeCount, resetChangeCount,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
     handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
@@ -2188,19 +2173,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
+ 
