@@ -13,6 +13,8 @@ import { format, parseISO, differenceInDays, startOfToday } from 'date-fns';
 const NODE_DIAMETER = 192; // Corresponds to w-48 and h-48
 const HORIZONTAL_SPACING = 300;
 const VERTICAL_SPACING = 150;
+const DESCRIPTION_WIDTH = 200;
+const DESCRIPTION_MARGIN = 24;
 
 function PathPageContent() {
   const { productizationPlans, offerizationPlans, projects, coreSkills } = useAuth();
@@ -58,12 +60,12 @@ function PathPageContent() {
   }, [productizationPlans, offerizationPlans, projects, coreSkills]);
 
   const nodePositions = useMemo(() => {
-    const positions = new Map<string, { x: number; y: number }>();
+    const positions = new Map<string, { x: number; y: number; isLeft: boolean }>();
     upcomingReleases.forEach((item, index) => {
       const isLeft = index % 2 === 0;
       const x = isLeft ? HORIZONTAL_SPACING / 2 : HORIZONTAL_SPACING * 1.5;
       const y = (upcomingReleases.length - 1 - index) * VERTICAL_SPACING + NODE_DIAMETER / 2;
-      positions.set(item.release.id, { x, y });
+      positions.set(item.release.id, { x, y, isLeft });
     });
     return positions;
   }, [upcomingReleases]);
@@ -125,35 +127,45 @@ function PathPageContent() {
             {upcomingReleases.map((item) => {
               const pos = nodePositions.get(item.release.id);
               if (!pos) return null;
+              
+              const descriptionStyle: React.CSSProperties = {
+                position: 'absolute',
+                top: pos.y - NODE_DIAMETER / 2, // Align top with the node's bounding box
+                width: DESCRIPTION_WIDTH,
+                textAlign: pos.isLeft ? 'left' : 'right',
+                left: pos.isLeft 
+                  ? pos.x + NODE_DIAMETER / 2 + DESCRIPTION_MARGIN 
+                  : pos.x - NODE_DIAMETER / 2 - DESCRIPTION_MARGIN - DESCRIPTION_WIDTH,
+              };
+
               return (
-                <div
-                  key={item.release.id}
-                  className="absolute flex items-center justify-center text-center p-4 shadow-2xl"
-                  style={{
-                    left: pos.x - NODE_DIAMETER / 2,
-                    top: pos.y - NODE_DIAMETER / 2,
-                    width: NODE_DIAMETER,
-                    height: NODE_DIAMETER,
-                  }}
-                >
-                  <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
-                      <p className="text-lg font-bold leading-tight" title={item.release.name}>
-                        {item.release.name}
-                      </p>
-                      <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
-                        ({item.topic})
-                      </p>
-                       <div className="flex-grow min-h-0 flex items-center justify-center">
-                        <p className="text-xs text-gray-300 mt-2 leading-tight line-clamp-3" title={item.release.description}>
-                            {item.release.description}
-                        </p>
+                <React.Fragment key={item.release.id}>
+                    <div
+                      className="absolute flex items-center justify-center text-center p-4 shadow-2xl"
+                      style={{
+                        left: pos.x - NODE_DIAMETER / 2,
+                        top: pos.y - NODE_DIAMETER / 2,
+                        width: NODE_DIAMETER,
+                        height: NODE_DIAMETER,
+                      }}
+                    >
+                      <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
+                          <p className="text-lg font-bold leading-tight" title={item.release.name}>
+                            {item.release.name}
+                          </p>
+                          <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
+                            ({item.topic})
+                          </p>
+                          <div className="mt-auto pt-2 text-xs text-yellow-400">
+                            <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
+                            <p>({item.release.daysRemaining} days)</p>
+                          </div>
                       </div>
-                      <div className="mt-auto pt-2 text-xs text-yellow-400">
-                        <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
-                        <p>({item.release.daysRemaining} days)</p>
-                      </div>
-                  </div>
-                </div>
+                    </div>
+                    <div style={descriptionStyle} className="text-sm text-gray-300 py-2 h-48 flex items-center">
+                        <p className="line-clamp-6">{item.release.description}</p>
+                    </div>
+                </React.Fragment>
               );
             })}
           </div>
