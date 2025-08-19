@@ -71,42 +71,43 @@ function PathPageContent() {
 
                 return (
                 <div key={node.id} className="relative h-64">
+                    {/* Circle Container */}
                     <div className={cn("absolute flex items-center w-1/2", isLeft ? "left-0" : "right-0")}>
-                    {/* Circle */}
-                    <div className="relative w-48 h-48 bg-gray-800 border-2 border-gray-600 rounded-full flex items-center justify-center text-center p-4 shadow-2xl">
-                        {editingNodeId === node.id ? (
-                        <Textarea
-                            value={editText}
-                            onChange={handleTextChange}
-                            onBlur={() => handleSaveText(node.id)}
-                            autoFocus
-                            className="bg-transparent text-white border-none focus-visible:ring-0 text-center resize-none text-lg"
-                        />
-                        ) : (
-                        <p className="text-lg cursor-pointer" onClick={() => handleTextClick(node)}>
-                            {node.text}
-                        </p>
-                        )}
-                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-red-500 opacity-50 hover:opacity-100" onClick={() => handleDeleteNode(node.id)}>
-                            <Trash2 className="h-4 w-4"/>
-                        </Button>
-                    </div>
-                    {/* Arrow stem from circle */}
-                    {hasNext && (
-                        <div className={cn(
-                        "absolute top-1/2 -translate-y-1/2 h-0.5 bg-gray-500 w-1/2",
-                        isLeft ? "left-full" : "right-full"
-                        )} />
-                    )}
-                    </div>
-
-                    {/* Vertical line and arrowhead connecting to next node */}
-                    {hasNext && (
-                    <div className={cn("absolute top-full w-0.5 bg-gray-500", isLeft ? "left-3/4" : "left-1/4")} style={{height: '100px'}}>
-                        <div className={cn("absolute w-0 h-0 border-x-8 border-x-transparent", 
-                        isLeft ? "bottom-0 -translate-x-1/2 border-b-[16px] border-b-gray-500" : "top-0 -translate-x-1/2 border-t-[16px] border-t-gray-500")}>
+                        <div className="relative w-48 h-48 bg-gray-800 border-2 border-gray-600 rounded-full flex items-center justify-center text-center p-4 shadow-2xl">
+                            {editingNodeId === node.id ? (
+                            <Textarea
+                                value={editText}
+                                onChange={handleTextChange}
+                                onBlur={() => handleSaveText(node.id)}
+                                autoFocus
+                                className="bg-transparent text-white border-none focus-visible:ring-0 text-center resize-none text-lg"
+                            />
+                            ) : (
+                            <p className="text-lg cursor-pointer" onClick={() => handleTextClick(node)}>
+                                {node.text}
+                            </p>
+                            )}
+                            <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-7 w-7 text-red-500 opacity-50 hover:opacity-100" onClick={() => handleDeleteNode(node.id)}>
+                                <Trash2 className="h-4 w-4"/>
+                            </Button>
                         </div>
                     </div>
+
+                    {/* Connectors */}
+                    {hasNext && (
+                        <>
+                            {/* Horizontal Line */}
+                            <div className={cn("absolute top-1/2 -translate-y-1/2 h-0.5 bg-gray-500 w-1/4", isLeft ? "left-1/2" : "right-1/2")} />
+                            
+                            {/* Vertical Line */}
+                            <div className={cn("absolute h-[100px] w-0.5 bg-gray-500", isLeft ? "left-3/4" : "left-1/4")} style={{ top: 'calc(50% - 1px)' }}/>
+                            
+                            {/* Arrowhead */}
+                             <div className={cn(
+                                "absolute w-0 h-0 border-x-8 border-x-transparent", 
+                                isLeft ? "left-3/4 bottom-[calc(50%-100px)] -translate-x-1/2 border-t-[16px] border-t-gray-500" : "left-1/4 top-[calc(50%+100px)] -translate-x-1/2 border-b-[16px] border-b-gray-500"
+                            )}></div>
+                        </>
                     )}
                 </div>
                 );
