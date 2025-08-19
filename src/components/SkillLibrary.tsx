@@ -113,7 +113,7 @@ const TaskItem = ({
                             {isIntentionOrCuriosity && (
                               <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                             )}
-                            {libraryView === 'deepwork' && !isIntentionOrCuriosity && (
+                            {libraryView === 'deepwork' && (
                                 <DropdownMenuItem onSelect={() => onToggleReadyForBranding(task.id)}>
                                     <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
                                     <span>Mark as Ready for Branding</span>
