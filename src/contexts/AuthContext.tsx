@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -421,9 +420,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Path Diagram State
   const [pathNodes, setPathNodes] = useTrackedState<PathNode[]>([]);
 
-  const saveData = useCallback(() => {
-    if (!currentUser?.username) return;
-    const allData = {
+  const getAllUserData = useCallback(() => {
+    return {
       main: {
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
@@ -443,6 +441,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         recentItems,
       }
     };
+  }, [
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+  ]);
+
+  const saveData = useCallback(() => {
+    if (!currentUser?.username) return;
+    const allData = getAllUserData();
     try {
       localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
       localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
@@ -454,16 +459,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         variant: "destructive",
       });
     }
-  }, [
-    currentUser, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, toast
-  ]);
+  }, [currentUser, getAllUserData, toast]);
 
   useEffect(() => {
     if (!isLoadingState) {
       saveData();
     }
   }, [
-    isLoadingState, saveData, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pathNodes
+    isLoadingState, saveData
   ]);
 
   useEffect(() => {
@@ -1573,7 +1576,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
-  }, []);
+  }, [setExpandedItems]);
   
   const openIntentionPopup = (intentionId: string) => {
     setIntentionPopups(prev => {
@@ -2000,3 +2003,6 @@ const usePrevious = <T,>(value: T) => {
 
     
 
+
+
+    
