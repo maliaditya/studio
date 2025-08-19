@@ -283,13 +283,28 @@ export function SkillLibrary({
     else if (selectedDomain) title = selectedDomain.name;
 
     const showBackButton = !!(selectedDomainId || selectedProjectId);
+
+    const handleTitleClick = () => {
+        if (selectedMicroSkill) {
+            onSelectFocusArea(null, libraryView);
+        }
+    };
     
     return (
         <div className="flex items-center gap-2">
             {showBackButton && (
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ChevronLeft className="h-4 w-4" /></Button>
             )}
-            <CardTitle className="text-lg text-primary truncate" title={title}>{title}</CardTitle>
+             <CardTitle
+                className={cn(
+                    "text-lg text-primary truncate",
+                    selectedMicroSkill && "cursor-pointer hover:underline"
+                )}
+                title={title}
+                onClick={handleTitleClick}
+            >
+                {title}
+            </CardTitle>
         </div>
     );
   };
