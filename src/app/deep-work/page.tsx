@@ -915,11 +915,15 @@ function DeepWorkPageContent() {
     }));
   }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
 
-  const handleLinkProjectToTaskFromModal = (projectId: string | null) => {
-    if (!linkingTask || !projectId) return;
-    linkProjectToTask(linkingTask.id, projectId);
-  };
-  
+  useEffect(() => {
+    if (linkingTask) {
+        const fullTaskData = [...deepWorkDefinitions, ...upskillDefinitions].find(t => t.id === linkingTask.id);
+        if (fullTaskData) {
+            setLinkingTask(fullTaskData);
+        }
+    }
+  }, [deepWorkDefinitions, upskillDefinitions, linkingTask]);
+
   const handleOpenLinkProjectModal = (task: ExerciseDefinition) => {
     setLinkingTask(task);
     setIsLinkProjectModalOpen(true);
@@ -2424,6 +2428,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
