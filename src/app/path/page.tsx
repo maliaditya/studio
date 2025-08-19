@@ -10,9 +10,9 @@ import { cn } from '@/lib/utils';
 import type { Release } from '@/types/workout';
 import { format, parseISO, differenceInDays, startOfToday } from 'date-fns';
 
-const NODE_DIAMETER = 256; // Increased from 192 to 256
+const NODE_DIAMETER = 205; 
 const HORIZONTAL_SPACING = 400;
-const VERTICAL_SPACING = 150;
+const VERTICAL_SPACING = 250;
 const DESCRIPTION_WIDTH = 200;
 const DESCRIPTION_MARGIN = 24;
 
