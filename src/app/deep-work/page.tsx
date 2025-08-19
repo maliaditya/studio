@@ -612,9 +612,21 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
 
     return (
         <div ref={ref} className="space-y-4">
-            <div className="space-y-1">
+            <div className="flex items-center gap-4 justify-between">
                 <h3 className="text-xl font-bold">{currentTask.name}</h3>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => onEdit(currentTask)}><Edit3 className="h-4 w-4"/></Button>
+                    </TooltipTrigger><TooltipContent><p>Edit Task</p></TooltipContent></Tooltip></TooltipProvider>
+                    
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => onOpenMindMap(currentTask.id)}><GitMerge className="h-4 w-4"/></Button>
+                    </TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip></TooltipProvider>
+                    
+                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={() => handleViewProgress(currentTask, currentTask.type)}><TrendingUp className="h-4 w-4"/></Button>
+                    </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></Tooltip></TooltipProvider>
+                    
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button size="sm" variant="outline"><LinkIcon className="mr-2 h-4 w-4" /> Link Deep Work</Button>
@@ -656,31 +668,31 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             </ScrollArea>
                         </DropdownMenuContent>
                     </DropdownMenu>
+
                     <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
+
                     {isHighLevelNode && (
-                        <div className="flex items-center gap-1">
-                          <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button size="sm" variant="outline" className="gap-2">
-                                        <Briefcase className="h-4 w-4" />
-                                        {linkedProjects.length > 0 ? `${linkedProjects.length} Linked Project(s)` : "Link Project"}
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    {projectsInDomain.map(proj => (
-                                        <DropdownMenuCheckboxItem
-                                            key={proj.id}
-                                            checked={linkedProjects.some(p => p.id === proj.id)}
-                                            onCheckedChange={() => linkProjectToTask(currentTask.id, proj.id)}
-                                        >
-                                            {proj.name}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button size="sm" variant="outline" className="gap-2">
+                                    <Briefcase className="h-4 w-4" />
+                                    {linkedProjects.length > 0 ? `${linkedProjects.length} Project(s)` : "Link Project"}
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                {projectsInDomain.map(proj => (
+                                    <DropdownMenuCheckboxItem
+                                        key={proj.id}
+                                        checked={linkedProjects.some(p => p.id === proj.id)}
+                                        onCheckedChange={() => linkProjectToTask(currentTask.id, proj.id)}
+                                    >
+                                        {proj.name}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     )}
                 </div>
             </div>
@@ -2428,6 +2440,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
