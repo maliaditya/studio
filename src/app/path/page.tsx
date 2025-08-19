@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import type { Release } from '@/types/workout';
 import { format, parseISO, differenceInDays, startOfToday } from 'date-fns';
 
-const NODE_DIAMETER = 192; // Corresponds to w-48 and h-48
+const NODE_DIAMETER = 256; // Increased from 192 to 256
 const HORIZONTAL_SPACING = 400;
 const VERTICAL_SPACING = 150;
 const DESCRIPTION_WIDTH = 200;
