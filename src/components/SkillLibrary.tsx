@@ -2,12 +2,12 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical, PackageCheck } from 'lucide-react';
+import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical, PackageCheck, Checkbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -33,52 +33,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
-import { Checkbox } from './ui/checkbox';
 
 
-interface SkillLibraryProps {
-  selectedMicroSkill: MicroSkill | null;
-  onSelectMicroSkill: (skill: MicroSkill | null) => void;
-  onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
-  onOpenNewFocusArea: (type: 'deepwork' | 'upskill') => void;
-  selectedProject: Project | null;
-  onSelectProject: (project: Project | null) => void;
-  onDeleteFocusArea: (defId: string) => void;
-  onUpdateFocusAreaName: (defId: string, newName: string) => void;
-  onOpenMindMap: (focusAreaId: string) => void;
-  onEditFocusArea: (def: ExerciseDefinition) => void;
-  addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
-  onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
-  onToggleReadyForBranding: (defId: string) => void;
+interface TaskItemProps {
+    task: ExerciseDefinition;
+    allDefinitions: Map<string, ExerciseDefinition>;
+    level?: number;
+    getIcon: (def: ExerciseDefinition) => React.ReactNode;
+    onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
+    libraryView: 'deepwork' | 'upskill';
+    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
+    onContextMenu: (e: React.MouseEvent, task: ExerciseDefinition) => void;
 }
 
-const TaskItem = ({ 
-    task, 
-    allDefinitions, 
-    level = 0,
-    getIcon,
-    onSelectFocusArea,
-    onOpenMindMap,
-    onEditFocusArea,
-    onDeleteFocusArea,
-    addToRecents,
-    libraryView,
-    onOpenLinkProjectModal,
-    onToggleReadyForBranding,
-  }: {
-    task: ExerciseDefinition,
-    allDefinitions: Map<string, ExerciseDefinition>,
-    level?: number,
-    getIcon: (def: ExerciseDefinition) => React.ReactNode,
-    onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void,
-    onOpenMindMap: (focusAreaId: string) => void,
-    onEditFocusArea: (def: ExerciseDefinition) => void,
-    onDeleteFocusArea: (defId: string) => void,
-    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
-    libraryView: 'deepwork' | 'upskill';
-    onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
-    onToggleReadyForBranding: (defId: string) => void;
-  }) => {
+const TaskItem: React.FC<TaskItemProps> = ({
+  task,
+  allDefinitions,
+  level = 0,
+  getIcon,
+  onSelectFocusArea,
+  libraryView,
+  addToRecents,
+  onContextMenu
+}) => {
     const { linkedDeepWorkIds = [], linkedUpskillIds = [] } = task;
     const childIds = libraryView === 'deepwork' ? linkedDeepWorkIds : linkedUpskillIds;
     const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
@@ -87,7 +64,10 @@ const TaskItem = ({
 
     return (
         <div style={{ marginLeft: `${level * 16}px` }}>
-            <div className="flex items-center justify-between group/task rounded-md hover:bg-muted">
+            <div 
+                className="flex items-center justify-between group/task rounded-md hover:bg-muted"
+                onContextMenu={(e) => onContextMenu(e, task)}
+            >
                 <button
                     onClick={() => {
                         onSelectFocusArea(task, libraryView);
@@ -100,30 +80,6 @@ const TaskItem = ({
                     {getIcon(task)}
                     <span className="truncate" title={task.name}>{task.name}</span>
                 </button>
-                <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                             <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => onEditFocusArea(task)}><Edit3 className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                            {isIntentionOrCuriosity && (
-                              <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
-                            )}
-                            {libraryView === 'deepwork' && (
-                                <DropdownMenuItem onSelect={() => onToggleReadyForBranding(task.id)}>
-                                    <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
-                                    <span>Mark as Ready for Branding</span>
-                                </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
             </div>
             {children.length > 0 && (
                 <div className="border-l-2 ml-2 pl-2">
@@ -135,13 +91,9 @@ const TaskItem = ({
                             level={level + 1}
                             getIcon={getIcon}
                             onSelectFocusArea={onSelectFocusArea}
-                            onOpenMindMap={onOpenMindMap}
-                            onEditFocusArea={onEditFocusArea}
-                            onDeleteFocusArea={onDeleteFocusArea}
                             addToRecents={addToRecents}
                             libraryView={libraryView}
-                            onOpenLinkProjectModal={onOpenLinkProjectModal}
-                            onToggleReadyForBranding={onToggleReadyForBranding}
+                            onContextMenu={onContextMenu}
                         />
                     ))}
                 </div>
@@ -165,7 +117,18 @@ export function SkillLibrary({
     addToRecents,
     onOpenLinkProjectModal,
     onToggleReadyForBranding,
-}: SkillLibraryProps) {
+}: Omit<TaskItemProps, 'task' | 'allDefinitions' | 'level' | 'getIcon' | 'onContextMenu'> & {
+    selectedMicroSkill: MicroSkill | null;
+    selectedProject: Project | null;
+    onSelectMicroSkill: (skill: MicroSkill | null) => void;
+    onOpenNewFocusArea: (type: 'deepwork' | 'upskill') => void;
+    onSelectProject: (project: Project | null) => void;
+    onUpdateFocusAreaName: (id: string, newName: string) => void;
+    onOpenMindMap: (id: string) => void;
+    onEditFocusArea: (def: ExerciseDefinition) => void;
+    onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+    onToggleReadyForBranding: (defId: string) => void;
+}) {
   const { 
     skillDomains, 
     coreSkills, 
@@ -184,7 +147,24 @@ export function SkillLibrary({
   const [editingName, setEditingName] = useState('');
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
   const [contextMenuTask, setContextMenuTask] = useState<ExerciseDefinition | null>(null);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const contextMenuRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+            setContextMenuTask(null);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleContextMenu = (e: React.MouseEvent, task: ExerciseDefinition) => {
+    e.preventDefault();
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+    setContextMenuTask(task);
+  };
 
   const selectedDomain = skillDomains.find(d => d.id === selectedDomainId);
   const selectedCoreSkill = coreSkills.find(s => s.id === selectedSkillId);
@@ -336,13 +316,9 @@ export function SkillLibrary({
                             allDefinitions={allDefsMap}
                             getIcon={getIcon}
                             onSelectFocusArea={onSelectFocusArea}
-                            onOpenMindMap={onOpenMindMap}
-                            onEditFocusArea={onEditFocusArea}
-                            onDeleteFocusArea={onDeleteFocusArea}
                             addToRecents={addToRecents}
                             libraryView={libraryView}
-                            onOpenLinkProjectModal={onOpenLinkProjectModal}
-                            onToggleReadyForBranding={onToggleReadyForBranding}
+                            onContextMenu={handleContextMenu}
                         />
                     )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
                 </div>
@@ -444,6 +420,7 @@ export function SkillLibrary({
   };
 
   return (
+    <>
     <Card>
         <CardHeader>
            {renderHeader()}
@@ -468,5 +445,35 @@ export function SkillLibrary({
            </AnimatePresence>
         </CardContent>
     </Card>
+    {contextMenuTask && contextMenuPosition && (
+        <div
+            ref={contextMenuRef}
+            style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
+            className="fixed z-50"
+            onClick={() => setContextMenuTask(null)}
+        >
+            <DropdownMenu open={true}>
+                <DropdownMenuTrigger asChild>
+                    <div/>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                    <DropdownMenuItem onSelect={() => onEditFocusArea(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onOpenMindMap(contextMenuTask.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                    {((contextMenuTask.linkedDeepWorkIds && contextMenuTask.linkedDeepWorkIds.length > 0) || (contextMenuTask.linkedUpskillIds && contextMenuTask.linkedUpskillIds.length > 0)) && (
+                      <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                    )}
+                    {libraryView === 'deepwork' && (
+                        <DropdownMenuItem onSelect={() => onToggleReadyForBranding(contextMenuTask.id)}>
+                            <Checkbox className="mr-2" checked={!!contextMenuTask.isReadyForBranding} />
+                            <span>Mark as Ready for Branding</span>
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(contextMenuTask.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
+    )}
+    </>
   );
 }
