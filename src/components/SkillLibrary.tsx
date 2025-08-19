@@ -80,25 +80,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
     return (
         <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <div style={{ marginLeft: `${level * 16}px` }}>
-                <DropdownMenuTrigger asChild>
-                    <div
-                        onContextMenu={handleContextMenu}
-                        className="flex items-center justify-between group/task rounded-md hover:bg-muted cursor-pointer"
+                <div onContextMenu={handleContextMenu} className="group/task rounded-md hover:bg-muted cursor-pointer">
+                    <button
+                        onClick={() => {
+                            onSelectFocusArea(task, libraryView);
+                            if (isIntentionOrCuriosity) {
+                                addToRecents({ ...task, type: libraryView });
+                            }
+                        }}
+                        className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0 w-full"
                     >
-                        <button
-                            onClick={() => {
-                                onSelectFocusArea(task, libraryView);
-                                if (isIntentionOrCuriosity) {
-                                    addToRecents({ ...task, type: libraryView });
-                                }
-                            }}
-                            className="flex-grow text-left p-1 rounded-md text-sm text-muted-foreground flex items-center gap-2 min-w-0"
-                        >
-                            {getIcon(task)}
-                            <span className="truncate" title={task.name}>{task.name}</span>
-                        </button>
-                    </div>
-                </DropdownMenuTrigger>
+                        {getIcon(task)}
+                        <span className="truncate" title={task.name}>{task.name}</span>
+                    </button>
+                </div>
                 
                 <DropdownMenuContent align="start" onContextMenu={(e) => e.preventDefault()}>
                     <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
@@ -206,7 +201,7 @@ export function SkillLibrary({
   };
   
   const handleSelect = (item: any, type: 'domain' | 'coreSkill' | 'microSkill' | 'project') => {
-    onSelectFocusArea(null, 'deepwork');
+    onSelectFocusArea(null, libraryView);
     
     if(type === 'project') {
         addToRecents({ ...item, type: 'project' });
@@ -279,13 +274,13 @@ export function SkillLibrary({
   const getIcon = (def: ExerciseDefinition) => {
     const nodeType = libraryView === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
     switch (nodeType) {
-        case 'Intention': return <Lightbulb className="mr-2 h-4 w-4 text-amber-500" />;
-        case 'Objective': return <Flag className="mr-2 h-4 w-4 text-green-500" />;
-        case 'Action': return <Bolt className="mr-2 h-4 w-4 text-blue-500" />;
-        case 'Curiosity': return <Flashlight className="mr-2 h-4 w-4 text-amber-500" />;
-        case 'Visualization': return <Frame className="mr-2 h-4 w-4 text-blue-500" />;
-        case 'Standalone': return <Focus className="mr-2 h-4 w-4 text-purple-500" />;
-        default: return <Briefcase className="mr-2 h-4 w-4" />;
+        case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
+        case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+        case 'Action': return <Bolt className="h-4 w-4 text-blue-500" />;
+        case 'Curiosity': return <Flashlight className="h-4 w-4 text-amber-500" />;
+        case 'Visualization': return <Frame className="h-4 w-4 text-blue-500" />;
+        case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
+        default: return <Briefcase className="h-4 w-4" />;
     }
   };
   
