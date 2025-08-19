@@ -1756,6 +1756,14 @@ function DeepWorkPageContent() {
       setSelectedDeepWorkTask(null);
     }
   };
+  
+  const onSelectMicroSkill = (skill: MicroSkill | null) => {
+    setSelectedMicroSkill(skill);
+    // Also reset the navigation stack and selected tasks
+    setNavigationStack([]);
+    setSelectedDeepWorkTask(null);
+    setSelectedUpskillTask(null);
+  };
 
   const handleSelectRecentItem = (item: (ExerciseDefinition | Project) & { type: string }) => {
     if (item.type === 'project') {
@@ -2406,6 +2414,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
