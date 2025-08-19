@@ -833,6 +833,7 @@ function DeepWorkPageContent() {
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
   const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
+  const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
   
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'deepwork' | 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);
@@ -1901,6 +1902,8 @@ function DeepWorkPageContent() {
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
                     onToggleReadyForBranding={handleToggleReadyForBranding}
+                    libraryView={libraryView}
+                    setLibraryView={setLibraryView}
                 />
               {currentTask && (
                   <Card>
@@ -2051,7 +2054,7 @@ function DeepWorkPageContent() {
                                 ))}
                                 {selectedMicroSkill && (
                                     <Card
-                                        onClick={() => handleOpenNewFocusAreaModal('deepwork')}
+                                        onClick={() => handleOpenNewFocusAreaModal(libraryView)}
                                         className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
                                     >
                                         <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -2421,6 +2424,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
