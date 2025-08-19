@@ -7,7 +7,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { BrainCircuit, Blocks, Sprout, PlusCircle, Lightbulb, Flag, Bolt, Focus, BookCopy, Flashlight, Frame, Activity, ArrowLeft, Briefcase, Building, Folder, Workflow, Trash2, GitMerge, Edit3, ChevronLeft, MoreVertical, PackageCheck } from 'lucide-react';
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from '@/lib/utils';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature } from '@/types/workout';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -33,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 interface TaskItemProps {
@@ -44,7 +44,6 @@ interface TaskItemProps {
     libraryView: 'deepwork' | 'upskill';
     addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
     onDeleteFocusArea: (id: string) => void;
-    onUpdateFocusAreaName: (id: string, newName: string) => void;
     onOpenMindMap: (id: string) => void;
     onEdit: (def: ExerciseDefinition) => void;
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
@@ -70,22 +69,16 @@ const TaskItem: React.FC<TaskItemProps> = ({
     const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
 
     const isIntentionOrCuriosity = (task.linkedDeepWorkIds && task.linkedDeepWorkIds.length > 0) || (task.linkedUpskillIds && task.linkedUpskillIds.length > 0);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    const handleContextMenu = (event: React.MouseEvent) => {
-        event.preventDefault();
-        setIsMenuOpen(true);
-    };
-    
     return (
-        <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+        <DropdownMenu>
             <div style={{ marginLeft: `${level * 16}px` }}>
-                <div 
-                    className="flex items-center justify-between group/task rounded-md hover:bg-muted"
-                >
-                    <DropdownMenuTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                    <div
+                        className="flex items-center justify-between group/task rounded-md hover:bg-muted cursor-pointer"
+                        onContextMenu={(e) => e.preventDefault()}
+                    >
                         <button
-                            onContextMenu={handleContextMenu}
                             onClick={() => {
                                 onSelectFocusArea(task, libraryView);
                                 if (isIntentionOrCuriosity) {
@@ -97,21 +90,21 @@ const TaskItem: React.FC<TaskItemProps> = ({
                             {getIcon(task)}
                             <span className="truncate" title={task.name}>{task.name}</span>
                         </button>
-                    </DropdownMenuTrigger>
-                </div>
+                    </div>
+                </DropdownMenuTrigger>
 
-                <DropdownMenuContent align="start" onContextMenu={(e) => e.preventDefault()}>
-                    <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                <DropdownMenuContent align="start">
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onEdit(task); }}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenMindMap(task.id); }}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenLinkProjectModal(task); }}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                     {libraryView === 'deepwork' && (
-                        <DropdownMenuItem onSelect={() => onToggleReadyForBranding(task.id)}>
+                        <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onToggleReadyForBranding(task.id); }}>
                             <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
                             <span>Mark as Ready for Branding</span>
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onDeleteFocusArea(task.id); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
                 </DropdownMenuContent>
 
                 {children.length > 0 && (
@@ -159,14 +152,16 @@ export function SkillLibrary({
     setLibraryView,
 }: {
     selectedMicroSkill: MicroSkill | null;
-    selectedProject: Project | null;
     onSelectMicroSkill: (skill: MicroSkill | null) => void;
+    onSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
     onOpenNewFocusArea: (type: 'deepwork' | 'upskill') => void;
+    selectedProject: Project | null;
     onSelectProject: (project: Project | null) => void;
     onDeleteFocusArea: (id: string) => void;
     onUpdateFocusAreaName: (id: string, newName: string) => void;
     onOpenMindMap: (id: string) => void;
     onEdit: (def: ExerciseDefinition) => void;
+    addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onToggleReadyForBranding: (defId: string) => void;
     libraryView: 'deepwork' | 'upskill';
@@ -185,6 +180,8 @@ export function SkillLibrary({
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId
   } = useAuth();
+  
+  const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
   
   const definitions = libraryView === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
   
@@ -356,7 +353,6 @@ export function SkillLibrary({
             </div>
         );
     }
-
 
     if (selectedCoreSkill) {
       return (
