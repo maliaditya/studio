@@ -74,10 +74,6 @@ function PathPageContent() {
     return { width: Math.max(width, 800), height: Math.max(height, 600) };
   }, [upcomingReleases]);
 
-  const getIcon = (type: 'product' | 'service') => {
-    return <Package className="h-6 w-6 text-primary" />;
-  }
-
   return (
     <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-8 overflow-auto relative">
       <div className="w-full max-w-4xl flex items-center justify-center">
@@ -143,7 +139,6 @@ function PathPageContent() {
               }}
             >
               <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
-                  <div className="mb-2">{getIcon(item.type)}</div>
                   <p className="text-lg font-bold leading-tight" title={item.release.name}>
                     {item.release.name}
                   </p>
