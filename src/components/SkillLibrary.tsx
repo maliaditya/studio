@@ -60,7 +60,8 @@ const TaskItem = ({
     onEditFocusArea,
     onDeleteFocusArea,
     addToRecents,
-    libraryView
+    libraryView,
+    onOpenLinkProjectModal,
   }: {
     task: ExerciseDefinition,
     allDefinitions: Map<string, ExerciseDefinition>,
@@ -71,14 +72,14 @@ const TaskItem = ({
     onEditFocusArea: (def: ExerciseDefinition) => void,
     onDeleteFocusArea: (defId: string) => void,
     addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void,
-    libraryView: 'deepwork' | 'upskill'
+    libraryView: 'deepwork' | 'upskill';
+    onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
   }) => {
     const { linkedDeepWorkIds = [], linkedUpskillIds = [] } = task;
     const childIds = libraryView === 'deepwork' ? linkedDeepWorkIds : linkedUpskillIds;
     const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
 
-    const [isEditing, setIsEditing] = useState(false);
-    const [name, setName] = useState(task.name);
+    const isIntentionOrCuriosity = (task.linkedDeepWorkIds && task.linkedDeepWorkIds.length > 0) || (task.linkedUpskillIds && task.linkedUpskillIds.length > 0);
 
     return (
         <div style={{ marginLeft: `${level * 16}px` }}>
@@ -94,9 +95,22 @@ const TaskItem = ({
                     <span className="truncate" title={task.name}>{task.name}</span>
                 </button>
                 <div className="flex-shrink-0 flex items-center opacity-0 group-hover/task:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onOpenMindMap(task.id)}>
-                        <GitMerge className="h-3 w-3" />
-                    </Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                             <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => onEditFocusArea(task)}><Edit3 className="mr-2 h-4 w-4" />Edit</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                            {isIntentionOrCuriosity && (
+                              <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
             {children.length > 0 && (
@@ -114,6 +128,7 @@ const TaskItem = ({
                             onDeleteFocusArea={onDeleteFocusArea}
                             addToRecents={addToRecents}
                             libraryView={libraryView}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                         />
                     ))}
                 </div>
@@ -318,6 +333,7 @@ export function SkillLibrary({
                             onDeleteFocusArea={onDeleteFocusArea}
                             addToRecents={addToRecents}
                             libraryView={libraryView}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                         />
                     )) : <p className="text-xs text-muted-foreground text-center py-2">No top-level tasks for this skill yet.</p>}
                 </div>
