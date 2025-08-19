@@ -991,28 +991,26 @@ function DeepWorkPageContent() {
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const hasUpskillChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
-    
+
     if (!hasUpskillChildren) {
-        const isChildOfUpskill = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-        return isChildOfUpskill ? 'Visualization' : 'Standalone';
+      const isChildOfUpskill = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+      return isChildOfUpskill ? 'Visualization' : 'Standalone';
+    }
+
+    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
+      const childDef = upskillDefinitions.find(d => d.id === childId);
+      if (!childDef) return false;
+      // An actionable child is a leaf node in its own branch.
+      const nodeType = getUpskillNodeType(childDef);
+      return nodeType === 'Visualization' || nodeType === 'Standalone';
+    });
+
+    if (hasActionableChild) {
+      return 'Objective';
     }
     
-    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        if (!childDef) return false;
-        const nodeType = getUpskillNodeType(childDef);
-        return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-    if (hasActionableChild) return 'Objective';
-    
-    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        if (!childDef) return false;
-        return getUpskillNodeType(childDef) === 'Objective';
-    });
-    if (hasObjectiveChild) return 'Curiosity';
-    
-    return 'Objective';
+    // If it has children but none are actionable (i.e., they are all Objectives or Curiosities), it's a Curiosity.
+    return 'Curiosity';
   }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
