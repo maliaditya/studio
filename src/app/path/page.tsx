@@ -75,10 +75,17 @@ function PathPageContent() {
   }, [upcomingReleases]);
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-gray-900 text-white p-8 overflow-auto relative">
-      <div className="w-full max-w-4xl flex items-center justify-center">
+    <div className="flex flex-col min-h-screen bg-gray-900 text-white p-8">
+      <div className="w-full max-w-4xl mx-auto text-center mb-12">
+        <h1 className="text-4xl font-bold tracking-tight">Your Strategic Path</h1>
+        <p className="mt-4 text-lg text-gray-400">
+          A visual timeline of your upcoming product and service releases, ordered by launch date.
+        </p>
+      </div>
+
+      <div className="flex-grow flex items-center justify-center overflow-auto relative">
         {upcomingReleases.length === 0 ? (
-          <div className="text-center absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-center">
              <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-700 rounded-lg">
                 <Zap className="h-16 w-16 text-yellow-400 mb-4" />
                 <h2 className="text-2xl font-bold mb-2">No Upcoming Releases</h2>
@@ -86,7 +93,8 @@ function PathPageContent() {
             </div>
           </div>
         ) : (
-            <svg width={svgSize.width} height={svgSize.height} className="overflow-visible">
+          <div className="relative" style={{ width: `${svgSize.width}px`, height: `${svgSize.height}px` }}>
+            <svg width={svgSize.width} height={svgSize.height} className="absolute inset-0 overflow-visible">
                 <defs>
                     <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto" markerUnits="strokeWidth">
                         <polygon points="0 0, 10 3.5, 0 7" fill="hsl(210 40% 96.1% / 0.5)" />
@@ -119,40 +127,39 @@ function PathPageContent() {
                     );
                 })}
             </svg>
-        )}
-      </div>
-
-      {/* Render Nodes on top of SVG */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2" style={{ width: `${svgSize.width}px`, height: `${svgSize.height}px` }}>
-        {upcomingReleases.map((item) => {
-          const pos = nodePositions.get(item.release.id);
-          if (!pos) return null;
-          return (
-            <div
-              key={item.release.id}
-              className="absolute flex items-center justify-center text-center p-4 shadow-2xl"
-              style={{
-                left: pos.x - NODE_DIAMETER / 2,
-                top: pos.y - NODE_DIAMETER / 2,
-                width: NODE_DIAMETER,
-                height: NODE_DIAMETER,
-              }}
-            >
-              <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
-                  <p className="text-lg font-bold leading-tight" title={item.release.name}>
-                    {item.release.name}
-                  </p>
-                  <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
-                    ({item.topic})
-                  </p>
-                  <div className="mt-3 text-xs text-yellow-400">
-                    <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
-                    <p>({item.release.daysRemaining} days)</p>
+            
+            {/* Render Nodes on top of SVG */}
+            {upcomingReleases.map((item) => {
+              const pos = nodePositions.get(item.release.id);
+              if (!pos) return null;
+              return (
+                <div
+                  key={item.release.id}
+                  className="absolute flex items-center justify-center text-center p-4 shadow-2xl"
+                  style={{
+                    left: pos.x - NODE_DIAMETER / 2,
+                    top: pos.y - NODE_DIAMETER / 2,
+                    width: NODE_DIAMETER,
+                    height: NODE_DIAMETER,
+                  }}
+                >
+                  <div className="relative w-full h-full bg-gray-800 border-2 border-gray-600 rounded-full flex flex-col items-center justify-center p-4">
+                      <p className="text-lg font-bold leading-tight" title={item.release.name}>
+                        {item.release.name}
+                      </p>
+                      <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
+                        ({item.topic})
+                      </p>
+                      <div className="mt-3 text-xs text-yellow-400">
+                        <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
+                        <p>({item.release.daysRemaining} days)</p>
+                      </div>
                   </div>
-              </div>
-            </div>
-          );
-        })}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
