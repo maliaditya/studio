@@ -16,6 +16,8 @@ import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { useAuth } from '@/contexts/AuthContext';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -137,7 +139,9 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                                         </div>
                                     ) : point.type === 'code' ? (
-                                         <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                            {point.text || ""}
+                                        </SyntaxHighlighter>
                                     ) : (
                                         <span className="break-words w-full" title={point.text}>{point.text}</span>
                                     )}
@@ -214,7 +218,9 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
                                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                                       </div>
                                   ) : point.type === 'code' ? (
-                                      <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                            {point.text || ""}
+                                        </SyntaxHighlighter>
                                   ) : (
                                       <span className="break-words w-full" title={point.text}>{point.text}</span>
                                   )}
@@ -587,6 +593,7 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
 
 
 

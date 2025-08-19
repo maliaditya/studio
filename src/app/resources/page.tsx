@@ -36,6 +36,8 @@ import { Separator } from '@/components/ui/separator';
 import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -1802,7 +1804,9 @@ function ResourcesPageContent() {
                                     {point.type === 'markdown' ? (
                                         <div className="prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
                                     ) : (
-                                        <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                            {point.text || ""}
+                                        </SyntaxHighlighter>
                                     )}
                                 </div>
                             ))
@@ -1889,7 +1893,9 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
                 ) : point.type === 'markdown' ? (
                     <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
                 ) : point.type === 'code' ? (
-                    <pre className="w-full bg-muted/50 p-2 rounded-md text-xs font-mono text-foreground whitespace-pre-wrap break-words">{point.text}</pre>
+                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                        {point.text || ""}
+                    </SyntaxHighlighter>
                 ) : point.type === 'link' ? (
                      <div className="flex-grow min-w-0 flex items-center gap-2">
                         {point.text && <Image src={getFaviconUrl(point.text)!} alt="" width={16} height={16} className="flex-shrink-0"/>}
@@ -1926,5 +1932,6 @@ export default function ResourcesPage() {
     
 
     
+
 
 
