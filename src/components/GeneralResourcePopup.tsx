@@ -19,6 +19,7 @@ import remarkGfm from 'remark-gfm';
 import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { Dialog, DialogHeader, DialogTitle } from './ui/dialog';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -33,6 +34,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const [markdownModalState, setMarkdownModalState] = useState<{ isOpen: boolean; resource: Resource | null; point: ResourcePoint | null }>({ isOpen: false, resource: null, point: null });
+
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     
@@ -107,6 +110,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         }
     };
 
+    const handleOpenMarkdownModal = (point: ResourcePoint) => {
+        setMarkdownModalState({ isOpen: true, resource, point });
+    };
+
     const renderContent = () => {
         switch (resource.type) {
             case 'card':
@@ -119,6 +126,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
                                 onDelete={() => handleDeletePoint(point.id)}
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
+                                onOpenMarkdownModal={() => handleOpenMarkdownModal(point)}
                             />
                         ))}
                     </ul>
@@ -194,72 +202,94 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-            <audio ref={audioRef} />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
-                <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                </div>
-                <div className="absolute top-2 right-2 z-20 flex items-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                        {getIcon()}
-                        {editingTitle ? (
-                            <Input 
-                                value={resource.name} 
-                                onChange={(e) => handleTitleChange(e.target.value)} 
-                                onBlur={() => setEditingTitle(false)} 
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base"
-                                autoFocus
-                            />
-                        ) : (
-                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name}
-                            </CardTitle>
-                        )}
+        <>
+            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+                <audio ref={audioRef} />
+                <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
+                    <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
+                        <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                     </div>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {renderContent()}
-                    </CardContent>
-                </div>
-                 {resource.type === 'card' && (
-                    <CardFooter className="p-2 flex gap-2">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className="w-full">
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-1">
-                               <div className="space-y-1">
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                    <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                               </div>
-                            </PopoverContent>
-                        </Popover>
-                    </CardFooter>
-                 )}
-            </Card>
-        </div>
+                    <div className="absolute top-2 right-2 z-20 flex items-center">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+
+                    <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                            {getIcon()}
+                            {editingTitle ? (
+                                <Input 
+                                    value={resource.name} 
+                                    onChange={(e) => handleTitleChange(e.target.value)} 
+                                    onBlur={() => setEditingTitle(false)} 
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                    className="h-8 text-base"
+                                    autoFocus
+                                />
+                            ) : (
+                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                    {resource.name}
+                                </CardTitle>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <div className="flex-grow min-h-0 overflow-y-auto">
+                        <CardContent className="p-3 pt-0">
+                            {renderContent()}
+                        </CardContent>
+                    </div>
+                    {resource.type === 'card' && (
+                        <CardFooter className="p-2 flex gap-2">
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" size="sm" className="w-full">
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48 p-1">
+                                <div className="space-y-1">
+                                        <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
+                                        <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
+                                        <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
+                                        <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                                </div>
+                                </PopoverContent>
+                            </Popover>
+                        </CardFooter>
+                    )}
+                </Card>
+            </div>
+             <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                    <DialogHeader className="p-4 border-b">
+                        <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-grow min-h-0">
+                        <ScrollArea className="h-full">
+                            <div className="p-6">
+                                {markdownModalState.point?.type === 'markdown' ? (
+                                    <div className="prose dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown></div>
+                                ) : (
+                                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0 }} showLineNumbers>
+                                        {markdownModalState.point?.text || ""}
+                                    </SyntaxHighlighter>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void 
+    onOpenMarkdownModal: () => void;
 }) => {
     const { setFloatingVideoUrl } = useAuth();
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
@@ -320,22 +350,19 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
                         className="text-sm" 
                         rows={1}
                     />
-                ) : point.type === 'markdown' ? (
-                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
-                ) : point.type === 'code' ? (
-                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                        {point.text || ""}
-                    </SyntaxHighlighter>
+                ) : point.type === 'markdown' || point.type === 'code' ? (
+                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenMarkdownModal}>
+                      {point.type === 'markdown' ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown>
+                      ) : (
+                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                            {point.text || ""}
+                        </SyntaxHighlighter>
+                      )}
+                    </div>
                 ) : point.type === 'link' ? (
                      <div className="flex-grow min-w-0">
-                        <span 
-                            className="cursor-pointer text-primary hover:underline truncate" 
-                            title={point.text} 
-                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
-                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
-                        >
-                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
-                        </span>
+                        <span className="cursor-pointer text-primary hover:underline" onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text}</span>
                     </div>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
