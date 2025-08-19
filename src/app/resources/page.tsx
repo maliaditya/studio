@@ -273,8 +273,9 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                                         }}
                                         onDelete={() => handleDeletePoint(point.id)}
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
+                                        onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={() => onConvertToCard(point)}
+                                        onConvertToCard={onConvertToCard}
                                     />
                                 ))}
                             </ul>
@@ -361,12 +362,13 @@ const SortableResourceCard = ({ item, children, className, linkingFromId }: {
     );
 };
 
-const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText }: {
+const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
     point: ResourcePoint;
     onConvertToCard: () => void;
     onUpdate: (updatedText: string) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onOpenMarkdownModal: () => void;
     onEditLinkText: (point: ResourcePoint) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
@@ -405,6 +407,7 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onEditLinkText={onEditLinkText}
+                onOpenMarkdownModal={onOpenMarkdownModal}
                 onConvertToCard={onConvertToCard}
                 dragHandle={{ attributes, listeners }}
             />
@@ -502,9 +505,9 @@ function ResourcesPageContent() {
 
   const [markdownModalState, setMarkdownModalState] = useState<{
     isOpen: boolean;
-    resourceId: string | null;
-    pointId: string | null;
-  }>({ isOpen: false, resourceId: null, pointId: null });
+    resource: Resource | null;
+    point: ResourcePoint | null;
+  }>({ isOpen: false, resource: null, point: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -1223,10 +1226,14 @@ function ResourcesPageContent() {
   };
   
   const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
-      setMarkdownModalState({ isOpen: true, resourceId, pointId });
+      const resource = resources.find(r => r.id === resourceId);
+      const point = resource?.points?.find(p => p.id === pointId);
+      if (resource && point) {
+        setMarkdownModalState({ isOpen: true, resource, point });
+      }
   };
   
-  const currentMarkdownResource = resources.find(r => r.id === markdownModalState.resourceId);
+  const currentMarkdownResource = markdownModalState.resource;
 
   const sortedTabs = useMemo(() => {
     return [...activeResourceTabIds].sort((a, b) => {
@@ -1294,13 +1301,12 @@ function ResourcesPageContent() {
 
     // Create a new resource card in the determined sub-folder
     const newCard: Resource = {
-        id: `res_${Date.now()}`,
+        id: `res_card_${Date.now()}`,
         name: point.text,
         folderId: subFolderId,
         type: 'card',
-        points: [],
-        icon: 'Library',
         createdAt: new Date().toISOString(),
+        points: []
     };
     
     // Update the original point to link to the new card
@@ -1792,25 +1798,18 @@ function ResourcesPageContent() {
         <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
           <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
               <DialogHeader className="p-4 border-b">
-                  <DialogTitle>{currentMarkdownResource?.name || "Resource"}</DialogTitle>
+                  <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
               </DialogHeader>
               <div className="flex-grow min-h-0">
                   <ScrollArea className="h-full">
-                      <div className="p-6 space-y-4">
-                        {(currentMarkdownResource?.points || [])
-                            .filter(p => p.type === 'markdown' || p.type === 'code')
-                            .map((point) => (
-                                <div key={point.id}>
-                                    {point.type === 'markdown' ? (
-                                        <div className="prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
-                                    ) : (
-                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                                            {point.text || ""}
-                                        </SyntaxHighlighter>
-                                    )}
-                                </div>
-                            ))
-                        }
+                      <div className="p-6">
+                        {markdownModalState.point?.type === 'markdown' ? (
+                            <div className="prose dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown></div>
+                        ) : (
+                            <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0 }} showLineNumbers>
+                                {markdownModalState.point?.text || ""}
+                            </SyntaxHighlighter>
+                        )}
                       </div>
                   </ScrollArea>
               </div>
@@ -1837,10 +1836,12 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onEditLinkText, dragHandle }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
     onUpdate: (updatedText: string) => void, 
     onDelete: () => void,
+    onOpenNestedPopup: (event: React.MouseEvent) => void;
+    onOpenMarkdownModal: () => void;
     onEditLinkText: (point: ResourcePoint) => void;
     onConvertToCard: () => void;
     dragHandle?: { attributes: any; listeners: any };
@@ -1873,7 +1874,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
         e.target.style.height = 'auto';
         e.target.style.height = `${e.target.scrollHeight}px`;
     }
-
+    
     return (
         <li className="flex items-start gap-3 group/item w-full">
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity" {...dragHandle?.attributes} {...dragHandle?.listeners}>
@@ -1890,12 +1891,16 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onE
                         className="text-sm" 
                         rows={1}
                     />
-                ) : point.type === 'markdown' ? (
-                    <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown></div>
-                ) : point.type === 'code' ? (
-                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                        {point.text || ""}
-                    </SyntaxHighlighter>
+                ) : point.type === 'markdown' || point.type === 'code' ? (
+                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenMarkdownModal}>
+                      {point.type === 'markdown' ? (
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown>
+                      ) : (
+                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                            {point.text || ""}
+                        </SyntaxHighlighter>
+                      )}
+                    </div>
                 ) : point.type === 'link' ? (
                      <div className="flex-grow min-w-0 flex items-center gap-2">
                         {point.text && <Image src={getFaviconUrl(point.text)!} alt="" width={16} height={16} className="flex-shrink-0"/>}
@@ -1932,6 +1937,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 

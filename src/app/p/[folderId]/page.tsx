@@ -161,12 +161,13 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
 };
 
 
-const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setPlayingAudio, setFloatingVideoUrl }: { 
+const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setPlayingAudio, setFloatingVideoUrl, onOpenMarkdownModal }: { 
   resource: Resource; 
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   playingAudio: { id: string; isPlaying: boolean } | null;
   setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
   setFloatingVideoUrl: (url: string | null) => void;
+  onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
     const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
@@ -213,14 +214,16 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
                                       <button onClick={(e) => onOpenNestedPopup(point.resourceId!, e)} className="text-left font-medium text-primary hover:underline">
                                           {point.text}
                                       </button>
-                                  ) : point.type === 'markdown' ? (
-                                      <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                  ) : point.type === 'markdown' || point.type === 'code' ? (
+                                      <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={() => onOpenMarkdownModal(resource.id, point.id)}>
+                                          {point.type === 'markdown' ? (
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                          ) : (
+                                            <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                                {point.text || ""}
+                                            </SyntaxHighlighter>
+                                          )}
                                       </div>
-                                  ) : point.type === 'code' ? (
-                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                                            {point.text || ""}
-                                        </SyntaxHighlighter>
                                   ) : (
                                       <span className="break-words w-full" title={point.text}>{point.text}</span>
                                   )}
@@ -311,10 +314,11 @@ export default function SharedFolderPage() {
     
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(folderId);
     const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+    const [markdownModalState, setMarkdownModalState] = useState<{ isOpen: boolean; resource: Resource | null; point: ResourcePoint | null }>({ isOpen: false, resource: null, point: null });
 
     const { setFloatingVideoUrl, globalVolume } = useAuth();
     const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-    const [playingAudio, setPlayingAudio] = useState<{ id: string, isPlaying: boolean } | null>(null);
+    const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
@@ -484,6 +488,14 @@ export default function SharedFolderPage() {
         }
     };
 
+    const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
+        const resource = data?.resources.find(r => r.id === resourceId);
+        const point = resource?.points?.find(p => p.id === pointId);
+        if (resource && point) {
+            setMarkdownModalState({ isOpen: true, resource, point });
+        }
+    };
+
 
     if (loading) {
         return (
@@ -542,7 +554,7 @@ export default function SharedFolderPage() {
                                     const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
                                     return (
                                         <div key={res.id} className={cardClassName}>
-                                            <ResourceCardComponent resource={res} onOpenNestedPopup={handleOpenNestedPopup} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} setFloatingVideoUrl={setFloatingVideoUrl} />
+                                            <ResourceCardComponent resource={res} onOpenNestedPopup={handleOpenNestedPopup} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} setFloatingVideoUrl={setFloatingVideoUrl} onOpenMarkdownModal={handleOpenMarkdownModal} />
                                         </div>
                                     );
                                 })}
@@ -565,6 +577,26 @@ export default function SharedFolderPage() {
                     onSizeChange={handleSizeChange}
                 />
             ))}
+            <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
+                <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                    <DialogHeader className="p-4 border-b">
+                        <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-grow min-h-0">
+                        <ScrollArea className="h-full">
+                            <div className="p-6">
+                                {markdownModalState.point?.type === 'markdown' ? (
+                                    <div className="prose dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown></div>
+                                ) : (
+                                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0 }} showLineNumbers>
+                                        {markdownModalState.point?.text || ""}
+                                    </SyntaxHighlighter>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
             {Array.from(openPopups.values()).map(popup => {
                 if (!popup.parentId) return null;
@@ -593,6 +625,7 @@ export default function SharedFolderPage() {
         </DndContext>
     );
 }
+
 
 
 
