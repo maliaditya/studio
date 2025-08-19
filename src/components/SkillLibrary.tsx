@@ -31,6 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -69,14 +70,20 @@ const TaskItem: React.FC<TaskItemProps> = ({
     const children = childIds.map(id => allDefinitions.get(id)).filter((d): d is ExerciseDefinition => !!d);
 
     const isIntentionOrCuriosity = (task.linkedDeepWorkIds && task.linkedDeepWorkIds.length > 0) || (task.linkedUpskillIds && task.linkedUpskillIds.length > 0);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsMenuOpen(true);
+    };
 
     return (
-        <DropdownMenu>
+        <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <div style={{ marginLeft: `${level * 16}px` }}>
                 <DropdownMenuTrigger asChild>
                     <div
+                        onContextMenu={handleContextMenu}
                         className="flex items-center justify-between group/task rounded-md hover:bg-muted cursor-pointer"
-                        onContextMenu={(e) => e.preventDefault()}
                     >
                         <button
                             onClick={() => {
@@ -92,19 +99,19 @@ const TaskItem: React.FC<TaskItemProps> = ({
                         </button>
                     </div>
                 </DropdownMenuTrigger>
-
-                <DropdownMenuContent align="start">
-                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onEdit(task); }}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenMindMap(task.id); }}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenLinkProjectModal(task); }}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                
+                <DropdownMenuContent align="start" onContextMenu={(e) => e.preventDefault()}>
+                    <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                     {libraryView === 'deepwork' && (
-                        <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onToggleReadyForBranding(task.id); }}>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onToggleReadyForBranding(task.id); }}>
                             <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
                             <span>Mark as Ready for Branding</span>
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onDeleteFocusArea(task.id); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
                 </DropdownMenuContent>
 
                 {children.length > 0 && (
