@@ -200,7 +200,7 @@ export function TodaysLearningModal({
         const microSkillId = microSkillInfo[0];
         if(!microSkillIdsInProject.has(microSkillId)) return false;
 
-        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
         const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
         
         return isParent && !isLinkedAsChild;
@@ -220,7 +220,7 @@ export function TodaysLearningModal({
           const node = upskillDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          const isParent = (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+          const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
   
           if (!isParent) { // It's a Visualization
               visualizations.push(node);
@@ -257,7 +257,7 @@ export function TodaysLearningModal({
           const node = deepWorkDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
+          const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0;
   
           if (!isParent) { // It's an Action
               actions.push(node);
@@ -274,7 +274,7 @@ export function TodaysLearningModal({
     if (!selectedDeepWorkProject || pageType !== 'deepwork') return [];
 
     return (deepWorkDefinitions || []).filter(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
         const isChild = linkedDeepWorkChildIds.has(def.id);
         const isIntention = isParent && !isChild;
 
