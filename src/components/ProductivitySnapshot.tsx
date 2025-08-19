@@ -1,6 +1,7 @@
 
 "use client";
 
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -15,7 +16,6 @@ import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, C
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Dialog,
@@ -325,47 +325,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <DialogHeader>
               <DialogTitle>Manage Features for "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                {selectedReleaseInfo.release.description
-                  ? `Goal: ${selectedReleaseInfo.release.description}`
-                  : "Break down this release into smaller, actionable features. This will create new Deep Work tasks."
-                }
+                {selectedReleaseInfo.release.description || 'Break down this release into smaller, actionable tasks.'}
               </DialogDescription>
             </DialogHeader>
-
-            <div className="grid grid-cols-3 gap-4 text-center my-4">
-                <div className="p-2 bg-muted/50 rounded-md">
-                    <p className="text-sm text-muted-foreground">Days Remaining</p>
-                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.daysRemaining}</p>
-                </div>
-                <div className="p-2 bg-muted/50 rounded-md">
-                    <p className="text-sm text-muted-foreground">Productive Hours</p>
-                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.availableHours?.toFixed(1) ?? 'N/A'}</p>
-                </div>
-                <div className="p-2 bg-muted/50 rounded-md">
-                    <p className="text-sm text-muted-foreground">Total Hours</p>
-                    <p className="text-2xl font-bold">{selectedReleaseInfo.release.totalAvailableHours ?? 'N/A'}</p>
-                </div>
-            </div>
             
-            {(selectedReleaseInfo.release.totalLoggedHours !== undefined || (selectedReleaseInfo.release.totalEstimatedHours && selectedReleaseInfo.release.totalEstimatedHours > 0)) && (
-                <div className="flex justify-around items-center text-center p-3 my-2 bg-muted/50 rounded-lg">
-                    <div>
-                        <p className="text-sm text-muted-foreground">Logged Hours</p>
-                        <p className="text-2xl font-bold">{(selectedReleaseInfo.release.totalLoggedHours || 0).toFixed(1)}h</p>
-                    </div>
-                    {selectedReleaseInfo.release.totalEstimatedHours && selectedReleaseInfo.release.totalEstimatedHours > 0 && (
-                        <>
-                            <div className="text-2xl text-muted-foreground">/</div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Estimated Hours</p>
-                                <p className="text-2xl font-bold">{selectedReleaseInfo.release.totalEstimatedHours}h</p>
-                            </div>
-                        </>
-                    )}
-                </div>
-            )}
-            
-             {microSkillsForRelease.length > 0 && (
+            {microSkillsForRelease.length > 0 && (
                 <div className="space-y-2">
                     <Label className="font-semibold">Associated Micro-Skills</Label>
                     <div className="flex flex-wrap gap-1">
