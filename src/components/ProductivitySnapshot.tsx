@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -317,7 +316,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <DialogHeader>
               <DialogTitle>Manage Features for "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                 View existing features or add a new one. This will also create a new focus area in your Deep Work library under the "{selectedReleaseInfo.topic}" topic.
+                {selectedReleaseInfo.release.description
+                  ? `Goal: ${selectedReleaseInfo.release.description}`
+                  : 'Add features to this release. Each feature will become a new Deep Work task under the same topic.'
+                }
               </DialogDescription>
             </DialogHeader>
 
