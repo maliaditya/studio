@@ -624,6 +624,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
+    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, autoPush: false, autoPushLimit: 100 };
+    
+    if (settings.autoPush && localChangeCount >= settings.autoPushLimit) {
+        if (currentUser.username !== 'demo') {
+            pushDataToCloud();
+        }
+    }
+  }, [localChangeCount, currentUser, isScheduleLoaded]);
+
+  useEffect(() => {
+    if (!currentUser || !isScheduleLoaded) return;
+    
+    const settingsKey = `lifeos_settings_${currentUser.username}`;
+    const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
     if (!settings.carryForward) return;
 
@@ -1985,3 +1999,4 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+

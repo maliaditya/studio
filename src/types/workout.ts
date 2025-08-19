@@ -164,6 +164,7 @@ export interface Activity {
   focusSessionEndTime?: number;
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
   focusSessionInitialDuration?: number; // The originally intended duration
+  duration?: number; // For interruptions
 };
 
 export interface Interrupt {
@@ -416,6 +417,7 @@ export interface Project {
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
   purposePillar?: string;
+  productPlan?: ProjectPlan; // Added for dedicated product planning
 }
 
 // Professional Experience Types
@@ -445,6 +447,13 @@ export interface PillarCardData {
   practiceEquationIds: string[];
   applicationSpecializationIds: string[];
   outcome: string;
+}
+
+export interface ProjectPlan {
+  linkedRuleEquationIds: string[];
+  targetDate: string;
+  requiredMoney: number | null;
+  requiredHours: number | null;
 }
 
 export interface HabitEquation {

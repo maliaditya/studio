@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -24,12 +25,18 @@ interface SettingsModalProps {
 
 interface UserSettings {
   carryForward: boolean;
+  autoPush: boolean;
+  autoPushLimit: number;
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const { currentUser, theme, setTheme } = useAuth();
   const { toast } = useToast();
-  const [settings, setSettings] = useState<UserSettings>({ carryForward: false });
+  const [settings, setSettings] = useState<UserSettings>({ 
+    carryForward: false,
+    autoPush: false,
+    autoPushLimit: 100,
+  });
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
 
@@ -38,18 +45,23 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       try {
         const storedSettings = localStorage.getItem(settingsKey);
         if (storedSettings) {
-          setSettings(JSON.parse(storedSettings));
+          const parsedSettings = JSON.parse(storedSettings);
+          setSettings({
+            carryForward: parsedSettings.carryForward || false,
+            autoPush: parsedSettings.autoPush || false,
+            autoPushLimit: parsedSettings.autoPushLimit || 100,
+          });
         } else {
-          setSettings({ carryForward: false });
+          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100 });
         }
       } catch (error) {
         console.error("Failed to load settings from localStorage", error);
-        setSettings({ carryForward: false });
+        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100 });
       }
     }
   }, [isOpen, settingsKey]);
 
-  const handleSettingChange = (key: keyof UserSettings, value: boolean) => {
+  const handleSettingChange = (key: keyof UserSettings, value: boolean | number) => {
     if (!settingsKey) return;
     
     const newSettings = { ...settings, [key]: value };
@@ -122,6 +134,39 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               </div>
             </RadioGroup>
           </div>
+          
+           <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <Label className="text-base">Cloud Sync</Label>
+              <p className="text-sm text-muted-foreground">
+                Manage how your data is synced to the cloud.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="auto-push"
+                checked={settings.autoPush}
+                onCheckedChange={(checked) => handleSettingChange('autoPush', checked)}
+              />
+              <Label htmlFor="auto-push" className="font-normal">
+                Auto Push to Cloud
+              </Label>
+            </div>
+             <div className="flex items-center space-x-2">
+              <Label htmlFor="auto-push-limit" className="font-normal flex-shrink-0">
+                Push when changes reach:
+              </Label>
+              <Input
+                id="auto-push-limit"
+                type="number"
+                value={settings.autoPushLimit}
+                onChange={(e) => handleSettingChange('autoPushLimit', parseInt(e.target.value, 10) || 0)}
+                className="w-24 h-8"
+                disabled={!settings.autoPush}
+              />
+            </div>
+          </div>
+
           <div className="space-y-4 rounded-lg border p-4">
             <div className="space-y-0.5">
               <Label className="text-base">General</Label>
@@ -136,7 +181,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 onCheckedChange={(checked) => handleSettingChange('carryForward', checked)}
               />
               <Label htmlFor="carry-forward" className="font-normal">
-                Carry-forward yesterday's incomplete tasks to today.
+                Carry-forward yesterday's incomplete tasks.
               </Label>
             </div>
              <div className="flex items-center justify-between">
