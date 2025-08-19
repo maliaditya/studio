@@ -445,7 +445,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
-        recentItems,
     };
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
@@ -455,7 +454,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     resources, resourceFolders,
     canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
     purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
-    autoSuggestions, recentItems
+    autoSuggestions,
   ]);
 
   const uiStateData = useMemo(() => {
@@ -463,13 +462,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
         selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
         selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-        activeFocusSession, isAgendaDocked
+        activeFocusSession, isAgendaDocked,
+        recentItems,
     };
   }, [
     pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
     selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
     selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
-    activeFocusSession, isAgendaDocked
+    activeFocusSession, isAgendaDocked,
+    recentItems,
   ]);
 
   useEffect(() => {
@@ -2036,4 +2037,3 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
  
-
