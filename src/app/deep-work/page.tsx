@@ -991,14 +991,16 @@ function DeepWorkPageContent() {
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasUpskillChildren = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        if (!childDef) return false;
+        return getUpskillNodeType(childDef) === 'Objective';
+    });
   
-    if (!hasUpskillChildren) {
-      const isChildOfUpskill = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-      return isChildOfUpskill ? 'Visualization' : 'Standalone';
+    if (hasObjectiveChild) {
+        return 'Curiosity';
     }
   
-    // An Objective MUST have a direct child that is actionable (Visualization or Standalone)
     const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
       const childDef = upskillDefinitions.find(d => d.id === childId);
       if (!childDef) return false;
@@ -1009,9 +1011,16 @@ function DeepWorkPageContent() {
     if (hasActionableChild) {
       return 'Objective';
     }
-    
-    // If it has children but none are directly actionable, it's a Curiosity.
-    return 'Curiosity';
+  
+    const hasChildren = (def.linkedUpskillIds || []).length > 0;
+    if(hasChildren) {
+        // If it has children but none are objectives or actionable, it's not a Curiosity.
+        // It becomes an Objective by definition of having children that are not higher-level.
+        return 'Objective';
+    }
+  
+    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+    return isLinkedAsChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
@@ -2050,7 +2059,7 @@ function DeepWorkPageContent() {
                                         upskillDef={def}
                                         nodeType={getUpskillNodeType(def)}
                                         handleAddTaskToSession={handleAddTaskToSession} 
-                                        setSelectedSubtopic={setSelectedUpskillTask}
+                                        setSelectedSubtopic={(def) => handleSelectFocusArea(def, 'upskill')}
                                         setViewMode={setViewMode}
                                         handleUnlinkItem={handleUnlinkItem} 
                                         handleDeleteSubtopic={handleDeleteFocusArea}
@@ -2463,3 +2472,6 @@ export default function DeepWorkPage() {
     
 
 
+
+
+    
