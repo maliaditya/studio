@@ -117,6 +117,8 @@ export function SkillLibrary({
     addToRecents,
     onOpenLinkProjectModal,
     onToggleReadyForBranding,
+    libraryView,
+    setLibraryView,
 }: Omit<TaskItemProps, 'task' | 'allDefinitions' | 'level' | 'getIcon' | 'onContextMenu'> & {
     selectedMicroSkill: MicroSkill | null;
     selectedProject: Project | null;
@@ -129,6 +131,8 @@ export function SkillLibrary({
     onEdit: (def: ExerciseDefinition) => void;
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onToggleReadyForBranding: (defId: string) => void;
+    libraryView: 'deepwork' | 'upskill';
+    setLibraryView: React.Dispatch<React.SetStateAction<'deepwork' | 'upskill'>>;
 }) {
   const { 
     skillDomains, 
@@ -146,7 +150,6 @@ export function SkillLibrary({
   
   const [editingFocusAreaId, setEditingFocusAreaId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
   const [contextMenuTask, setContextMenuTask] = useState<ExerciseDefinition | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
   const contextMenuRef = React.useRef<HTMLDivElement>(null);
@@ -291,20 +294,27 @@ export function SkillLibrary({
     };
     
     return (
-        <div className="flex items-center gap-2">
-            {showBackButton && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ChevronLeft className="h-4 w-4" /></Button>
-            )}
-             <CardTitle
-                className={cn(
-                    "text-lg text-primary truncate",
-                    selectedMicroSkill && "cursor-pointer hover:underline"
+        <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+                {showBackButton && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleBack}><ChevronLeft className="h-4 w-4" /></Button>
                 )}
-                title={title}
-                onClick={handleTitleClick}
-            >
-                {title}
-            </CardTitle>
+                <CardTitle
+                    className={cn(
+                        "text-lg text-primary truncate",
+                        selectedMicroSkill && "cursor-pointer hover:underline"
+                    )}
+                    title={title}
+                    onClick={handleTitleClick}
+                >
+                    {title}
+                </CardTitle>
+            </div>
+            {selectedMicroSkill && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
+                    <PlusCircle className="h-4 w-4 text-green-500" />
+                </Button>
+            )}
         </div>
     );
   };
@@ -318,12 +328,6 @@ export function SkillLibrary({
       
         return (
             <div className="space-y-1">
-                <div className="flex items-center justify-between group">
-                    <h3 className="font-semibold text-base py-2 flex items-center gap-2"><Activity className="h-4 w-4"/>Micro-Skill: {selectedMicroSkill.name}</h3>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
-                        <PlusCircle className="h-4 w-4 text-green-500" />
-                    </Button>
-                </div>
                 <div className="space-y-1">
                     {topLevelTasks.length > 0 ? topLevelTasks.map(task => (
                         <TaskItem
@@ -472,18 +476,18 @@ export function SkillLibrary({
                 <DropdownMenuTrigger asChild>
                     <div/>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                    <DropdownMenuItem onSelect={() => onEdit(contextMenuTask)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenMindMap(contextMenuTask.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(contextMenuTask)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
+                <DropdownMenuContent align="start" onMouseLeave={() => setContextMenuTask(null)}>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onEdit(contextMenuTask); }}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenMindMap(contextMenuTask.id); }}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onOpenLinkProjectModal(contextMenuTask); }}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
                     {libraryView === 'deepwork' && (
-                        <DropdownMenuItem onSelect={() => onToggleReadyForBranding(contextMenuTask.id)}>
+                        <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onToggleReadyForBranding(contextMenuTask.id); }}>
                             <Checkbox className="mr-2" checked={!!contextMenuTask.isReadyForBranding} />
                             <span>Mark as Ready for Branding</span>
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => onDeleteFocusArea(contextMenuTask.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); onDeleteFocusArea(contextMenuTask.id); }} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
