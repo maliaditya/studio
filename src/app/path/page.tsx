@@ -143,7 +143,10 @@ function PathPageContent() {
                       <p className="text-sm text-gray-400 leading-tight mt-1" title={item.topic}>
                         ({item.topic})
                       </p>
-                      <div className="mt-3 text-xs text-yellow-400">
+                      <p className="text-xs text-gray-300 mt-2 leading-tight line-clamp-3" title={item.release.description}>
+                        {item.release.description}
+                      </p>
+                      <div className="mt-auto pt-2 text-xs text-yellow-400">
                         <p>{format(parseISO(item.release.launchDate), 'MMM d, yyyy')}</p>
                         <p>({item.release.daysRemaining} days)</p>
                       </div>
