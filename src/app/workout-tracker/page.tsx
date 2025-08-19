@@ -847,7 +847,7 @@ function WorkoutPageContent() {
         onLogWeight={handleLogWeight}
         onUpdateWeightLog={handleUpdateWeightLog}
         onDeleteWeightLog={handleDeleteWeightLog}
-        onSetGoalWeight={handleSetGoalWeight}
+        onSetGoalWeight={onSetGoalWeight}
         onSetHeight={handleSetHeight}
         onSetDateOfBirth={handleSetDateOfBirth}
         onSetGender={handleSetGender}
