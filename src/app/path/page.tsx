@@ -11,7 +11,7 @@ import type { Release } from '@/types/workout';
 import { format, parseISO, differenceInDays, startOfToday } from 'date-fns';
 
 const NODE_DIAMETER = 192; // Corresponds to w-48 and h-48
-const HORIZONTAL_SPACING = 300;
+const HORIZONTAL_SPACING = 400;
 const VERTICAL_SPACING = 150;
 const DESCRIPTION_WIDTH = 200;
 const DESCRIPTION_MARGIN = 24;
