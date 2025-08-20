@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1000,24 +999,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
     const todayKey = format(new Date(), 'yyyy-MM-dd');
 
+    const allDefs = isUpskill ? upskillDefinitions : deepWorkDefinitions;
+    const exerciseInstanceId = activity.taskIds?.[0];
+    if (!exerciseInstanceId) {
+        toast({ title: "Error", description: "Could not log progress. Task ID is missing.", variant: "destructive" });
+        return;
+    }
+
+    const def = allDefs.find(d => exerciseInstanceId.startsWith(d.id));
+
+    if (!def) {
+        toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
+        console.error("Definition not found for task instance:", exerciseInstanceId);
+        return;
+    }
+    
     let updateSucceeded = false;
 
     logsUpdater(prevLogs => {
         let currentLog = prevLogs.find(log => log.date === todayKey);
         
-        const exerciseInstanceId = activity.taskIds?.[0];
-        if (!exerciseInstanceId) return prevLogs; 
-
-        // Extract the base definition ID from the instance ID
-        const definitionId = exerciseInstanceId.split('-')[0];
-        const allDefs = isUpskill ? upskillDefinitions : deepWorkDefinitions;
-        const def = allDefs.find(d => d.id === definitionId);
-        
-        if (!def) {
-            console.error("Definition not found for task:", exerciseInstanceId);
-            return prevLogs;
-        }
-
         const newSet: LoggedSet = {
             id: `${Date.now()}-${Math.random()}`,
             reps: isUpskill ? duration : 1,
@@ -1065,8 +1066,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (updateSucceeded) {
         toast({ title: "Progress Logged", description: "Your session has been saved." });
-    } else {
-        toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
     }
   };
 
@@ -1738,7 +1737,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 newPopups.set(taskId, {
                     ...popup,
                     x: popup.x + event.delta.x,
-                    y: popup.y + event.delta.y,
+                    y: popup.y + delta.y,
                 });
             }
             return newPopups;
@@ -2098,3 +2097,6 @@ const usePrevious = <T,>(value: T) => {
     
 
 
+
+
+    
