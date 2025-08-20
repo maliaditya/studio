@@ -35,6 +35,7 @@ interface FocusSessionModalProps {
   onOpenChange: (isOpen: boolean) => void;
   activity: Activity | null;
   onStartSession: (activity: Activity, duration: number) => void;
+  initialDuration: number;
 }
 
 export function FocusSessionModal({
@@ -42,6 +43,7 @@ export function FocusSessionModal({
   onOpenChange,
   activity,
   onStartSession,
+  initialDuration,
 }: FocusSessionModalProps) {
   const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession, updateActivity } = useAuth();
   const [duration, setDuration] = useState(45);
@@ -55,6 +57,10 @@ export function FocusSessionModal({
   const [selectedResourceId, setSelectedResourceId] = useState<string>('');
 
   const [dailyGoalHours, setDailyGoalHours] = useState(8);
+
+  useEffect(() => {
+    setDuration(initialDuration > 0 ? initialDuration : 45);
+  }, [initialDuration, isOpen]);
 
   useEffect(() => {
     if (activity?.habitEquationIds) {

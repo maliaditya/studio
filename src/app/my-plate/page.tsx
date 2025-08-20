@@ -134,6 +134,7 @@ function MyPlatePageContent() {
   // Focus Session State
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
   const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
+  const [focusDuration, setFocusDuration] = useState(45);
 
 
   // State for Modal content
@@ -451,6 +452,9 @@ function MyPlatePageContent() {
   };
   
   const handleOpenFocusModal = (activity: Activity) => {
+    const duration = _activityDurations[activity.id];
+    const parsedDuration = duration ? parseDurationToMinutes(duration) : 45;
+    setFocusDuration(parsedDuration > 0 ? parsedDuration : 45);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
   };
@@ -875,6 +879,16 @@ function MyPlatePageContent() {
   useEffect(() => {
     setActivityDurations(_activityDurations);
   }, [_activityDurations, setActivityDurations]);
+  
+  const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    return totalMinutes;
+  };
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
@@ -1038,7 +1052,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={handleOpenFocusModal}
+                        onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={openTaskContextPopup}
                     />
                 )}
@@ -1090,7 +1104,7 @@ function MyPlatePageContent() {
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
                 onToggleComplete={handleToggleComplete}
-                onOpenFocusModal={handleOpenFocusModal}
+                onOpenFocusModal={onOpenFocusModal}
                 onOpenTaskContext={openTaskContextPopup}
             />
         )}
@@ -1181,6 +1195,7 @@ function MyPlatePageContent() {
           onOpenChange={setFocusSessionModalOpen}
           activity={focusActivity}
           onStartSession={handleStartFocusSession}
+          initialDuration={focusDuration}
         />
 
         <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
