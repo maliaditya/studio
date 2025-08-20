@@ -453,7 +453,7 @@ function MyPlatePageContent() {
   
   const handleOpenFocusModal = (activity: Activity) => {
     const duration = _activityDurations[activity.id];
-    const parsedDuration = duration ? parseDurationToMinutes(duration) : 45;
+    const parsedDuration = parseDurationToMinutes(duration);
     setFocusDuration(parsedDuration > 0 ? parsedDuration : 45);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
@@ -1052,7 +1052,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={onOpenFocusModal}
+                        onOpenFocusModal={handleOpenFocusModal}
                         onOpenTaskContext={openTaskContextPopup}
                     />
                 )}
@@ -1104,7 +1104,7 @@ function MyPlatePageContent() {
                 onStartWorkoutLog={handleStartWorkoutLog}
                 onStartLeadGenLog={handleStartLeadGenLog}
                 onToggleComplete={handleToggleComplete}
-                onOpenFocusModal={onOpenFocusModal}
+                onOpenFocusModal={handleOpenFocusModal}
                 onOpenTaskContext={openTaskContextPopup}
             />
         )}
