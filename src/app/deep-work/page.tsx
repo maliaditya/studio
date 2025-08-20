@@ -967,11 +967,10 @@ function DeepWorkPageContent() {
   
  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isChildOfDeepWork = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        // An Action or Standalone is an actionable child
-        return childDef && ['Action', 'Standalone'].includes(getDeepWorkNodeType(childDef));
-    });
+    
+    // An Action must have other Actions linked to become an Objective.
+    // An Intention must have other Actions or Objectives linked.
+    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).length > 0;
 
     if (hasDeepWorkChildren) {
         return isChildOfDeepWork ? 'Objective' : 'Intention';
@@ -1791,6 +1790,14 @@ function DeepWorkPageContent() {
     setSelectedUpskillTask(null);
   };
 
+  const handleProjectSelect = (project: Project | null) => {
+    onSelectProject(project);
+    setSelectedProjectId(project ? project.id : null);
+    setSelectedSkillId(null);
+    onSelectMicroSkill(null);
+    setNavigationStack([]);
+  };
+
   const handleSelectRecentItem = (item: (ExerciseDefinition | Project) & { type: string }) => {
     if (item.type === 'project') {
       handleProjectSelect(item as Project);
@@ -2469,3 +2476,4 @@ export default function DeepWorkPage() {
 
 
     
+
