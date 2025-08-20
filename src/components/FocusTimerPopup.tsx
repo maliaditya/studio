@@ -5,7 +5,7 @@
 import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee } from 'lucide-react';
 import type { Activity, PauseEvent } from '@/types/workout';
 import {
   Popover,
@@ -35,7 +35,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const { activeFocusSession, setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
   const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
+  
+  const BREAK_DURATION = 5 * 60; // 5 minutes
+  const WORK_DURATION = 25 * 60; // 25 minutes
+
   const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
+  const [currentCycle, setCurrentCycle] = React.useState<'work' | 'break'>('work');
+  const [cycleSecondsLeft, setCycleSecondsLeft] = React.useState(WORK_DURATION);
+  
   const popupRef = React.useRef<HTMLDivElement>(null);
   
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -52,23 +59,42 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   React.useEffect(() => {
     setIsAudioPlaying(true);
+    setCycleSecondsLeft(WORK_DURATION);
   }, [setIsAudioPlaying]);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
-    if (sessionState === 'running' && secondsLeft > 0) {
-      interval = setInterval(() => {
-        setSecondsLeft(s => s - 1);
-      }, 1000);
-    } else if (sessionState === 'running' && secondsLeft <= 0) {
-      setSessionState('finished');
-      setIsAudioPlaying(false);
-    }
     
+    if (sessionState === 'running') {
+      interval = setInterval(() => {
+        setSecondsLeft(s => Math.max(0, s - 1));
+        setCycleSecondsLeft(s => s - 1);
+      }, 1000);
+    }
+  
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [sessionState, secondsLeft, setIsAudioPlaying]);
+  }, [sessionState]);
+
+  React.useEffect(() => {
+    if (secondsLeft <= 0 && sessionState === 'running') {
+        setSessionState('finished');
+        setIsAudioPlaying(false);
+    }
+
+    if (cycleSecondsLeft <= 0 && sessionState === 'running') {
+        if (currentCycle === 'work') {
+            setCurrentCycle('break');
+            setCycleSecondsLeft(BREAK_DURATION);
+            setIsAudioPlaying(false); // Stop music for break
+        } else { // Break is over
+            setCurrentCycle('work');
+            setCycleSecondsLeft(WORK_DURATION);
+            setIsAudioPlaying(true); // Resume music for work
+        }
+    }
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying]);
 
   React.useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -110,19 +136,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       newSessionState = 'paused';
       const newPause: PauseEvent = { pauseTime: now, resumeTime: null };
       updatedActivity.focusSessionPauses = [...(updatedActivity.focusSessionPauses || []), newPause];
+      setIsAudioPlaying(false); // Pause music on manual pause
     } else { // Resuming from pause
       newSessionState = 'running';
       const lastPauseIndex = (updatedActivity.focusSessionPauses || []).length - 1;
       if (lastPauseIndex >= 0 && updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime === null) {
         updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime = now;
       }
+       if (currentCycle === 'work') {
+          setIsAudioPlaying(true); // Only resume music if it's a work cycle
+       }
     }
     
     updatedActivity.focusSessionStartTime = now;
     updateActivity(updatedActivity);
     setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
     setSessionState(newSessionState);
-    setIsAudioPlaying(newSessionState === 'running');
   };
   
   const handleExtend = () => {
@@ -149,6 +178,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   if (!activity) return null;
 
   const isContextAvailable = (activity.type === 'deepwork' || activity.type === 'upskill') && (activity.taskIds?.length ?? 0) > 0;
+  const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
+  const cycleSeconds = cycleSecondsLeft % 60;
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -186,7 +217,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </span>
                   </div>
                 </div>
-                <div className="flex justify-center items-center gap-4 mt-4">
+                <div className="text-center mt-2">
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        {currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />}
+                        <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
+                    </div>
+                </div>
+                <div className="flex justify-center items-center gap-4 mt-2">
                     <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
                       {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                     </Button>
