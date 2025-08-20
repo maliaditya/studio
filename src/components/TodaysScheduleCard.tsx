@@ -41,7 +41,6 @@ function AgendaWidgetItem({
     onOpenTaskContext,
 }: AgendaWidgetItemProps) {
   const [openPopover, setOpenPopover] = useState(false);
-  const [progressInput, setProgressInput] = useState('');
   const [durationInput, setDurationInput] = useState('');
 
   const canLogProgress = (activity.type === 'upskill' || activity.type === 'deepwork') && (activity.taskIds?.length ?? 0) > 0;
@@ -66,11 +65,9 @@ function AgendaWidgetItem({
     const duration = parseInt(durationInput);
 
     if(activity.type === 'upskill') {
-      const progress = parseInt(progressInput);
-      if(!isNaN(progress) && progress > 0 && !isNaN(duration) && duration > 0) {
-        onLogLearning(activity, progress, duration);
+      if(!isNaN(duration) && duration > 0) {
+        onLogLearning(activity, 0, duration); // Progress (weight) is now always 0 for upskill
         setOpenPopover(false);
-        setProgressInput('');
         setDurationInput('');
       }
     } else { // deepwork or branding
@@ -138,12 +135,6 @@ function AgendaWidgetItem({
               <p className="text-sm text-muted-foreground">Log your session for '{activity.details}'.</p>
             </div>
             <div className="space-y-2">
-              {activity.type === 'upskill' && (
-                <div>
-                  <Label htmlFor="progress">Progress (pages/units)</Label>
-                  <Input id="progress" type="number" value={progressInput} onChange={e => setProgressInput(e.target.value)} className="h-8" />
-                </div>
-              )}
               <div>
                 <Label htmlFor="duration">Duration (minutes)</Label>
                 <Input id="duration" type="number" value={durationInput} onChange={e => setDurationInput(e.target.value)} className="h-8" />
