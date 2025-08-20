@@ -24,7 +24,7 @@ type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
 
 const formatMinutes = (minutes: number) => {
-    if (minutes <= 0) return "-";
+    if (minutes <= 0) return "0m";
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
     if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
@@ -126,10 +126,10 @@ function TimesheetPageContent() {
         const parseDurationToMinutes = (durationStr: string | undefined): number => {
             if (!durationStr) return 0;
             let totalMinutes = 0;
-            const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-            if (hourMatch) totalMinutes += parseFloat(hourMatch[1]) * 60;
+            const hourMatch = durationStr.match(/(\d+)\s*h/);
+            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
             const minMatch = durationStr.match(/(\d+)\s*m/);
-            if (minMatch) totalMinutes += parseFloat(minMatch[1]);
+            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
             return totalMinutes;
         };
 
@@ -239,9 +239,14 @@ function TimesheetPageContent() {
                         return (
                             <Card key={slot.name}>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-lg">
-                                        {slot.icon}
-                                        {slot.name}
+                                    <CardTitle className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-lg">
+                                            {slot.icon}
+                                            {slot.name}
+                                        </div>
+                                        <div className="text-sm font-medium text-muted-foreground">
+                                            {formatMinutes(totalDuration)} / 4h
+                                        </div>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
