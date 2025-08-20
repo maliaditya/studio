@@ -1003,61 +1003,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let updateSucceeded = false;
 
     logsUpdater(prevLogs => {
-      const logIndex = prevLogs.findIndex(log => log.date === todayKey);
-      
-      let currentLog = prevLogs[logIndex];
-      if (logIndex === -1) {
-          currentLog = { id: todayKey, date: todayKey, exercises: [] };
-      }
-      
-      const exerciseId = activity.taskIds?.[0];
-      if (!exerciseId) return prevLogs; 
-      
-      const newSet: LoggedSet = {
-        id: `${Date.now()}-${Math.random()}`,
-        reps: isUpskill ? duration : 1,
-        weight: isUpskill ? progress : duration,
-        timestamp: Date.now(),
-      };
+        let currentLog = prevLogs.find(log => log.date === todayKey);
+        
+        const exerciseInstanceId = activity.taskIds?.[0];
+        if (!exerciseInstanceId) return prevLogs; 
 
-      const newLogs = [...prevLogs];
-      const exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseId);
-      
-      let updatedExercises;
-      if (exerciseIndex > -1) {
-        updatedExercises = [...currentLog.exercises];
-        updatedExercises[exerciseIndex] = {
-          ...updatedExercises[exerciseIndex],
-          loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
-        };
-      } else {
-        const def = (isUpskill ? upskillDefinitions : deepWorkDefinitions).find(d => d.id === activity.taskIds?.[0]?.split('-')[0]);
-        if (!def) return prevLogs;
-        const newExercise = {
-            id: activity.taskIds![0],
-            definitionId: def.id,
-            name: def.name,
-            category: def.category,
-            loggedSets: [newSet],
-            targetSets: 1,
-            targetReps: '25'
-        };
-        updatedExercises = [...currentLog.exercises, newExercise];
-      }
+        // Extract the base definition ID from the instance ID
+        const definitionId = exerciseInstanceId.split('-')[0];
+        const allDefs = isUpskill ? upskillDefinitions : deepWorkDefinitions;
+        const def = allDefs.find(d => d.id === definitionId);
+        
+        if (!def) {
+            console.error("Definition not found for task:", exerciseInstanceId);
+            return prevLogs;
+        }
 
-      const updatedLog = { ...currentLog, exercises: updatedExercises };
-      
-      if (logIndex > -1) {
-          newLogs[logIndex] = updatedLog;
-      } else {
-          newLogs.push(updatedLog);
-      }
-      updateSucceeded = true;
-      return newLogs;
+        const newSet: LoggedSet = {
+            id: `${Date.now()}-${Math.random()}`,
+            reps: isUpskill ? duration : 1,
+            weight: isUpskill ? progress : duration,
+            timestamp: Date.now(),
+        };
+
+        const newLogs = [...prevLogs];
+        let logIndex = prevLogs.findIndex(log => log.date === todayKey);
+
+        if (logIndex === -1) {
+            currentLog = { id: todayKey, date: todayKey, exercises: [] };
+            newLogs.push(currentLog);
+            logIndex = newLogs.length - 1;
+        } else {
+            currentLog = { ...newLogs[logIndex] };
+        }
+        
+        let exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseInstanceId);
+
+        let updatedExercises;
+        if (exerciseIndex > -1) {
+            updatedExercises = [...currentLog.exercises];
+            updatedExercises[exerciseIndex] = {
+                ...updatedExercises[exerciseIndex],
+                loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
+            };
+        } else {
+            const newExercise: WorkoutExercise = {
+                id: exerciseInstanceId,
+                definitionId: def.id,
+                name: def.name,
+                category: def.category,
+                loggedSets: [newSet],
+                targetSets: 1,
+                targetReps: '25'
+            };
+            updatedExercises = [...currentLog.exercises, newExercise];
+        }
+
+        newLogs[logIndex] = { ...currentLog, exercises: updatedExercises };
+        updateSucceeded = true;
+        return newLogs;
     });
     
     if (updateSucceeded) {
-      toast({ title: "Progress Logged", description: "Your session has been saved." });
+        toast({ title: "Progress Logged", description: "Your session has been saved." });
     } else {
         toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
     }
@@ -1965,45 +1972,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).length > 0;
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
     const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-
-    if (hasDeepWorkChildren) {
+    
+    if (isParent) {
         return isChild ? 'Objective' : 'Intention';
     }
-    
     return isChild ? 'Action' : 'Standalone';
   }, [deepWorkDefinitions]);
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        if (!childDef) return false;
-        return getUpskillNodeType(childDef) === 'Objective';
-    });
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
   
-    if (hasObjectiveChild) {
-        return 'Curiosity';
+    if(isParent) {
+      return isChild ? 'Objective' : 'Curiosity';
     }
-  
-    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
-      const childDef = upskillDefinitions.find(d => d.id === childId);
-      if (!childDef) return false;
-      const nodeType = getUpskillNodeType(childDef);
-      return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-  
-    if (hasActionableChild) {
-      return 'Objective';
-    }
-  
-    const hasChildren = (def.linkedUpskillIds || []).length > 0;
-    if(hasChildren) {
-        return 'Objective';
-    }
-  
-    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-    return isLinkedAsChild ? 'Visualization' : 'Standalone';
+    return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
 
   const value: AuthContextType = {
@@ -2111,4 +2096,5 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
 
