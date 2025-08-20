@@ -637,7 +637,7 @@ function MyPlatePageContent() {
           let completionStats = null;
           if (averageRatePerDay > 0.01 && remainingProgress > 0) {
             const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
-            completionStats = { date: format(addDays(new Date(), daysToCompletion), 'PPP'), daysRemaining: daysToCompletion, timeNeeded: (remainingProgress / (speed / 60)) || null };
+            completionStats = { date: format(addDays(new Date(), daysToCompletion), 'PPP'), daysRemaining: daysToCompletion, timeNeeded: speed > 0 ? (remainingProgress / (speed / 60)) : null };
           }
       
           let milestoneStats = null;
@@ -649,7 +649,7 @@ function MyPlatePageContent() {
               const unitType = goal.goalType.endsWith('s') && progressToMilestone === 1 ? goal.goalType.slice(0, -1) : goal.goalType;
               milestoneStats = {
                 percent: (i + 1) * 25, date: format(addDays(new Date(), daysToMilestone), 'PPP'), daysRemaining: daysToMilestone,
-                progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: (progressToMilestone / (speed / 60)) || null,
+                progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: speed > 0 ? (progressToMilestone / (speed / 60)) : null,
               };
               break;
             }
@@ -661,7 +661,7 @@ function MyPlatePageContent() {
           topicStats[topic] = {
             topic, speed, unit: `${goal.goalType}/hr`, totalProgress: Math.round(totalProgress), remainingProgress: Math.round(remainingProgress),
             goalValue: goal.goalValue, completion: completionStats, nextMilestone: milestoneStats, requiredDailyRate, todaysProgress,
-            timeForTodaysProgress: (todaysProgress / (speed / 60)) || null, progressUnit: goal.goalType, remainingForToday: parseFloat(remainingForToday.toFixed(1)),
+            timeForTodaysProgress: speed > 0 ? (todaysProgress / (speed / 60)) : null, progressUnit: goal.goalType, remainingForToday: parseFloat(remainingForToday.toFixed(1)),
           };
         });
         return topicStats;
