@@ -448,46 +448,50 @@ function SkillPageContent() {
   
   const linkedTasksByCoreSkill = useMemo(() => {
     if (!selectedProject) return new Map();
-
+  
     const taskMap = new Map<string, {
-      microSkills: Map<string, { microSkill: MicroSkill, tasks: ExerciseDefinition[] }>
+      microSkills: Map<string, { microSkill: MicroSkill, intentions: ExerciseDefinition[], curiosities: ExerciseDefinition[] }>
     }>();
-
+  
     const projectIntentions = deepWorkDefinitions.filter(def => 
       (def.linkedProjectIds || []).includes(selectedProject.id) && getDeepWorkNodeType(def) === 'Intention'
     );
-
+  
     const projectCuriosities = upskillDefinitions.filter(def => 
         (def.linkedProjectIds || []).includes(selectedProject.id) && getUpskillNodeType(def) === 'Curiosity'
     );
       
-    const allRelevantTasks = [...projectIntentions, ...projectCuriosities];
-
-    allRelevantTasks.forEach(task => {
-        const microSkillInfo = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === task.category);
-        if (!microSkillInfo) return;
-
-        const [microSkillId, info] = microSkillInfo;
-        const { coreSkillName, skillAreaName, microSkillName } = info;
-        
-        if (!taskMap.has(coreSkillName)) {
-            taskMap.set(coreSkillName, { microSkills: new Map() });
-        }
-        const coreSkillData = taskMap.get(coreSkillName)!;
-        
-        const mapKey = `${skillAreaName} > ${microSkillName}`;
-        if (!coreSkillData.microSkills.has(mapKey)) {
-            const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === microSkillId);
-            if (microSkill) {
-                coreSkillData.microSkills.set(mapKey, { microSkill, tasks: [] });
+    const processTasks = (tasks: ExerciseDefinition[], type: 'intention' | 'curiosity') => {
+        tasks.forEach(task => {
+            const microSkillInfo = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === task.category);
+            if (!microSkillInfo) return;
+    
+            const [microSkillId, info] = microSkillInfo;
+            const { coreSkillName, skillAreaName, microSkillName } = info;
+            
+            if (!taskMap.has(coreSkillName)) {
+                taskMap.set(coreSkillName, { microSkills: new Map() });
             }
-        }
-        
-        const microSkillData = coreSkillData.microSkills.get(mapKey);
-        if (microSkillData) {
-            microSkillData.tasks.push(task);
-        }
-    });
+            const coreSkillData = taskMap.get(coreSkillName)!;
+            
+            const mapKey = `${skillAreaName} > ${microSkillName}`;
+            if (!coreSkillData.microSkills.has(mapKey)) {
+                const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === microSkillId);
+                if (microSkill) {
+                    coreSkillData.microSkills.set(mapKey, { microSkill, intentions: [], curiosities: [] });
+                }
+            }
+            
+            const microSkillData = coreSkillData.microSkills.get(mapKey);
+            if (microSkillData) {
+                if(type === 'intention') microSkillData.intentions.push(task);
+                else microSkillData.curiosities.push(task);
+            }
+        });
+    };
+
+    processTasks(projectIntentions, 'intention');
+    processTasks(projectCuriosities, 'curiosity');
 
     return taskMap;
   }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
@@ -662,9 +666,7 @@ function SkillPageContent() {
                                   <CardTitle className="text-base">{coreSkillName}</CardTitle>
                               </CardHeader>
                               <CardContent className="space-y-2 p-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                  {Array.from(data.microSkills.entries()).map(([mapKey, { microSkill, tasks }]) => {
-                                      const curiosities = tasks.filter(t => getUpskillNodeType(t) === 'Curiosity');
-                                      const intentions = tasks.filter(t => getDeepWorkNodeType(t) === 'Intention');
+                                  {Array.from(data.microSkills.entries()).map(([mapKey, { microSkill, intentions, curiosities }]) => {
                                       const skillAreaName = mapKey.split(' > ')[0];
                                       
                                       return (
