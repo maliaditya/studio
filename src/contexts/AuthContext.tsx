@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -994,7 +995,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const handleLogLearning = (activity: Activity, progress: number, duration: number) => {
+  const handleLogLearning = useCallback((activity: Activity, progress: number, duration: number) => {
     const isUpskill = activity.type === 'upskill';
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1005,30 +1006,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "Could not log progress. Task ID is missing.", variant: "destructive" });
         return;
     }
+    
+    let definition: ExerciseDefinition | undefined;
+    for (const def of allDefs) {
+        if (exerciseInstanceId.startsWith(def.id)) {
+            definition = def;
+            break;
+        }
+    }
 
-    const def = allDefs.find(d => exerciseInstanceId.startsWith(d.id));
-
-    if (!def) {
+    if (!definition) {
         toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
         console.error("Definition not found for task instance:", exerciseInstanceId);
         return;
     }
     
-    let updateSucceeded = false;
+    let totalDurationMinutes = duration;
 
+    if (activity.focusSessionInitialStartTime) {
+        const { focusSessionInitialStartTime, focusSessionPauses = [] } = activity;
+        const endTime = Date.now();
+        let totalPauseTime = 0;
+        
+        focusSessionPauses.forEach(p => {
+            if (p.resumeTime) {
+                totalPauseTime += p.resumeTime - p.pauseTime;
+            }
+        });
+
+        const totalWorkTimeMs = (endTime - focusSessionInitialStartTime) - totalPauseTime;
+        totalDurationMinutes = Math.floor(totalWorkTimeMs / 60000);
+    }
+    
     logsUpdater(prevLogs => {
         let currentLog = prevLogs.find(log => log.date === todayKey);
-        
         const newSet: LoggedSet = {
             id: `${Date.now()}-${Math.random()}`,
-            reps: isUpskill ? duration : 1,
-            weight: isUpskill ? progress : duration,
+            reps: isUpskill ? totalDurationMinutes : 1,
+            weight: isUpskill ? progress : totalDurationMinutes,
             timestamp: Date.now(),
         };
 
         const newLogs = [...prevLogs];
         let logIndex = prevLogs.findIndex(log => log.date === todayKey);
-
+        
         if (logIndex === -1) {
             currentLog = { id: todayKey, date: todayKey, exercises: [] };
             newLogs.push(currentLog);
@@ -1049,25 +1070,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             const newExercise: WorkoutExercise = {
                 id: exerciseInstanceId,
-                definitionId: def.id,
-                name: def.name,
-                category: def.category,
+                definitionId: definition!.id,
+                name: definition!.name,
+                category: definition!.category,
                 loggedSets: [newSet],
                 targetSets: 1,
                 targetReps: '25'
             };
             updatedExercises = [...currentLog.exercises, newExercise];
         }
-
         newLogs[logIndex] = { ...currentLog, exercises: updatedExercises };
-        updateSucceeded = true;
         return newLogs;
     });
-    
-    if (updateSucceeded) {
-        toast({ title: "Progress Logged", description: "Your session has been saved." });
-    }
-  };
+
+    handleToggleComplete(activity.slot, activity.id, true);
+    toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions, handleToggleComplete]);
 
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1737,7 +1755,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 newPopups.set(taskId, {
                     ...popup,
                     x: popup.x + event.delta.x,
-                    y: popup.y + delta.y,
+                    y: popup.y + event.delta.y,
                 });
             }
             return newPopups;
