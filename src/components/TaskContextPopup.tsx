@@ -115,6 +115,14 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         if (focusSessionEndTime) {
             const totalSessionMs = focusSessionEndTime - focusSessionInitialStartTime;
             
+            const pauseDurationsMs: number[] = [];
+            (focusSessionPauses || []).forEach(p => {
+                if (p.resumeTime) {
+                    pauseDurationsMs.push(p.resumeTime - p.pauseTime);
+                }
+            });
+            const totalPauseTimeMs = pauseDurationsMs.reduce((sum, p) => sum + p, 0);
+
             const workIntervalsMs: number[] = [];
             let lastStartTime = focusSessionInitialStartTime;
 
@@ -149,6 +157,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                 workIntervals: validIntervalsMs.map(ms => formatDistanceStrict(new Date(0), new Date(ms))),
                 pauses: focusSessionPauses.length,
                 extendedBy: extendedTime > 0 ? `${extendedTime} minutes` : null,
+                totalBreakTime: formatDistanceStrict(new Date(0), new Date(totalPauseTimeMs)),
             };
         } else {
             // Live session data
@@ -163,6 +172,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                 workIntervals: [],
                 pauses: focusSessionPauses.length,
                 extendedBy: null,
+                totalBreakTime: '-',
             };
         }
     }, [activityInfo, activeFocusSession]);
@@ -257,6 +267,10 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                                      <div>
                                         <p className="text-xs text-muted-foreground">Extended By</p>
                                         <p className="text-lg font-bold">{attentionSpanInfo.extendedBy || '-'}</p>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <p className="text-xs text-muted-foreground">Total Break Time</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.totalBreakTime}</p>
                                     </div>
                                 </div>
                                 {attentionSpanInfo.workIntervals.length > 0 && (
