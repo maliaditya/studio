@@ -1919,7 +1919,7 @@ function DeepWorkPageContent() {
                     onSelectMicroSkill={onSelectMicroSkill}
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
-                    onSelectProject={handleSelectProject}
+                    onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={onOpenMindMap}
