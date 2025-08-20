@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -175,7 +176,8 @@ export function SkillLibrary({
     handleExpansionChange, 
     upskillDefinitions, 
     deepWorkDefinitions,
-    setDeepWorkDefinitions,
+    getDeepWorkNodeType,
+    getUpskillNodeType,
     selectedDomainId, setSelectedDomainId,
     selectedSkillId, setSelectedSkillId,
     selectedProjectId, setSelectedProjectId
@@ -220,52 +222,6 @@ export function SkillLibrary({
             setSelectedProjectId(item.id);
             break;
     }
-  };
-
-  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
-  const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
-
-  const getDeepWorkNodeType = (def: ExerciseDefinition) => {
-    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    if (!hasChildren) {
-        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-        return isChild ? 'Action' : 'Standalone';
-    }
-    
-    const hasActionableChild = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        return childDef && getDeepWorkNodeType(childDef).match(/Action|Standalone/);
-    });
-    if (hasActionableChild) return 'Objective';
-
-    const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        return childDef && getDeepWorkNodeType(childDef) === 'Objective';
-    });
-    if (hasObjectiveChild) return 'Intention';
-
-    return 'Objective';
-  };
-  
-  const getUpskillNodeType = (def: ExerciseDefinition) => {
-    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
-      const childDef = upskillDefinitions.find(d => d.id === childId);
-      if (!childDef) return false;
-      const nodeType = getUpskillNodeType(childDef);
-      return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-
-    if (hasActionableChild) {
-      return 'Objective';
-    }
-
-    const hasChildren = (def.linkedUpskillIds || []).length > 0;
-    if (hasChildren) {
-      return 'Curiosity';
-    }
-
-    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-    return isLinkedAsChild ? 'Visualization' : 'Standalone';
   };
 
   const getIcon = (def: ExerciseDefinition) => {
@@ -326,7 +282,7 @@ export function SkillLibrary({
     if (selectedMicroSkill) {
         const allTasksForMicroSkill = definitions.filter(def => def.category === selectedMicroSkill.name);
         const allDefsMap = new Map(definitions.map(def => [def.id, def]));
-        const childIdSet = libraryView === 'deepwork' ? linkedDeepWorkChildIds : linkedUpskillChildIds;
+        const childIdSet = libraryView === 'deepwork' ? new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])) : new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []));
         const topLevelTasks = allTasksForMicroSkill.filter(task => !childIdSet.has(task.id));
       
         return (

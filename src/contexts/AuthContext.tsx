@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -131,6 +132,8 @@ interface AuthContextType {
 
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
+  getDeepWorkNodeType: (def: ExerciseDefinition) => string;
+  getUpskillNodeType: (def: ExerciseDefinition) => string;
   
   leadGenDefinitions: ExerciseDefinition[];
   setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
@@ -1961,6 +1964,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
+    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).length > 0;
+    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+
+    if (hasDeepWorkChildren) {
+        return isChild ? 'Objective' : 'Intention';
+    }
+    
+    return isChild ? 'Action' : 'Standalone';
+  }, [deepWorkDefinitions]);
+
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
+    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
+        const childDef = upskillDefinitions.find(d => d.id === childId);
+        if (!childDef) return false;
+        return getUpskillNodeType(childDef) === 'Objective';
+    });
+  
+    if (hasObjectiveChild) {
+        return 'Curiosity';
+    }
+  
+    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
+      const childDef = upskillDefinitions.find(d => d.id === childId);
+      if (!childDef) return false;
+      const nodeType = getUpskillNodeType(childDef);
+      return nodeType === 'Visualization' || nodeType === 'Standalone';
+    });
+  
+    if (hasActionableChild) {
+      return 'Objective';
+    }
+  
+    const hasChildren = (def.linkedUpskillIds || []).length > 0;
+    if(hasChildren) {
+        return 'Objective';
+    }
+  
+    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+    return isLinkedAsChild ? 'Visualization' : 'Standalone';
+  }, [upskillDefinitions]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -1978,7 +2023,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions,
+    deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType,
     leadGenDefinitions, setLeadGenDefinitions,
     productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
@@ -2066,3 +2111,4 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
