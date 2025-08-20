@@ -5,7 +5,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock, Plus, Minus } from 'lucide-react';
+import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock, Plus, Minus, Timer } from 'lucide-react';
 import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, FullSchedule, PauseEvent } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
@@ -72,8 +72,8 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
             (p.linkedUpskillIds?.includes(task.id))
         );
         
-        const linkedProject = parent?.linkedProjectId 
-            ? projects.find(p => p.id === parent.linkedProjectId) 
+        const linkedProject = parent?.linkedProjectIds && parent.linkedProjectIds.length > 0
+            ? projects.find(p => p.id === parent.linkedProjectIds![0]) 
             : null;
 
         const microSkillId = Array.from(microSkillMap.entries()).find(([, v]) => v.microSkillName === task.category)?.[0];
@@ -113,53 +113,54 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         const focusSessionPauses = Array.isArray(activityForSpan.focusSessionPauses) ? activityForSpan.focusSessionPauses : [];
 
         if (focusSessionEndTime) {
-            const totalSpanMs = focusSessionEndTime - focusSessionInitialStartTime;
+            const totalSessionMs = focusSessionEndTime - focusSessionInitialStartTime;
             
-            const workIntervals: number[] = [];
+            const workIntervalsMs: number[] = [];
             let lastStartTime = focusSessionInitialStartTime;
 
             focusSessionPauses.forEach(p => {
-                workIntervals.push(p.pauseTime - lastStartTime);
+                workIntervalsMs.push(p.pauseTime - lastStartTime);
                 if (p.resumeTime) {
                     lastStartTime = p.resumeTime;
                 }
             });
-
-            if (focusSessionPauses.length > 0) {
-                 const lastPause = focusSessionPauses[focusSessionPauses.length - 1];
-                 if(lastPause.resumeTime) {
-                    workIntervals.push(focusSessionEndTime - lastPause.resumeTime);
-                 }
-            } else { 
-                workIntervals.push(focusSessionEndTime - focusSessionInitialStartTime);
-            }
-
-            const validIntervals = workIntervals.filter(i => i > 0);
-            const totalWorkTimeMs = validIntervals.reduce((sum, i) => sum + i, 0);
-
-            const averageAttentionSpanMs = validIntervals.length > 0
-                ? totalWorkTimeMs / validIntervals.length
-                : totalWorkTimeMs;
             
-            const totalDurationMinutes = Math.ceil(totalSpanMs / 60000);
+            const lastEventTime = focusSessionPauses.length > 0 && focusSessionPauses[focusSessionPauses.length-1].resumeTime 
+                ? focusSessionPauses[focusSessionPauses.length-1].resumeTime! 
+                : focusSessionInitialStartTime;
+
+            workIntervalsMs.push(focusSessionEndTime - lastEventTime);
+
+            const validIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
+            const totalWorkTimeMs = validIntervalsMs.reduce((sum, i) => sum + i, 0);
+
+            const attentionSpanMs = validIntervalsMs.length > 0 ? Math.max(...validIntervalsMs) : 0;
+            const avgSpanMs = validIntervalsMs.length > 0 ? totalWorkTimeMs / validIntervalsMs.length : 0;
+            
+            const totalDurationMinutes = Math.ceil(totalSessionMs / 60000);
             const extendedTime = focusSessionInitialDuration ? totalDurationMinutes - focusSessionInitialDuration : 0;
             
             return {
                 title: "Session Completed",
-                totalSpan: formatDistanceStrict(new Date(0), new Date(totalSpanMs), { unit: 'minute' }),
-                averageSpan: formatDistanceStrict(new Date(0), new Date(averageAttentionSpanMs), { unit: 'minute' }),
-                attentionSpan: formatDistanceStrict(new Date(0), new Date(totalWorkTimeMs), { unit: 'minute'}),
-                intervals: validIntervals.map(ms => formatDistanceStrict(new Date(0), new Date(ms), { unit: 'minute'})),
+                sessionCompleted: formatDistanceStrict(new Date(0), new Date(totalSessionMs)),
+                attentionSpan: formatDistanceStrict(new Date(0), new Date(attentionSpanMs)),
+                avgSpan: formatDistanceStrict(new Date(0), new Date(avgSpanMs)),
+                totalAttention: formatDistanceStrict(new Date(0), new Date(totalWorkTimeMs)),
+                workIntervals: validIntervalsMs.map(ms => formatDistanceStrict(new Date(0), new Date(ms))),
                 pauses: focusSessionPauses.length,
                 extendedBy: extendedTime > 0 ? `${extendedTime} minutes` : null,
             };
         } else {
-            return {
-                title: "Session Started",
-                totalSpan: format(focusSessionInitialStartTime, 'p'),
-                averageSpan: '-',
+            // Live session data
+             const now = Date.now();
+             const totalSessionMs = now - focusSessionInitialStartTime;
+             return {
+                title: "Session In Progress",
+                sessionCompleted: formatDistanceStrict(new Date(0), new Date(totalSessionMs)),
                 attentionSpan: '-',
-                intervals: [],
+                avgSpan: '-',
+                totalAttention: '-',
+                workIntervals: [],
                 pauses: focusSessionPauses.length,
                 extendedBy: null,
             };
@@ -238,7 +239,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                             <div className="space-y-4 w-full">
                                 <div>
                                     <p className="text-xs text-muted-foreground">{attentionSpanInfo.title}</p>
-                                    <p className="text-2xl font-bold">{attentionSpanInfo.totalSpan}</p>
+                                    <p className="text-2xl font-bold">{attentionSpanInfo.sessionCompleted}</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 text-center">
                                     <div>
@@ -247,7 +248,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                                     </div>
                                     <div>
                                         <p className="text-xs text-muted-foreground">Avg. Span</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.averageSpan}</p>
+                                        <p className="text-lg font-bold">{attentionSpanInfo.avgSpan}</p>
                                     </div>
                                      <div>
                                         <p className="text-xs text-muted-foreground">Pauses</p>
@@ -258,12 +259,12 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                                         <p className="text-lg font-bold">{attentionSpanInfo.extendedBy || '-'}</p>
                                     </div>
                                 </div>
-                                {attentionSpanInfo.intervals.length > 0 && (
+                                {attentionSpanInfo.workIntervals.length > 0 && (
                                     <div className="pt-2 border-t">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-1">Work Intervals</p>
+                                        <p className="text-xs font-semibold text-muted-foreground mb-1">Work Intervals ({attentionSpanInfo.totalAttention})</p>
                                         <ScrollArea className="h-20">
                                             <ul className="text-xs text-center space-y-1">
-                                                {attentionSpanInfo.intervals.map((interval, i) => (
+                                                {attentionSpanInfo.workIntervals.map((interval, i) => (
                                                     <li key={i}>{i+1}. {interval}</li>
                                                 ))}
                                             </ul>
@@ -283,3 +284,4 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         </div>
     );
 }
+
