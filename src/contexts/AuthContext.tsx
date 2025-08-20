@@ -1698,6 +1698,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTaskContextPopups(prev => {
         const newPopups = new Map(prev);
         const CONTEXT_POPUP_WIDTH = 600;
+        const CONTEXT_POPUP_HEIGHT = 400; // Estimated height for centering
         const MARGIN = 16;
         let x = 0;
         let y = 0;
@@ -1709,12 +1710,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             parentId = parentPopupState.activityId;
             x = parentPopupState.x + 30;
             y = parentPopupState.y + 30;
-        } else if (timerRect) {
-            x = timerRect.left - CONTEXT_POPUP_WIDTH - MARGIN;
-            if (x < MARGIN) {
-                x = timerRect.right + MARGIN;
-            }
-            y = timerRect.top;
+        } else {
+            // Center the popup on the screen
+            x = (window.innerWidth - CONTEXT_POPUP_WIDTH) / 2;
+            y = (window.innerHeight - CONTEXT_POPUP_HEIGHT) / 2;
         }
         
         newPopups.set(activityId, { activityId, x, y, level, parentId });
@@ -2118,4 +2117,5 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
