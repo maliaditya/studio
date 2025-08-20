@@ -9,14 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, formatDistanceStrict } from 'date-fns';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
-import type { Activity } from '@/types/workout';
+import type { Activity, PauseEvent } from '@/types/workout';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -31,7 +32,14 @@ const formatMinutes = (minutes: number) => {
     return `${mins}m`;
 };
 
-const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+const slotOrder: {name: string, icon: React.ReactNode}[] = [
+  { name: 'Late Night', icon: <Moon className="h-5 w-5 text-indigo-400" /> },
+  { name: 'Dawn', icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
+  { name: 'Morning', icon: <Sun className="h-5 w-5 text-yellow-400" /> },
+  { name: 'Afternoon', icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
+  { name: 'Evening', icon: <Sunset className="h-5 w-5 text-purple-500" /> },
+  { name: 'Night', icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
+];
 
 interface ProcessedActivity extends Activity {
     calculatedDuration: number; // in minutes
@@ -154,8 +162,9 @@ function TimesheetPageContent() {
             const processedActivities: ProcessedActivity[] = [];
             
             slotOrder.forEach(slot => {
-                if (dailySchedule[slot]) {
-                    dailySchedule[slot].forEach(activity => {
+                const activities = dailySchedule[slot.name] as Activity[] | undefined;
+                if (activities) {
+                    activities.forEach(activity => {
                         if (filterActivity(activity)) {
                             let duration = 0;
                             if (activity.type === 'deepwork' || activity.type === 'upskill') {
@@ -163,7 +172,7 @@ function TimesheetPageContent() {
                             } else {
                                 duration = parseDurationToMinutes(activityDurations[activity.id]);
                             }
-                            processedActivities.push({ ...activity, slot, calculatedDuration: duration });
+                            processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
                         }
                     });
                 }
@@ -176,45 +185,98 @@ function TimesheetPageContent() {
     
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const activities = timeData.dailyData[dateKey] || [];
-        const totalMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
-
+        const activitiesForDay = timeData.dailyData[dateKey] || [];
+        
+        const calculateAttentionMetrics = (activity: Activity) => {
+            if (!activity.focusSessionInitialStartTime || !activity.focusSessionEndTime) {
+                return { totalFocusMinutes: 0, totalBreakMinutes: 0 };
+            }
+    
+            const pauses = Array.isArray(activity.focusSessionPauses) ? activity.focusSessionPauses : [];
+    
+            let lastEventTime = activity.focusSessionInitialStartTime;
+            let workIntervalsMs: number[] = [];
+    
+            pauses.forEach(p => {
+                if (p.resumeTime) {
+                    workIntervalsMs.push(p.pauseTime - lastEventTime);
+                    lastEventTime = p.resumeTime;
+                }
+            });
+            workIntervalsMs.push(activity.focusSessionEndTime - lastEventTime);
+    
+            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000);
+            const totalFocusMs = validWorkIntervalsMs.reduce((sum, i) => sum + i, 0);
+            
+            const totalBreakMs = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime) - totalFocusMs;
+    
+            return {
+                totalFocusMinutes: Math.round(totalFocusMs / 60000),
+                totalBreakMinutes: Math.round(totalBreakMs / 60000),
+            };
+        };
+    
         return (
-            <Card>
-                <CardHeader>
+            <div className="space-y-6">
+                <CardHeader className="text-center">
                     <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
-                    <CardDescription>Total time for selected filters: {formatMinutes(totalMinutes)}</CardDescription>
+                    <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[120px]">Slot</TableHead>
-                                <TableHead className="w-[120px]">Type</TableHead>
-                                <TableHead>Details</TableHead>
-                                <TableHead className="text-right w-[100px]">Duration</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {activities.length > 0 ? activities.map(activity => (
-                                <TableRow key={activity.id}>
-                                    <TableCell>{activity.slot}</TableCell>
-                                    <TableCell><span className="capitalize">{activity.type.replace('_', ' + ')}</span></TableCell>
-                                    <TableCell>{activity.details}</TableCell>
-                                    <TableCell className="text-right font-medium">{formatMinutes(activity.calculatedDuration)}</TableCell>
-                                </TableRow>
-                            )) : (
-                                <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">No activities matching your filter for this day.</TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {slotOrder.map(slot => {
+                        const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
+                        const totalDuration = activitiesInSlot.reduce((sum, act) => sum + act.calculatedDuration, 0);
+                        const { totalFocusMinutes, totalBreakMinutes } = activitiesInSlot.reduce(
+                            (acc, act) => {
+                                const metrics = calculateAttentionMetrics(act);
+                                acc.totalFocusMinutes += metrics.totalFocusMinutes;
+                                acc.totalBreakMinutes += metrics.totalBreakMinutes;
+                                return acc;
+                            },
+                            { totalFocusMinutes: 0, totalBreakMinutes: 0 }
+                        );
+    
+                        return (
+                            <Card key={slot.name}>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg">
+                                        {slot.icon}
+                                        {slot.name}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-sm text-muted-foreground">Total Time</span>
+                                            <span className="text-xl font-bold">{formatMinutes(totalDuration)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-sm text-muted-foreground flex items-center gap-2"><BrainCircuit className="h-4 w-4" />Focused</span>
+                                            <span className="text-lg font-semibold">{formatMinutes(totalFocusMinutes)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-baseline">
+                                            <span className="text-sm text-muted-foreground flex items-center gap-2"><Coffee className="h-4 w-4" />Breaks</span>
+                                            <span className="text-lg font-semibold">{formatMinutes(totalBreakMinutes)}</span>
+                                        </div>
+                                    </div>
+                                    {activitiesInSlot.length > 0 && <Separator />}
+                                    <div className="space-y-2">
+                                        {activitiesInSlot.map(act => (
+                                            <div key={act.id} className="text-xs p-2 rounded-md bg-muted/50">
+                                                <p className="font-medium truncate text-foreground">{act.details}</p>
+                                                <p className="text-muted-foreground capitalize">{act.type.replace('-', ' ')} - {formatMinutes(act.calculatedDuration)}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            </div>
         );
     };
-    
+
     const renderWeekView = () => {
         const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
         const endDate = endOfWeek(selectedDate, { weekStartsOn: 1 });
