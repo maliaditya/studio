@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -346,11 +345,15 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={false} type="resource" />;
                         })}
                     </div>
+                     {loggedMinutes > 0 && (
+                        <div className="mt-2 pt-2 border-t text-sm font-semibold text-primary">
+                            Logged: {formatDuration(loggedMinutes)}
+                        </div>
+                    )}
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
                         {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
-                        {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                     </div>
                 </CardFooter>
             </Card>
@@ -685,7 +688,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                                 {projectsInDomain.map(proj => (
                                     <DropdownMenuCheckboxItem
                                         key={proj.id}
-                                        checked={linkedProjects.some(p => p.id === proj.id)}
+                                        checked={(currentTask.linkedProjectIds || []).includes(proj.id)}
                                         onCheckedChange={() => linkProjectToTask(currentTask.id, proj.id)}
                                     >
                                         {proj.name}
@@ -2386,50 +2389,4 @@ export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
     
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-    
-
-
-
-
 
