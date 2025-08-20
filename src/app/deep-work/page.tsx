@@ -966,27 +966,42 @@ function DeepWorkPageContent() {
   }, [allDeepWorkLogs, allUpskillLogs]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    const hasResources = (def.linkedResourceIds?.length ?? 0) > 0;
+    const hasDeepWorkChildren = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+    const isChildOfDeepWork = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
     
-    if (!hasChildren || hasResources) {
-        const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-        return isChild ? 'Action' : 'Standalone';
+    // An Action becomes an Objective only if it has other Actions linked under it.
+    if (hasDeepWorkChildren) {
+        const hasActionableChild = (def.linkedDeepWorkIds || []).some(childId => {
+            const childDef = deepWorkDefinitions.find(d => d.id === childId);
+            return childDef && getDeepWorkNodeType(childDef).match(/Action|Standalone/);
+        });
+        
+        if (hasActionableChild) {
+            return 'Objective';
+        }
     }
     
-    const hasActionableChild = (def.linkedDeepWorkIds || []).some(childId => {
-        const childDef = deepWorkDefinitions.find(d => d.id === childId);
-        return childDef && getDeepWorkNodeType(childDef).match(/Action|Standalone/);
-    });
-    if (hasActionableChild) return 'Objective';
+    // If it's a child but has no deep work children of its own, it's an Action.
+    if (isChildOfDeepWork) {
+        return 'Action';
+    }
 
+    // Top-level nodes with deep work children are Intentions.
     const hasObjectiveChild = (def.linkedDeepWorkIds || []).some(childId => {
         const childDef = deepWorkDefinitions.find(d => d.id === childId);
         return childDef && getDeepWorkNodeType(childDef) === 'Objective';
     });
-    if (hasObjectiveChild) return 'Intention';
+    if (hasObjectiveChild || (hasDeepWorkChildren && !isChildOfDeepWork)) {
+        return 'Intention';
+    }
 
-    return 'Objective';
+    // If it has children (could be upskill/resource) but no parent, it's an Objective.
+    // If it's not a child of anything, it's Standalone.
+    const hasAnyChildren = hasDeepWorkChildren || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    if (hasAnyChildren && !isChildOfDeepWork) return 'Objective';
+
+
+    return 'Standalone';
   }, [deepWorkDefinitions]);
 
 
