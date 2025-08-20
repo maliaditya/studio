@@ -90,7 +90,7 @@ function MyPlatePageContent() {
     allWorkoutLogs,
     allLeadGenLogs,
     brandingLogs, setAllBrandingLogs,
-    setActivityDurations,
+    activityDurations, setActivityDurations,
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
