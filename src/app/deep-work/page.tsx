@@ -1919,8 +1919,7 @@ function DeepWorkPageContent() {
                     onSelectMicroSkill={onSelectMicroSkill}
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
-                    selectedProject={selectedProject}
-                    onSelectProject={(project) => { if(project) handleSelectRecentItem(project as Project & { type: 'project' }) }}
+                    onSelectProject={handleSelectProject}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={onOpenMindMap}
@@ -2028,7 +2027,7 @@ function DeepWorkPageContent() {
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {(selectedProject ? deepWorkDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && (getDeepWorkNodeType(def) === 'Intention')) : deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
+                                {(selectedProject ? deepWorkDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && getDeepWorkNodeType(def) === 'Intention') : deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
                                     <LinkedDeepWorkCard 
                                         key={def.id} 
                                         deepworkDef={def}
@@ -2053,7 +2052,7 @@ function DeepWorkPageContent() {
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
                                     />
                                 ))}
-                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && (getUpskillNodeType(def) === 'Curiosity')) : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
+                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
                                     <LinkedUpskillCard 
                                         key={def.id} 
                                         upskillDef={def}
