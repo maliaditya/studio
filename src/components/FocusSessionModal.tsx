@@ -104,7 +104,7 @@ export function FocusSessionModal({
   const chartData = [
     {
       name: 'completed',
-      value: dailyProgress.completed > 0 ? (dailyProgress.completed / dailyProgress.goal) * 100 : 0.1, // Show a sliver for 0
+      value: dailyProgress.goal > 0 ? (dailyProgress.completed / dailyProgress.goal) * 100 : 0,
       fill: 'hsl(var(--primary))',
     },
   ];

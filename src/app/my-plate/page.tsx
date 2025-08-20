@@ -866,13 +866,19 @@ function MyPlatePageContent() {
   }, [_activityDurations, setActivityDurations]);
   
   const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-    return totalMinutes;
+      if (!durationStr) return 0;
+      let totalMinutes = 0;
+      const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+      if (hourMatch) totalMinutes += parseFloat(hourMatch[1]) * 60;
+      const minMatch = durationStr.match(/(\d+)\s*m/);
+      if (minMatch) totalMinutes += parseFloat(minMatch[1]);
+      
+      // Fallback for plain numbers, assuming they are minutes
+      if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr)) {
+          totalMinutes += parseFloat(durationStr);
+      }
+    
+      return totalMinutes;
   };
 
   const handleLogWeight = (weight: number, date: Date) => {
