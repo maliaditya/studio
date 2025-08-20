@@ -414,6 +414,28 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
+  const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+      totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+      totalMinutes += parseInt(minMatch[1], 10);
+    }
+
+    // Fallback for plain numbers, assuming they are minutes
+    if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr.trim())) {
+      totalMinutes += parseFloat(durationStr);
+    }
+    
+    return isNaN(totalMinutes) ? 0 : totalMinutes;
+  };
+  
   const handleOpenFocusModal = (activity: Activity) => {
     const duration = parseDurationToMinutes(activityDurations[activity.id]);
     setFocusDuration(duration > 0 ? duration : 45);
@@ -805,45 +827,51 @@ function MyPlatePageContent() {
     const durations: Record<string, string> = {};
     const daySchedule = schedule[selectedDateKey];
     if (!daySchedule) return durations;
-
+  
     const allDefs = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
-    
+  
     for (const slotName in daySchedule) {
-      const activitiesInSlot = daySchedule[slotName] || [];
-
+      const activitiesInSlot = (daySchedule as any)[slotName] || [];
+  
       for (const activity of activitiesInSlot) {
-        const loggedDuration = (activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs)
-          .find(log => log.date === selectedDateKey)
-          ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-          .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (activity.type === 'upskill' ? set.reps : set.weight), 0), 0) || 0;
-
-        let totalMinutes = loggedDuration;
-
-        if(loggedDuration === 0) {
-            switch (activity.type) {
-                case 'workout': totalMinutes = 90; break;
-                case 'planning': case 'tracking': totalMinutes = 30; break;
-                case 'lead-generation': totalMinutes = 45; break;
-                case 'branding': totalMinutes = 120; break;
-                case 'upskill': case 'deepwork':
-                    totalMinutes = (activity.taskIds || []).reduce((sum, taskId) => {
-                        const def = allDefs.get(taskId.split('-')[0]); // Get definition from instance ID
-                        return sum + (def?.estimatedDuration || 120);
-                    }, 0);
-                    if ((activity.taskIds?.length ?? 0) === 0) totalMinutes = 120; // Default if no tasks
-                    break;
-                case 'interrupt': totalMinutes = activity.duration || 30; break;
-                default: totalMinutes = 30;
-            }
+        if (!activity || !activity.id) continue;
+  
+        let totalMinutes = 0;
+  
+        if (activity.completed) {
+          const loggedDuration = (activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs)
+            .find(log => log.date === selectedDateKey)
+            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (activity.type === 'upskill' ? set.reps : set.weight), 0), 0) || 0;
+          totalMinutes = loggedDuration;
+        } else {
+          switch (activity.type) {
+            case 'workout': totalMinutes = 90; break;
+            case 'planning': case 'tracking': totalMinutes = 30; break;
+            case 'lead-generation': totalMinutes = 45; break;
+            case 'branding': totalMinutes = 120; break;
+            case 'upskill': case 'deepwork':
+              totalMinutes = (activity.taskIds || []).reduce((sum, taskId) => {
+                const defId = taskId.split('-')[0];
+                const def = allDefs.get(defId);
+                return sum + (def?.estimatedDuration || 120);
+              }, 0);
+              if ((activity.taskIds?.length ?? 0) === 0) {
+                 totalMinutes = (activity.type === 'upskill' || activity.type === 'deepwork') ? 120 : 45;
+              }
+              break;
+            case 'interrupt': totalMinutes = activity.duration || 30; break;
+            default: totalMinutes = 30;
+          }
         }
-        
+  
         if (totalMinutes > 0) {
           const hours = Math.floor(totalMinutes / 60);
           const minutes = Math.round(totalMinutes % 60);
           let durationStr = '';
           if (hours > 0) durationStr += `${hours}h `;
           if (minutes > 0) durationStr += `${minutes}m`;
-          durations[activity.id] = durationStr.trim();
+          durations[activity.id] = durationStr.trim() || '0m';
         } else {
           durations[activity.id] = '';
         }
@@ -865,21 +893,6 @@ function MyPlatePageContent() {
     setActivityDurations(_activityDurations);
   }, [_activityDurations, setActivityDurations]);
   
-  const parseDurationToMinutes = (durationStr: string | undefined): number => {
-      if (!durationStr) return 0;
-      let totalMinutes = 0;
-      const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-      if (hourMatch) totalMinutes += parseFloat(hourMatch[1]) * 60;
-      const minMatch = durationStr.match(/(\d+)\s*m/);
-      if (minMatch) totalMinutes += parseFloat(minMatch[1]);
-      
-      // Fallback for plain numbers, assuming they are minutes
-      if (!hourMatch && !minMatch && /^\d+(\.\d+)?$/.test(durationStr)) {
-          totalMinutes += parseFloat(durationStr);
-      }
-    
-      return totalMinutes;
-  };
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
