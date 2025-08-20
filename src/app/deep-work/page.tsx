@@ -827,6 +827,8 @@ function DeepWorkPageContent() {
     setSelectedMicroSkill,
     setSelectedDomainId,
     setSelectedSkillId,
+    selectedProjectId,
+    setSelectedProjectId,
     createResourceWithHierarchy,
     deleteResource,
   } = useAuth();
@@ -874,7 +876,7 @@ function DeepWorkPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
   
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, onSelectProject] = useState<Project | null>(null);
   
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
   
@@ -966,21 +968,16 @@ function DeepWorkPageContent() {
   }, [allDeepWorkLogs, allUpskillLogs]);
   
  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isChildOfDeepWork = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-    
-    // An Action must have other Actions linked to become an Objective.
-    // An Intention must have other Actions or Objectives linked.
-    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).length > 0;
+    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).some(childId => 
+        deepWorkDefinitions.some(d => d.id === childId)
+    );
 
     if (hasDeepWorkChildren) {
-        return isChildOfDeepWork ? 'Objective' : 'Intention';
+        return isChild ? 'Objective' : 'Intention';
     }
-
-    if (isChildOfDeepWork) {
-        return 'Action';
-    }
-
-    return 'Standalone';
+    
+    return isChild ? 'Action' : 'Standalone';
 }, [deepWorkDefinitions]);
 
 
@@ -1658,12 +1655,6 @@ function DeepWorkPageContent() {
   };
 
 
-  const handleProjectSelect = (project: Project | null) => {
-    setSelectedProject(project);
-    setNavigationStack([]);
-    setSelectedMicroSkill(null);
-  };
-  
   const handleToggleReadyForBranding = (defId: string) => {
     setDeepWorkDefinitions(prev => prev.map(def =>
       def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
@@ -1921,6 +1912,7 @@ function DeepWorkPageContent() {
                     onSelectMicroSkill={onSelectMicroSkill}
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
+                    selectedProject={selectedProject}
                     onSelectProject={handleProjectSelect}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
@@ -2476,4 +2468,5 @@ export default function DeepWorkPage() {
 
 
     
+
 
