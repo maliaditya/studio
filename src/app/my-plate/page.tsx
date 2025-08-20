@@ -29,7 +29,6 @@ import { cn } from '@/lib/utils';
 import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
-import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TaskContextModal } from '@/components/TaskContextModal';
 
 
@@ -459,14 +458,6 @@ function MyPlatePageContent() {
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     setActiveFocusSession({ activity, duration, secondsLeft: duration * 60 });
     setIsAudioPlaying(true);
-  };
-  
-  const handleLogFocusTime = (activity: Activity, minutes: number) => {
-    if (activity.type === 'deepwork' || activity.type === 'upskill') {
-      handleLogLearning(activity, 0, minutes);
-    } else {
-      toast({ title: 'Focus time logged (simulation)', description: `${minutes} minutes logged for ${activity.details}` });
-    }
   };
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
@@ -1192,15 +1183,6 @@ function MyPlatePageContent() {
           onStartSession={handleStartFocusSession}
         />
 
-        {activeFocusSession && (
-          <FocusTimerPopup
-            activity={activeFocusSession.activity}
-            duration={activeFocusSession.duration}
-            initialSecondsLeft={activeFocusSession.secondsLeft}
-            onClose={() => setActiveFocusSession(null)}
-            onLogTime={handleLogFocusTime}
-          />
-        )}
         <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
             <DialogContent>
                 <DialogHeader>

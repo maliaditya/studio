@@ -38,7 +38,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
   const popupRef = React.useRef<HTMLDivElement>(null);
   
-  const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
@@ -152,13 +151,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const isContextAvailable = (activity.type === 'deepwork' || activity.type === 'upskill') && (activity.taskIds?.length ?? 0) > 0;
 
   return (
-    <DndContext onDragEnd={(e) => {
-        const { delta } = e;
-        setPosition(prev => ({
-            x: prev.x + delta.x,
-            y: prev.y + delta.y,
-        }));
-    }}>
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
         <Card ref={popupRef} className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
             <CardContent className="p-4">
@@ -228,6 +220,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             </CardContent>
         </Card>
         </div>
-    </DndContext>
   );
 }

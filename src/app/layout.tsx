@@ -22,6 +22,7 @@ import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
+import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -38,6 +39,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    activeFocusSession,
+    setActiveFocusSession,
+    handleLogLearning,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
 
@@ -83,6 +87,15 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
+      {activeFocusSession && (
+          <FocusTimerPopup
+            activity={activeFocusSession.activity}
+            duration={activeFocusSession.duration}
+            initialSecondsLeft={activeFocusSession.secondsLeft}
+            onClose={() => setActiveFocusSession(null)}
+            onLogTime={handleLogLearning}
+          />
+        )}
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
