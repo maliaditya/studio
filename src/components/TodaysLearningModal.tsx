@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -184,24 +185,13 @@ export function TodaysLearningModal({
   // ----- UPSKILL-SPECIFIC LOGIC -----
   const curiositiesForProject = useMemo(() => {
     if (!selectedUpskillProject || pageType !== 'upskill') return [];
-  
-    const microSkillIdsInProject = new Set(
-      selectedUpskillProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId))
-    );
-  
-    const microSkillCategoriesInProject = new Set(
-        Array.from(microSkillIdsInProject)
-            .map(id => microSkillMap.get(id)?.microSkillName)
-            .filter(Boolean)
-    );
-  
     return (upskillDefinitions || []).filter(def => {
         if (getUpskillNodeType(def) !== 'Curiosity') {
             return false;
         }
-        return microSkillCategoriesInProject.has(def.category);
+        return (def.linkedProjectIds || []).includes(selectedUpskillProject.id);
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [upskillDefinitions, selectedUpskillProject, pageType, microSkillMap, getUpskillNodeType]);
+  }, [upskillDefinitions, selectedUpskillProject, pageType, getUpskillNodeType]);
 
   const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();

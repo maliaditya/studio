@@ -832,6 +832,7 @@ function DeepWorkPageContent() {
     createResourceWithHierarchy,
     deleteResource,
     getDeepWorkNodeType,
+    getUpskillNodeType,
   } = useAuth();
   const router = useRouter();
   
@@ -877,7 +878,7 @@ function DeepWorkPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
   
-  const [selectedProject, onSelectProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
   
@@ -968,39 +969,6 @@ function DeepWorkPageContent() {
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
   
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const hasObjectiveChild = (def.linkedUpskillIds || []).some(childId => {
-        const childDef = upskillDefinitions.find(d => d.id === childId);
-        if (!childDef) return false;
-        return getUpskillNodeType(childDef) === 'Objective';
-    });
-  
-    if (hasObjectiveChild) {
-        return 'Curiosity';
-    }
-  
-    const hasActionableChild = (def.linkedUpskillIds || []).some(childId => {
-      const childDef = upskillDefinitions.find(d => d.id === childId);
-      if (!childDef) return false;
-      const nodeType = getUpskillNodeType(childDef);
-      return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-  
-    if (hasActionableChild) {
-      return 'Objective';
-    }
-  
-    const hasChildren = (def.linkedUpskillIds || []).length > 0;
-    if(hasChildren) {
-        // If it has children but none are objectives or actionable, it's not a Curiosity.
-        // It becomes an Objective by definition of having children that are not higher-level.
-        return 'Objective';
-    }
-  
-    const isLinkedAsChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-    return isLinkedAsChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions]);
-
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
     const visited = new Set<string>();
@@ -1769,7 +1737,7 @@ function DeepWorkPageContent() {
   };
   
   const handleProjectSelect = (project: Project | null) => {
-    onSelectProject(project);
+    setSelectedProject(project);
     if (project) {
         addToRecents({ ...project, type: 'project' });
         setSelectedProjectId(project.id);
@@ -2460,6 +2428,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
