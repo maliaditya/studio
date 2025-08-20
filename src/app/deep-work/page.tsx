@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -967,18 +966,16 @@ function DeepWorkPageContent() {
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
   
- const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).some(childId => 
-        deepWorkDefinitions.some(d => d.id === childId)
-    );
+    const hasDeepWorkChildren = (def.linkedDeepWorkIds || []).length > 0;
 
     if (hasDeepWorkChildren) {
         return isChild ? 'Objective' : 'Intention';
     }
     
     return isChild ? 'Action' : 'Standalone';
-}, [deepWorkDefinitions]);
+  }, [deepWorkDefinitions]);
 
 
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
@@ -1780,18 +1777,23 @@ function DeepWorkPageContent() {
     setSelectedDeepWorkTask(null);
     setSelectedUpskillTask(null);
   };
-
-  const handleProjectSelect = (project: Project | null) => {
+  
+  const handleSelectProject = (project: Project | null) => {
     onSelectProject(project);
-    setSelectedProjectId(project ? project.id : null);
-    setSelectedSkillId(null);
-    onSelectMicroSkill(null);
-    setNavigationStack([]);
+    if (project) {
+        addToRecents({ ...project, type: 'project' });
+        setSelectedProjectId(project.id);
+        setSelectedSkillId(null);
+        onSelectMicroSkill(null);
+        setNavigationStack([]);
+    } else {
+        setSelectedProjectId(null);
+    }
   };
 
   const handleSelectRecentItem = (item: (ExerciseDefinition | Project) & { type: string }) => {
     if (item.type === 'project') {
-      handleProjectSelect(item as Project);
+      handleSelectProject(item as Project);
       return;
     }
     
@@ -1913,7 +1915,7 @@ function DeepWorkPageContent() {
                     onSelectFocusArea={handleSelectFocusArea}
                     onOpenNewFocusArea={handleOpenNewFocusAreaModal}
                     selectedProject={selectedProject}
-                    onSelectProject={handleProjectSelect}
+                    onSelectProject={handleSelectProject}
                     onDeleteFocusArea={handleDeleteFocusArea}
                     onUpdateFocusAreaName={handleUpdateFocusAreaName}
                     onOpenMindMap={onOpenMindMap}
@@ -2468,5 +2470,6 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
