@@ -2028,7 +2028,7 @@ function DeepWorkPageContent() {
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => (
+                                {(selectedProject ? deepWorkDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && (getDeepWorkNodeType(def) === 'Intention')) : deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
                                     <LinkedDeepWorkCard 
                                         key={def.id} 
                                         deepworkDef={def}
@@ -2053,7 +2053,7 @@ function DeepWorkPageContent() {
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
                                     />
                                 ))}
-                                {upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => (
+                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && (getUpskillNodeType(def) === 'Curiosity')) : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
                                     <LinkedUpskillCard 
                                         key={def.id} 
                                         upskillDef={def}
@@ -2090,7 +2090,7 @@ function DeepWorkPageContent() {
                                         </p>
                                     </Card>
                                 )}
-                                {!selectedMicroSkill && <div className="col-span-3 text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>}
+                                {!selectedMicroSkill && !selectedProject && <div className="col-span-3 text-center py-10 text-muted-foreground">Select a micro-skill or project from the library to view its tasks.</div>}
                            </div>
                         )}
                     </CardContent>
