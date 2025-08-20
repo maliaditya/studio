@@ -57,7 +57,7 @@ export function TodaysLearningModal({
   productizationPlans = {},
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
-  const { microSkillMap } = useAuth();
+  const { microSkillMap, getDeepWorkNodeType, getUpskillNodeType } = useAuth();
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for branding bundle creation
@@ -182,30 +182,26 @@ export function TodaysLearningModal({
   };
 
   // ----- UPSKILL-SPECIFIC LOGIC -----
-  const linkedUpskillChildIds = useMemo(() => 
-    new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
-  , [upskillDefinitions]);
-
   const curiositiesForProject = useMemo(() => {
     if (!selectedUpskillProject || pageType !== 'upskill') return [];
-    
+  
     const microSkillIdsInProject = new Set(
       selectedUpskillProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId))
     );
-
+  
+    const microSkillCategoriesInProject = new Set(
+        Array.from(microSkillIdsInProject)
+            .map(id => microSkillMap.get(id)?.microSkillName)
+            .filter(Boolean)
+    );
+  
     return (upskillDefinitions || []).filter(def => {
-        const microSkillInfo = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === def.category);
-        if (!microSkillInfo) return false;
-        
-        const microSkillId = microSkillInfo[0];
-        if(!microSkillIdsInProject.has(microSkillId)) return false;
-
-        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-        const isLinkedAsChild = linkedUpskillChildIds.has(def.id);
-        
-        return isParent && !isLinkedAsChild;
+        if (getUpskillNodeType(def) !== 'Curiosity') {
+            return false;
+        }
+        return microSkillCategoriesInProject.has(def.category);
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [upskillDefinitions, selectedUpskillProject, pageType, linkedUpskillChildIds, microSkillMap]);
+  }, [upskillDefinitions, selectedUpskillProject, pageType, microSkillMap, getUpskillNodeType]);
 
   const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();
@@ -220,11 +216,9 @@ export function TodaysLearningModal({
           const node = upskillDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
-  
-          if (!isParent) { // It's a Visualization
+          if (getUpskillNodeType(node) === 'Visualization') {
               visualizations.push(node);
-          } else { // It's a Curiosity or Objective, so recurse
+          } else if (getUpskillNodeType(node) === 'Objective' || getUpskillNodeType(node) === 'Curiosity') { // It's an Objective or Curiosity, so recurse
               (node.linkedUpskillIds || []).forEach(childId => {
                   if (!visited.has(childId)) {
                       queue.push(childId);
@@ -233,7 +227,7 @@ export function TodaysLearningModal({
           }
       }
       return visualizations.sort((a,b) => a.name.localeCompare(b.name));
-  }, [upskillDefinitions]);
+  }, [upskillDefinitions, getUpskillNodeType]);
 
   const visualizationsForCuriosity = useMemo(() => {
     if (!selectedUpskillCuriosity || pageType !== 'upskill') return [];
@@ -242,8 +236,6 @@ export function TodaysLearningModal({
 
 
   // ----- DEEPWORK-SPECIFIC LOGIC -----
-  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
-
   const getActionsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();
       const actions: ExerciseDefinition[] = [];
@@ -257,33 +249,25 @@ export function TodaysLearningModal({
           const node = deepWorkDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0;
-  
-          if (!isParent) { // It's an Action
+          if(getDeepWorkNodeType(node) === 'Action') {
               actions.push(node);
-          } else { // It's an Intention or Objective, so recurse
+          } else if (getDeepWorkNodeType(node) === 'Intention' || getDeepWorkNodeType(node) === 'Objective') { // It's an Intention or Objective, so recurse
               (node.linkedDeepWorkIds || []).forEach(childId => {
                   if (!visited.has(childId)) queue.push(childId);
               });
           }
       }
       return actions.sort((a,b) => a.name.localeCompare(b.name));
-  }, [deepWorkDefinitions]);
+  }, [deepWorkDefinitions, getDeepWorkNodeType]);
 
   const intentionsForProject = useMemo(() => {
     if (!selectedDeepWorkProject || pageType !== 'deepwork') return [];
 
     return (deepWorkDefinitions || []).filter(def => {
-        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-        const isChild = linkedDeepWorkChildIds.has(def.id);
-        const isIntention = isParent && !isChild;
-
-        if (!isIntention) return false;
-        
-        // This is a simplified check. A more robust check might trace up the project hierarchy.
+        if (getDeepWorkNodeType(def) !== 'Intention') return false;
         return (def.linkedProjectIds || []).includes(selectedDeepWorkProject.id);
     }).sort((a,b) => a.name.localeCompare(b.name));
-  }, [deepWorkDefinitions, selectedDeepWorkProject, pageType, linkedDeepWorkChildIds]);
+  }, [deepWorkDefinitions, selectedDeepWorkProject, pageType, getDeepWorkNodeType]);
 
   const actionsForIntention = useMemo(() => {
     if (!selectedDeepWorkIntention || pageType !== 'deepwork') return [];
