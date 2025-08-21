@@ -194,10 +194,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   {learningItems.length > 0 ? (
                       <Carousel
                         items={learningItems}
-                        renderItem={([topic, topicStats]: [string, any]) => (
+                        renderItem={([topic, topicStats]: [string, { logged: number, estimated: number }]) => (
                             <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px]">
                                 <p className="font-bold text-foreground text-base truncate" title={topic}>{topic}</p>
-                                <p className="text-sm text-muted-foreground">Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span></p>
+                                <p className="text-sm text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{topicStats.logged.toFixed(1)}h</span> logged / <span className="font-semibold text-foreground">{topicStats.estimated.toFixed(1)}h</span> est.
+                                </p>
+                                {topicStats.estimated > 0 && <Progress value={(topicStats.logged / topicStats.estimated) * 100} className="h-2 mt-2" />}
                             </div>
                         )}
                       />
