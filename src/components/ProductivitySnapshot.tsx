@@ -192,17 +192,18 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
                 <motion.div layout>
                   {learningItems.length > 0 ? (
-                    <Carousel
-                      items={learningItems}
-                      renderItem={([topic, topicStats]: [string, any]) => (
-                        <div className="p-3 rounded-md bg-muted/30 border-b-0">
-                          <h5 className="font-bold text-foreground text-base truncate" title={topic}>{topic}</h5>
-                          <p className="text-xs text-muted-foreground">
-                            Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span>
-                          </p>
-                        </div>
-                      )}
-                    />
+                    <Accordion type="single" collapsible className="w-full">
+                      {learningItems.map(([topic, topicStats]: [string, any]) => (
+                        <AccordionItem value={topic} key={topic}>
+                          <AccordionTrigger>{topic}</AccordionTrigger>
+                          <AccordionContent>
+                             <p className="text-sm text-muted-foreground">
+                                Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span>
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress in the Upskill page.</p>
                   )}
