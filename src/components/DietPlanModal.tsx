@@ -310,7 +310,7 @@ export function DietPlanModal({
                             </div>
                         </CardContent>
                     </Card>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 gap-6">
                         <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
                         <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
                         <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
