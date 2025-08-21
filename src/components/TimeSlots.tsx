@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
@@ -46,12 +47,19 @@ interface TimeSlotsProps {
 }
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    
+    // Handle "30" as "30m"
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+
     let totalMinutes = 0;
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
     if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    
     return totalMinutes;
 };
 
@@ -74,8 +82,13 @@ export function TimeSlots({
       {slots.map((slot) => {
         const activities = schedule[slot.name] || [];
         const currentSlotDuration = activities.reduce((sum, act) => {
-            const duration = activityDurations[act.id];
-            return sum + parseDurationToMinutes(duration);
+            let duration = 0;
+            if(act.type === 'essentials') {
+                duration = act.duration || 0;
+            } else {
+                duration = parseDurationToMinutes(activityDurations[act.id]);
+            }
+            return sum + duration;
         }, 0);
 
         return (
@@ -119,6 +132,7 @@ export function TimeSlots({
                             </p>
                             <p className="text-xs text-muted-foreground capitalize">
                               {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}
+                               {activity.duration ? ` (${activity.duration}m)`: ''}
                             </p>
                           </div>
                         </div>

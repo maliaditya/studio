@@ -130,6 +130,10 @@ function MyPlatePageContent() {
   const [interruptDetails, setInterruptDetails] = useState('');
   const [interruptDuration, setInterruptDuration] = useState('');
 
+  const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [essentialDetails, setEssentialDetails] = useState('');
+  const [essentialDuration, setEssentialDuration] = useState('');
+
 
   // Focus Session State
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
@@ -187,31 +191,52 @@ function MyPlatePageContent() {
     if (!currentUser || !isScheduleLoaded) return;
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
-    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
-    if (!settings.carryForward) return;
+    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false };
+    
     const today = new Date();
     const todayDateKey = format(today, 'yyyy-MM-dd');
     const yesterday = addDays(today, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
+    
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
     if (lastCarryForwardDate === todayDateKey) return;
+    
     const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => slot.length > 0);
     if (hasTodaysActivities) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
+
     const yesterdaysSchedule = schedule[yesterdayKey];
     if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
+
     const newTodaySchedule: DailySchedule = {};
     let carriedOver = false;
+
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
         if (activities && activities.length > 0) {
-            newTodaySchedule[slotName] = activities.map(activity => ({ ...activity, id: `${activity.type}-${Date.now()}-${Math.random()}`, completed: false }));
-            carriedOver = true;
+            const activitiesToCarry = (activities as Activity[]).filter(activity => {
+                if(activity.completed) return false;
+                if(activity.type === 'essentials') return settings.carryForwardEssentials;
+                return settings.carryForward;
+            });
+
+            if (activitiesToCarry.length > 0) {
+                if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
+                (newTodaySchedule[slotName] as Activity[]).push(
+                    ...activitiesToCarry.map(activity => ({
+                        ...activity,
+                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                        completed: false,
+                    }))
+                );
+                carriedOver = true;
+            }
         }
     });
+
     if (carriedOver) {
-        setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
-        toast({ title: "Activities Carried Over", description: "Yesterday's activities have been added to today's schedule." });
+        setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...prev[todayDateKey] } }));
+        toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
@@ -223,11 +248,16 @@ function MyPlatePageContent() {
         setInterruptModalState({ isOpen: true, slotName });
         return;
     }
+    
+    if (type === 'essentials') {
+        setEssentialsModalState({ isOpen: true, slotName });
+        return;
+    }
 
     const SLOT_CAPACITY_MINUTES = 240;
     
     const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
-    const currentSlotDuration = activitiesInSlot.reduce((sum, act) => sum + (act.duration || 0), 0); // Simplified for now
+    const currentSlotDuration = activitiesInSlot.reduce((sum, act) => sum + (act.duration || 0), 0);
 
     let details = '';
     let newActivityDuration = 0;
@@ -295,7 +325,39 @@ function MyPlatePageContent() {
     setInterruptDuration('');
     setInterruptModalState({ isOpen: false, slotName: null });
     toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
-};
+  };
+  
+  const handleSaveEssential = () => {
+    const { slotName } = essentialsModalState;
+    if (!slotName || !essentialDetails.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
+        return;
+    }
+    const durationMinutes = parseInt(essentialDuration, 10) || 0;
+
+    const newActivity: Activity = {
+        id: `essentials-${Date.now()}`,
+        type: 'essentials',
+        details: essentialDetails,
+        completed: false,
+        taskIds: [],
+        duration: durationMinutes,
+    };
+
+    setSchedule(prev => ({
+        ...prev,
+        [selectedDateKey]: {
+            ...(prev[selectedDateKey] || {}),
+            [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
+        },
+    }));
+
+    setEssentialDetails('');
+    setEssentialDuration('');
+    setEssentialsModalState({ isOpen: false, slotName: null });
+    toast({ title: 'Essential Task Added', description: 'The task has been added to your agenda.' });
+  };
+
 
   const handleRemoveActivity = (slotName: string, activityId: string) => {
     if (!selectedDateKey) return;
@@ -499,7 +561,6 @@ function MyPlatePageContent() {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     
-    // New accurate calculation for today's learning hours
     const todaysAgenda = schedule[todayStr] || {};
     const completedUpskillActivities = Object.values(todaysAgenda).flat().filter(act => act.type === 'upskill' && act.completed);
     
@@ -942,6 +1003,7 @@ function MyPlatePageContent() {
             case 'planning': case 'tracking': totalMinutes = 30; break;
             case 'lead-generation': totalMinutes = 45; break;
             case 'branding': totalMinutes = 120; break;
+            case 'essentials': totalMinutes = activity.duration || 30; break;
             case 'upskill': case 'deepwork':
               totalMinutes = (activity.taskIds || []).reduce((sum, taskId) => {
                 const defId = taskId.split('-')[0];
@@ -1313,6 +1375,29 @@ function MyPlatePageContent() {
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
                     <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        
+         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => setEssentialsModalState({ isOpen, slotName: null })}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Log a Daily Essential</DialogTitle>
+                    <DialogDescription>Add a recurring or essential one-off task.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-1">
+                        <Label htmlFor="essential-details">Description</Label>
+                        <Textarea id="essential-details" value={essentialDetails} onChange={(e) => setEssentialDetails(e.target.value)} placeholder="e.g., Meditate, Journal..." />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="essential-duration">Est. Duration (minutes)</Label>
+                        <Input id="essential-duration" type="number" value={essentialDuration} onChange={(e) => setEssentialDuration(e.target.value)} placeholder="e.g., 15" />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null })}>Cancel</Button>
+                    <Button onClick={handleSaveEssential}>Save Task</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
