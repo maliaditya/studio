@@ -774,13 +774,16 @@ function SkillPageContent() {
                       )}
                        <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => {
-                              const formatMinutes = (minutes: number) => {
-                                if (minutes < 1) return '0m';
-                                const hours = Math.floor(minutes / 60);
-                                const mins = Math.round(minutes % 60);
-                                if (hours > 0) return `${hours}h ${mins}m`;
-                                return `${mins}m`;
-                              };
+                              const totalAreaEst = area.microSkills.reduce((areaSum, micro) => {
+                                  const intentions = microSkillIntentions.get(micro.name) || [];
+                                  return areaSum + intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                              }, 0);
+                              const totalAreaLogged = area.microSkills.reduce((areaSum, micro) => {
+                                  const intentions = microSkillIntentions.get(micro.name) || [];
+                                  const taskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
+                                  return areaSum + getLoggedTime(taskIds, allDeepWorkLogs, 'weight');
+                              }, 0);
+
                               return (
                                 <Card key={area.id}>
                                   <AccordionItem value={area.id} className="border-b-0">
@@ -793,6 +796,7 @@ function SkillPageContent() {
                                           </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center">
+                                           {totalAreaEst > 0 && <Badge variant="secondary">{formatMinutes(totalAreaEst)} est / {formatMinutes(totalAreaLogged)} log</Badge>}
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingArea({skillId: selectedCoreSkill.id, area}); }}><Edit className="h-4 w-4"/></Button>
                                           <AlertDialog>
                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
