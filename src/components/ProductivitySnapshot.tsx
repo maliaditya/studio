@@ -182,7 +182,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               {stats.avgProductiveHoursChange !== 0 && (
                 <p className={cn("text-xs text-muted-foreground flex items-center justify-center", stats.avgProductiveHoursChange > 0 ? "text-emerald-500" : "text-red-500")}>
                   {stats.avgProductiveHoursChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                  {Math.abs(stats.avgProductiveHoursChange).toFixed(0)}% vs previous average
+                  {stats.avgProductiveHoursChange === Infinity ? 'vs yesterday' : `${Math.abs(stats.avgProductiveHoursChange).toFixed(0)}% vs yesterday`}
                 </p>
               )}
             </div>
@@ -192,18 +192,15 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
                 <motion.div layout>
                   {learningItems.length > 0 ? (
-                    <Accordion type="single" collapsible className="w-full">
-                      {learningItems.map(([topic, topicStats]: [string, any]) => (
-                        <AccordionItem value={topic} key={topic}>
-                          <AccordionTrigger>{topic}</AccordionTrigger>
-                          <AccordionContent>
-                             <p className="text-sm text-muted-foreground">
-                                Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span>
-                            </p>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
+                      <Carousel
+                        items={learningItems}
+                        renderItem={([topic, topicStats]: [string, any]) => (
+                            <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px]">
+                                <p className="font-bold text-foreground text-base truncate" title={topic}>{topic}</p>
+                                <p className="text-sm text-muted-foreground">Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span></p>
+                            </div>
+                        )}
+                      />
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress in the Upskill page.</p>
                   )}
