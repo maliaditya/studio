@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -567,12 +567,54 @@ function MyPlatePageContent() {
     };
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
   
+  const upcomingReleases = useMemo(() => {
+    const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
+    const today = startOfToday();
+
+    const processPlan = (plan: any, topicName: string, type: 'product' | 'service') => {
+      if (plan.releases) {
+        plan.releases.forEach((release: Release) => {
+          try {
+            const launchDate = parseISO(release.launchDate);
+            if (isAfter(launchDate, today) || format(launchDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+              allReleases.push({
+                topic: topicName,
+                release: { ...release, daysRemaining: differenceInDays(launchDate, today) },
+                type,
+              });
+            }
+          } catch (e) {
+            // Invalid date format, skip this release
+          }
+        });
+      }
+    };
+
+    if (productizationPlans) {
+      Object.entries(productizationPlans).forEach(([projectId, plan]) => {
+        const project = projects.find(p => p.id === projectId);
+        processPlan(plan, project?.name || projectId, 'product');
+      });
+    }
+
+    if (offerizationPlans) {
+      Object.entries(offerizationPlans).forEach(([specId, plan]) => {
+        const specialization = coreSkills.find(s => s.id === specId);
+        processPlan(plan, specialization?.name || specId, 'service');
+      });
+    }
+
+    return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
+  }, [productizationPlans, offerizationPlans, projects, coreSkills]);
+
   const dashboardStats = useMemo(() => {
     const {
       todayDeepWorkHours,
       deepWorkChange,
       todayUpskillHours,
       upskillChange,
+      totalProductiveHours,
+      avgProductiveHoursChange
     } = productivityStats;
   
     const todaysActivities = schedule[todayKey] || {};
@@ -586,10 +628,13 @@ function MyPlatePageContent() {
       deepWorkChange,
       todayUpskillHours,
       upskillChange,
+      totalProductiveHours,
+      avgProductiveHoursChange,
       direction: allCompleted,
       overallNextMilestone: null,
+      upcomingReleases: upcomingReleases,
     };
-  }, [productivityStats, schedule, todayKey]);
+  }, [productivityStats, schedule, todayKey, upcomingReleases]);
 
   useEffect(() => {
     const newDurations: Record<string, string> = {};
@@ -684,7 +729,7 @@ function MyPlatePageContent() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               <div className="lg:col-span-3">
                 <ProductivitySnapshot 
-                  stats={productivityStats} 
+                  stats={dashboardStats} 
                   timeAllocationData={[]} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
@@ -901,3 +946,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
