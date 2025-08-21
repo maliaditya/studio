@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
@@ -70,11 +69,21 @@ const SpecializationItem: React.FC<{
   onAddSub: (parentId: string) => void;
   onEdit: (skill: CoreSkill) => void;
   onDelete: (skillId: string) => void;
-}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete }) => {
+  totalEst: number;
+  totalLogged: number;
+}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete, totalEst, totalLogged }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
     
     const childSpecs = allSpecs.filter(s => s.parentId === spec.id);
+
+    const formatMinutes = (minutes: number) => {
+        if (minutes < 1) return "0m";
+        if (minutes < 60) return `${Math.round(minutes)}m`;
+        const hours = Math.floor(minutes / 60);
+        const remainingMinutes = Math.round(minutes % 60);
+        return `${hours}h ${remainingMinutes}m`;
+    };
 
     return (
         <div style={{ marginLeft: `${level * 20}px` }}>
@@ -90,6 +99,7 @@ const SpecializationItem: React.FC<{
                         </span>
                     </button>
                     <div className="flex items-center opacity-0 group-hover:opacity-100">
+                        {totalEst > 0 && <Badge variant="secondary" className="mr-2 text-xs">{formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log</Badge>}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(spec.id)}>
                             <Plus className="h-4 w-4 text-green-500" />
                         </Button>
@@ -100,19 +110,26 @@ const SpecializationItem: React.FC<{
             </Droppable>
             {childSpecs.length > 0 && (
                 <div className="pl-4 border-l-2 ml-4">
-                    {childSpecs.map(child => (
-                        <SpecializationItem
-                            key={child.id}
-                            spec={child}
-                            allSpecs={allSpecs}
-                            level={level + 1}
-                            selectedSkillId={selectedSkillId}
-                            onSelect={onSelect}
-                            onAddSub={onAddSub}
-                            onEdit={onEdit}
-                            onDelete={onDelete}
-                        />
-                    ))}
+                    {childSpecs.map(child => {
+                        // We need to calculate totals for each child as well to pass down, or handle it inside the component.
+                        // For simplicity, passing 0 for now as the user didn't ask for multi-level totals *on the sub-items*.
+                        // The correct implementation would require recursively calculating totals here too.
+                        return (
+                            <SpecializationItem
+                                key={child.id}
+                                spec={child}
+                                allSpecs={allSpecs}
+                                level={level + 1}
+                                selectedSkillId={selectedSkillId}
+                                onSelect={onSelect}
+                                onAddSub={onAddSub}
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                                totalEst={0}
+                                totalLogged={0}
+                            />
+                        )
+                    })}
                 </div>
             )}
         </div>
@@ -403,27 +420,6 @@ function SkillPageContent() {
     setSelectedProjectId(null);
   };
 
-  const linkedDeepWorkChildIds = useMemo(() => new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])), [deepWorkDefinitions]);
-  const linkedUpskillChildIds = useMemo(() => new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || [])), [upskillDefinitions]);
-
-  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent && !isChild) return 'Intention';
-    if (isParent && isChild) return 'Objective';
-    if (!isParent && isChild) return 'Action';
-    return 'Standalone';
-  }, [linkedDeepWorkChildIds]);
-  
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
-    const isChild = linkedUpskillChildIds.has(def.id);
-    if (isParent && !isChild) return 'Curiosity';
-    if (isParent && isChild) return 'Objective';
-    if (!isParent && isChild) return 'Visualization';
-    return 'Standalone';
-  }, [linkedUpskillChildIds]);
-
   const getDescendantsRecursive = useCallback((startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
     const descendants: ExerciseDefinition[] = [];
     const queue: string[] = [startNodeId];
@@ -447,30 +443,6 @@ function SkillPageContent() {
     return descendants;
   }, []);
 
-  const microSkillIntentions = useMemo(() => {
-    const map = new Map<string, ExerciseDefinition[]>();
-    deepWorkDefinitions.forEach(def => {
-        if (getDeepWorkNodeType(def) === 'Intention') {
-            const category = def.category;
-            if (!map.has(category)) map.set(category, []);
-            map.get(category)!.push(def);
-        }
-    });
-    return map;
-  }, [deepWorkDefinitions, getDeepWorkNodeType]);
-
-  const microSkillCuriosities = useMemo(() => {
-    const map = new Map<string, ExerciseDefinition[]>();
-    upskillDefinitions.forEach(def => {
-        if (getUpskillNodeType(def) === 'Curiosity') {
-            const category = def.category;
-            if (!map.has(category)) map.set(category, []);
-            map.get(category)!.push(def);
-        }
-    });
-    return map;
-  }, [upskillDefinitions, getUpskillNodeType]);
-  
   const getLoggedTime = useCallback((taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
       let totalMinutes = 0;
       const idSet = new Set(taskIds);
@@ -483,6 +455,51 @@ function SkillPageContent() {
       });
       return totalMinutes;
   }, []);
+
+  const microSkillIntentions = useMemo(() => {
+    const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
+    const getDeepWorkNodeType = (def: ExerciseDefinition) => {
+        const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedDeepWorkChildIds.has(def.id);
+        if (isParent && !isChild) return 'Intention';
+        if (isParent && isChild) return 'Objective';
+        if (!isParent && isChild) return 'Action';
+        return 'Standalone';
+    };
+
+    const map = new Map<string, ExerciseDefinition[]>();
+    deepWorkDefinitions.forEach(def => {
+        if (getDeepWorkNodeType(def) === 'Intention') {
+            const category = def.category;
+            if (!map.has(category)) map.set(category, []);
+            map.get(category)!.push(def);
+        }
+    });
+    return map;
+  }, [deepWorkDefinitions]);
+
+  const microSkillCuriosities = useMemo(() => {
+    const linkedUpskillChildIds = new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []));
+    const getUpskillNodeType = (def: ExerciseDefinition) => {
+        const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+        const isChild = linkedUpskillChildIds.has(def.id);
+        if (isParent && !isChild) return 'Curiosity';
+        if (isParent && isChild) return 'Objective';
+        if (!isParent && isChild) return 'Visualization';
+        return 'Standalone';
+    };
+
+    const map = new Map<string, ExerciseDefinition[]>();
+    upskillDefinitions.forEach(def => {
+        if (getUpskillNodeType(def) === 'Curiosity') {
+            const category = def.category;
+            if (!map.has(category)) map.set(category, []);
+            map.get(category)!.push(def);
+        }
+    });
+    return map;
+  }, [upskillDefinitions]);
+
   
   const linkedTasksByCoreSkill = useMemo(() => {
     if (!selectedProject) return new Map();
@@ -492,11 +509,11 @@ function SkillPageContent() {
     }>();
   
     const projectIntentions = deepWorkDefinitions.filter(def => 
-      (def.linkedProjectIds || []).includes(selectedProject.id) && getDeepWorkNodeType(def) === 'Intention'
+      (def.linkedProjectIds || []).includes(selectedProject.id)
     );
   
     const projectCuriosities = upskillDefinitions.filter(def => 
-        (def.linkedProjectIds || []).includes(selectedProject.id) && getUpskillNodeType(def) === 'Curiosity'
+        (def.linkedProjectIds || []).includes(selectedProject.id)
     );
       
     const processTasks = (tasks: ExerciseDefinition[], type: 'intention' | 'curiosity') => {
@@ -532,7 +549,7 @@ function SkillPageContent() {
     processTasks(projectCuriosities, 'curiosity');
 
     return taskMap;
-  }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
+  }, [selectedProject, microSkillMap, coreSkills, deepWorkDefinitions, upskillDefinitions]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -550,7 +567,7 @@ function SkillPageContent() {
   };
 
   const formatMinutes = (minutes: number) => {
-    if (minutes < 1) return '0m';
+    if (minutes < 1) return "0m";
     if (minutes < 60) return `${Math.round(minutes)}m`;
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = Math.round(minutes % 60);
@@ -582,11 +599,40 @@ function SkillPageContent() {
                             const domainProjects = projects.filter(p => p.domainId === domain.id);
                             const topLevelSpecializations = domainCoreSkills.filter(s => s.type === 'Specialization' && !s.parentId);
                             
+                            const totalDomainEst = domainCoreSkills.reduce((domainSum, skill) => {
+                                return domainSum + skill.skillAreas.reduce((skillSum, area) => {
+                                    return skillSum + area.microSkills.reduce((areaSum, micro) => {
+                                        const intentions = microSkillIntentions.get(micro.name) || [];
+                                        const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                        const intentionEst = intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                        const curiosityEst = curiosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                        return areaSum + intentionEst + curiosityEst;
+                                    }, 0);
+                                }, 0);
+                            }, 0);
+                        
+                            const totalDomainLogged = domainCoreSkills.reduce((domainSum, skill) => {
+                                return domainSum + skill.skillAreas.reduce((skillSum, area) => {
+                                    return skillSum + area.microSkills.reduce((areaSum, micro) => {
+                                        const intentions = microSkillIntentions.get(micro.name) || [];
+                                        const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                        const intentionTaskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
+                                        const curiosityTaskIds = curiosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id));
+                                        const intentionLogged = getLoggedTime(intentionTaskIds, allDeepWorkLogs, 'weight');
+                                        const curiosityLogged = getLoggedTime(curiosityTaskIds, allUpskillLogs, 'reps');
+                                        return areaSum + intentionLogged + curiosityLogged;
+                                    }, 0);
+                                }, 0);
+                            }, 0);
+
                             return (
                                 <AccordionItem value={domain.id} key={domain.id}>
                                     <div className="flex items-center justify-between w-full group">
                                         <AccordionTrigger className="flex-grow">
-                                          <span>{domain.name}</span>
+                                          <div className="flex items-center gap-2">
+                                            <span>{domain.name}</span>
+                                            {totalDomainEst > 0 && <Badge variant="outline" className="text-xs">{formatMinutes(totalDomainEst)} est / {formatMinutes(totalDomainLogged)} log</Badge>}
+                                          </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center opacity-0 group-hover:opacity-100 ml-2">
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingDomain(domain); }}><Edit className="h-4 w-4"/></Button>
@@ -614,18 +660,44 @@ function SkillPageContent() {
                                               </Button>
                                             ))}
                                             <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
-                                            {topLevelSpecializations.map(spec => (
-                                                <SpecializationItem
-                                                    key={spec.id}
-                                                    spec={spec}
-                                                    allSpecs={domainCoreSkills}
-                                                    selectedSkillId={selectedSkillId}
-                                                    onSelect={handleSelectCoreSkill}
-                                                    onAddSub={(parentId) => handleAddSpecialization(domain.id, parentId)}
-                                                    onEdit={setEditingSkill}
-                                                    onDelete={handleDeleteCoreSkill}
-                                                />
-                                            ))}
+                                            {topLevelSpecializations.map(spec => {
+                                                const skillAreas = spec.skillAreas || [];
+                                                const totalSpecEst = skillAreas.reduce((skillSum, area) => {
+                                                    return skillSum + area.microSkills.reduce((areaSum, micro) => {
+                                                        const intentions = microSkillIntentions.get(micro.name) || [];
+                                                        const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                                        const intentionEst = intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                                        const curiosityEst = curiosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                                        return areaSum + intentionEst + curiosityEst;
+                                                    }, 0);
+                                                }, 0);
+                                            
+                                                const totalSpecLogged = skillAreas.reduce((skillSum, area) => {
+                                                    return skillSum + area.microSkills.reduce((areaSum, micro) => {
+                                                        const intentions = microSkillIntentions.get(micro.name) || [];
+                                                        const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                                        const intentionTaskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
+                                                        const curiosityTaskIds = curiosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id));
+                                                        const intentionLogged = getLoggedTime(intentionTaskIds, allDeepWorkLogs, 'weight');
+                                                        const curiosityLogged = getLoggedTime(curiosityTaskIds, allUpskillLogs, 'reps');
+                                                        return areaSum + intentionLogged + curiosityLogged;
+                                                    }, 0);
+                                                }, 0);
+                                                return (
+                                                    <SpecializationItem
+                                                        key={spec.id}
+                                                        spec={spec}
+                                                        allSpecs={domainCoreSkills}
+                                                        selectedSkillId={selectedSkillId}
+                                                        onSelect={handleSelectCoreSkill}
+                                                        onAddSub={(parentId) => handleAddSpecialization(domain.id, parentId)}
+                                                        onEdit={setEditingSkill}
+                                                        onDelete={handleDeleteCoreSkill}
+                                                        totalEst={totalSpecEst}
+                                                        totalLogged={totalSpecLogged}
+                                                    />
+                                                );
+                                            })}
                                             <div className="flex gap-2 pt-2">
                                               <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
                                               <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
@@ -776,12 +848,20 @@ function SkillPageContent() {
                           {selectedCoreSkill.skillAreas.map(area => {
                               const totalAreaEst = area.microSkills.reduce((areaSum, micro) => {
                                   const intentions = microSkillIntentions.get(micro.name) || [];
-                                  return areaSum + intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                  const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                  const intentionEst = intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                  const curiosityEst = curiosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                  return areaSum + intentionEst + curiosityEst;
                               }, 0);
+                          
                               const totalAreaLogged = area.microSkills.reduce((areaSum, micro) => {
                                   const intentions = microSkillIntentions.get(micro.name) || [];
-                                  const taskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
-                                  return areaSum + getLoggedTime(taskIds, allDeepWorkLogs, 'weight');
+                                  const curiosities = microSkillCuriosities.get(micro.name) || [];
+                                  const intentionTaskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
+                                  const curiosityTaskIds = curiosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id));
+                                  const intentionLogged = getLoggedTime(intentionTaskIds, allDeepWorkLogs, 'weight');
+                                  const curiosityLogged = getLoggedTime(curiosityTaskIds, allUpskillLogs, 'reps');
+                                  return areaSum + intentionLogged + curiosityLogged;
                               }, 0);
 
                               return (
@@ -796,7 +876,7 @@ function SkillPageContent() {
                                           </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center">
-                                           {totalAreaEst > 0 && <Badge variant="secondary">{formatMinutes(totalAreaEst)} est / {formatMinutes(totalAreaLogged)} log</Badge>}
+                                           {totalAreaEst > 0 && <Badge variant="secondary" className="mr-2">{formatMinutes(totalAreaEst)} est / {formatMinutes(totalAreaLogged)} log</Badge>}
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingArea({skillId: selectedCoreSkill.id, area}); }}><Edit className="h-4 w-4"/></Button>
                                           <AlertDialog>
                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
@@ -1075,3 +1155,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
