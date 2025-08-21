@@ -192,7 +192,6 @@ export function DietPlanModal({
       };
     });
 
-    // Deep comparison to prevent infinite loops
     if (JSON.stringify(updatedPlan) !== JSON.stringify(plan)) {
       setDietPlan(updatedPlan);
     }
@@ -284,7 +283,7 @@ export function DietPlanModal({
                     <TabsTrigger key={day} value={day}>{day.substring(0,3)}</TabsTrigger>
                 ))}
             </TabsList>
-             <div className="flex-grow min-h-0 mt-4">
+            <TabsContent value={activeTab} className="mt-4 flex-grow min-h-0">
               <ScrollArea className="h-full pr-6">
                 <div className="space-y-6">
                     <Card>
@@ -318,7 +317,7 @@ export function DietPlanModal({
                     </div>
                 </div>
               </ScrollArea>
-            </div>
+            </TabsContent>
             <div className="mt-4 pt-4 border-t flex-shrink-0">
               <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Daily Totals for {activeTab}</h3>
