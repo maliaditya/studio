@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -223,21 +222,16 @@ export function TodaysScheduleCard({
 
   const scheduledActivities = React.useMemo(() => {
     return slotOrder.flatMap(slot => {
-      const activities = todaysSchedule[slot];
-      if (activities && Array.isArray(activities) && activities.length > 0) {
-        // Sort activities: incomplete first, then complete
-        const sortedActivities = [...activities].sort((a, b) => {
-          if (a.completed && !b.completed) {
-            return 1; // b comes first
-          }
-          if (!a.completed && b.completed) {
-            return -1; // a comes first
-          }
-          return 0; // maintain original order among same-status items
-        });
-        return sortedActivities.map(activity => ({ slot, ...activity }));
-      }
-      return [];
+        const activities = todaysSchedule[slot];
+        if (activities && Array.isArray(activities) && activities.length > 0) {
+            return activities.map(activity => ({ slot, ...activity }));
+        }
+        return [];
+    }).sort((a, b) => {
+        if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+        }
+        return 0; // Keep original order for items with the same completion status
     });
   }, [todaysSchedule]);
 
