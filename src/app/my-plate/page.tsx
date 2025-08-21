@@ -473,10 +473,15 @@ function MyPlatePageContent() {
   }, [allWorkoutLogs, oneYearAgo, today]);
   
   const productivityStats = useMemo(() => {
-    const getDailyMinutes = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
-        const logForDay = logs.find(log => log.date === dateStr);
-        if (!logForDay) return 0;
-        return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+    const getDailyMinutes = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight'): number => {
+      const logForDay = logs.find(log => log.date === dateStr);
+      if (!logForDay) return 0;
+      return logForDay.exercises.reduce((total, ex) => {
+        return total + ex.loggedSets.reduce((sum, set) => {
+          const value = set[durationField];
+          return sum + (typeof value === 'number' ? value : 0);
+        }, 0);
+      }, 0);
     };
 
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
