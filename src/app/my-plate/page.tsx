@@ -543,46 +543,13 @@ function MyPlatePageContent() {
       return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
       
-    // Today's Totals
     const todayUpskillMinutes = getDailyDuration(allUpskillLogs, todayStr, 'reps');
     const todayDeepWorkMinutes = getDailyDuration(allDeepWorkLogs, todayStr, 'weight');
-    
-    // Yesterday's Totals
+    const totalProductiveMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
+
     const yesterdayUpskillMinutes = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
     const yesterdayDeepWorkMinutes = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
-
-    // 7-day average for Total Productive Hours
-    const calculateWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-      const today = new Date();
-      let totalMinutes = 0;
-      for (let i = 0; i < 7; i++) {
-        const day = subDays(today, i);
-        const dateKey = format(day, 'yyyy-MM-dd');
-        totalMinutes += getDailyDuration(logs, dateKey, durationField);
-      }
-      return totalMinutes / 7;
-    };
-
-    const avgUpskillMinutes = calculateWeeklyAverage(allUpskillLogs, 'reps');
-    const avgDeepWorkMinutes = calculateWeeklyAverage(allDeepWorkLogs, 'weight');
-    const totalProductiveMinutes = avgUpskillMinutes + avgDeepWorkMinutes;
-    const avgProductiveHours = totalProductiveMinutes / 60;
     
-    // Change vs previous 7-day average
-    const calculatePreviousWeeklyAverage = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-        const today = new Date();
-        let totalMinutes = 0;
-        for (let i = 7; i < 14; i++) { // For days 7 to 13 days ago
-            const day = subDays(today, i);
-            const dateKey = format(day, 'yyyy-MM-dd');
-            totalMinutes += getDailyDuration(logs, dateKey, durationField);
-        }
-        return totalMinutes / 7;
-    };
-    const prevAvgUpskillMinutes = calculatePreviousWeeklyAverage(allUpskillLogs, 'reps');
-    const prevAvgDeepWorkMinutes = calculatePreviousWeeklyAverage(allDeepWorkLogs, 'weight');
-    const prevTotalProductiveMinutes = prevAvgUpskillMinutes + prevAvgDeepWorkMinutes;
-
     const calculateTotalLoggedMinutesForFocusArea = (focusAreaDef: ExerciseDefinition | undefined) => {
       if (!focusAreaDef) return 0;
       
@@ -787,6 +754,7 @@ function MyPlatePageContent() {
   
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+      const totalProductiveHoursPerDay = (todayUpskillMinutes + todayDeepWorkMinutes) / 60;
   
       return allReleasesWithDetails
           .filter(({ release }) => {
@@ -797,7 +765,7 @@ function MyPlatePageContent() {
               const { release, topic, type } = item;
               const launchDate = parseISO(release.launchDate);
               const daysRemaining = differenceInDays(launchDate, today);
-              const availableHours = daysRemaining * avgProductiveHours;
+              const availableHours = daysRemaining * totalProductiveHoursPerDay;
               const totalAvailableHours = daysRemaining * 24;
 
               return {
@@ -838,8 +806,8 @@ function MyPlatePageContent() {
         todayUpskillHours: todayUpskillMinutes / 60,
         upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
         consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
-        totalProductiveHours: avgProductiveHours,
-        avgProductiveHoursChange: calculateChange(totalProductiveMinutes, prevTotalProductiveMinutes),
+        totalProductiveHours: totalProductiveMinutes / 60,
+        avgProductiveHoursChange: calculateChange(totalProductiveMinutes, yesterdayUpskillMinutes + yesterdayDeepWorkMinutes),
         currentLevel: productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null,
         learningStats: learningStats,
         latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
