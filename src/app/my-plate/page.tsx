@@ -665,30 +665,43 @@ function MyPlatePageContent() {
     const todayLog = brandingLogs.find(log => log.date === todayKey);
     const todaysBrandingTasks = schedule[todayKey]?.branding || [];
     
-    if (todaysBrandingTasks && todaysBrandingTasks.length > 0 && todayLog) {
-        const inProgressItems = todaysBrandingTasks
-            .filter(act => !act.completed)
-            .map(act => {
-                const task = todayLog.exercises.find(ex => ex.id === act.taskIds?.[0]);
-                if (!task) return null;
-                
-                const progress = task.loggedSets.length;
-                const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
-                
-                return {
-                    taskName: task.name,
-                    stage: stages[progress] || 'Starting',
-                    progress: `${progress}/4`
-                };
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null);
-        
-        if (inProgressItems.length > 0) {
+    const inProgressItems = (todaysBrandingTasks || [])
+        .filter(act => !act.completed)
+        .map(act => {
+            const task = todayLog?.exercises.find(ex => ex.id === act.taskIds?.[0]);
+            if (!task) return null;
+            
+            const progress = task.loggedSets.length;
+            const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+            
             return {
-                status: 'in_progress',
-                items: inProgressItems
+                taskName: task.name,
+                stage: stages[progress] || 'Starting',
+                progress: `${progress}/4`
             };
-        }
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    const isFullyShared = (task: ExerciseDefinition) => 
+        task.sharingStatus && 
+        task.sharingStatus.twitter && 
+        task.sharingStatus.linkedin && 
+        task.sharingStatus.devto;
+
+    const allBundles = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+
+    const publishedItems = allBundles.filter(isFullyShared).map(bundle => ({
+        taskName: bundle.name,
+        stage: 'Published',
+        sharingStatus: bundle.sharingStatus
+    }));
+
+    if (inProgressItems.length > 0 || publishedItems.length > 0) {
+        return {
+            status: 'in_progress', // Use a general status
+            items: inProgressItems,
+            publishedItems: publishedItems,
+        };
     }
     
     const readyBundles = deepWorkDefinitions.filter(def => 
@@ -699,16 +712,18 @@ function MyPlatePageContent() {
         return {
             status: 'ready',
             message: `${readyBundles.length} focus area(s) ready for branding.`,
-            subMessage: "Go to the Personal Branding page to create a content bundle."
+            subMessage: "Go to the Personal Branding page to create a content bundle.",
+            publishedItems: []
         };
     }
 
     return {
         status: 'idle',
         message: 'No active branding tasks.',
-        subMessage: 'Mark a Deep Work item as "Ready for Branding" to begin.'
+        subMessage: 'Mark a Deep Work item as "Ready for Branding" to begin.',
+        publishedItems: []
     };
-  }, [brandingLogs, schedule, todayKey, deepWorkDefinitions]);
+}, [brandingLogs, schedule, todayKey, deepWorkDefinitions]);
   
   const dashboardStats = useMemo(() => {
     const {
@@ -1068,10 +1083,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-
-
-
-

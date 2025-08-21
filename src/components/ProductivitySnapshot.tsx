@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer } from '@/components/ui/chart';
@@ -27,8 +27,22 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Release, ExerciseDefinition } from '@/types/workout';
+import type { Release, ExerciseDefinition, SharingStatus } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
+
+const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>X</title>
+        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
+    </svg>
+);
+
+const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <title>DEV Community</title>
+        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
+    </svg>
+);
 
 interface ProductivitySnapshotProps {
   stats: any;
@@ -101,8 +115,30 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
 
 
   const learningItems = Object.entries(stats.learningStats);
-  const brandingItems = stats.brandingStatus?.status === 'in_progress' ? stats.brandingStatus.items : [];
+  const inProgressBrandingItems = stats.brandingStatus?.items || [];
+  const publishedBrandingItems = stats.brandingStatus?.publishedItems || [];
   const roadmapItems = stats.upcomingReleases || [];
+
+  const renderBrandingItem = (item: any) => (
+    <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
+        <div className="flex justify-between items-center">
+          <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
+          <div className="text-right text-xs ml-4 flex-shrink-0">
+              <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
+              {item.progress && <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>}
+          </div>
+        </div>
+        {item.stage !== 'Published' ?
+          <p className="text-sm text-muted-foreground mt-1 truncate">Go to Personal Branding page to continue...</p>
+          : item.sharingStatus && 
+          <div className="flex items-center gap-3 text-muted-foreground mt-2">
+            {item.sharingStatus.twitter && <TwitterIcon className="h-4 w-4" />}
+            {item.sharingStatus.linkedin && <Linkedin className="h-4 w-4" />}
+            {item.sharingStatus.devto && <DevToIcon className="h-4 w-4" />}
+          </div>
+        }
+    </div>
+  );
 
   return (
     <>
@@ -238,29 +274,18 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <Separator className="my-2" />
               <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-                <motion.div layout>
-                  {brandingItems.length > 0 ? (
-                      <Carousel
-                          items={brandingItems}
-                          renderItem={(item: any) => (
-                              <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
-                                  <div className="flex justify-between items-center">
-                                    <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
-                                    <div className="text-right text-xs ml-4 flex-shrink-0">
-                                        <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
-                                        <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>
-                                    </div>
-                                  </div>
-                                  <p className="text-sm text-muted-foreground mt-1 truncate">Go to Personal Branding page to continue...</p>
-                              </div>
-                          )}
-                      />
-                  ) : (
-                      <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
-                        <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
-                        <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
-                      </div>
-                  )}
+                 <motion.div layout>
+                    {inProgressBrandingItems.length > 0 || publishedBrandingItems.length > 0 ? (
+                        <Carousel
+                            items={[...inProgressBrandingItems, ...publishedBrandingItems]}
+                            renderItem={renderBrandingItem}
+                        />
+                    ) : (
+                        <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
+                            <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
+                            <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
+                        </div>
+                    )}
                 </motion.div>
               </div>
               <Separator className="my-2" />
