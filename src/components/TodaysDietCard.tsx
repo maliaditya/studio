@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Utensils, BookCopy } from 'lucide-react';
-import type { UserDietPlan } from '@/types/workout';
+import type { UserDietPlan, MealItem } from '@/types/workout';
 import { format } from 'date-fns';
 
 interface TodaysDietCardProps {
@@ -19,6 +19,17 @@ export function TodaysDietCard({ dietPlan, onEditClick }: TodaysDietCardProps) {
     const dayName = format(new Date(), 'EEEE');
     return dietPlan.find(plan => plan.day === dayName);
   }, [dietPlan]);
+
+  const renderMealItems = (meal: MealItem[] | string | undefined) => {
+    if (typeof meal === 'string') {
+      return meal; // Handle legacy string data
+    }
+    if (Array.isArray(meal) && meal.length > 0) {
+      return meal.map(item => `${item.quantity} ${item.content}`).join(', ');
+    }
+    return 'N/A';
+  };
+
 
   return (
     <Card>
@@ -43,19 +54,19 @@ export function TodaysDietCard({ dietPlan, onEditClick }: TodaysDietCardProps) {
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <h4 className="font-semibold text-foreground">Meal 1</h4>
-                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal1 || 'N/A'}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{renderMealItems(todaysDiet.meal1)}</p>
                     </div>
                     <div>
                         <h4 className="font-semibold text-foreground">Meal 2</h4>
-                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal2 || 'N/A'}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{renderMealItems(todaysDiet.meal2)}</p>
                     </div>
                     <div>
                         <h4 className="font-semibold text-foreground">Meal 3</h4>
-                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal3 || 'N/A'}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{renderMealItems(todaysDiet.meal3)}</p>
                     </div>
                     <div>
                         <h4 className="font-semibold text-foreground">Supplements</h4>
-                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.supplements || 'N/A'}</p>
+                        <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{renderMealItems(todaysDiet.supplements)}</p>
                     </div>
                 </div>
             </div>

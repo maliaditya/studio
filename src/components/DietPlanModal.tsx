@@ -54,7 +54,7 @@ const MealEditor = ({ mealKey, day, plan, onUpdate }: {
   plan: EditableMealPlan,
   onUpdate: (day: string, field: MealKey, items: MealItem[]) => void
 }) => {
-  const items = plan[mealKey] as MealItem[];
+  const items = Array.isArray(plan[mealKey]) ? (plan[mealKey] as MealItem[]) : [];
 
   const handleItemChange = (itemId: string, field: keyof MealItem, value: string) => {
     const updatedItems = items.map(item => {
@@ -170,13 +170,16 @@ export function DietPlanModal({
       let dailyTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
       
       MEAL_KEYS.forEach(mealKey => {
-        (dayPlan[mealKey] as MealItem[]).forEach(item => {
-          dailyTotals.calories += item.calories || 0;
-          dailyTotals.protein += item.protein || 0;
-          dailyTotals.carbs += item.carbs || 0;
-          dailyTotals.fat += item.fat || 0;
-          dailyTotals.fiber += item.fiber || 0;
-        });
+        const mealItems = dayPlan[mealKey];
+        if (Array.isArray(mealItems)) {
+            (mealItems as MealItem[]).forEach(item => {
+                dailyTotals.calories += item.calories || 0;
+                dailyTotals.protein += item.protein || 0;
+                dailyTotals.carbs += item.carbs || 0;
+                dailyTotals.fat += item.fat || 0;
+                dailyTotals.fiber += item.fiber || 0;
+            });
+        }
       });
       
       return {
@@ -189,6 +192,7 @@ export function DietPlanModal({
       };
     });
 
+    // Deep comparison to prevent infinite loops
     if (JSON.stringify(updatedPlan) !== JSON.stringify(plan)) {
       setDietPlan(updatedPlan);
     }
