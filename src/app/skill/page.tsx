@@ -424,6 +424,28 @@ function SkillPageContent() {
     return 'Standalone';
   }, [linkedUpskillChildIds]);
 
+  const getDescendantsRecursive = useCallback((startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
+    const descendants: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        const node = definitions.find(d => d.id === currentId);
+        if (node) {
+            descendants.push(node);
+            (node[linkKey] || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return descendants;
+  }, []);
 
   const microSkillIntentions = useMemo(() => {
     const map = new Map<string, ExerciseDefinition[]>();
@@ -448,6 +470,19 @@ function SkillPageContent() {
     });
     return map;
   }, [upskillDefinitions, getUpskillNodeType]);
+  
+  const getLoggedTime = useCallback((taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
+      let totalMinutes = 0;
+      const idSet = new Set(taskIds);
+      logs.forEach(log => {
+          log.exercises.forEach((ex: any) => {
+              if (idSet.has(ex.definitionId)) {
+                  totalMinutes += ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+              }
+          });
+      });
+      return totalMinutes;
+  }, []);
   
   const linkedTasksByCoreSkill = useMemo(() => {
     if (!selectedProject) return new Map();
@@ -514,18 +549,13 @@ function SkillPageContent() {
     }
   };
 
-  const getLoggedTime = useCallback((taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
-      let totalMinutes = 0;
-      const idSet = new Set(taskIds);
-      logs.forEach(log => {
-          log.exercises.forEach((ex: any) => {
-              if (idSet.has(ex.definitionId)) {
-                  totalMinutes += ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
-              }
-          });
-      });
-      return totalMinutes;
-  }, []);
+  const formatMinutes = (minutes: number) => {
+    if (minutes < 1) return '0m';
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = Math.round(minutes % 60);
+    return `${hours}h ${remainingMinutes}m`;
+  };
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -744,6 +774,13 @@ function SkillPageContent() {
                       )}
                        <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => {
+                              const formatMinutes = (minutes: number) => {
+                                if (minutes < 1) return '0m';
+                                const hours = Math.floor(minutes / 60);
+                                const mins = Math.round(minutes % 60);
+                                if (hours > 0) return `${hours}h ${mins}m`;
+                                return `${mins}m`;
+                              };
                               return (
                                 <Card key={area.id}>
                                   <AccordionItem value={area.id} className="border-b-0">
@@ -776,20 +813,21 @@ function SkillPageContent() {
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
                                             
-                                            const totalIntentionMinutes = getLoggedTime(relatedIntentions.flatMap(i => i.id ? [i.id] : []), allDeepWorkLogs, 'weight');
-                                            const totalCuriosityMinutes = getLoggedTime(relatedCuriosities.flatMap(c => c.id ? [c.id] : []), allUpskillLogs, 'reps');
+                                            const totalIntentionEst = relatedIntentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                            const totalIntentionLogged = getLoggedTime(relatedIntentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id)), allDeepWorkLogs, 'weight');
+
+                                            const totalCuriosityEst = relatedCuriosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                            const totalCuriosityLogged = getLoggedTime(relatedCuriosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id)), allUpskillLogs, 'reps');
 
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3">
                                                       <div className="flex justify-between items-start gap-2">
                                                           <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
-                                                            {(totalIntentionMinutes > 0 || totalCuriosityMinutes > 0) && (
-                                                                <div className="flex flex-col text-right text-xs">
-                                                                    {totalCuriosityMinutes > 0 && <Badge variant="secondary" className="mb-1">{Math.round(totalCuriosityMinutes)}m L</Badge>}
-                                                                    {totalIntentionMinutes > 0 && <Badge variant="outline">{Math.round(totalIntentionMinutes)}m W</Badge>}
-                                                                </div>
-                                                            )}
+                                                            <div className="flex flex-col text-right text-xs">
+                                                                {totalCuriosityEst > 0 && <Badge variant="secondary" className="mb-1">{formatMinutes(totalCuriosityEst)} est / {formatMinutes(totalCuriosityLogged)} log</Badge>}
+                                                                {totalIntentionEst > 0 && <Badge variant="outline">{formatMinutes(totalIntentionEst)} est / {formatMinutes(totalIntentionLogged)} log</Badge>}
+                                                            </div>
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
