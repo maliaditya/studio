@@ -147,6 +147,8 @@ function SkillPageContent() {
     openIntentionPopup,
     setSelectedDeepWorkTask,
     setSelectedUpskillTask,
+    allUpskillLogs,
+    allDeepWorkLogs,
   } = useAuth();
   
   const router = useRouter();
@@ -512,6 +514,19 @@ function SkillPageContent() {
     }
   };
 
+  const getLoggedTime = useCallback((taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
+      let totalMinutes = 0;
+      const idSet = new Set(taskIds);
+      logs.forEach(log => {
+          log.exercises.forEach((ex: any) => {
+              if (idSet.has(ex.definitionId)) {
+                  totalMinutes += ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+              }
+          });
+      });
+      return totalMinutes;
+  }, []);
+
   return (
     <DndContext onDragEnd={handleDragEnd}>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -655,7 +670,7 @@ function SkillPageContent() {
         <main className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>{selectedProject ? selectedProject.name : 'Details'}</CardTitle>
+              <CardTitle>{selectedCoreSkill ? selectedCoreSkill.name : selectedProject ? selectedProject.name : selectedCompanyId ? companies.find(c => c.id === selectedCompanyId)?.name : 'Details'}</CardTitle>
               <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing linked tasks for "${selectedProject.name}"` : selectedCompanyId ? `Viewing positions for "${companies.find(c => c.id === selectedCompanyId)?.name}"` : 'Select an item from the library.'}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -760,25 +775,21 @@ function SkillPageContent() {
                                         {area.microSkills.map(micro => {
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                            
+                                            const totalIntentionMinutes = getLoggedTime(relatedIntentions.flatMap(i => i.id ? [i.id] : []), allDeepWorkLogs, 'weight');
+                                            const totalCuriosityMinutes = getLoggedTime(relatedCuriosities.flatMap(c => c.id ? [c.id] : []), allUpskillLogs, 'reps');
+
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3">
                                                       <div className="flex justify-between items-start gap-2">
                                                           <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
-                                                          {selectedCoreSkill && <Badge variant="outline">{area.name}</Badge>}
-                                                           <div className="flex items-center opacity-0 group-hover/item:opacity-100 transition-opacity">
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
-                                                            <AlertDialog>
-                                                              <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
-                                                              <AlertDialogContent>
-                                                                  <AlertDialogHeader>
-                                                                      <AlertDialogTitle>Delete "{micro.name}"?</AlertDialogTitle>
-                                                                      <AlertDialogDescription>This will permanently delete this micro-skill.</AlertDialogDescription>
-                                                                  </AlertDialogHeader>
-                                                                  <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteMicroSkill(selectedCoreSkill!.id, area.id, micro.id)}>Delete</AlertDialogAction></AlertDialogFooter>
-                                                              </AlertDialogContent>
-                                                            </AlertDialog>
-                                                          </div>
+                                                            {(totalIntentionMinutes > 0 || totalCuriosityMinutes > 0) && (
+                                                                <div className="flex flex-col text-right text-xs">
+                                                                    {totalCuriosityMinutes > 0 && <Badge variant="secondary" className="mb-1">{Math.round(totalCuriosityMinutes)}m L</Badge>}
+                                                                    {totalIntentionMinutes > 0 && <Badge variant="outline">{Math.round(totalIntentionMinutes)}m W</Badge>}
+                                                                </div>
+                                                            )}
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
@@ -807,6 +818,21 @@ function SkillPageContent() {
                                                           ) : <p className="text-muted-foreground text-xs italic">None</p>}
                                                       </div>
                                                   </CardContent>
+                                                   <CardFooter className="p-2 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                                                        <div className="flex justify-end w-full">
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
+                                                            <AlertDialog>
+                                                            <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>
+                                                            <AlertDialogContent>
+                                                                <AlertDialogHeader>
+                                                                    <AlertDialogTitle>Delete "{micro.name}"?</AlertDialogTitle>
+                                                                    <AlertDialogDescription>This will permanently delete this micro-skill.</AlertDialogDescription>
+                                                                </AlertDialogHeader>
+                                                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteMicroSkill(selectedCoreSkill!.id, area.id, micro.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+                                                            </AlertDialogContent>
+                                                            </AlertDialog>
+                                                        </div>
+                                                  </CardFooter>
                                               </Card>
                                             )
                                         })}
