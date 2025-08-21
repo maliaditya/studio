@@ -163,7 +163,7 @@ interface AuthContextType {
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
-  createResourceWithHierarchy: (parentTask: ExerciseDefinition, type: Resource['type']) => ExerciseDefinition | undefined;
+  createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, type: Resource['type']) => ExerciseDefinition | Resource | undefined;
 
   
   // Resource Popups (Original system, kept for resources page)
@@ -620,7 +620,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSelectedUpskillTask(null);
       setSelectedDeepWorkTask(null);
       setSelectedMicroSkill(null);
-      setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null); setSelectedCompanyId(null);
+      setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null);
       setAutoSuggestions({});
       setRecentItems([]);
       setPathNodes([]);
@@ -1700,8 +1700,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const CONTEXT_POPUP_WIDTH = 600;
         const CONTEXT_POPUP_HEIGHT = 400; // Estimated height for centering
         const MARGIN = 16;
-        let x = 0;
-        let y = 0;
+        let x = (window.innerWidth - CONTEXT_POPUP_WIDTH) / 2;
+        let y = (window.innerHeight - CONTEXT_POPUP_HEIGHT) / 2;
         let level = 0;
         let parentId: string | undefined;
 
@@ -1710,10 +1710,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             parentId = parentPopupState.activityId;
             x = parentPopupState.x + 30;
             y = parentPopupState.y + 30;
-        } else {
-            // Center the popup on the screen
-            x = (window.innerWidth - CONTEXT_POPUP_WIDTH) / 2;
-            y = (window.innerHeight - CONTEXT_POPUP_HEIGHT) / 2;
         }
         
         newPopups.set(activityId, { activityId, x, y, level, parentId });
@@ -1846,26 +1842,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setRecentItems]);
 
-  const createResourceWithHierarchy = (parentTask: ExerciseDefinition, type: Resource['type']): ExerciseDefinition | undefined => {
-    const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parentTask.category);
-    if (!microSkill) {
-      toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
-      return undefined;
+  const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, type: Resource['type']): ExerciseDefinition | Resource | undefined => {
+    let path: string[];
+    let parentName: string;
+
+    if ('category' in parent) { // It's an ExerciseDefinition
+        const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
+        if (!microSkill) {
+          toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
+          return undefined;
+        }
+        const microSkillInfo = microSkill[1];
+        const { coreSkillName, skillAreaName } = microSkillInfo;
+        const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
+        if (!coreSkill) return undefined;
+        const domain = skillDomains.find(d => d.id === coreSkill.domainId);
+        if (!domain) return undefined;
+        path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
+        parentName = parent.name;
+    } else { // It's a Resource
+        parentName = parent.name;
+        const folderPath: string[] = [];
+        let currentFolderId: string | null = parent.folderId;
+        while(currentFolderId) {
+            const folder = resourceFolders.find(f => f.id === currentFolderId);
+            if (folder) {
+                folderPath.unshift(folder.name);
+                currentFolderId = folder.parentId;
+            } else {
+                currentFolderId = null;
+            }
+        }
+        path = [...folderPath, parent.name];
     }
-  
-    const microSkillInfo = microSkill[1];
-    const { coreSkillName, skillAreaName } = microSkillInfo;
-  
-    const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
-    if (!coreSkill) return undefined;
-  
-    const domain = skillDomains.find(d => d.id === coreSkill.domainId);
-    if (!domain) return undefined;
   
     let parentFolderId: string | null = null;
     let finalFolders = [...resourceFolders];
-  
-    const path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parentTask.name];
   
     path.forEach(folderName => {
       let folder = finalFolders.find(f => f.name === folderName && f.parentId === parentFolderId);
@@ -1893,25 +1905,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setResources(prev => [...prev, newResource]);
   
-    const parentIsUpskill = upskillDefinitions.some(d => d.id === parentTask.id);
-    const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
-    
-    let updatedParentTask: ExerciseDefinition | undefined;
-    
-    setParentDefinitions(prev => {
-      const newDefs = prev.map(def => {
-        if (def.id === parentTask.id) {
-          updatedParentTask = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
-          return updatedParentTask;
-        } 
-        return def;
+    // Logic to update the parent (ExerciseDefinition or Resource) with the new resource link
+    let updatedParent: ExerciseDefinition | Resource | undefined;
+    if ('category' in parent) {
+      const parentIsUpskill = upskillDefinitions.some(d => d.id === parent.id);
+      const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+      setParentDefinitions(prev => {
+        const newDefs = prev.map(def => {
+          if (def.id === parent.id) {
+            updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
+            return updatedParent;
+          } 
+          return def;
+        });
+        return newDefs;
       });
-      return newDefs;
-    });
+    } else {
+      setResources(prev => {
+        const newDefs = prev.map(def => {
+          if (def.id === parent.id) {
+            updatedParent = { ...def, points: [...(def.points || []), { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }] };
+            return updatedParent as Resource;
+          }
+          return def;
+        });
+        return newDefs;
+      });
+    }
   
-    toast({ title: 'Resource Created', description: `A new resource card has been created, linked, and placed in the appropriate folder.` });
+    toast({ title: 'Resource Created', description: `A new resource card has been created and linked.` });
     
-    return updatedParentTask;
+    return updatedParent;
   };
   
   const deleteResource = (resourceId: string) => {
@@ -2117,5 +2141,6 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
