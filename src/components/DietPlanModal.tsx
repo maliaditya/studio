@@ -123,7 +123,7 @@ const MealEditor = ({ mealKey, day, plan, onUpdate }: {
                      <TableCell key={field}>
                         <Input 
                             type="number" 
-                            value={item[field] === null ? '' : item[field]} 
+                            value={item[field] === null ? '' : item[field]!} 
                             onChange={(e) => handleItemChange(item.id, field, e.target.value)} 
                             className="h-8" 
                         />
@@ -284,7 +284,7 @@ export function DietPlanModal({
                     <TabsTrigger key={day} value={day}>{day.substring(0,3)}</TabsTrigger>
                 ))}
             </TabsList>
-            <div className="flex-grow min-h-0 mt-4">
+             <div className="flex-grow min-h-0 mt-4">
               <ScrollArea className="h-full pr-6">
                 <div className="space-y-6">
                     <Card>
