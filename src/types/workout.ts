@@ -610,6 +610,13 @@ export interface ContentViewPopupState {
     y: number;
 }
 
+export interface TodaysDietPopupState {
+  id: string;
+  x: number;
+  y: number;
+  z?: number;
+}
+
 export interface PathNode {
   id: string;
   text: string;

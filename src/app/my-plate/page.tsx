@@ -77,6 +77,7 @@ function MyPlatePageContent() {
     openTaskContextPopup,
     metaRules,
     coreSkills,
+    openTodaysDietPopup,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -91,7 +92,6 @@ function MyPlatePageContent() {
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
-  const [isTodaysDietModalOpen, setIsTodaysDietModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
@@ -179,7 +179,7 @@ function MyPlatePageContent() {
     if (lastCarryForwardDate === todayDateKey) return;
     
     const todaysActivities = schedule[todayDateKey];
-    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => slot.length > 0);
+    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
     if (hasTodaysActivities) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
 
     const yesterdaysSchedule = schedule[yesterdayKey];
@@ -189,7 +189,7 @@ function MyPlatePageContent() {
     let carriedOver = false;
 
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-        if (activities && activities.length > 0) {
+        if (Array.isArray(activities) && activities.length > 0) {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
                 if(activity.completed) return false;
                 if(activity.type === 'essentials') return settings.carryForwardEssentials;
@@ -212,7 +212,7 @@ function MyPlatePageContent() {
     });
 
     if (carriedOver) {
-        setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...prev[todayDateKey] } }));
+        setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
         toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
@@ -242,7 +242,7 @@ function MyPlatePageContent() {
     const SLOT_CAPACITY_MINUTES = 240;
     
     const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
-    const currentSlotDuration = activitiesInSlot.reduce((sum, act) => sum + (act.duration || 0), 0);
+    const currentSlotDuration = (Array.isArray(activitiesInSlot) ? activitiesInSlot : []).reduce((sum, act) => sum + (act.duration || 0), 0);
 
     let details = '';
     let newActivityDuration = 0;
@@ -272,9 +272,10 @@ function MyPlatePageContent() {
       details, 
       completed: false,
       taskIds: [],
+      slot: slotName,
     };
     
-    setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity] } }));
+    setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity] } }));
   };
 
   const handleSaveInterrupt = () => {
@@ -296,13 +297,14 @@ function MyPlatePageContent() {
         completed: true,
         taskIds: [],
         duration: durationMinutes,
+        slot: slotName,
     };
 
     setSchedule(prev => ({
         ...prev,
         [selectedDateKey]: {
             ...(prev[selectedDateKey] || {}),
-            [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
+            [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity],
         },
     }));
 
@@ -325,8 +327,8 @@ function MyPlatePageContent() {
             const newSchedule = { ...prev };
             if (newSchedule[selectedDateKey]) {
                 const daySchedule = { ...newSchedule[selectedDateKey] };
-                if (daySchedule[slotName]) {
-                    daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act => 
+                if (Array.isArray(daySchedule[slotName])) {
+                    (daySchedule[slotName] as Activity[]) = (daySchedule[slotName] as Activity[]).map(act => 
                         act.id === activity.id 
                             ? { ...act, details: essentialDetails, duration: durationMinutes }
                             : act
@@ -346,13 +348,14 @@ function MyPlatePageContent() {
             completed: false,
             taskIds: [],
             duration: durationMinutes,
+            slot: slotName,
         };
 
         setSchedule(prev => ({
             ...prev,
             [selectedDateKey]: {
                 ...(prev[selectedDateKey] || {}),
-                [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
+                [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity],
             },
         }));
         toast({ title: 'Essential Task Added', description: 'The task has been added to your agenda.' });
@@ -380,11 +383,12 @@ function MyPlatePageContent() {
       details: mealDetails,
       completed: false,
       taskIds: [mealType], // Use taskIds to store which meal it is
+      slot: currentSlotForMeal,
     };
 
     setSchedule(prev => {
       const daySchedule = prev[selectedDateKey] || {};
-      const slotActivities = daySchedule[currentSlotForMeal!] || [];
+      const slotActivities = Array.isArray(daySchedule[currentSlotForMeal!]) ? daySchedule[currentSlotForMeal!] as Activity[] : [];
       return {
         ...prev,
         [selectedDateKey]: {
@@ -403,7 +407,7 @@ function MyPlatePageContent() {
     if (!selectedDateKey) return;
     setSchedule(prev => {
       const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
-      const activities = newTodaySchedule[slotName] || [];
+      const activities = Array.isArray(newTodaySchedule[slotName]) ? newTodaySchedule[slotName] as Activity[] : [];
       const updatedActivities = activities.filter(act => act.id !== activityId);
       if (updatedActivities.length > 0) { newTodaySchedule[slotName] = updatedActivities; } else { delete newTodaySchedule[slotName]; }
       return { ...prev, [selectedDateKey]: newTodaySchedule };
@@ -429,7 +433,7 @@ function MyPlatePageContent() {
     setIsLeadGenModalOpen(true);
   };
 
-  const handleActivityClick = (slotName: string, activity: Activity) => {
+  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (!activity || activity.completed) return;
     if (activity.type === 'workout') {
       handleStartWorkoutLog(activity);
@@ -443,7 +447,7 @@ function MyPlatePageContent() {
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
         setEssentialsModalState({ isOpen: true, slotName, activity });
     } else if (activity.type === 'nutrition') {
-      setIsTodaysDietModalOpen(true);
+      openTodaysDietPopup(event);
     }
   };
 
@@ -511,7 +515,7 @@ function MyPlatePageContent() {
     setSchedule(prev => {
       const newSchedule = { ...prev };
       const daySchedule = { ...(newSchedule[selectedDateKey] || {}) };
-      const activitiesInSlot = (daySchedule[slotName] || []).map(act =>
+      const activitiesInSlot = (Array.isArray(daySchedule[slotName]) ? daySchedule[slotName] as Activity[] : []).map(act =>
         act.id === activity.id ? { ...act, taskIds: finalInstanceIds, details: newDetails } : act
       );
       daySchedule[slotName] = activitiesInSlot;
@@ -695,32 +699,34 @@ function MyPlatePageContent() {
 
         for (const slotName in daySchedule) {
             const activities = (daySchedule as any)[slotName] || [];
-            for (const activity of activities) {
-                if (!activity || !activity.id) continue;
-                
-                if (activity.completed) {
-                    let logs, durationField;
-                    if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                    else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+            if(Array.isArray(activities)) {
+                for (const activity of activities) {
+                    if (!activity || !activity.id) continue;
                     
-                    if (logs && durationField) {
-                        const loggedDuration = logs.find(log => log.date === dateKey)
-                            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0;
-                        if (loggedDuration > 0) {
-                            newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
+                    if (activity.completed) {
+                        let logs, durationField;
+                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                        
+                        if (logs && durationField) {
+                            const loggedDuration = logs.find(log => log.date === dateKey)
+                                ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                                .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0;
+                            if (loggedDuration > 0) {
+                                newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
+                            }
+                        } else if (activity.duration) {
+                            newDurations[activity.id] = `${activity.duration}m`;
                         }
-                    } else if (activity.duration) {
-                        newDurations[activity.id] = `${activity.duration}m`;
-                    }
-                } else {
-                    let totalMinutes = 0;
-                     if (activity.type === 'essentials' || activity.type === 'interrupt') {
-                        totalMinutes = activity.duration || 0;
                     } else {
-                       // Logic to calculate estimated duration for other types if needed
+                        let totalMinutes = 0;
+                         if (activity.type === 'essentials' || activity.type === 'interrupt') {
+                            totalMinutes = activity.duration || 0;
+                        } else {
+                           // Logic to calculate estimated duration for other types if needed
+                        }
+                        if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
                     }
-                    if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
                 }
             }
         }
@@ -899,21 +905,6 @@ function MyPlatePageContent() {
           isOpen={isDietPlanModalOpen}
           onOpenChange={setIsDietPlanModalOpen}
         />
-        
-        <Dialog open={isTodaysDietModalOpen} onOpenChange={setIsTodaysDietModalOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Today's Diet</DialogTitle>
-                </DialogHeader>
-                <TodaysDietCard
-                    dietPlan={dietPlan}
-                    onEditClick={() => {
-                        setIsTodaysDietModalOpen(false);
-                        setIsDietPlanModalOpen(true);
-                    }}
-                />
-            </DialogContent>
-        </Dialog>
 
         <StatsOverviewModal
           isOpen={isStatsModalOpen}
@@ -1027,6 +1018,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 

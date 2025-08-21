@@ -23,6 +23,8 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
+import { TodaysDietPopup } from '@/components/TodaysDietPopup';
+import { DietPlanModal } from '@/components/DietPlanModal';
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -42,8 +44,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     activeFocusSession,
     setActiveFocusSession,
     handleLogLearning,
+    todaysDietPopup,
+    closeTodaysDietPopup,
+    handleTodaysDietPopupDragEnd,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
+  const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
 
   useEffect(() => {
     setIsBrowser(true);
@@ -74,6 +80,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handlePopupDragEnd(event);
     handleRulePopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
+    handleTodaysDietPopupDragEnd(event);
   };
 
   return (
@@ -87,6 +94,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
+      <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       {activeFocusSession && (
           <FocusTimerPopup
             activity={activeFocusSession.activity}
@@ -126,6 +134,16 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     popupState={popupState}
                 />
             ))}
+            {todaysDietPopup && (
+                <TodaysDietPopup 
+                    popupState={todaysDietPopup}
+                    onClose={closeTodaysDietPopup}
+                    onOpenEdit={() => {
+                        closeTodaysDietPopup();
+                        setIsDietPlanModalOpen(true);
+                    }}
+                />
+            )}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {
                   if (!popup.parentId) return null;
@@ -191,3 +209,4 @@ export default function RootLayout({
     </html>
   );
 }
+

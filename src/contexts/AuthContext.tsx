@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
+import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 
 
 interface ResourcePopupProps {
@@ -201,6 +202,12 @@ interface AuthContextType {
   openContentViewPopup: (contentId: string, resource: Resource, point: ResourcePoint, event: React.MouseEvent) => void;
   closeContentViewPopup: (contentId: string) => void;
   handleContentViewPopupDragEnd: (event: DragEndEvent) => void;
+
+  // Today's Diet Popup
+  todaysDietPopup: TodaysDietPopupState | null;
+  openTodaysDietPopup: (event: React.MouseEvent) => void;
+  closeTodaysDietPopup: () => void;
+  handleTodaysDietPopupDragEnd: (event: DragEndEvent) => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -393,6 +400,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Content Viewer Popup
   const [contentViewPopups, setContentViewPopups] = useTrackedState<Map<string, ContentViewPopupState>>(new Map());
+
+  // Today's Diet Popup
+  const [todaysDietPopup, setTodaysDietPopup] = useTrackedState<TodaysDietPopupState | null>(null);
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useTrackedState<string[]>([]);
@@ -705,7 +715,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
-    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false };
+    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     if (!currentSettings.carryForward) return;
 
     const today = new Date();
@@ -734,54 +744,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let carriedOver = false;
 
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-      const incompleteActivities = (activities || []).filter(activity => activity && !activity.completed);
+      const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
       
-      if (incompleteActivities.length > 0) {
-        newTodaySchedule[slotName] = incompleteActivities.map(activity => {
-          let newDetails = '';
+      const activitiesToCarry = incompleteActivities.filter(activity => {
+          if(activity.completed) return false;
+          if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
+          if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
+          return currentSettings.carryForward;
+      });
 
-          switch (activity.type) {
-            case 'workout': {
-              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-              newDetails = description.split(' for ')[1] || "Workout";
-              break;
-            }
-            case 'upskill':
-              newDetails = 'Learning Session';
-              break;
-            case 'deepwork':
-              newDetails = 'Deep Work Session';
-              break;
-            case 'planning':
-              newDetails = 'Planning Session';
-              break;
-            case 'tracking':
-              newDetails = 'Tracking Session';
-              break;
-            case 'branding':
-              newDetails = 'Branding Session';
-              break;
-            case 'lead-generation':
-              newDetails = 'Lead Generation Session';
-              break;
-            default:
-              newDetails = activity.details;
-          }
+      if (activitiesToCarry.length > 0) {
+        newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
+            activitiesToCarry.map(activity => {
+                let newDetails = '';
 
-          return {
-            ...activity,
-            id: `${activity.type}-${Date.now()}-${Math.random()}`,
-            completed: false,
-            details: newDetails,
-            taskIds: [],
-          };
-        });
+                switch (activity.type) {
+                  case 'workout': {
+                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                    newDetails = description.split(' for ')[1] || "Workout";
+                    break;
+                  }
+                  case 'upskill': newDetails = 'Learning Session'; break;
+                  case 'deepwork': newDetails = 'Deep Work Session'; break;
+                  case 'planning': newDetails = 'Planning Session'; break;
+                  case 'tracking': newDetails = 'Tracking Session'; break;
+                  case 'branding': newDetails = 'Branding Session'; break;
+                  case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                  default: newDetails = activity.details;
+                }
+
+                return {
+                  ...activity,
+                  id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                  completed: false,
+                  details: newDetails,
+                  taskIds: [],
+                };
+            })
+        );
         carriedOver = true;
       }
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: newTodaySchedule }));
+      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
       toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
 
@@ -985,13 +991,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
         const daySchedule = { ...(prev[todayKey] || {}) };
-        const activities = daySchedule[slotName] || [];
+        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
         const activityIndex = activities.findIndex(act => act.id === activityId);
 
         if (activityIndex > -1) {
-            const updatedActivities = [...activities];
-            updatedActivities[activityIndex] = { ...updatedActivities[activityIndex], completed: isCompleted };
-            daySchedule[slotName] = updatedActivities;
+            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            daySchedule[slotName] = activities;
         }
 
         return { ...prev, [todayKey]: daySchedule };
@@ -1094,7 +1099,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
     const activitiesInSlot = schedule[todayKey]?.[targetSlot] || [];
-    if (activitiesInSlot.length >= 2) {
+    if (Array.isArray(activitiesInSlot) && activitiesInSlot.length >= 2) {
       toast({
           title: "Slot Full",
           description: "Cannot add more than two activities to a single time slot.",
@@ -1111,7 +1116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setSchedule(prev => {
         const newTodaySchedule = { ...(prev[todayKey] || {}) };
-        const currentActivities = newTodaySchedule[targetSlot] || [];
+        const currentActivities = Array.isArray(newTodaySchedule[targetSlot]) ? newTodaySchedule[targetSlot] as Activity[] : [];
         newTodaySchedule[targetSlot] = [...currentActivities, newActivity as Activity];
         return { ...prev, [todayKey]: newTodaySchedule };
     });
@@ -1198,7 +1203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSchedule(prev => {
         const newSchedule = { ...prev };
         const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activitiesInSlot = daySchedule[slotName] || [];
+        const activitiesInSlot = Array.isArray(daySchedule[slotName]) ? daySchedule[slotName] as Activity[] : [];
 
         if (activitiesInSlot.length >= 2) {
             toast({ title: "Slot Full", description: "Cannot add more than two activities per slot.", variant: "destructive" });
@@ -1803,6 +1808,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const openTodaysDietPopup = (event: React.MouseEvent) => {
+    const popupWidth = 420;
+    const popupHeight = 500;
+    let x = event.clientX;
+    let y = event.clientY;
+
+    if (x + popupWidth > window.innerWidth) x = window.innerWidth - popupWidth - 20;
+    if (y + popupHeight > window.innerHeight) y = window.innerHeight - popupHeight - 20;
+
+    setTodaysDietPopup({ id: 'todays-diet', x, y, z: 80 });
+  };
+  const closeTodaysDietPopup = () => {
+    setTodaysDietPopup(null);
+  };
+  const handleTodaysDietPopupDragEnd = (event: DragEndEvent) => {
+    if (event.active.id === 'todays-diet-popup') {
+      setTodaysDietPopup(prev => prev ? { ...prev, x: prev.x + event.delta.x, y: prev.y + event.delta.y } : null);
+    }
+  };
+
+
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
       id: `res_habit_${Date.now()}`,
@@ -2074,6 +2100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     contentViewPopups, openContentViewPopup, closeContentViewPopup, handleContentViewPopupDragEnd,
+    todaysDietPopup, openTodaysDietPopup, closeTodaysDietPopup, handleTodaysDietPopupDragEnd,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
@@ -2144,6 +2171,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
