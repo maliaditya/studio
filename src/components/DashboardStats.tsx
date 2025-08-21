@@ -22,6 +22,21 @@ interface DashboardStatsProps {
   stats: ProductivityStats;
 }
 
+const StatChange = ({ value }: { value: number }) => {
+  if (value === undefined || value === 0) return null;
+
+  const isPositive = value > 0;
+  const isInfinite = !isFinite(value);
+
+  return (
+    <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", isPositive ? "text-emerald-500" : "text-red-500")}>
+      {isPositive ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+      {isInfinite ? 'vs yesterday' : `${Math.abs(value).toFixed(0)}% vs yesterday`}
+    </p>
+  );
+};
+
+
 export function DashboardStats({ stats }: DashboardStatsProps) {
   const router = useRouter();
   const {
@@ -45,12 +60,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         <CardContent>
           <div className="text-2xl font-bold">{latestConsistency}%</div>
           <p className="text-xs text-muted-foreground">Workout Consistency</p>
-          {consistencyChange !== undefined && consistencyChange !== 0 && (
-            <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", consistencyChange > 0 ? "text-emerald-500" : "text-red-500")}>
-              {consistencyChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-              {consistencyChange.toFixed(1)} points vs yesterday
-            </p>
-          )}
+          <StatChange value={consistencyChange} />
         </CardContent>
       </Card>
 
@@ -62,12 +72,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         <CardContent>
           <div className="text-2xl font-bold">{todayDeepWorkHours.toFixed(1)} hrs</div>
           <p className="text-xs text-muted-foreground">Today's Deep Work</p>
-          {deepWorkChange !== undefined && deepWorkChange !== 0 && (
-            <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", deepWorkChange > 0 ? "text-emerald-500" : "text-red-500")}>
-              {deepWorkChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-              {Math.abs(deepWorkChange).toFixed(0)}% vs yesterday
-            </p>
-          )}
+          <StatChange value={deepWorkChange} />
         </CardContent>
       </Card>
 
@@ -81,12 +86,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
             <CardContent>
               <div className="text-2xl font-bold">{todayUpskillHours.toFixed(1)} hrs</div>
               <p className="text-xs text-muted-foreground">Today's Learning</p>
-              {upskillChange !== undefined && upskillChange !== 0 && (
-                <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", upskillChange > 0 ? "text-emerald-500" : "text-red-500")}>
-                  {upskillChange > 0 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                  {Math.abs(upskillChange).toFixed(0)}% vs yesterday
-                </p>
-              )}
+              <StatChange value={upskillChange} />
             </CardContent>
           </Card>
         </PopoverTrigger>
