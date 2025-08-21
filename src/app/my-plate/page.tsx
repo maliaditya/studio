@@ -549,6 +549,7 @@ function MyPlatePageContent() {
 
     const yesterdayUpskillMinutes = getDailyDuration(allUpskillLogs, yesterdayStr, 'reps');
     const yesterdayDeepWorkMinutes = getDailyDuration(allDeepWorkLogs, yesterdayStr, 'weight');
+    const yesterdayTotalProductiveMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
     const calculateTotalLoggedMinutesForFocusArea = (focusAreaDef: ExerciseDefinition | undefined) => {
       if (!focusAreaDef) return 0;
@@ -791,10 +792,10 @@ function MyPlatePageContent() {
         { name: 'Workout', hours: new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date)).size },
         { name: 'Branding', hours: parseFloat((brandingLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.length, 0), 0) * 30 / 60).toFixed(1)) },
     ];
-    const getTodayHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => (logs.find(log => log.date === todayStr)?.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (field === 'reps' ? set.reps : set.weight), 0), 0) || 0) / 60;
+
     const todayHoursData = [
-        { name: 'Learning', hours: parseFloat(getTodayHours(allUpskillLogs, 'reps').toFixed(1)) },
-        { name: 'Deep Work', hours: parseFloat(getTodayHours(allDeepWorkLogs, 'weight').toFixed(1)) },
+        { name: 'Learning', hours: todayUpskillMinutes / 60 },
+        { name: 'Deep Work', hours: todayDeepWorkMinutes / 60 },
         { name: 'Workout', hours: allWorkoutLogs.some(log => log.date === todayStr && log.exercises.some(ex => ex.loggedSets.length > 0)) ? 1 : 0 },
         { name: 'Branding', hours: (brandingLogs.find(log => log.date === todayStr)?.exercises.reduce((total, ex) => total + ex.loggedSets.length, 0) || 0) * 0.5 },
     ];
@@ -807,7 +808,7 @@ function MyPlatePageContent() {
         upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
         consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
         totalProductiveHours: totalProductiveMinutes / 60,
-        avgProductiveHoursChange: calculateChange(totalProductiveMinutes, yesterdayUpskillMinutes + yesterdayDeepWorkMinutes),
+        avgProductiveHoursChange: calculateChange(totalProductiveMinutes, yesterdayTotalProductiveMinutes),
         currentLevel: productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null,
         learningStats: learningStats,
         latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
