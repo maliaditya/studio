@@ -275,7 +275,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={onConvertToCard}
+                                        onConvertToCard={() => onConvertToCard(point)}
                                     />
                                 ))}
                             </ul>
@@ -1274,60 +1274,53 @@ function ResourcesPageContent() {
       setCurrentDisplayText('');
   };
 
-  const handleConvertToCard = (point: ResourcePoint) => {
-    const parentResource = resources.find(r => r.points?.some(p => p.id === point.id));
-    if (!parentResource) return;
+  const handleConvertToCard = (pointToConvert: ResourcePoint) => {
+      const parentResource = resources.find(r => r.points?.some(p => p.id === pointToConvert.id));
+      if (!parentResource) return;
 
-    let finalFolders = [...resourceFolders];
-    const parentFolderId = parentResource.folderId;
-    let subFolderId: string;
+      let finalFolders = [...resourceFolders];
+      const parentFolderId = parentResource.folderId;
+      let subFolderId: string;
+      
+      // Find or create a sub-folder named after the parent card
+      let subFolder = finalFolders.find(f => f.parentId === parentFolderId && f.name === parentResource.name);
 
-    // Check if a sub-folder named after the parent card already exists
-    let subFolder = finalFolders.find(f => f.parentId === parentFolderId && f.name === parentResource.name);
-
-    if (!subFolder) {
-      // If not, create it
-      const newSubFolder: ResourceFolder = {
-        id: `folder_${Date.now()}`,
-        name: parentResource.name,
-        parentId: parentFolderId,
-        icon: 'Folder',
-      };
-      finalFolders.push(newSubFolder);
-      subFolderId = newSubFolder.id;
-    } else {
+      if (!subFolder) {
+          subFolder = {
+              id: `folder_${Date.now()}`,
+              name: parentResource.name,
+              parentId: parentFolderId,
+              icon: 'Folder',
+          };
+          finalFolders.push(subFolder);
+      }
       subFolderId = subFolder.id;
-    }
 
-    // Create a new resource card in the determined sub-folder
-    const newCard: Resource = {
-        id: `res_card_${Date.now()}`,
-        name: point.text,
-        folderId: subFolderId,
-        type: 'card',
-        createdAt: new Date().toISOString(),
-        points: []
-    };
-    
-    // Update the original point to link to the new card
-    const updatedPoints = (parentResource.points || []).map(p => {
-        if (p.id === point.id) {
-            return {
-                ...p,
-                type: 'card' as const,
-                resourceId: newCard.id
-            };
-        }
-        return p;
-    });
-    
-    const updatedParentResource = { ...parentResource, points: updatedPoints };
+      const newCard: Resource = {
+          id: `res_card_${Date.now()}`,
+          name: pointToConvert.text,
+          folderId: subFolderId,
+          type: 'card',
+          createdAt: new Date().toISOString(),
+          points: [],
+      };
 
-    // Update state
-    setResourceFolders(finalFolders);
-    setResources(prev => [...prev.map(r => r.id === parentResource.id ? updatedParentResource : r), newCard]);
+      const updatedParent = {
+          ...parentResource,
+          points: (parentResource.points || []).map(p =>
+              p.id === pointToConvert.id
+                  ? { ...p, type: 'card' as const, resourceId: newCard.id }
+                  : p
+          ),
+      };
 
-    toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
+      setResourceFolders(finalFolders);
+      setResources(prev => [
+          ...prev.map(r => r.id === parentResource.id ? updatedParent : r),
+          newCard
+      ]);
+
+      toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
   };
 
   const handleModelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1877,11 +1870,14 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     
     return (
         <li className="flex items-start gap-3 group/item w-full">
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity" {...dragHandle?.attributes} {...dragHandle?.listeners}>
-                <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+            <div className="pt-0.5" {...dragHandle?.attributes} {...dragHandle?.listeners}>
+                {point.type === 'code' ? <Code className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'markdown' ? <MessageSquare className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'link' ? <LinkIcon className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                <ArrowRight className="h-4 w-4 text-primary/50 flex-shrink-0" />
+                }
             </div>
-            
-            <div className="flex-grow min-w-0 pl-8 pr-8" onDoubleClick={() => !isEditing && setIsEditing(true)}>
+             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
                 {isEditing ? (
                     <Textarea 
                         ref={textareaRef} 
@@ -1902,11 +1898,9 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                       )}
                     </div>
                 ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0 flex items-center gap-2">
-                        {point.text && <Image src={getFaviconUrl(point.text)!} alt="" width={16} height={16} className="flex-shrink-0"/>}
+                     <div className="flex-grow min-w-0">
                         <span 
-                            className="cursor-pointer text-primary hover:underline truncate" 
-                            title={point.text} 
+                            className="cursor-pointer text-primary hover:underline" 
                             onClick={() => point.text && setFloatingVideoUrl(point.text)}
                             onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
                         >
@@ -1917,7 +1911,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                     <p className="whitespace-pre-wrap text-muted-foreground">{point.text}</p>
                 )}
             </div>
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity">
+            <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
                  {point.type === 'text' && (
                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
                         <Blocks className="h-3 w-3"/>
@@ -1937,6 +1931,8 @@ export default function ResourcesPage() {
     
 
     
+
+
 
 
 
