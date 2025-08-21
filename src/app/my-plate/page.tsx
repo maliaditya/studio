@@ -527,20 +527,19 @@ function MyPlatePageContent() {
         };
     }, [allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, weightLogs, goalWeight]);
 
-
   const productivityStats = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
     const getDailyDuration = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight') => {
-      const logForDay = logs.find(log => log.date === dateStr);
-      if (!logForDay) return 0;
-      return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+        const logForDay = logs.find(log => log.date === dateStr);
+        if (!logForDay) return 0;
+        return logForDay.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
     };
 
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
-      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
       
     const todayUpskillMinutes = getDailyDuration(allUpskillLogs, todayStr, 'reps');
@@ -1227,3 +1226,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
