@@ -601,30 +601,30 @@ function MyPlatePageContent() {
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { totalLoggedHours: number }> = {};
 
+    const getDescendants = (startNodeId: string): Set<string> => {
+        const visited = new Set<string>();
+        const queue: string[] = [startNodeId];
+        visited.add(startNodeId);
+        
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            const node = upskillDefinitions.find(d => d.id === currentId);
+            (node?.linkedUpskillIds || []).forEach(childId => {
+                if (!visited.has(childId)) {
+                    visited.add(childId);
+                    queue.push(childId);
+                }
+            });
+        }
+        return visited;
+    };
+
     specializations.forEach(spec => {
         let totalMinutesForSpec = 0;
         const microSkillNamesInSpec = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
         const allUpskillDefsForSpec = upskillDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
         
-        const getDescendantIds = (startNodeId: string): Set<string> => {
-            const visited = new Set<string>();
-            const queue = [startNodeId];
-            visited.add(startNodeId);
-            
-            while (queue.length > 0) {
-                const currentId = queue.shift()!;
-                const node = upskillDefinitions.find(d => d.id === currentId);
-                (node?.linkedUpskillIds || []).forEach(childId => {
-                    if (!visited.has(childId)) {
-                        visited.add(childId);
-                        queue.push(childId);
-                    }
-                });
-            }
-            return visited;
-        };
-
         const allTaskIdsInSpec = new Set<string>();
         allUpskillDefsForSpec.forEach(def => {
             getDescendants(def.id).forEach(id => allTaskIdsInSpec.add(id));
@@ -1115,4 +1115,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
