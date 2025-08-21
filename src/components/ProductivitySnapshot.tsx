@@ -121,7 +121,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const roadmapItems = stats.upcomingReleases || [];
   
   const hasBrandingContent = inProgressBrandingItems.length > 0 || publishedBrandingItems.length > 0;
-  const showReadyForBrandingMessage = stats.brandingStatus?.readyForBrandingCount > 0;
+  const showReadyForBrandingMessage = stats.brandingStatus?.readyForBrandingCount > 0 && !(inProgressBrandingItems.length > 0);
 
   const renderBrandingItem = (item: any) => (
     <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
