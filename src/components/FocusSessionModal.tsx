@@ -256,7 +256,7 @@ export function FocusSessionModal({
                     <div className="grid grid-cols-3 gap-4 mt-6 text-center w-full">
                         <div>
                             <p className="text-muted-foreground text-sm">Yesterday</p>
-                            <p className="text-2xl font-bold">{dailyProgress.yesterday}</p>
+                            <p className="text-2xl font-bold">{dailyProgress.yesterday || 0}</p>
                             <p className="text-xs text-muted-foreground">minutes</p>
                         </div>
                         <div className="border-l border-r px-4">
