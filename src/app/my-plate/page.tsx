@@ -45,36 +45,6 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
-const productivityLevels = [
-    { level: 'L1', min: 15, max: 30, description: 'Just showing up', zone: '⚪️ Entry Zone' },
-    { level: 'L2', min: 30, max: 45, description: 'Light touch / spark', zone: '⚪️ Entry Zone' },
-    { level: 'L3', min: 45, max: 60, description: 'Single Pomodoro session', zone: '⚪️ Entry Zone' },
-    { level: 'L4', min: 60, max: 90, description: 'Basic learner habit', zone: '🟢 Stable Zone' },
-    { level: 'L5', min: 90, max: 120, description: 'Focused beginner phase', zone: '🟢 Stable Zone' },
-    { level: 'L6', min: 120, max: 150, description: 'Mini deep work commitment', zone: '🟢 Stable Zone' },
-    { level: 'L7', min: 150, max: 180, description: 'Structured discipline zone', zone: '🟢 Stable Zone' },
-    { level: 'L8', min: 180, max: 210, description: 'Daily scholar mode', zone: '🟡 Progress Zone' },
-    { level: 'L9', min: 210, max: 240, description: 'Solid effort / Part-time student', zone: '🟡 Progress Zone' },
-    { level: 'L10', min: 240, max: 300, description: 'Full-time learner level', zone: '🟡 Progress Zone' },
-    { level: 'L11', min: 300, max: 360, description: 'Deep learner zone', zone: '🟡 Progress Zone' },
-    { level: 'L12', min: 360, max: 420, description: 'Advanced practice / Bootcamp ready', zone: '🟠 High Intensity' },
-    { level: 'L13', min: 420, max: 480, description: 'Peak state zone', zone: '🟠 High Intensity' },
-    { level: 'L14', min: 480, max: 540, description: 'Monastic discipline', zone: '🔴 Extreme Zone' },
-    { level: 'L15', min: 540, max: 600, description: 'Legendary grind day', zone: '🔴 Extreme Zone' },
-    { level: 'L16', min: 600, max: 660, description: 'Elite performer stretch', zone: '🔴 Extreme Zone' },
-    { level: 'L17', min: 660, max: 720, description: 'Near-max capacity', zone: '🔴 Extreme Zone' },
-    { level: 'L18', min: 720, max: 780, description: 'Obsessive learner', zone: '🔴 Extreme Zone' },
-    { level: 'L19', min: 780, max: 900, description: 'Burning fuel — not sustainable daily', zone: '🔥 Overdrive Zone' },
-    { level: 'L20', min: 900, max: Infinity, description: 'Legendary grind day (Rare / Purpose-driven only)', zone: '⚠️ Apex Zone' },
-];
-
-const EMOTIONAL_STATES = ['Doubt', 'Fear', 'Shame', 'Regret', 'Overwhelm', 'Hopelessness', 'Loneliness', 'Imposter Syndrome', 'Resentment / Envy'];
-const FANTASY_STATES = ['Excitement', 'Anticipation', 'Euphoria', 'Pride', 'Desire', 'Longing', 'Curiosity', 'Hope', 'Satisfaction'];
-
-interface ThoughtEntry extends PistonEntry {
-  type: string;
-}
-
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -130,7 +100,7 @@ function MyPlatePageContent() {
   const [interruptDetails, setInterruptDetails] = useState('');
   const [interruptDuration, setInterruptDuration] = useState('');
 
-  const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null, activity: Activity | null}>({ isOpen: false, slotName: null, activity: null });
   const [essentialDetails, setEssentialDetails] = useState('');
   const [essentialDuration, setEssentialDuration] = useState('');
 
@@ -250,7 +220,9 @@ function MyPlatePageContent() {
     }
     
     if (type === 'essentials') {
-        setEssentialsModalState({ isOpen: true, slotName });
+        setEssentialDetails('');
+        setEssentialDuration('');
+        setEssentialsModalState({ isOpen: true, slotName, activity: null });
         return;
     }
 
@@ -328,34 +300,54 @@ function MyPlatePageContent() {
   };
   
   const handleSaveEssential = () => {
-    const { slotName } = essentialsModalState;
+    const { slotName, activity } = essentialsModalState;
     if (!slotName || !essentialDetails.trim()) {
         toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
         return;
     }
     const durationMinutes = parseInt(essentialDuration, 10) || 0;
+    
+    if (activity) { // Editing existing
+        setSchedule(prev => {
+            const newSchedule = { ...prev };
+            if (newSchedule[selectedDateKey]) {
+                const daySchedule = { ...newSchedule[selectedDateKey] };
+                if (daySchedule[slotName]) {
+                    daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act => 
+                        act.id === activity.id 
+                            ? { ...act, details: essentialDetails, duration: durationMinutes }
+                            : act
+                    );
+                    newSchedule[selectedDateKey] = daySchedule;
+                }
+            }
+            return newSchedule;
+        });
+        toast({ title: 'Essential Task Updated', description: 'The task has been updated.' });
 
-    const newActivity: Activity = {
-        id: `essentials-${Date.now()}`,
-        type: 'essentials',
-        details: essentialDetails,
-        completed: false,
-        taskIds: [],
-        duration: durationMinutes,
-    };
+    } else { // Creating new
+        const newActivity: Activity = {
+            id: `essentials-${Date.now()}`,
+            type: 'essentials',
+            details: essentialDetails,
+            completed: false,
+            taskIds: [],
+            duration: durationMinutes,
+        };
 
-    setSchedule(prev => ({
-        ...prev,
-        [selectedDateKey]: {
-            ...(prev[selectedDateKey] || {}),
-            [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
-        },
-    }));
+        setSchedule(prev => ({
+            ...prev,
+            [selectedDateKey]: {
+                ...(prev[selectedDateKey] || {}),
+                [slotName]: [...(prev[selectedDateKey]?.[slotName] || []), newActivity],
+            },
+        }));
+        toast({ title: 'Essential Task Added', description: 'The task has been added to your agenda.' });
+    }
 
     setEssentialDetails('');
     setEssentialDuration('');
-    setEssentialsModalState({ isOpen: false, slotName: null });
-    toast({ title: 'Essential Task Added', description: 'The task has been added to your agenda.' });
+    setEssentialsModalState({ isOpen: false, slotName: null, activity: null });
   };
 
 
@@ -398,6 +390,10 @@ function MyPlatePageContent() {
       setIsLearningModalOpen(true);
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
+    } else if (activity.type === 'essentials') {
+        setEssentialDetails(activity.details);
+        setEssentialDuration(activity.duration ? String(activity.duration) : '');
+        setEssentialsModalState({ isOpen: true, slotName, activity });
     }
   };
 
@@ -521,532 +517,116 @@ function MyPlatePageContent() {
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
-  const consistencyData = useMemo(() => {
-    if (!allWorkoutLogs || !oneYearAgo || !today) return [];
-    const workoutDates = new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date));
-    const data: { date: string; fullDate: string; score: number }[] = [];
-    let score = 0.5;
-    for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
-        const dateKey = format(d, 'yyyy-MM-dd');
-        if (workoutDates.has(dateKey)) { score += (1 - score) * 0.1; } else { score *= 0.95; }
-        data.push({ date: format(d, 'MMM dd'), fullDate: format(d, 'PPP'), score: Math.round(score * 100) });
-    }
-    return data;
-  }, [allWorkoutLogs, oneYearAgo, today]);
-  
   const productivityStats = useMemo(() => {
-    const getDailyMinutes = (
-      logs: DatedWorkout[],
-      dateStr: string,
-      durationField: 'reps' | 'weight'
-    ): number => {
-      const logForDay = logs.find((log) => log.date === dateStr);
-      if (!logForDay) return 0;
-      return logForDay.exercises.reduce((total, ex) => {
-        return (
-          total +
-          ex.loggedSets.reduce((sum, set) => {
-            const value = set[durationField];
-            return sum + (typeof value === 'number' ? value : 0);
-          }, 0)
-        );
-      }, 0);
-    };
-
-    const calculateChange = (todayVal: number, yesterdayVal: number) => {
-      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
-    };
-
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     
-    const todaysAgenda = schedule[todayStr] || {};
-    const completedUpskillActivities = Object.values(todaysAgenda).flat().filter(act => act.type === 'upskill' && act.completed);
-    
-    const todayUpskillMinutes = completedUpskillActivities.reduce((total, activity) => {
-        const logForDay = allUpskillLogs.find(log => log.date === todayStr);
-        if (!logForDay || !activity.taskIds) return total;
-        
-        const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-        const duration = relevantExercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((sum, set) => sum + set.reps, 0), 0);
-        
-        return total + duration;
-    }, 0);
+    const getMinutes = (dateKey: string, activityType: 'upskill' | 'deepwork') => {
+        const logs = activityType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+        const durationField = activityType === 'upskill' ? 'reps' : 'weight';
+        const relevantActivities = Object.values(schedule[dateKey] || {}).flat().filter(a => a.type === activityType && a.completed);
 
+        let totalMinutes = 0;
+        const dailyLog = logs.find(log => log.date === dateKey);
 
-    const todayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, todayStr, 'weight');
-    const totalProductiveMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
-
-    const yesterdayUpskillMinutes = getDailyMinutes(allUpskillLogs, yesterdayStr, 'reps');
-    const yesterdayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, yesterdayStr, 'weight');
-    const yesterdayTotalProductiveMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-
-    const calculateLearningStats = (
-      logs: DatedWorkout[],
-      goals: typeof topicGoals
-    ) => {
-      const topicStats: Record<string, any> = {};
-      if (!logs || !goals) return topicStats;
-
-      Object.entries(goals).forEach(([topic, goal]) => {
-        const topicData: {
-          totalDuration: number;
-          logs: { date: Date; progress: number }[];
-        } = {
-          totalDuration: 0,
-          logs: [],
-        };
-
-        logs.forEach((log) => {
-          log.exercises.forEach((ex) => {
-            if (ex.category === topic) {
-              const dailyProgress = ex.loggedSets.reduce(
-                (sum, set) => sum + set.weight,
-                0
-              );
-              const dailyDuration = ex.loggedSets.reduce(
-                (sum, set) => sum + set.reps,
-                0
-              );
-              if (dailyProgress > 0) {
-                topicData.logs.push({
-                  date: parseISO(log.date),
-                  progress: dailyProgress,
+        if (dailyLog) {
+            relevantActivities.forEach(activity => {
+                (activity.taskIds || []).forEach(taskId => {
+                    const exercise = dailyLog.exercises.find(ex => ex.id === taskId);
+                    if (exercise) {
+                        totalMinutes += exercise.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
+                    }
                 });
-              }
-              topicData.totalDuration += dailyDuration;
-            }
-          });
-        });
-
-        if (topicData.logs.length === 0) return;
-
-        const totalProgress = topicData.logs.reduce(
-          (sum, log) => sum + log.progress,
-          0
-        );
-        const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
-        const sortedLogs = topicData.logs.sort(
-          (a, b) => a.date.getTime() - b.date.getTime()
-        );
-        const firstDay = sortedLogs[0].date;
-        const durationInDays = differenceInDays(new Date(), firstDay) + 1;
-        const averageRatePerDay =
-          durationInDays > 0 ? totalProgress / durationInDays : 0;
-        const todaysProgress =
-          logs
-            .find((log) => log.date === todayStr)
-            ?.exercises.filter((ex) => ex.category === topic)
-            .reduce(
-              (total, ex) =>
-                total +
-                ex.loggedSets.reduce((sum, set) => sum + set.weight, 0),
-              0
-            ) || 0;
-        const speed =
-          topicData.totalDuration > 0
-            ? (totalProgress / topicData.totalDuration) * 60
-            : 0;
-
-        let completionStats = null;
-        if (averageRatePerDay > 0.01 && remainingProgress > 0) {
-          const daysToCompletion = Math.ceil(
-            remainingProgress / averageRatePerDay
-          );
-          completionStats = {
-            date: format(addDays(new Date(), daysToCompletion), 'PPP'),
-            daysRemaining: daysToCompletion,
-            timeNeeded: speed > 0 ? remainingProgress / (speed / 60) : null,
-          };
-        }
-
-        let milestoneStats = null;
-        const milestones = [0.25, 0.5, 0.75, 1.0].map((m) => m * goal.goalValue);
-        for (let i = 0; i < milestones.length; i++) {
-          if (totalProgress < milestones[i]) {
-            const progressToMilestone = milestones[i] - totalProgress;
-            const daysToMilestone = Math.ceil(
-              progressToMilestone / averageRatePerDay
-            );
-            const unitType =
-              goal.goalType.endsWith('s') && progressToMilestone === 1
-                ? goal.goalType.slice(0, -1)
-                : goal.goalType;
-            milestoneStats = {
-              percent: (i + 1) * 25,
-              date: format(addDays(new Date(), daysToMilestone), 'PPP'),
-              daysRemaining: daysToMilestone,
-              progressNeeded: Math.round(progressToMilestone),
-              unit: unitType,
-              timeNeeded: speed > 0 ? progressToMilestone / (speed / 60) : null,
-            };
-            break;
-          }
-        }
-
-        let requiredDailyRate =
-          (milestoneStats?.progressNeeded || remainingProgress) /
-          (milestoneStats?.daysRemaining || 1);
-        const remainingForToday = Math.max(
-          0,
-          requiredDailyRate - todaysProgress
-        );
-
-        topicStats[topic] = {
-          topic,
-          speed,
-          unit: `${goal.goalType}/hr`,
-          totalProgress: Math.round(totalProgress),
-          remainingProgress: Math.round(remainingProgress),
-          goalValue: goal.goalValue,
-          completion: completionStats,
-          nextMilestone: milestoneStats,
-          requiredDailyRate,
-          todaysProgress,
-          timeForTodaysProgress:
-            speed > 0 ? todaysProgress / (speed / 60) : null,
-          progressUnit: goal.goalType,
-          remainingForToday: parseFloat(remainingForToday.toFixed(1)),
-        };
-      });
-      return topicStats;
-    };
-
-    const calculateBrandingStatus = () => {
-      if (!deepWorkDefinitions || !brandingLogs) {
-        return {
-          status: 'pending' as const,
-          message: 'Loading branding status...',
-          items: [],
-        };
-      }
-      const allBundles = deepWorkDefinitions.filter(
-        (def) => def.category === 'Content Bundle'
-      );
-      const isFullyShared = (task: ExerciseDefinition) =>
-        task.sharingStatus &&
-        task.sharingStatus.twitter &&
-        task.sharingStatus.linkedin &&
-        task.sharingStatus.devto;
-      const activeBundles = allBundles.filter((task) => !isFullyShared(task));
-      if (activeBundles.length > 0) {
-        return {
-          status: 'in_progress' as const,
-          items: activeBundles.map((nextTask) => {
-            const logForTask = brandingLogs
-              .flatMap((log) => log.exercises)
-              .find((ex) => ex.definitionId === nextTask.id);
-            const loggedStagesCount = logForTask?.loggedSets.length || 0;
-            const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
-            return {
-              taskName: nextTask.name,
-              stage:
-                loggedStagesCount < 4
-                  ? stages[loggedStagesCount]
-                  : 'Ready to Share',
-              progress: `${loggedStagesCount}/4`,
-            };
-          }),
-        };
-      }
-      const readyForBrandingCount = deepWorkDefinitions.filter(
-        (def) => def.isReadyForBranding && !Array.isArray(def.focusAreaIds)
-      ).length;
-      if (readyForBrandingCount > 0) {
-        return {
-          status: 'pending' as const,
-          message: `You have ${readyForBrandingCount} focus area(s) ready.`,
-          subMessage: 'Go to Personal Branding to create a content bundle.',
-          items: [],
-        };
-      }
-      return {
-        status: 'pending' as const,
-        message: 'No content bundles in the pipeline.',
-        subMessage:
-          "Go to Deep Work to mark focus areas as 'Ready for Branding'.",
-        items: [],
-      };
-    };
-
-    const getUpcomingReleases = () => {
-      if (!productizationPlans && !offerizationPlans) return [];
-      const allReleasesWithDetails: {
-        topic: string;
-        release: Release;
-        type: 'product' | 'service';
-      }[] = [];
-      const processPlan = (
-        plan: ProductizationPlan,
-        topicId: string,
-        topicName: string,
-        type: 'product' | 'service'
-      ) => {
-        if (plan.releases) {
-          plan.releases.forEach((release) => {
-            const featureNames = (release.focusAreaIds || [])
-              .map((id) =>
-                deepWorkDefinitions.find((def) => def.id === id)?.name
-              )
-              .filter((name): name is string => !!name);
-            allReleasesWithDetails.push({
-              topic: topicName,
-              release: {
-                ...release,
-                features: featureNames,
-              },
-              type,
             });
-          });
         }
-      };
-      if (productizationPlans) {
-        Object.entries(productizationPlans).forEach(([topicId, plan]) =>
-          processPlan(
-            plan,
-            topicId,
-            projects.find((p) => p.id === topicId)?.name || topicId,
-            'product'
-          )
-        );
-      }
-      if (offerizationPlans) {
-        Object.entries(offerizationPlans).forEach(([topicId, plan]) =>
-          processPlan(
-            plan,
-            topicId,
-            coreSkills.find((s) => s.id === topicId)?.name || topicId,
-            'service'
-          )
-        );
-      }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      return allReleasesWithDetails
-        .filter(({ release }) => {
-          try {
-            return parseISO(release.launchDate) >= today;
-          } catch (e) {
-            return false;
-          }
-        })
-        .map((item) => {
-          const { release, topic, type } = item;
-          const launchDate = parseISO(release.launchDate);
-          const daysRemaining = differenceInDays(launchDate, today);
-          const availableHours = daysRemaining * 2; // Assuming 2 productive hours/day
-          const totalAvailableHours = daysRemaining * 24;
-          return {
-            topic,
-            type,
-            release: { ...release, daysRemaining, availableHours, totalAvailableHours },
-          };
-        })
-        .sort(
-          (a, b) =>
-            new Date(a.release.launchDate).getTime() -
-            new Date(b.release.launchDate).getTime()
-        );
+        return totalMinutes;
     };
-
-    const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
-    const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') =>
-      logs.reduce(
-        (total, log) =>
-          total +
-          log.exercises.reduce(
-            (exTotal, ex) =>
-              exTotal +
-              ex.loggedSets.reduce(
-                (setTotal, set) =>
-                  setTotal + (field === 'reps' ? set.reps : set.weight),
-                0
-              ),
-            0
-          ),
-        0
-      ) / 60;
-    const totalHoursData = [
-      {
-        name: 'Learning',
-        hours: parseFloat(getHours(allUpskillLogs, 'reps').toFixed(1)),
-      },
-      {
-        name: 'Deep Work',
-        hours: parseFloat(getHours(allDeepWorkLogs, 'weight').toFixed(1)),
-      },
-      {
-        name: 'Workout',
-        hours: new Set(
-          allWorkoutLogs
-            .filter((log) => log.exercises.some((ex) => ex.loggedSets.length > 0))
-            .map((log) => log.date)
-        ).size,
-      },
-      {
-        name: 'Branding',
-        hours: parseFloat(
-          (
-            brandingLogs.reduce(
-              (total, log) =>
-                total +
-                log.exercises.reduce(
-                  (exTotal, ex) => exTotal + ex.loggedSets.length,
-                  0
-                ),
-              0
-            ) *
-            30 /
-            60
-          ).toFixed(1)
-        ),
-      },
-    ];
-    const todayHoursData = [
-      { name: 'Learning', hours: todayUpskillMinutes / 60 },
-      { name: 'Deep Work', hours: todayDeepWorkMinutes / 60 },
-      {
-        name: 'Workout',
-        hours: allWorkoutLogs.some(
-          (log) =>
-            log.date === todayStr &&
-            log.exercises.some((ex) => ex.loggedSets.length > 0)
-        )
-          ? 1
-          : 0,
-      },
-      {
-        name: 'Branding',
-        hours:
-          (brandingLogs
-            .find((log) => log.date === todayStr)
-            ?.exercises.reduce(
-              (total, ex) => total + ex.loggedSets.length,
-              0
-            ) || 0) * 0.5,
-      },
-    ];
+    
+    const todayUpskillMinutes = getMinutes(todayStr, 'upskill');
+    const yesterdayUpskillMinutes = getMinutes(yesterdayStr, 'upskill');
+    
+    const todayDeepWorkMinutes = getMinutes(todayStr, 'deepwork');
+    const yesterdayDeepWorkMinutes = getMinutes(yesterdayStr, 'deepwork');
+    
+    const calculateChange = (todayVal: number, yesterdayVal: number) => {
+        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+    };
 
     return {
-      todayDeepWorkHours: todayDeepWorkMinutes / 60,
-      deepWorkChange: calculateChange(
-        todayDeepWorkMinutes,
-        yesterdayDeepWorkMinutes
-      ),
-      todayUpskillHours: todayUpskillMinutes / 60,
-      upskillChange: calculateChange(
-        todayUpskillMinutes,
-        yesterdayUpskillMinutes
-      ),
-      consistencyChange:
-        (consistencyData[consistencyData.length - 1]?.score || 0) -
-        (consistencyData[consistencyData.length - 2]?.score || 0),
-      totalProductiveHours: totalProductiveMinutes / 60,
-      avgProductiveHoursChange: calculateChange(
-        totalProductiveMinutes,
-        yesterdayTotalProductiveMinutes
-      ),
-      currentLevel:
-        productivityLevels.find(
-          (l) =>
-            totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max
-        ) || null,
-      learningStats: learningStats,
-      latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
-      brandingStatus: calculateBrandingStatus(),
-      totalHoursData,
-      todayHoursData,
-      upcomingReleases: getUpcomingReleases(),
+        todayUpskillHours: todayUpskillMinutes / 60,
+        upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
+        todayDeepWorkHours: todayDeepWorkMinutes / 60,
+        deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
+        learningStats: {}, // Placeholder
     };
-  }, [
-    allUpskillLogs,
-    allDeepWorkLogs,
-    topicGoals,
-    allWorkoutLogs,
-    oneYearAgo,
-    today,
-    consistencyData,
-    brandingLogs,
-    deepWorkDefinitions,
-    productizationPlans,
-    offerizationPlans,
-    projects,
-    coreSkills,
-    schedule
-  ]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
   
-  const _activityDurations = useMemo(() => {
-    const durations: Record<string, string> = {};
-    const daySchedule = schedule[selectedDateKey];
-    if (!daySchedule) return durations;
+  const dashboardStats = useMemo(() => {
+    const {
+      todayDeepWorkHours,
+      deepWorkChange,
+      todayUpskillHours,
+      upskillChange,
+    } = productivityStats;
   
-    const allDefs = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
+    const todaysActivities = schedule[todayKey] || {};
+    const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
+    const allCompleted = hasPlannedOrCompleted && Object.values(todaysActivities).flat().every(a => a.completed);
   
-    for (const slotName in daySchedule) {
-      const activitiesInSlot = (daySchedule as any)[slotName] || [];
-  
-      for (const activity of activitiesInSlot) {
-        if (!activity || !activity.id) continue;
-  
-        let totalMinutes = 0;
-  
-        if (activity.completed) {
-          const loggedDuration = (activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs)
-            .find(log => log.date === selectedDateKey)
-            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (activity.type === 'upskill' ? set.reps : set.weight), 0), 0) || 0;
-          totalMinutes = loggedDuration;
-        } else {
-          switch (activity.type) {
-            case 'workout': totalMinutes = 90; break;
-            case 'planning': case 'tracking': totalMinutes = 30; break;
-            case 'lead-generation': totalMinutes = 45; break;
-            case 'branding': totalMinutes = 120; break;
-            case 'essentials': totalMinutes = activity.duration || 30; break;
-            case 'upskill': case 'deepwork':
-              totalMinutes = (activity.taskIds || []).reduce((sum, taskId) => {
-                const defId = taskId.split('-')[0];
-                const def = allDefs.get(defId);
-                return sum + (def?.estimatedDuration || 120);
-              }, 0);
-              if ((activity.taskIds?.length ?? 0) === 0) {
-                 totalMinutes = (activity.type === 'upskill' || activity.type === 'deepwork') ? 120 : 45;
-              }
-              break;
-            case 'interrupt': totalMinutes = activity.duration || 30; break;
-            default: totalMinutes = 30;
-          }
-        }
-  
-        if (totalMinutes > 0) {
-          const hours = Math.floor(totalMinutes / 60);
-          const minutes = Math.round(totalMinutes % 60);
-          let durationStr = '';
-          if (hours > 0) durationStr += `${hours}h `;
-          if (minutes > 0) durationStr += `${minutes}m`;
-          durations[activity.id] = durationStr.trim() || '0m';
-        } else {
-          durations[activity.id] = '';
-        }
-      }
-    }
-    return durations;
-  }, [schedule, selectedDateKey, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions]);
-  
-  const formatMinutes = (minutes: number) => {
-    if (minutes <= 0) return "0m";
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
-  };
+    return {
+      latestConsistency: 0, 
+      consistencyChange: 0,
+      todayDeepWorkHours,
+      deepWorkChange,
+      todayUpskillHours,
+      upskillChange,
+      direction: allCompleted,
+      overallNextMilestone: null,
+    };
+  }, [productivityStats, schedule, todayKey]);
 
   useEffect(() => {
-    setActivityDurations(_activityDurations);
-  }, [_activityDurations, setActivityDurations]);
-  
+    const newDurations: Record<string, string> = {};
+    for (const dateKey in schedule) {
+        const daySchedule = schedule[dateKey];
+        if (!daySchedule) continue;
+
+        for (const slotName in daySchedule) {
+            const activities = (daySchedule as any)[slotName] || [];
+            for (const activity of activities) {
+                if (!activity || !activity.id) continue;
+                
+                if (activity.completed) {
+                    let logs, durationField;
+                    if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                    else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                    
+                    if (logs && durationField) {
+                        const loggedDuration = logs.find(log => log.date === dateKey)
+                            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0;
+                        if (loggedDuration > 0) {
+                            newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
+                        }
+                    } else if (activity.duration) {
+                        newDurations[activity.id] = `${activity.duration}m`;
+                    }
+                } else {
+                    let totalMinutes = 0;
+                     if (activity.type === 'essentials' || activity.type === 'interrupt') {
+                        totalMinutes = activity.duration || 0;
+                    } else {
+                       // Logic to calculate estimated duration for other types if needed
+                    }
+                    if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
+                }
+            }
+        }
+    }
+    setActivityDurations(newDurations);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, setActivityDurations]);
+
 
   const handleLogWeight = (weight: number, date: Date) => {
     if (!currentUser || isNaN(weight) || weight <= 0) {
@@ -1073,99 +653,6 @@ function MyPlatePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
 
-  const handleSetGoalWeight = (goal: number | null) => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to set a goal.", variant: "destructive" });
-        return;
-    }
-    if (goal === null || (!isNaN(goal) && goal > 0)) {
-        setGoalWeight(goal);
-        if(goal !== null) toast({ title: "Goal Set!", description: `Your new goal weight is ${goal} kg/lb.` });
-    } else {
-        toast({ title: "Invalid Input", description: "Please enter a valid goal weight.", variant: "destructive" });
-    }
-  };
-
-  const handleSetHeight = (h: number | null) => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to set your height.", variant: "destructive" });
-        return;
-    }
-    if (h === null || (!isNaN(h) && h > 0)) {
-        setHeight(h);
-        if (h !== null) toast({ title: "Height Set!", description: `Your height has been saved as ${h} cm.` });
-    } else {
-        toast({ title: "Invalid Input", description: "Please enter a valid height.", variant: "destructive" });
-    }
-  };
-
-  const handleSetDateOfBirth = (dob: string | null) => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to set your date of birth.", variant: "destructive" });
-        return;
-    }
-    setDateOfBirth(dob);
-    if(dob) toast({ title: "Date of Birth Set", description: `Your DoB has been saved.` });
-  };
-
-  const handleSetGender = (g: Gender | null) => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to set your gender.", variant: "destructive" });
-        return;
-    }
-    setGender(g);
-    if(g) toast({ title: "Gender Set!", description: `Your gender has been saved.` });
-  };
-
-
-  const handleDietModalOpenChange = (isOpen: boolean) => {
-      setIsDietPlanModalOpen(isOpen);
-  };
-  
-  const dashboardStats = useMemo(() => {
-    const {
-      latestConsistency,
-      consistencyChange,
-      todayDeepWorkHours,
-      deepWorkChange,
-      todayUpskillHours,
-      upskillChange,
-    } = productivityStats;
-
-    const todaysActivities = schedule[todayKey] || {};
-    const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
-    const allCompleted = Object.values(todaysActivities).flat().every(a => a.completed);
-    const direction = hasPlannedOrCompleted && allCompleted;
-    
-    const learningMilestones = Object.values(productivityStats.learningStats)
-      .map(s => s.nextMilestone)
-      .filter(m => m !== null)
-      .sort((a,b) => a.daysRemaining - b.daysRemaining);
-
-    const overallNextMilestone = learningMilestones.length > 0 ? learningMilestones[0] : null;
-
-    return {
-      latestConsistency,
-      consistencyChange,
-      todayDeepWorkHours,
-      deepWorkChange,
-      todayUpskillHours,
-      upskillChange,
-      direction,
-      overallNextMilestone,
-    };
-  }, [productivityStats, schedule, todayKey]);
-
-
-  const timeAllocationData = useMemo(() => {
-    if (!productivityStats.todayHoursData) return [];
-    const dailyTime = productivityStats.todayHoursData.reduce((sum, d) => sum + d.hours, 0);
-    return [
-      { name: 'Productive', time: dailyTime, fill: 'hsl(var(--primary))' },
-      { name: 'Ideal', time: 12, fill: 'hsl(var(--chart-2))' },
-      { name: 'Autopilot', time: Math.max(0, 24 - dailyTime), fill: 'hsl(var(--border))' },
-    ];
-  }, [productivityStats.todayHoursData]);
 
   return (
     <>
@@ -1193,7 +680,7 @@ function MyPlatePageContent() {
               <div className="lg:col-span-3">
                 <ProductivitySnapshot 
                   stats={productivityStats} 
-                  timeAllocationData={timeAllocationData} 
+                  timeAllocationData={[]} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                 />
@@ -1203,7 +690,7 @@ function MyPlatePageContent() {
                     <TodaysScheduleCard
                         schedule={schedule}
                         date={selectedDate}
-                        activityDurations={_activityDurations}
+                        activityDurations={activityDurations}
                         isAgendaDocked={isAgendaDocked}
                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                         onLogLearning={handleLogLearning}
@@ -1255,7 +742,7 @@ function MyPlatePageContent() {
             <TodaysScheduleCard
                 schedule={schedule}
                 date={selectedDate}
-                activityDurations={_activityDurations}
+                activityDurations={activityDurations}
                 isAgendaDocked={isAgendaDocked}
                 onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                 onLogLearning={handleLogLearning}
@@ -1309,7 +796,7 @@ function MyPlatePageContent() {
 
         <DietPlanModal
           isOpen={isDietPlanModalOpen}
-          onOpenChange={handleDietModalOpenChange}
+          onOpenChange={setIsDietPlanModalOpen}
         />
 
         <StatsOverviewModal
@@ -1320,9 +807,9 @@ function MyPlatePageContent() {
           allDeepWorkLogs={allDeepWorkLogs}
           weightLogs={weightLogs}
           goalWeight={goalWeight}
-          consistencyData={consistencyData}
-          totalHoursData={productivityStats.totalHoursData}
-          todayHoursData={productivityStats.todayHoursData}
+          consistencyData={[]}
+          totalHoursData={[]}
+          todayHoursData={[]}
         />
 
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
@@ -1379,10 +866,10 @@ function MyPlatePageContent() {
             </DialogContent>
         </Dialog>
         
-         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => setEssentialsModalState({ isOpen, slotName: null })}>
+         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Log a Daily Essential</DialogTitle>
+                    <DialogTitle>{essentialsModalState.activity ? 'Edit' : 'Log a'} Daily Essential</DialogTitle>
                     <DialogDescription>Add a recurring or essential one-off task.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -1396,7 +883,7 @@ function MyPlatePageContent() {
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null })}>Cancel</Button>
+                    <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>Cancel</Button>
                     <Button onClick={handleSaveEssential}>Save Task</Button>
                 </DialogFooter>
             </DialogContent>
