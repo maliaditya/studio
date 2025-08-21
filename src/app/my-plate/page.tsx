@@ -78,6 +78,7 @@ function MyPlatePageContent() {
     metaRules,
     coreSkills,
     openTodaysDietPopup,
+    getUpskillNodeType,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -571,44 +572,60 @@ function MyPlatePageContent() {
 
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
+  const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
+    const dailyLog = logs.find(log => log.date === dateKey);
+    if (!dailyLog) return 0;
+    const durationField = taskType === 'deepwork' ? 'weight' : 'reps';
+    return dailyLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+  }, []);
+
   const productivityStats = useMemo(() => {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
-    const getDailyMinutes = (dateKey: string, activityType: 'upskill' | 'deepwork', durationField: 'reps' | 'weight') => {
-      const logs = activityType === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-      const todaysActivities = Object.values(schedule[dateKey] || {}).flat();
-      const relevantActivities = todaysActivities.filter(a => a.type === activityType && a.completed);
+    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, todayStr, 'upskill');
+    const yesterdayUpskillMinutes = getLoggedMinutes(allUpskillLogs, yesterdayStr, 'upskill');
 
-      let totalMinutes = 0;
-      const dailyLog = logs.find(log => log.date === dateKey);
+    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, todayStr, 'deepwork');
+    const yesterdayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, yesterdayStr, 'deepwork');
 
-      if (dailyLog) {
-        relevantActivities.forEach(activity => {
-          (activity.taskIds || []).forEach(taskId => {
-            const exercise = dailyLog.exercises.find(ex => ex.id === taskId);
-            if (exercise) {
-              totalMinutes += exercise.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
-            }
-          });
-        });
-      }
-      return totalMinutes;
-    };
-    
-    const todayUpskillMinutes = getDailyMinutes(todayStr, 'upskill', 'reps');
-    const yesterdayUpskillMinutes = getDailyMinutes(yesterdayStr, 'upskill', 'reps');
-    
-    const todayDeepWorkMinutes = getDailyMinutes(todayStr, 'deepwork', 'weight');
-    const yesterdayDeepWorkMinutes = getDailyMinutes(yesterdayStr, 'deepwork', 'weight');
-    
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
-        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
-    
+
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
+
+    const allChildIds = new Set(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
+    const curiosities = upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Curiosity');
+
+    const learningStats: Record<string, { totalLoggedHours: number }> = {};
+
+    curiosities.forEach(curiosity => {
+        const descendantIds = new Set<string>();
+        const queue = [curiosity.id];
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (descendantIds.has(currentId)) continue;
+            descendantIds.add(currentId);
+            const node = upskillDefinitions.find(d => d.id === currentId);
+            (node?.linkedUpskillIds || []).forEach(childId => queue.push(childId));
+        }
+
+        let totalMinutes = 0;
+        allUpskillLogs.forEach(log => {
+            log.exercises.forEach(ex => {
+                if (descendantIds.has(ex.definitionId)) {
+                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                }
+            });
+        });
+        
+        if (totalMinutes > 0) {
+            learningStats[curiosity.name] = { totalLoggedHours: totalMinutes / 60 };
+        }
+    });
 
     return {
       todayUpskillHours: todayUpskillMinutes / 60,
@@ -617,9 +634,9 @@ function MyPlatePageContent() {
       deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
       totalProductiveHours: totalTodayMinutes / 60,
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
-      learningStats: {},
+      learningStats,
     };
-  }, [schedule, allUpskillLogs, allDeepWorkLogs]);
+  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, upskillDefinitions, getUpskillNodeType]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -730,7 +747,8 @@ function MyPlatePageContent() {
       todayUpskillHours,
       upskillChange,
       totalProductiveHours,
-      avgProductiveHoursChange
+      avgProductiveHoursChange,
+      learningStats
     } = productivityStats;
   
     const todaysActivities = schedule[todayKey] || {};
@@ -749,7 +767,7 @@ function MyPlatePageContent() {
       direction: allCompleted,
       overallNextMilestone: null,
       upcomingReleases: upcomingReleases,
-      learningStats: productivityStats.learningStats,
+      learningStats: learningStats,
       brandingStatus,
     };
   }, [productivityStats, schedule, todayKey, upcomingReleases, brandingStatus]);

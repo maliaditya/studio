@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -114,7 +115,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   };
 
 
-  const learningItems = Object.entries(stats.learningStats);
+  const learningItems = Object.entries(stats.learningStats || {});
   const inProgressBrandingItems = stats.brandingStatus?.items || [];
   const publishedBrandingItems = stats.brandingStatus?.publishedItems || [];
   const roadmapItems = stats.upcomingReleases || [];
@@ -193,84 +194,17 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   {learningItems.length > 0 ? (
                     <Carousel
                       items={learningItems}
-                      renderItem={([topic, topicStats]: [string, any]) => {
-                        const showTodayStats = topicStats.todaysProgress > 0 || (topicStats.requiredDailyRate && topicStats.requiredDailyRate > 0.01);
-                        return (
-                          <Accordion type="single" collapsible className="w-full" key={topic}>
-                              <AccordionItem value={topic} className="p-0 rounded-md bg-muted/30 border-b-0">
-                                <AccordionTrigger className="py-2 px-3 text-left hover:no-underline">
-                                    <div className="flex flex-col items-start flex-grow min-w-0">
-                                      <h5 className="font-bold text-foreground text-base truncate" title={topic}>{topic}</h5>
-                                      <div className="text-xs text-muted-foreground font-normal truncate">
-                                        Progress: {topicStats.totalProgress.toLocaleString()} / {topicStats.goalValue.toLocaleString()} {topicStats.unit.split('/')[0]}
-                                      </div>
-                                    </div>
-                                    {showTodayStats && (
-                                      <div className="text-right text-xs ml-4 flex-shrink-0">
-                                        <div className="font-semibold text-foreground whitespace-nowrap">Today</div>
-                                        {topicStats.todaysProgress > 0 ? (
-                                          <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                            +{topicStats.todaysProgress.toLocaleString()} {topicStats.todaysProgress === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit}
-                                            {topicStats.timeForTodaysProgress !== null && ` (est. ${(topicStats.timeForTodaysProgress / 60).toFixed(1)} hr)`}
-                                          </div>
-                                        ) : null}
-                                        {topicStats.remainingForToday > 0 ? (
-                                          <div className="text-muted-foreground whitespace-nowrap">
-                                            {topicStats.remainingForToday.toLocaleString()} {topicStats.remainingForToday === 1 ? topicStats.progressUnit.slice(0, -1) : topicStats.progressUnit} left
-                                          </div>
-                                        ) : (topicStats.todaysProgress > 0 && topicStats.requiredDailyRate > 0) ? (
-                                          <div className="text-muted-foreground whitespace-nowrap text-green-500">
-                                            Daily goal met!
-                                          </div>
-                                        ) : (topicStats.todaysProgress === 0 && topicStats.requiredDailyRate === 0) ? (
-                                          <div className="text-muted-foreground whitespace-nowrap">
-                                            -
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    )}
-                                </AccordionTrigger>
-                                <AccordionContent className="px-3">
-                                    <Progress value={(topicStats.totalProgress / topicStats.goalValue) * 100} className="h-2 my-2" />
-                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                                      {topicStats.nextMilestone && (
-                                        <div className="space-y-1">
-                                          <div className="font-semibold">Next Milestone ({topicStats.nextMilestone.percent}%)</div>
-                                          <div>Est. Date: <span className="font-medium text-foreground">{topicStats.nextMilestone.date}</span></div>
-                                          <div>Days Left: <span className="font-medium text-foreground">{topicStats.nextMilestone.daysRemaining}</span></div>
-                                          <div>Needed: <span className="font-medium text-foreground">{topicStats.nextMilestone.progressNeeded} {topicStats.nextMilestone.unit}</span></div>
-                                          {topicStats.nextMilestone.timeNeeded !== null && (
-                                            <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.nextMilestone.timeNeeded / 60).toFixed(1)} hr</span></div>
-                                          )}
-                                        </div>
-                                      )}
-                                      <div className="space-y-1">
-                                        <div className="font-semibold">Goal Completion</div>
-                                        {topicStats.completion ? (
-                                          <>
-                                            <div>Est. Date: <span className="font-medium text-foreground">{topicStats.completion.date}</span></div>
-                                            <div>Days Left: <span className="font-medium text-foreground">{topicStats.completion.daysRemaining}</span></div>
-                                            {topicStats.completion.timeNeeded !== null && (
-                                              <div>Est. Time: <span className="font-medium text-foreground">{(topicStats.completion.timeNeeded / 60).toFixed(1)} hr</span></div>
-                                            )}
-                                          </>
-                                        ) : (topicStats.totalProgress >= topicStats.goalValue) ? <div className="text-green-500 font-bold">Completed!</div> : <div className="text-muted-foreground">Not enough data to project.</div>}
-                                      </div>
-                                    </div>
-                                    <div className="mt-2 pt-2 border-t text-xs">
-                                      <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Learning Speed</span>
-                                        <span className="font-medium text-foreground">{topicStats.speed.toFixed(1)} {topicStats.unit}</span>
-                                      </div>
-                                    </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                          </Accordion>
-                        )
-                      }}
+                      renderItem={([topic, topicStats]: [string, any]) => (
+                        <div className="p-3 rounded-md bg-muted/30 border-b-0">
+                          <h5 className="font-bold text-foreground text-base truncate" title={topic}>{topic}</h5>
+                          <p className="text-xs text-muted-foreground">
+                            Total Time Logged: <span className="font-semibold text-foreground">{topicStats.totalLoggedHours.toFixed(1)} hours</span>
+                          </p>
+                        </div>
+                      )}
                     />
                   ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress and duration in the Upskill page.</p>
+                    <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress in the Upskill page.</p>
                   )}
                 </motion.div>
               </div>
