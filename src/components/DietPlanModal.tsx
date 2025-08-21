@@ -106,11 +106,11 @@ const MealEditor = ({ mealKey, day, plan, onUpdate }: {
               <TableRow>
                 <TableHead className="w-[100px]">Qty</TableHead>
                 <TableHead>Content</TableHead>
-                <TableHead className="w-[70px]">Protein</TableHead>
-                <TableHead className="w-[70px]">Carbs</TableHead>
-                <TableHead className="w-[70px]">Fat</TableHead>
-                <TableHead className="w-[70px]">Fiber</TableHead>
-                <TableHead className="w-[70px]">Calories</TableHead>
+                <TableHead className="w-[90px]">Protein (g)</TableHead>
+                <TableHead className="w-[90px]">Carbs (g)</TableHead>
+                <TableHead className="w-[90px]">Fat (g)</TableHead>
+                <TableHead className="w-[90px]">Fiber (g)</TableHead>
+                <TableHead className="w-[90px]">Calories</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
