@@ -79,6 +79,7 @@ function MyPlatePageContent() {
     coreSkills,
     openTodaysDietPopup,
     getUpskillNodeType,
+    skillDomains,
   } = useAuth();
   const { toast } = useToast();
   const [currentSlot, setCurrentSlot] = useState('');
@@ -596,34 +597,49 @@ function MyPlatePageContent() {
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-
-    const allChildIds = new Set(upskillDefinitions.flatMap(def => def.linkedUpskillIds || []));
-    const curiosities = upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Curiosity');
-
+    
+    const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { totalLoggedHours: number }> = {};
 
-    curiosities.forEach(curiosity => {
-        const descendantIds = new Set<string>();
-        const queue = [curiosity.id];
-        while(queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (descendantIds.has(currentId)) continue;
-            descendantIds.add(currentId);
-            const node = upskillDefinitions.find(d => d.id === currentId);
-            (node?.linkedUpskillIds || []).forEach(childId => queue.push(childId));
-        }
+    specializations.forEach(spec => {
+        let totalMinutesForSpec = 0;
+        const microSkillNamesInSpec = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-        let totalMinutes = 0;
+        const allUpskillDefsForSpec = upskillDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
+        
+        const getDescendantIds = (startNodeId: string): Set<string> => {
+            const visited = new Set<string>();
+            const queue = [startNodeId];
+            visited.add(startNodeId);
+            
+            while (queue.length > 0) {
+                const currentId = queue.shift()!;
+                const node = upskillDefinitions.find(d => d.id === currentId);
+                (node?.linkedUpskillIds || []).forEach(childId => {
+                    if (!visited.has(childId)) {
+                        visited.add(childId);
+                        queue.push(childId);
+                    }
+                });
+            }
+            return visited;
+        };
+
+        const allTaskIdsInSpec = new Set<string>();
+        allUpskillDefsForSpec.forEach(def => {
+            getDescendants(def.id).forEach(id => allTaskIdsInSpec.add(id));
+        });
+        
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (descendantIds.has(ex.definitionId)) {
-                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                if (allTaskIdsInSpec.has(ex.definitionId)) {
+                    totalMinutesForSpec += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
                 }
             });
         });
-        
-        if (totalMinutes > 0) {
-            learningStats[curiosity.name] = { totalLoggedHours: totalMinutes / 60 };
+
+        if (totalMinutesForSpec > 0) {
+            learningStats[spec.name] = { totalLoggedHours: totalMinutesForSpec / 60 };
         }
     });
 
@@ -636,7 +652,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, upskillDefinitions, getUpskillNodeType]);
+  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, upskillDefinitions, coreSkills]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -1099,3 +1115,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
