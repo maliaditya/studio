@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { TodaysDietCard } from '@/components/TodaysDietCard';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -90,6 +91,7 @@ function MyPlatePageContent() {
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
+  const [isTodaysDietModalOpen, setIsTodaysDietModalOpen] = useState(false);
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
@@ -441,7 +443,7 @@ function MyPlatePageContent() {
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
         setEssentialsModalState({ isOpen: true, slotName, activity });
     } else if (activity.type === 'nutrition') {
-      setIsDietPlanModalOpen(true);
+      setIsTodaysDietModalOpen(true);
     }
   };
 
@@ -897,6 +899,21 @@ function MyPlatePageContent() {
           isOpen={isDietPlanModalOpen}
           onOpenChange={setIsDietPlanModalOpen}
         />
+        
+        <Dialog open={isTodaysDietModalOpen} onOpenChange={setIsTodaysDietModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Today's Diet</DialogTitle>
+                </DialogHeader>
+                <TodaysDietCard
+                    dietPlan={dietPlan}
+                    onEditClick={() => {
+                        setIsTodaysDietModalOpen(false);
+                        setIsDietPlanModalOpen(true);
+                    }}
+                />
+            </DialogContent>
+        </Dialog>
 
         <StatsOverviewModal
           isOpen={isStatsModalOpen}
@@ -1010,6 +1027,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
