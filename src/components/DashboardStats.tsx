@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,12 +25,11 @@ const StatChange = ({ value }: { value: number }) => {
   if (value === undefined || value === 0) return null;
 
   const isPositive = value > 0;
-  const isInfinite = !isFinite(value);
 
   return (
     <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", isPositive ? "text-emerald-500" : "text-red-500")}>
       {isPositive ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-      {isInfinite ? 'vs yesterday' : `${Math.abs(value).toFixed(0)}% vs yesterday`}
+      {`${Math.abs(value).toFixed(0)}% vs yesterday`}
     </p>
   );
 };
