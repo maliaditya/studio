@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -109,6 +109,10 @@ function MyPlatePageContent() {
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
   const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
   const [focusDuration, setFocusDuration] = useState(45);
+  
+  // Meal selection modal
+  const [isMealModalOpen, setIsMealModalOpen] = useState(false);
+  const [currentSlotForMeal, setCurrentSlotForMeal] = useState<string | null>(null);
 
 
   // State for Modal content
@@ -161,7 +165,7 @@ function MyPlatePageContent() {
     if (!currentUser || !isScheduleLoaded) return;
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
-    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false };
+    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     
     const today = new Date();
     const todayDateKey = format(today, 'yyyy-MM-dd');
@@ -187,6 +191,7 @@ function MyPlatePageContent() {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
                 if(activity.completed) return false;
                 if(activity.type === 'essentials') return settings.carryForwardEssentials;
+                if(activity.type === 'nutrition') return settings.carryForwardNutrition;
                 return settings.carryForward;
             });
 
@@ -211,7 +216,7 @@ function MyPlatePageContent() {
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
   
-  const handleAddActivity = (slotName: string, type: ActivityType) => {
+    const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
     
     if (type === 'interrupt') {
@@ -223,6 +228,12 @@ function MyPlatePageContent() {
         setEssentialDetails('');
         setEssentialDuration('');
         setEssentialsModalState({ isOpen: true, slotName, activity: null });
+        return;
+    }
+    
+    if (type === 'nutrition') {
+        setCurrentSlotForMeal(slotName);
+        setIsMealModalOpen(true);
         return;
     }
 
@@ -350,6 +361,41 @@ function MyPlatePageContent() {
     setEssentialsModalState({ isOpen: false, slotName: null, activity: null });
   };
 
+  const handleSelectMeal = (mealType: 'meal1' | 'meal2' | 'meal3' | 'supplements') => {
+    if (!currentSlotForMeal) return;
+
+    const dayName = format(selectedDate, 'EEEE');
+    const dayPlan = dietPlan.find(p => p.day === dayName);
+    
+    let mealDetails = `Nutrition: ${mealType.replace('meal', 'Meal ')}`;
+    if (dayPlan) {
+      mealDetails = dayPlan[mealType] || mealDetails;
+    }
+
+    const newActivity: Activity = {
+      id: `nutrition-${Date.now()}-${Math.random()}`,
+      type: 'nutrition',
+      details: mealDetails,
+      completed: false,
+      taskIds: [mealType], // Use taskIds to store which meal it is
+    };
+
+    setSchedule(prev => {
+      const daySchedule = prev[selectedDateKey] || {};
+      const slotActivities = daySchedule[currentSlotForMeal!] || [];
+      return {
+        ...prev,
+        [selectedDateKey]: {
+          ...daySchedule,
+          [currentSlotForMeal!]: [...slotActivities, newActivity],
+        }
+      }
+    });
+
+    setIsMealModalOpen(false);
+    setCurrentSlotForMeal(null);
+  };
+
 
   const handleRemoveActivity = (slotName: string, activityId: string) => {
     if (!selectedDateKey) return;
@@ -394,6 +440,8 @@ function MyPlatePageContent() {
         setEssentialDetails(activity.details);
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
         setEssentialsModalState({ isOpen: true, slotName, activity });
+    } else if (activity.type === 'nutrition') {
+      setIsDietPlanModalOpen(true);
     }
   };
 
@@ -563,7 +611,7 @@ function MyPlatePageContent() {
       deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
       totalProductiveHours: totalTodayMinutes / 60,
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
-      learningStats: {}, // Added to fix the error
+      learningStats: {},
     };
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
   
@@ -633,6 +681,7 @@ function MyPlatePageContent() {
       direction: allCompleted,
       overallNextMilestone: null,
       upcomingReleases: upcomingReleases,
+      learningStats: productivityStats.learningStats,
     };
   }, [productivityStats, schedule, todayKey, upcomingReleases]);
 
@@ -938,6 +987,21 @@ function MyPlatePageContent() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <Dialog open={isMealModalOpen} onOpenChange={setIsMealModalOpen}>
+            <DialogContent className="sm:max-w-xs">
+                <DialogHeader>
+                    <DialogTitle>Select Meal</DialogTitle>
+                    <DialogDescription>Which meal are you logging?</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-2 py-4">
+                    <Button variant="outline" onClick={() => handleSelectMeal('meal1')}>Meal 1</Button>
+                    <Button variant="outline" onClick={() => handleSelectMeal('meal2')}>Meal 2</Button>
+                    <Button variant="outline" onClick={() => handleSelectMeal('meal3')}>Meal 3</Button>
+                    <Button variant="outline" onClick={() => handleSelectMeal('supplements')}>Supplements</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
       </div>
     </>
   );
@@ -946,5 +1010,6 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
