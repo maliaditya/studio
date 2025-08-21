@@ -498,8 +498,22 @@ function MyPlatePageContent() {
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    
+    // New accurate calculation for today's learning hours
+    const todaysAgenda = schedule[todayStr] || {};
+    const completedUpskillActivities = Object.values(todaysAgenda).flat().filter(act => act.type === 'upskill' && act.completed);
+    
+    const todayUpskillMinutes = completedUpskillActivities.reduce((total, activity) => {
+        const logForDay = allUpskillLogs.find(log => log.date === todayStr);
+        if (!logForDay || !activity.taskIds) return total;
+        
+        const relevantExercises = logForDay.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+        const duration = relevantExercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((sum, set) => sum + set.reps, 0), 0);
+        
+        return total + duration;
+    }, 0);
 
-    const todayUpskillMinutes = getDailyMinutes(allUpskillLogs, todayStr, 'reps');
+
     const todayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, todayStr, 'weight');
     const totalProductiveMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
 
@@ -898,6 +912,7 @@ function MyPlatePageContent() {
     offerizationPlans,
     projects,
     coreSkills,
+    schedule
   ]);
   
   const _activityDurations = useMemo(() => {
@@ -1055,9 +1070,9 @@ function MyPlatePageContent() {
       upskillChange,
     } = productivityStats;
 
-    const todayActivities = schedule[todayKey] || {};
-    const hasPlannedOrCompleted = Object.values(todayActivities).flat().length > 0;
-    const allCompleted = Object.values(todayActivities).flat().every(a => a.completed);
+    const todaysActivities = schedule[todayKey] || {};
+    const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
+    const allCompleted = Object.values(todaysActivities).flat().every(a => a.completed);
     const direction = hasPlannedOrCompleted && allCompleted;
     
     const learningMilestones = Object.values(productivityStats.learningStats)
