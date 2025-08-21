@@ -24,7 +24,7 @@ interface AgendaWidgetItemProps {
   duration: string | undefined;
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
-  onToggleComplete: (slotName: string, activityId: string) => void;
+  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
@@ -47,7 +47,7 @@ function AgendaWidgetItem({
 
   const handleItemClick = () => {
     if (activity.completed) {
-      onToggleComplete(activity.slot, activity.id); // Allow un-checking
+      onToggleComplete(activity.slot, activity.id, false); // Allow un-checking
     } else if (activity.type === 'workout') {
         onStartWorkoutLog(activity);
     } else if (activity.type === 'lead-generation') {
@@ -55,7 +55,7 @@ function AgendaWidgetItem({
     } else if (canLogProgress) {
       setOpenPopover(true);
     } else if (activity.type !== 'interrupt') {
-      onToggleComplete(activity.slot, activity.id);
+      onToggleComplete(activity.slot, activity.id, true);
     }
   };
 
@@ -163,7 +163,7 @@ interface TodaysScheduleCardProps {
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onToggleComplete: (slotName: string, activityId: string) => void;
+  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
@@ -418,7 +418,7 @@ export function TodaysScheduleCard({
                 duration={activityDurations[activity.id]}
                 onLogLearning={onLogLearning}
                 onStartWorkoutLog={onStartWorkoutLog}
-                onToggleComplete={() => onToggleComplete(activity.slot, activity.id)}
+                onToggleComplete={onToggleComplete}
                 onStartLeadGenLog={onStartLeadGenLog}
                 onOpenFocusModal={onOpenFocusModal}
                 onOpenTaskContext={onOpenTaskContext}

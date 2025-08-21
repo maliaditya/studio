@@ -984,14 +984,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
-      const daySchedule = { ...(prev[todayKey] || {}) };
-      const activities = daySchedule[slotName] || [];
-      if (activities.length > 0) {
-        daySchedule[slotName] = activities.map(act => 
-          act.id === activityId ? { ...act, completed: isCompleted } : act
-        );
-      }
-      return { ...prev, [todayKey]: daySchedule };
+        const daySchedule = { ...(prev[todayKey] || {}) };
+        const activities = daySchedule[slotName] || [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+
+        if (activityIndex > -1) {
+            const updatedActivities = [...activities];
+            updatedActivities[activityIndex] = { ...updatedActivities[activityIndex], completed: isCompleted };
+            daySchedule[slotName] = updatedActivities;
+        }
+
+        return { ...prev, [todayKey]: daySchedule };
     });
   };
   
@@ -1085,7 +1088,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     handleToggleComplete(activity.slot, activity.id, true);
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions, handleToggleComplete]);
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions]);
 
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2141,6 +2144,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 

@@ -42,7 +42,7 @@ interface TimeSlotsProps {
   remainingTime: string;
   onAddActivity: (slotName: string, type: ActivityType) => void;
   onRemoveActivity: (slotName: string, activityId: string) => void;
-  onToggleComplete: (slotName: string, activityId: string) => void;
+  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity) => void;
 }
 
@@ -140,7 +140,7 @@ export function TimeSlots({
                           <Checkbox
                             id={`cb-${activity.id}`}
                             checked={!!activity.completed}
-                            onCheckedChange={() => onToggleComplete(slot.name, activity.id)}
+                            onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
                           />
                           <Button variant="ghost" size="icon" onClick={() => onRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
                             <Trash2 className="h-4 w-4" />
