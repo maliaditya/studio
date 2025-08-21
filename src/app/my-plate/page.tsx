@@ -70,7 +70,7 @@ function MyPlatePageContent() {
     projects,
     productizationPlans,
     offerizationPlans,
-    openIntentionPopup,
+    onOpenIntentionPopup,
     activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
