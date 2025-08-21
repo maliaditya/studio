@@ -473,232 +473,513 @@ function MyPlatePageContent() {
   }, [allWorkoutLogs, oneYearAgo, today]);
   
   const productivityStats = useMemo(() => {
-    const getDailyMinutes = (logs: DatedWorkout[], dateStr: string, durationField: 'reps' | 'weight'): number => {
-      const logForDay = logs.find(log => log.date === dateStr);
+    const getDailyMinutes = (
+      logs: DatedWorkout[],
+      dateStr: string,
+      durationField: 'reps' | 'weight'
+    ): number => {
+      const logForDay = logs.find((log) => log.date === dateStr);
       if (!logForDay) return 0;
       return logForDay.exercises.reduce((total, ex) => {
-        return total + ex.loggedSets.reduce((sum, set) => {
-          const value = set[durationField];
-          return sum + (typeof value === 'number' ? value : 0);
-        }, 0);
+        return (
+          total +
+          ex.loggedSets.reduce((sum, set) => {
+            const value = set[durationField];
+            return sum + (typeof value === 'number' ? value : 0);
+          }, 0)
+        );
       }, 0);
     };
 
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
-        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
-    const todayUpskillMinutes = getDailyMinutes(allUpskillLogs, todayStr, 'reps');
-    const todayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, todayStr, 'weight');
+    const todayUpskillMinutes = getDailyMinutes(
+      allUpskillLogs,
+      todayStr,
+      'reps'
+    );
+    const todayDeepWorkMinutes = getDailyMinutes(
+      allDeepWorkLogs,
+      todayStr,
+      'weight'
+    );
     const totalProductiveMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
-    
-    const yesterdayUpskillMinutes = getDailyMinutes(allUpskillLogs, yesterdayStr, 'reps');
-    const yesterdayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, yesterdayStr, 'weight');
-    const yesterdayTotalProductiveMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-    
-    const calculateTotalLoggedMinutesForFocusArea = (focusAreaDef: ExerciseDefinition | undefined) => {
+
+    const yesterdayUpskillMinutes = getDailyMinutes(
+      allUpskillLogs,
+      yesterdayStr,
+      'reps'
+    );
+    const yesterdayDeepWorkMinutes = getDailyMinutes(
+      allDeepWorkLogs,
+      yesterdayStr,
+      'weight'
+    );
+    const yesterdayTotalProductiveMinutes =
+      yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
+
+    const calculateTotalLoggedMinutesForFocusArea = (
+      focusAreaDef: ExerciseDefinition | undefined
+    ) => {
       if (!focusAreaDef) return 0;
       let totalMinutes = 0;
       const visited = new Set<string>();
 
       function recurse(def: ExerciseDefinition) {
-          if (visited.has(def.id)) return;
-          visited.add(def.id);
+        if (visited.has(def.id)) return;
+        visited.add(def.id);
 
-          const isLeaf = (def.linkedDeepWorkIds?.length ?? 0) === 0 && (def.linkedUpskillIds?.length ?? 0) === 0;
+        const isLeaf =
+          (def.linkedDeepWorkIds?.length ?? 0) === 0 &&
+          (def.linkedUpskillIds?.length ?? 0) === 0;
 
-          if (isLeaf) {
-              const deepWorkLogs = allDeepWorkLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === def.id);
-              const upskillLogs = allUpskillLogs.flatMap(log => log.exercises).filter(ex => ex.definitionId === def.id);
-              totalMinutes += deepWorkLogs.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0);
-              totalMinutes += upskillLogs.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0);
-          } else {
-              (def.linkedDeepWorkIds || []).forEach(childId => {
-                  const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                  if (childDef) recurse(childDef);
-              });
-              (def.linkedUpskillIds || []).forEach(childId => {
-                  const childDef = upskillDefinitions.find(d => d.id === childId);
-                  if (childDef) recurse(childDef);
-              });
-          }
+        if (isLeaf) {
+          const deepWorkLogs = allDeepWorkLogs
+            .flatMap((log) => log.exercises)
+            .filter((ex) => ex.definitionId === def.id);
+          const upskillLogs = allUpskillLogs
+            .flatMap((log) => log.exercises)
+            .filter((ex) => ex.definitionId === def.id);
+          totalMinutes += deepWorkLogs.reduce(
+            (sum, ex) =>
+              sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0),
+            0
+          );
+          totalMinutes += upskillLogs.reduce(
+            (sum, ex) =>
+              sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0),
+            0
+          );
+        } else {
+          (def.linkedDeepWorkIds || []).forEach((childId) => {
+            const childDef = deepWorkDefinitions.find((d) => d.id === childId);
+            if (childDef) recurse(childDef);
+          });
+          (def.linkedUpskillIds || []).forEach((childId) => {
+            const childDef = upskillDefinitions.find((d) => d.id === childId);
+            if (childDef) recurse(childDef);
+          });
+        }
       }
       recurse(focusAreaDef);
       return totalMinutes;
     };
 
-    const calculateLearningStats = (logs: DatedWorkout[], goals: typeof topicGoals) => {
-        const topicStats: Record<string, any> = {};
-        if (!logs || !goals) return topicStats;
-    
-        Object.entries(goals).forEach(([topic, goal]) => {
-            const topicData: { totalDuration: number; logs: { date: Date; progress: number }[] } = {
-                totalDuration: 0,
-                logs: []
-            };
-        
-            logs.forEach(log => {
-                log.exercises.forEach(ex => {
-                    if (ex.category === topic) {
-                        const dailyProgress = ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                        const dailyDuration = ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                        if (dailyProgress > 0) {
-                            topicData.logs.push({ date: parseISO(log.date), progress: dailyProgress });
-                        }
-                        topicData.totalDuration += dailyDuration;
-                    }
+    const calculateLearningStats = (
+      logs: DatedWorkout[],
+      goals: typeof topicGoals
+    ) => {
+      const topicStats: Record<string, any> = {};
+      if (!logs || !goals) return topicStats;
+
+      Object.entries(goals).forEach(([topic, goal]) => {
+        const topicData: {
+          totalDuration: number;
+          logs: { date: Date; progress: number }[];
+        } = {
+          totalDuration: 0,
+          logs: [],
+        };
+
+        logs.forEach((log) => {
+          log.exercises.forEach((ex) => {
+            if (ex.category === topic) {
+              const dailyProgress = ex.loggedSets.reduce(
+                (sum, set) => sum + set.weight,
+                0
+              );
+              const dailyDuration = ex.loggedSets.reduce(
+                (sum, set) => sum + set.reps,
+                0
+              );
+              if (dailyProgress > 0) {
+                topicData.logs.push({
+                  date: parseISO(log.date),
+                  progress: dailyProgress,
                 });
-            });
-        
-            if (topicData.logs.length === 0) return;
-        
-            const totalProgress = topicData.logs.reduce((sum, log) => sum + log.progress, 0);
-            const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
-            const sortedLogs = topicData.logs.sort((a,b) => a.date.getTime() - b.date.getTime());
-            const firstDay = sortedLogs[0].date;
-            const durationInDays = differenceInDays(new Date(), firstDay) + 1;
-            const averageRatePerDay = durationInDays > 0 ? totalProgress / durationInDays : 0;
-            const todaysProgress = logs.find(log => log.date === todayStr)?.exercises.filter(ex => ex.category === topic).reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set.weight, 0), 0) || 0;
-            const speed = topicData.totalDuration > 0 ? (totalProgress / topicData.totalDuration) * 60 : 0;
-        
-            let completionStats = null;
-            if (averageRatePerDay > 0.01 && remainingProgress > 0) {
-                const daysToCompletion = Math.ceil(remainingProgress / averageRatePerDay);
-                completionStats = { date: format(addDays(new Date(), daysToCompletion), 'PPP'), daysRemaining: daysToCompletion, timeNeeded: speed > 0 ? (remainingProgress / (speed / 60)) : null };
+              }
+              topicData.totalDuration += dailyDuration;
             }
-        
-            let milestoneStats = null;
-            const milestones = [0.25, 0.5, 0.75, 1.0].map(m => m * goal.goalValue);
-            for (let i = 0; i < milestones.length; i++) {
-                if (totalProgress < milestones[i]) {
-                    const progressToMilestone = milestones[i] - totalProgress;
-                    const daysToMilestone = Math.ceil(progressToMilestone / averageRatePerDay);
-                    const unitType = goal.goalType.endsWith('s') && progressToMilestone === 1 ? goal.goalType.slice(0, -1) : goal.goalType;
-                    milestoneStats = {
-                        percent: (i + 1) * 25, date: format(addDays(new Date(), daysToMilestone), 'PPP'), daysRemaining: daysToMilestone,
-                        progressNeeded: Math.round(progressToMilestone), unit: unitType, timeNeeded: speed > 0 ? (progressToMilestone / (speed / 60)) : null,
-                    };
-                    break;
-                }
-            }
-        
-            let requiredDailyRate = (milestoneStats?.progressNeeded || remainingProgress) / (milestoneStats?.daysRemaining || 1);
-            const remainingForToday = Math.max(0, requiredDailyRate - todaysProgress);
-        
-            topicStats[topic] = {
-                topic, speed, unit: `${goal.goalType}/hr`, totalProgress: Math.round(totalProgress), remainingProgress: Math.round(remainingProgress),
-                goalValue: goal.goalValue, completion: completionStats, nextMilestone: milestoneStats, requiredDailyRate, todaysProgress,
-                timeForTodaysProgress: speed > 0 ? (todaysProgress / (speed / 60)) : null, progressUnit: goal.goalType, remainingForToday: parseFloat(remainingForToday.toFixed(1)),
-            };
+          });
         });
-        return topicStats;
+
+        if (topicData.logs.length === 0) return;
+
+        const totalProgress = topicData.logs.reduce(
+          (sum, log) => sum + log.progress,
+          0
+        );
+        const remainingProgress = Math.max(0, goal.goalValue - totalProgress);
+        const sortedLogs = topicData.logs.sort(
+          (a, b) => a.date.getTime() - b.date.getTime()
+        );
+        const firstDay = sortedLogs[0].date;
+        const durationInDays = differenceInDays(new Date(), firstDay) + 1;
+        const averageRatePerDay =
+          durationInDays > 0 ? totalProgress / durationInDays : 0;
+        const todaysProgress =
+          logs
+            .find((log) => log.date === todayStr)
+            ?.exercises.filter((ex) => ex.category === topic)
+            .reduce(
+              (total, ex) =>
+                total +
+                ex.loggedSets.reduce((sum, set) => sum + set.weight, 0),
+              0
+            ) || 0;
+        const speed =
+          topicData.totalDuration > 0
+            ? (totalProgress / topicData.totalDuration) * 60
+            : 0;
+
+        let completionStats = null;
+        if (averageRatePerDay > 0.01 && remainingProgress > 0) {
+          const daysToCompletion = Math.ceil(
+            remainingProgress / averageRatePerDay
+          );
+          completionStats = {
+            date: format(addDays(new Date(), daysToCompletion), 'PPP'),
+            daysRemaining: daysToCompletion,
+            timeNeeded: speed > 0 ? remainingProgress / (speed / 60) : null,
+          };
+        }
+
+        let milestoneStats = null;
+        const milestones = [0.25, 0.5, 0.75, 1.0].map((m) => m * goal.goalValue);
+        for (let i = 0; i < milestones.length; i++) {
+          if (totalProgress < milestones[i]) {
+            const progressToMilestone = milestones[i] - totalProgress;
+            const daysToMilestone = Math.ceil(
+              progressToMilestone / averageRatePerDay
+            );
+            const unitType =
+              goal.goalType.endsWith('s') && progressToMilestone === 1
+                ? goal.goalType.slice(0, -1)
+                : goal.goalType;
+            milestoneStats = {
+              percent: (i + 1) * 25,
+              date: format(addDays(new Date(), daysToMilestone), 'PPP'),
+              daysRemaining: daysToMilestone,
+              progressNeeded: Math.round(progressToMilestone),
+              unit: unitType,
+              timeNeeded: speed > 0 ? progressToMilestone / (speed / 60) : null,
+            };
+            break;
+          }
+        }
+
+        let requiredDailyRate =
+          (milestoneStats?.progressNeeded || remainingProgress) /
+          (milestoneStats?.daysRemaining || 1);
+        const remainingForToday = Math.max(
+          0,
+          requiredDailyRate - todaysProgress
+        );
+
+        topicStats[topic] = {
+          topic,
+          speed,
+          unit: `${goal.goalType}/hr`,
+          totalProgress: Math.round(totalProgress),
+          remainingProgress: Math.round(remainingProgress),
+          goalValue: goal.goalValue,
+          completion: completionStats,
+          nextMilestone: milestoneStats,
+          requiredDailyRate,
+          todaysProgress,
+          timeForTodaysProgress:
+            speed > 0 ? todaysProgress / (speed / 60) : null,
+          progressUnit: goal.goalType,
+          remainingForToday: parseFloat(remainingForToday.toFixed(1)),
+        };
+      });
+      return topicStats;
     };
 
     const calculateBrandingStatus = () => {
-        if (!deepWorkDefinitions || !brandingLogs) {
-            return { status: 'pending' as const, message: 'Loading branding status...', items: [] };
-        }
-        const allBundles = deepWorkDefinitions.filter(def => def.category === "Content Bundle");
-        const isFullyShared = (task: ExerciseDefinition) => task.sharingStatus && task.sharingStatus.twitter && task.sharingStatus.linkedin && task.sharingStatus.devto;
-        const activeBundles = allBundles.filter(task => !isFullyShared(task));
-        if (activeBundles.length > 0) {
+      if (!deepWorkDefinitions || !brandingLogs) {
+        return {
+          status: 'pending' as const,
+          message: 'Loading branding status...',
+          items: [],
+        };
+      }
+      const allBundles = deepWorkDefinitions.filter(
+        (def) => def.category === 'Content Bundle'
+      );
+      const isFullyShared = (task: ExerciseDefinition) =>
+        task.sharingStatus &&
+        task.sharingStatus.twitter &&
+        task.sharingStatus.linkedin &&
+        task.sharingStatus.devto;
+      const activeBundles = allBundles.filter((task) => !isFullyShared(task));
+      if (activeBundles.length > 0) {
+        return {
+          status: 'in_progress' as const,
+          items: activeBundles.map((nextTask) => {
+            const logForTask = brandingLogs
+              .flatMap((log) => log.exercises)
+              .find((ex) => ex.definitionId === nextTask.id);
+            const loggedStagesCount = logForTask?.loggedSets.length || 0;
+            const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
             return {
-                status: 'in_progress' as const,
-                items: activeBundles.map(nextTask => {
-                    const logForTask = brandingLogs.flatMap(log => log.exercises).find(ex => ex.definitionId === nextTask.id);
-                    const loggedStagesCount = logForTask?.loggedSets.length || 0;
-                    const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
-                    return { taskName: nextTask.name, stage: loggedStagesCount < 4 ? stages[loggedStagesCount] : 'Ready to Share', progress: `${loggedStagesCount}/4` };
-                })
+              taskName: nextTask.name,
+              stage:
+                loggedStagesCount < 4
+                  ? stages[loggedStagesCount]
+                  : 'Ready to Share',
+              progress: `${loggedStagesCount}/4`,
             };
-        }
-        const readyForBrandingCount = deepWorkDefinitions.filter(def => def.isReadyForBranding && !Array.isArray(def.focusAreaIds)).length;
-        if (readyForBrandingCount > 0) {
-            return { status: 'pending' as const, message: `You have ${readyForBrandingCount} focus area(s) ready.`, subMessage: "Go to Personal Branding to create a content bundle.", items: [] };
-        }
-        return { status: 'pending' as const, message: "No content bundles in the pipeline.", subMessage: "Go to Deep Work to mark focus areas as 'Ready for Branding'.", items: [] };
+          }),
+        };
+      }
+      const readyForBrandingCount = deepWorkDefinitions.filter(
+        (def) => def.isReadyForBranding && !Array.isArray(def.focusAreaIds)
+      ).length;
+      if (readyForBrandingCount > 0) {
+        return {
+          status: 'pending' as const,
+          message: `You have ${readyForBrandingCount} focus area(s) ready.`,
+          subMessage: 'Go to Personal Branding to create a content bundle.',
+          items: [],
+        };
+      }
+      return {
+        status: 'pending' as const,
+        message: 'No content bundles in the pipeline.',
+        subMessage:
+          "Go to Deep Work to mark focus areas as 'Ready for Branding'.",
+        items: [],
+      };
     };
 
     const getUpcomingReleases = () => {
-        if (!productizationPlans && !offerizationPlans) return [];
-        const allReleasesWithDetails: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
-        const processPlan = (plan: ProductizationPlan, topicId: string, topicName: string, type: 'product' | 'service') => {
-            if (plan.releases) {
-                plan.releases.forEach(release => {
-                    const featureNames = (release.focusAreaIds || []).map(id => deepWorkDefinitions.find(def => def.id === id)?.name).filter((name): name is string => !!name);
-                    let totalLoggedMinutesForRelease = 0;
-                    let totalEstimatedHoursForRelease = 0;
-                    (release.focusAreaIds || []).forEach(id => {
-                        const focusAreaDef = deepWorkDefinitions.find(def => def.id === id);
-                        if (focusAreaDef) {
-                            totalLoggedMinutesForRelease += calculateTotalLoggedMinutesForFocusArea(focusAreaDef);
-                            totalEstimatedHoursForRelease += focusAreaDef.estimatedDuration || 0;
-                        }
-                    });
-                    allReleasesWithDetails.push({ topic: topicName, release: { ...release, features: featureNames, totalLoggedHours: totalLoggedMinutesForRelease / 60, totalEstimatedHours: totalEstimatedHoursForRelease / 60 }, type });
-                });
-            }
-        };
-        if (productizationPlans) {
-            Object.entries(productizationPlans).forEach(([topicId, plan]) => processPlan(plan, topicId, projects.find(p => p.id === topicId)?.name || topicId, 'product'));
+      if (!productizationPlans && !offerizationPlans) return [];
+      const allReleasesWithDetails: {
+        topic: string;
+        release: Release;
+        type: 'product' | 'service';
+      }[] = [];
+      const processPlan = (
+        plan: ProductizationPlan,
+        topicId: string,
+        topicName: string,
+        type: 'product' | 'service'
+      ) => {
+        if (plan.releases) {
+          plan.releases.forEach((release) => {
+            const featureNames = (release.focusAreaIds || [])
+              .map((id) =>
+                deepWorkDefinitions.find((def) => def.id === id)?.name
+              )
+              .filter((name): name is string => !!name);
+            let totalLoggedMinutesForRelease = 0;
+            let totalEstimatedHoursForRelease = 0;
+            (release.focusAreaIds || []).forEach((id) => {
+              const focusAreaDef = deepWorkDefinitions.find(
+                (def) => def.id === id
+              );
+              if (focusAreaDef) {
+                totalLoggedMinutesForRelease +=
+                  calculateTotalLoggedMinutesForFocusArea(focusAreaDef);
+                totalEstimatedHoursForRelease +=
+                  focusAreaDef.estimatedDuration || 0;
+              }
+            });
+            allReleasesWithDetails.push({
+              topic: topicName,
+              release: {
+                ...release,
+                features: featureNames,
+                totalLoggedHours: totalLoggedMinutesForRelease / 60,
+                totalEstimatedHours: totalEstimatedHoursForRelease / 60,
+              },
+              type,
+            });
+          });
         }
-        if (offerizationPlans) {
-            Object.entries(offerizationPlans).forEach(([topicId, plan]) => processPlan(plan, topicId, coreSkills.find(s => s.id === topicId)?.name || topicId, 'service'));
-        }
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const totalProductiveHoursPerDay = (todayUpskillMinutes + todayDeepWorkMinutes) / 60;
-        return allReleasesWithDetails
-            .filter(({ release }) => {
-                try { return parseISO(release.launchDate) >= today; } 
-                catch (e) { return false; }
-            })
-            .map(item => {
-                const { release, topic, type } = item;
-                const launchDate = parseISO(release.launchDate);
-                const daysRemaining = differenceInDays(launchDate, today);
-                const availableHours = daysRemaining * totalProductiveHoursPerDay;
-                const totalAvailableHours = daysRemaining * 24;
-                return { topic, type, release: { ...release, daysRemaining, availableHours, totalAvailableHours } };
-            })
-            .sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
+      };
+      if (productizationPlans) {
+        Object.entries(productizationPlans).forEach(([topicId, plan]) =>
+          processPlan(
+            plan,
+            topicId,
+            projects.find((p) => p.id === topicId)?.name || topicId,
+            'product'
+          )
+        );
+      }
+      if (offerizationPlans) {
+        Object.entries(offerizationPlans).forEach(([topicId, plan]) =>
+          processPlan(
+            plan,
+            topicId,
+            coreSkills.find((s) => s.id === topicId)?.name || topicId,
+            'service'
+          )
+        );
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const totalProductiveHoursPerDay =
+        (todayUpskillMinutes + todayDeepWorkMinutes) / 60;
+      return allReleasesWithDetails
+        .filter(({ release }) => {
+          try {
+            return parseISO(release.launchDate) >= today;
+          } catch (e) {
+            return false;
+          }
+        })
+        .map((item) => {
+          const { release, topic, type } = item;
+          const launchDate = parseISO(release.launchDate);
+          const daysRemaining = differenceInDays(launchDate, today);
+          const availableHours = daysRemaining * totalProductiveHoursPerDay;
+          const totalAvailableHours = daysRemaining * 24;
+          return {
+            topic,
+            type,
+            release: { ...release, daysRemaining, availableHours, totalAvailableHours },
+          };
+        })
+        .sort(
+          (a, b) =>
+            new Date(a.release.launchDate).getTime() -
+            new Date(b.release.launchDate).getTime()
+        );
     };
 
     const learningStats = calculateLearningStats(allUpskillLogs, topicGoals);
-    const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') => logs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (field === 'reps' ? set.reps : set.weight), 0), 0), 0) / 60;
+    const getHours = (logs: DatedWorkout[], field: 'reps' | 'weight') =>
+      logs.reduce(
+        (total, log) =>
+          total +
+          log.exercises.reduce(
+            (exTotal, ex) =>
+              exTotal +
+              ex.loggedSets.reduce(
+                (setTotal, set) =>
+                  setTotal + (field === 'reps' ? set.reps : set.weight),
+                0
+              ),
+            0
+          ),
+        0
+      ) / 60;
     const totalHoursData = [
-        { name: 'Learning', hours: parseFloat(getHours(allUpskillLogs, 'reps').toFixed(1)) },
-        { name: 'Deep Work', hours: parseFloat(getHours(allDeepWorkLogs, 'weight').toFixed(1)) },
-        { name: 'Workout', hours: new Set(allWorkoutLogs.filter(log => log.exercises.some(ex => ex.loggedSets.length > 0)).map(log => log.date)).size },
-        { name: 'Branding', hours: parseFloat((brandingLogs.reduce((total, log) => total + log.exercises.reduce((exTotal, ex) => exTotal + ex.loggedSets.length, 0), 0) * 30 / 60).toFixed(1)) },
+      {
+        name: 'Learning',
+        hours: parseFloat(getHours(allUpskillLogs, 'reps').toFixed(1)),
+      },
+      {
+        name: 'Deep Work',
+        hours: parseFloat(getHours(allDeepWorkLogs, 'weight').toFixed(1)),
+      },
+      {
+        name: 'Workout',
+        hours: new Set(
+          allWorkoutLogs
+            .filter((log) => log.exercises.some((ex) => ex.loggedSets.length > 0))
+            .map((log) => log.date)
+        ).size,
+      },
+      {
+        name: 'Branding',
+        hours: parseFloat(
+          (
+            brandingLogs.reduce(
+              (total, log) =>
+                total +
+                log.exercises.reduce(
+                  (exTotal, ex) => exTotal + ex.loggedSets.length,
+                  0
+                ),
+              0
+            ) *
+            30 /
+            60
+          ).toFixed(1)
+        ),
+      },
     ];
     const todayHoursData = [
-        { name: 'Learning', hours: todayUpskillMinutes / 60 },
-        { name: 'Deep Work', hours: todayDeepWorkMinutes / 60 },
-        { name: 'Workout', hours: allWorkoutLogs.some(log => log.date === todayStr && log.exercises.some(ex => ex.loggedSets.length > 0)) ? 1 : 0 },
-        { name: 'Branding', hours: (brandingLogs.find(log => log.date === todayStr)?.exercises.reduce((total, ex) => total + ex.loggedSets.length, 0) || 0) * 0.5 },
+      { name: 'Learning', hours: todayUpskillMinutes / 60 },
+      { name: 'Deep Work', hours: todayDeepWorkMinutes / 60 },
+      {
+        name: 'Workout',
+        hours: allWorkoutLogs.some(
+          (log) =>
+            log.date === todayStr &&
+            log.exercises.some((ex) => ex.loggedSets.length > 0)
+        )
+          ? 1
+          : 0,
+      },
+      {
+        name: 'Branding',
+        hours:
+          (brandingLogs
+            .find((log) => log.date === todayStr)
+            ?.exercises.reduce(
+              (total, ex) => total + ex.loggedSets.length,
+              0
+            ) || 0) * 0.5,
+      },
     ];
-    
+
     return {
-        todayDeepWorkHours: todayDeepWorkMinutes / 60,
-        deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
-        todayUpskillHours: todayUpskillMinutes / 60,
-        upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
-        consistencyChange: (consistencyData[consistencyData.length - 1]?.score || 0) - (consistencyData[consistencyData.length - 2]?.score || 0),
-        totalProductiveHours: totalProductiveMinutes / 60,
-        avgProductiveHoursChange: calculateChange(totalProductiveMinutes, yesterdayTotalProductiveMinutes),
-        currentLevel: productivityLevels.find(l => totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max) || null,
-        learningStats: learningStats,
-        latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
-        brandingStatus: calculateBrandingStatus(),
-        totalHoursData, todayHoursData,
-        upcomingReleases: getUpcomingReleases(),
+      todayDeepWorkHours: todayDeepWorkMinutes / 60,
+      deepWorkChange: calculateChange(
+        todayDeepWorkMinutes,
+        yesterdayDeepWorkMinutes
+      ),
+      todayUpskillHours: todayUpskillMinutes / 60,
+      upskillChange: calculateChange(
+        todayUpskillMinutes,
+        yesterdayUpskillMinutes
+      ),
+      consistencyChange:
+        (consistencyData[consistencyData.length - 1]?.score || 0) -
+        (consistencyData[consistencyData.length - 2]?.score || 0),
+      totalProductiveHours: totalProductiveMinutes / 60,
+      avgProductiveHoursChange: calculateChange(
+        totalProductiveMinutes,
+        yesterdayTotalProductiveMinutes
+      ),
+      currentLevel:
+        productivityLevels.find(
+          (l) =>
+            totalProductiveMinutes >= l.min && totalProductiveMinutes < l.max
+        ) || null,
+      learningStats: learningStats,
+      latestConsistency: consistencyData[consistencyData.length - 1]?.score || 0,
+      brandingStatus: calculateBrandingStatus(),
+      totalHoursData,
+      todayHoursData,
+      upcomingReleases: getUpcomingReleases(),
     };
-  }, [allUpskillLogs, allDeepWorkLogs, topicGoals, allWorkoutLogs, oneYearAgo, today, consistencyData, brandingLogs, deepWorkDefinitions, productizationPlans, offerizationPlans, projects, coreSkills]);
+  }, [
+    allUpskillLogs,
+    allDeepWorkLogs,
+    topicGoals,
+    allWorkoutLogs,
+    oneYearAgo,
+    today,
+    consistencyData,
+    brandingLogs,
+    deepWorkDefinitions,
+    productizationPlans,
+    offerizationPlans,
+    projects,
+    coreSkills,
+  ]);
   
   const _activityDurations = useMemo(() => {
     const durations: Record<string, string> = {};
