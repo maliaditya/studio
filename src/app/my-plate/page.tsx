@@ -317,6 +317,43 @@ function MyPlatePageContent() {
     toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
   };
   
+  const handleSaveInterruptToAllSlots = () => {
+    if (!interruptDetails.trim() || !interruptDuration.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide both a description and a duration.', variant: 'destructive' });
+        return;
+    }
+    const durationMinutes = parseInt(interruptDuration, 10);
+    if (isNaN(durationMinutes) || durationMinutes <= 0) {
+        toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
+        return;
+    }
+
+    setSchedule(prev => {
+        const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
+        
+        slotEndHours && Object.keys(slotEndHours).forEach(slotName => {
+            const newActivity: Activity = {
+                id: `interrupt-${Date.now()}-${Math.random()}`,
+                type: 'interrupt',
+                details: interruptDetails,
+                completed: true,
+                taskIds: [],
+                duration: durationMinutes,
+                slot: slotName,
+            };
+            const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
+            newDaySchedule[slotName] = [...currentActivities, newActivity];
+        });
+
+        return { ...prev, [selectedDateKey]: newDaySchedule };
+    });
+
+    setInterruptDetails('');
+    setInterruptDuration('');
+    setInterruptModalState({ isOpen: false, slotName: null });
+    toast({ title: 'Interrupt Logged', description: 'The interruption has been added to all slots for today.' });
+};
+  
   const handleSaveEssential = () => {
     const { slotName, activity } = essentialsModalState;
     if (!slotName || !essentialDetails.trim()) {
@@ -562,7 +599,7 @@ function MyPlatePageContent() {
 
    const timeAllocationData = useMemo(() => {
     const todaysSchedule = schedule[todayKey] || {};
-    const dailyActivities = Object.values(todaysSchedule).flat();
+    const dailyActivities = Object.values(todaysSchedule).flat() as Activity[];
     const totals: Record<string, number> = {
       'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
     };
@@ -572,7 +609,7 @@ function MyPlatePageContent() {
     }
 
     dailyActivities.forEach(activity => {
-      const duration = parseDurationToMinutes(activityDurations[activity.id]);
+      const duration = activity.type === 'essentials' || activity.type === 'interrupt' ? activity.duration || 0 : parseDurationToMinutes(activityDurations[activity.id]);
       const mappedName = activityNameMap[activity.type];
       if (mappedName && totals[mappedName] !== undefined) {
         totals[mappedName] += duration / 60;
@@ -633,30 +670,29 @@ function MyPlatePageContent() {
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
     const getDescendantsRecursive = (startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
-      const descendants: ExerciseDefinition[] = [];
-      const queue: string[] = [startNodeId];
-      const visited = new Set<string>();
-  
-      while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
-  
-          const node = definitions.find(d => d.id === currentId);
-          if (node) {
-              const children = node[linkKey] || [];
-              if (children.length === 0) { // It's a leaf node
-                  descendants.push(node);
-              } else {
-                  children.forEach(childId => {
-                      if (!visited.has(childId)) {
-                          queue.push(childId);
-                      }
-                  });
-              }
-          }
-      }
-      return descendants;
+        const visited = new Set<string>();
+        const queue: string[] = [startNodeId];
+        let leafNodes: ExerciseDefinition[] = [];
+
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+            const node = definitions.find(d => d.id === currentId);
+            if (!node) continue;
+
+            const children = node[linkKey] || [];
+            if (children.length === 0) { // It's a leaf node
+                leafNodes.push(node);
+            } else {
+                children.forEach(childId => {
+                    if (!visited.has(childId)) {
+                        queue.push(childId);
+                    }
+                });
+            }
+        }
+        return leafNodes;
     };
   
     const learningStats: Record<string, { logged: number, estimated: number }> = {};
@@ -701,12 +737,18 @@ function MyPlatePageContent() {
         });
         
         const allDefsForSpec = [...allUpskillDefsForSpec, ...allDeepWorkDefsForSpec];
-        allDefsForSpec.forEach(def => {
-            totalEstimatedMinutes += def.estimatedDuration || 0;
+        let totalEstForLeaves = 0;
+        const leafNodes = new Set<string>();
+        
+        const allTaskIds = new Set([...allUpskillTaskIds, ...allDeepWorkTaskIds]);
+        allTaskIds.forEach(id => {
+            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === id);
+            if(def) totalEstForLeaves += def.estimatedDuration || 0;
         });
 
-        if (totalLoggedMinutes > 0 || totalEstimatedMinutes > 0) {
-            learningStats[spec.name] = { logged: totalLoggedMinutes / 60, estimated: totalEstimatedMinutes / 60 };
+
+        if (totalLoggedMinutes > 0 || totalEstForLeaves > 0) {
+            learningStats[spec.name] = { logged: totalLoggedMinutes / 60, estimated: totalEstForLeaves / 60 };
         }
     });
 
@@ -1134,6 +1176,7 @@ function MyPlatePageContent() {
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
                     <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+                    <Button onClick={handleSaveInterruptToAllSlots}>Save to All Slots</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
