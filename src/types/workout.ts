@@ -129,12 +129,24 @@ export interface WeightLog {
   weight: number;
 }
 
+export interface MealItem {
+  id: string;
+  quantity: string;
+  content: string;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  fiber: number | null;
+  calories: number | null;
+}
+
 export interface EditableMealPlan {
   day: string;
-  meal1: string;
-  meal2: string;
-  meal3: string;
-  supplements: string;
+  meal1: MealItem[];
+  meal2: MealItem[];
+  meal3: MealItem[];
+  supplements: MealItem[];
+  // The daily totals are now derived values, but can be kept for caching/display
   totalCalories: number | null;
   protein: number | null;
   carbs: number | null;
@@ -510,59 +522,6 @@ export interface Stopper {
 export interface Strength {
     id: string;
     text: string;
-}
-
-// Update Resource type for habits/mechanisms
-export interface Resource {
-  id: string;
-  name: string;
-  folderId: string;
-  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d';
-  createdAt: string;
-
-  // For 'link' type
-  link?: string;
-  description?: string;
-  iconUrl?: string;
-  githubLink?: string;
-  demoLink?: string;
-  linkedResourceId?: string;
-
-  // For 'card' type
-  points?: ResourcePoint[];
-  icon?: string;
-  audioUrl?: string;
-  
-  // For 'habit' type
-  trigger?: {
-    action?: string;
-    feeling?: string;
-  };
-  response?: {
-    text?: string;
-    resourceId?: string;
-    visualize?: string;
-  };
-  reward?: string;
-  newResponse?: {
-    text?: string;
-    resourceId?: string;
-    action?: string;
-    visualize?: string;
-  };
-  stoppers?: Stopper[];
-  strengths?: Strength[];
-  
-  // For 'mechanism' type
-  mechanismFramework?: 'positive' | 'negative';
-  benefit?: string;
-  law?: {
-    premise?: string;
-    outcome?: string;
-  };
-  
-  // For 3D Model
-  modelUrl?: string;
 }
 
 // Extending ResourcePoint for more complex links

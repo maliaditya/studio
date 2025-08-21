@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview A local, keyword-based service for estimating nutritional content.
  * This service avoids AI calls for speed and reliability.
@@ -16,8 +17,8 @@ const foodData: Record<string, { calories: number; protein: number; carbs: numbe
   'ground beef': { calories: 250, protein: 26, carbs: 0, fat: 15, fiber: 0, unit: 'g', defaultAmount: 150 },
   'salmon': { calories: 208, protein: 20, carbs: 0, fat: 13, fiber: 0, unit: 'g', defaultAmount: 150 },
   'tuna': { calories: 132, protein: 28, carbs: 0, fat: 1, fiber: 0, unit: 'g', defaultAmount: 100 },
-  'egg': { calories: 155 / 2, protein: 13 / 2, carbs: 1.1 / 2, fat: 11 / 2, fiber: 0, unit: 'item', defaultAmount: 2 },
-  'whey protein': { calories: 375, protein: 80, carbs: 7, fat: 2, fiber: 0, unit: 'scoop', defaultAmount: 1 },
+  'egg': { calories: 78, protein: 6.5, carbs: 0.5, fat: 5.5, fiber: 0, unit: 'item', defaultAmount: 2 },
+  'whey protein': { calories: 120, protein: 25, carbs: 3, fat: 1, fiber: 0, unit: 'scoop', defaultAmount: 1 },
   'tofu': { calories: 76, protein: 8, carbs: 1.9, fat: 4.8, fiber: 1.2, unit: 'g', defaultAmount: 100 },
 
   // Carbs
@@ -74,17 +75,15 @@ export function estimateCalories(input: MealInput): NutritionOutput {
 
   sortedFoodKeys.forEach(food => {
     // Regex to find an optional number, optional unit, and the food keyword
-    const foodRegex = new RegExp(`(\\d*\\.?\\d+)?\\s*(g|grams|gram|scoop|scoops)?\\s*${food.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+    const foodRegex = new RegExp(`(\\d*\\.?\\d+)?\\s*(g|grams|gram|scoop|scoops|items|item)?\\s*${food.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
     
     let match;
-    // Loop to find all occurrences of the keyword in the text
     while ((match = foodRegex.exec(fullText)) !== null) {
       if (match[0].trim().length === 0) continue;
 
       const data = foodData[food];
       let quantity = parseFloat(match[1]);
       
-      // If no number is found before the food, use the default amount
       if (isNaN(quantity)) {
         quantity = data.defaultAmount;
       }
@@ -102,8 +101,6 @@ export function estimateCalories(input: MealInput): NutritionOutput {
       totals.fat += data.fat * multiplier;
       totals.fiber += data.fiber * multiplier;
 
-      // "Consume" the matched text by replacing it with spaces so it's not matched again by a shorter keyword
-      // e.g. after matching "chicken breast", it won't be matched by "chicken"
       fullText = fullText.substring(0, match.index) + " ".repeat(match[0].length) + fullText.substring(match.index + match[0].length);
     }
   });
