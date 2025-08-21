@@ -661,6 +661,55 @@ function MyPlatePageContent() {
     return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
   }, [productizationPlans, offerizationPlans, projects, coreSkills]);
 
+  const brandingStatus = useMemo(() => {
+    const todayLog = brandingLogs.find(log => log.date === todayKey);
+    const todaysBrandingTasks = schedule[todayKey]?.branding || [];
+    
+    if (todaysBrandingTasks && todaysBrandingTasks.length > 0 && todayLog) {
+        const inProgressItems = todaysBrandingTasks
+            .filter(act => !act.completed)
+            .map(act => {
+                const task = todayLog.exercises.find(ex => ex.id === act.taskIds?.[0]);
+                if (!task) return null;
+                
+                const progress = task.loggedSets.length;
+                const stages = ['Create', 'Optimize', 'Review', 'Final Review'];
+                
+                return {
+                    taskName: task.name,
+                    stage: stages[progress] || 'Starting',
+                    progress: `${progress}/4`
+                };
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+        
+        if (inProgressItems.length > 0) {
+            return {
+                status: 'in_progress',
+                items: inProgressItems
+            };
+        }
+    }
+    
+    const readyBundles = deepWorkDefinitions.filter(def => 
+        def.isReadyForBranding && !def.focusAreaIds
+    );
+
+    if (readyBundles.length > 0) {
+        return {
+            status: 'ready',
+            message: `${readyBundles.length} focus area(s) ready for branding.`,
+            subMessage: "Go to the Personal Branding page to create a content bundle."
+        };
+    }
+
+    return {
+        status: 'idle',
+        message: 'No active branding tasks.',
+        subMessage: 'Mark a Deep Work item as "Ready for Branding" to begin.'
+    };
+  }, [brandingLogs, schedule, todayKey, deepWorkDefinitions]);
+  
   const dashboardStats = useMemo(() => {
     const {
       todayDeepWorkHours,
@@ -688,8 +737,9 @@ function MyPlatePageContent() {
       overallNextMilestone: null,
       upcomingReleases: upcomingReleases,
       learningStats: productivityStats.learningStats,
+      brandingStatus,
     };
-  }, [productivityStats, schedule, todayKey, upcomingReleases]);
+  }, [productivityStats, schedule, todayKey, upcomingReleases, brandingStatus]);
 
   useEffect(() => {
     const newDurations: Record<string, string> = {};
@@ -1018,6 +1068,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
