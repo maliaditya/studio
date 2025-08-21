@@ -598,38 +598,23 @@ function MyPlatePageContent() {
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
-    const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { totalLoggedHours: number }> = {};
-
-    const getDescendants = (startNodeId: string): Set<string> => {
-        const visited = new Set<string>();
-        const queue: string[] = [startNodeId];
-        visited.add(startNodeId);
-        
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            const node = upskillDefinitions.find(d => d.id === currentId);
-            (node?.linkedUpskillIds || []).forEach(childId => {
-                if (!visited.has(childId)) {
-                    visited.add(childId);
-                    queue.push(childId);
-                }
-            });
-        }
-        return visited;
-    };
+    const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
 
     specializations.forEach(spec => {
         let totalMinutesForSpec = 0;
-        const microSkillNamesInSpec = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-        const allUpskillDefsForSpec = upskillDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
-        
-        const allTaskIdsInSpec = new Set<string>();
-        allUpskillDefsForSpec.forEach(def => {
-            getDescendants(def.id).forEach(id => allTaskIdsInSpec.add(id));
+        // Collect all micro-skills for this specialization
+        const microSkillNamesInSpec = new Set<string>();
+        spec.skillAreas.forEach(area => {
+            area.microSkills.forEach(ms => microSkillNamesInSpec.add(ms.name));
         });
+
+        // Find all tasks related to these micro-skills
+        const allTaskDefsInSpec = upskillDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
+        const allTaskIdsInSpec = new Set(allTaskDefsInSpec.map(def => def.id));
         
+        // Sum up logged time for these tasks
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
                 if (allTaskIdsInSpec.has(ex.definitionId)) {
@@ -637,7 +622,7 @@ function MyPlatePageContent() {
                 }
             });
         });
-
+        
         if (totalMinutesForSpec > 0) {
             learningStats[spec.name] = { totalLoggedHours: totalMinutesForSpec / 60 };
         }
@@ -652,7 +637,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, upskillDefinitions, coreSkills]);
+  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
