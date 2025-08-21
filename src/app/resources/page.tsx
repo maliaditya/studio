@@ -464,6 +464,7 @@ function ResourcesPageContent() {
     setSelectedResourceFolderId,
     globalVolume,
     openGeneralPopup,
+    createResourceWithHierarchy,
   } = useAuth();
   const { toast } = useToast();
   
@@ -1275,52 +1276,10 @@ function ResourcesPageContent() {
   };
 
   const handleConvertToCard = (pointToConvert: ResourcePoint) => {
-      const parentResource = resources.find(r => r.points?.some(p => p.id === pointToConvert.id));
-      if (!parentResource) return;
+    const parentResource = resources.find(r => r.points?.some(p => p.id === pointToConvert.id));
+    if (!parentResource) return;
 
-      let finalFolders = [...resourceFolders];
-      const parentFolderId = parentResource.folderId;
-      let subFolderId: string;
-      
-      // Find or create a sub-folder named after the parent card
-      let subFolder = finalFolders.find(f => f.parentId === parentFolderId && f.name === parentResource.name);
-
-      if (!subFolder) {
-          subFolder = {
-              id: `folder_${Date.now()}`,
-              name: parentResource.name,
-              parentId: parentFolderId,
-              icon: 'Folder',
-          };
-          finalFolders.push(subFolder);
-      }
-      subFolderId = subFolder.id;
-
-      const newCard: Resource = {
-          id: `res_card_${Date.now()}`,
-          name: pointToConvert.text,
-          folderId: subFolderId,
-          type: 'card',
-          createdAt: new Date().toISOString(),
-          points: [],
-      };
-
-      const updatedParent = {
-          ...parentResource,
-          points: (parentResource.points || []).map(p =>
-              p.id === pointToConvert.id
-                  ? { ...p, type: 'card' as const, resourceId: newCard.id }
-                  : p
-          ),
-      };
-
-      setResourceFolders(finalFolders);
-      setResources(prev => [
-          ...prev.map(r => r.id === parentResource.id ? updatedParent : r),
-          newCard
-      ]);
-
-      toast({ title: "Converted to Card", description: `A new card "${newCard.name}" has been created and linked.` });
+    createResourceWithHierarchy(parentResource, 'card');
   };
 
   const handleModelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1931,6 +1890,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 

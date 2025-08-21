@@ -5,7 +5,7 @@
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2 } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -31,7 +31,7 @@ interface GeneralResourcePopupProps {
 }
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
@@ -128,6 +128,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onDelete={() => handleDeletePoint(point.id)}
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
                                 onOpenContentView={(e) => handleOpenContentView(point, e)}
+                                onConvertToCard={() => createResourceWithHierarchy(resource, 'card')}
                             />
                         ))}
                     </ul>
@@ -205,7 +206,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     return (
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
             <audio ref={audioRef} />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card max-h-[70vh] flex flex-col relative group">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] relative group">
                 <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                 </div>
@@ -250,14 +251,16 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView }: { 
+const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onConvertToCard }: { 
     point: ResourcePoint, 
     onUpdate: (text: string) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
+    onConvertToCard: () => void;
 }) => {
     const { setFloatingVideoUrl } = useAuth();
+    
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -334,9 +337,16 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
-                <Trash2 className="h-3 w-3"/>
-            </Button>
+            <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                {point.type === 'text' && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
+                        <Blocks className="h-3 w-3" />
+                    </Button>
+                )}
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </div>
         </li>
     );
 }
