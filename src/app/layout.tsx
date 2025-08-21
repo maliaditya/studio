@@ -57,16 +57,19 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // If there are no popups, do nothing.
-      if (openPopups.size === 0 && generalPopups.size === 0 && !ruleDetailPopup) return;
-
       const target = event.target as HTMLElement;
 
-      // Check if the click was inside any of the open popups.
+      // Close all popups if clicking completely outside any of them
       if (!target.closest('[data-popup-id]')) {
         closeAllResourcePopups();
-        // We might want to close other popups here too, or handle them separately.
-        // For now, only resource popups close on outside click.
+        if (ruleDetailPopup) closeRuleDetailPopup();
+        if (todaysDietPopup) closeTodaysDietPopup();
+        return;
+      }
+      
+      // Specifically check for Today's Diet popup
+      if (todaysDietPopup && !target.closest('[data-popup-id="todays-diet-popup"]')) {
+          closeTodaysDietPopup();
       }
     };
 
@@ -74,7 +77,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup]);
+  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup, closeRuleDetailPopup, todaysDietPopup, closeTodaysDietPopup]);
   
   const handleDragEnd = (event: DragEndEvent) => {
     handlePopupDragEnd(event);

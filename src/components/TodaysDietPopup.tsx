@@ -33,27 +33,8 @@ export function TodaysDietPopup({ popupState, onClose, onOpenEdit }: TodaysDietP
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
-        <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-            <CardHeader 
-                className="p-3 relative cursor-grab flex items-center justify-between"
-                {...listeners}
-                {...attributes}
-            >
-                <CardTitle className="text-base">Today's Diet</CardTitle>
-                <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenEdit}>
-                        <BookCopy className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-                <TodaysDietCard dietPlan={dietPlan} onEditClick={onOpenEdit} />
-            </CardContent>
-        </Card>
+    <div ref={setNodeRef} style={style} data-popup-id="todays-diet-popup" {...attributes} {...listeners}>
+        <TodaysDietCard dietPlan={dietPlan} onEditClick={onOpenEdit} />
     </div>
   );
 }
