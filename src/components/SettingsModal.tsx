@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -28,6 +29,7 @@ interface UserSettings {
   autoPush: boolean;
   autoPushLimit: number;
   carryForwardEssentials: boolean;
+  carryForwardNutrition: boolean;
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
@@ -38,6 +40,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     autoPush: false,
     autoPushLimit: 100,
     carryForwardEssentials: false,
+    carryForwardNutrition: false,
   });
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
@@ -53,13 +56,14 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             autoPush: parsedSettings.autoPush || false,
             autoPushLimit: parsedSettings.autoPushLimit || 100,
             carryForwardEssentials: parsedSettings.carryForwardEssentials || false,
+            carryForwardNutrition: parsedSettings.carryForwardNutrition || false,
           });
         } else {
-          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false });
+          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false });
         }
       } catch (error) {
         console.error("Failed to load settings from localStorage", error);
-        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false });
+        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false });
       }
     }
   }, [isOpen, settingsKey]);
@@ -196,6 +200,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               <Label htmlFor="carry-forward-essentials" className="font-normal">
                 Carry-forward daily essentials.
               </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+                <Switch
+                    id="carry-forward-nutrition"
+                    checked={settings.carryForwardNutrition}
+                    onCheckedChange={(checked) => handleSettingChange('carryForwardNutrition', checked)}
+                />
+                <Label htmlFor="carry-forward-nutrition" className="font-normal">
+                    Carry-forward Nutrition tasks.
+                </Label>
             </div>
              <div className="flex items-center justify-between">
               <Label htmlFor="reset-landing" className="font-normal">
