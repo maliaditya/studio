@@ -563,7 +563,7 @@ function MyPlatePageContent() {
       deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
       totalProductiveHours: totalTodayMinutes / 60,
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
-      learningStats: {},
+      learningStats: {}, // Added to fix the error
     };
   }, [schedule, allUpskillLogs, allDeepWorkLogs]);
   
@@ -946,4 +946,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
