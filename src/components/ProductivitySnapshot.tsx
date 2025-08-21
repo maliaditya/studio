@@ -118,6 +118,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const inProgressBrandingItems = stats.brandingStatus?.items || [];
   const publishedBrandingItems = stats.brandingStatus?.publishedItems || [];
   const roadmapItems = stats.upcomingReleases || [];
+  
+  const hasBrandingContent = inProgressBrandingItems.length > 0 || publishedBrandingItems.length > 0;
+  const showReadyForBrandingMessage = stats.brandingStatus?.readyForBrandingCount > 0;
 
   const renderBrandingItem = (item: any) => (
     <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
@@ -274,18 +277,28 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <Separator className="my-2" />
               <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-                 <motion.div layout>
-                    {inProgressBrandingItems.length > 0 || publishedBrandingItems.length > 0 ? (
-                        <Carousel
-                            items={[...inProgressBrandingItems, ...publishedBrandingItems]}
-                            renderItem={renderBrandingItem}
-                        />
-                    ) : (
-                        <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
-                            <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
-                            <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
-                        </div>
-                    )}
+                <motion.div layout>
+                  {hasBrandingContent ? (
+                      <Carousel
+                          items={[...inProgressBrandingItems, ...publishedBrandingItems]}
+                          renderItem={renderBrandingItem}
+                      />
+                  ) : showReadyForBrandingMessage ? (
+                      <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
+                          <p>{stats.brandingStatus?.message}</p>
+                          <p className="text-xs mt-1">{stats.brandingStatus?.subMessage}</p>
+                      </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
+                        <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
+                        <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
+                    </div>
+                  )}
+                  {hasBrandingContent && showReadyForBrandingMessage && (
+                    <div className="mt-2 text-xs text-center text-muted-foreground border-t pt-2">
+                       <p>{stats.brandingStatus?.message} <a href="/personal-branding" className="text-primary hover:underline">Create a new bundle.</a></p>
+                    </div>
+                  )}
                 </motion.div>
               </div>
               <Separator className="my-2" />

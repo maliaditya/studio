@@ -696,34 +696,32 @@ function MyPlatePageContent() {
         sharingStatus: bundle.sharingStatus
     }));
 
-    if (inProgressItems.length > 0 || publishedItems.length > 0) {
-        return {
-            status: 'in_progress', // Use a general status
-            items: inProgressItems,
-            publishedItems: publishedItems,
-        };
-    }
-    
-    const readyBundles = deepWorkDefinitions.filter(def => 
+    const readyForBrandingItems = deepWorkDefinitions.filter(def => 
         def.isReadyForBranding && !def.focusAreaIds
     );
 
-    if (readyBundles.length > 0) {
-        return {
-            status: 'ready',
-            message: `${readyBundles.length} focus area(s) ready for branding.`,
-            subMessage: "Go to the Personal Branding page to create a content bundle.",
-            publishedItems: []
-        };
-    }
+    let message = null;
+    let subMessage = null;
 
+    if (inProgressItems.length === 0 && publishedItems.length === 0) {
+        if (readyForBrandingItems.length > 0) {
+            message = `${readyForBrandingItems.length} focus area(s) ready for branding.`;
+            subMessage = "Go to the Personal Branding page to create a content bundle.";
+        } else {
+            message = 'No active branding tasks.';
+            subMessage = 'Mark a Deep Work item as "Ready for Branding" to begin.';
+        }
+    }
+    
     return {
-        status: 'idle',
-        message: 'No active branding tasks.',
-        subMessage: 'Mark a Deep Work item as "Ready for Branding" to begin.',
-        publishedItems: []
+        items: inProgressItems,
+        publishedItems: publishedItems,
+        readyForBrandingCount: readyForBrandingItems.length,
+        message,
+        subMessage
     };
 }, [brandingLogs, schedule, todayKey, deepWorkDefinitions]);
+
   
   const dashboardStats = useMemo(() => {
     const {
@@ -888,7 +886,7 @@ function MyPlatePageContent() {
                   onEditDietClick={() => setIsDietPlanModalOpen(true)}
                   deepWorkDefinitions={deepWorkDefinitions}
                   upskillDefinitions={upskillDefinitions}
-                  onOpenIntentionPopup={openIntentionPopup}
+                  onOpenIntentionPopup={onOpenIntentionPopup}
                   metaRules={metaRules}
                   offerizationPlans={offerizationPlans}
                   productizationPlans={productizationPlans}
