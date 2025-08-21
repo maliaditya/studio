@@ -499,77 +499,13 @@ function MyPlatePageContent() {
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
 
-    const todayUpskillMinutes = getDailyMinutes(
-      allUpskillLogs,
-      todayStr,
-      'reps'
-    );
-    const todayDeepWorkMinutes = getDailyMinutes(
-      allDeepWorkLogs,
-      todayStr,
-      'weight'
-    );
+    const todayUpskillMinutes = getDailyMinutes(allUpskillLogs, todayStr, 'reps');
+    const todayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, todayStr, 'weight');
     const totalProductiveMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
 
-    const yesterdayUpskillMinutes = getDailyMinutes(
-      allUpskillLogs,
-      yesterdayStr,
-      'reps'
-    );
-    const yesterdayDeepWorkMinutes = getDailyMinutes(
-      allDeepWorkLogs,
-      yesterdayStr,
-      'weight'
-    );
-    const yesterdayTotalProductiveMinutes =
-      yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-
-    const calculateTotalLoggedMinutesForFocusArea = (
-      focusAreaDef: ExerciseDefinition | undefined
-    ) => {
-      if (!focusAreaDef) return 0;
-      let totalMinutes = 0;
-      const visited = new Set<string>();
-
-      function recurse(def: ExerciseDefinition) {
-        if (visited.has(def.id)) return;
-        visited.add(def.id);
-
-        const isLeaf =
-          (def.linkedDeepWorkIds?.length ?? 0) === 0 &&
-          (def.linkedUpskillIds?.length ?? 0) === 0;
-
-        if (isLeaf) {
-          const deepWorkLogs = allDeepWorkLogs
-            .flatMap((log) => log.exercises)
-            .filter((ex) => ex.definitionId === def.id);
-          const upskillLogs = allUpskillLogs
-            .flatMap((log) => log.exercises)
-            .filter((ex) => ex.definitionId === def.id);
-          totalMinutes += deepWorkLogs.reduce(
-            (sum, ex) =>
-              sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0),
-            0
-          );
-          totalMinutes += upskillLogs.reduce(
-            (sum, ex) =>
-              sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0),
-            0
-          );
-        } else {
-          (def.linkedDeepWorkIds || []).forEach((childId) => {
-            const childDef = deepWorkDefinitions.find((d) => d.id === childId);
-            if (childDef) recurse(childDef);
-          });
-          (def.linkedUpskillIds || []).forEach((childId) => {
-            const childDef = upskillDefinitions.find((d) => d.id === childId);
-            if (childDef) recurse(childDef);
-          });
-        }
-      }
-      recurse(focusAreaDef);
-      return totalMinutes;
-    };
+    const yesterdayUpskillMinutes = getDailyMinutes(allUpskillLogs, yesterdayStr, 'reps');
+    const yesterdayDeepWorkMinutes = getDailyMinutes(allDeepWorkLogs, yesterdayStr, 'weight');
+    const yesterdayTotalProductiveMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
 
     const calculateLearningStats = (
       logs: DatedWorkout[],
@@ -779,26 +715,11 @@ function MyPlatePageContent() {
                 deepWorkDefinitions.find((def) => def.id === id)?.name
               )
               .filter((name): name is string => !!name);
-            let totalLoggedMinutesForRelease = 0;
-            let totalEstimatedHoursForRelease = 0;
-            (release.focusAreaIds || []).forEach((id) => {
-              const focusAreaDef = deepWorkDefinitions.find(
-                (def) => def.id === id
-              );
-              if (focusAreaDef) {
-                totalLoggedMinutesForRelease +=
-                  calculateTotalLoggedMinutesForFocusArea(focusAreaDef);
-                totalEstimatedHoursForRelease +=
-                  focusAreaDef.estimatedDuration || 0;
-              }
-            });
             allReleasesWithDetails.push({
               topic: topicName,
               release: {
                 ...release,
                 features: featureNames,
-                totalLoggedHours: totalLoggedMinutesForRelease / 60,
-                totalEstimatedHours: totalEstimatedHoursForRelease / 60,
               },
               type,
             });
@@ -827,8 +748,6 @@ function MyPlatePageContent() {
       }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const totalProductiveHoursPerDay =
-        (todayUpskillMinutes + todayDeepWorkMinutes) / 60;
       return allReleasesWithDetails
         .filter(({ release }) => {
           try {
@@ -841,7 +760,7 @@ function MyPlatePageContent() {
           const { release, topic, type } = item;
           const launchDate = parseISO(release.launchDate);
           const daysRemaining = differenceInDays(launchDate, today);
-          const availableHours = daysRemaining * totalProductiveHoursPerDay;
+          const availableHours = daysRemaining * 2; // Assuming 2 productive hours/day
           const totalAvailableHours = daysRemaining * 24;
           return {
             topic,
