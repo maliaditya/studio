@@ -283,41 +283,43 @@ export function DietPlanModal({
                     <TabsTrigger key={day} value={day}>{day.substring(0,3)}</TabsTrigger>
                 ))}
             </TabsList>
-            <TabsContent value={activeTab} className="mt-4 flex-grow min-h-0">
-              <ScrollArea className="h-full pr-6">
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <BrainCircuit className="text-primary h-5 w-5" />
-                                Smart Estimate
-                            </CardTitle>
-                             <CardDescription>
-                                Describe your full day's meals. The system will parse keywords to estimate your macros. This will replace the current items for this day.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex gap-2">
-                                <Textarea 
-                                    value={smartEstimateText} 
-                                    onChange={(e) => setSmartEstimateText(e.target.value)}
-                                    placeholder="e.g., For breakfast I had 3 eggs and 50g of oats. For lunch, 200g chicken breast with 150g white rice..."
-                                />
-                                <Button onClick={handleSmartEstimate} disabled={isLoading} className="flex-shrink-0">
-                                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Estimate"}
-                                </Button>
+            <div className="mt-4 flex-grow min-h-0 overflow-y-auto pr-2">
+                <TabsContent value={activeTab} className="m-0 h-full">
+                    <ScrollArea className="h-full pr-4">
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <BrainCircuit className="text-primary h-5 w-5" />
+                                        Smart Estimate
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Describe your full day's meals. The system will parse keywords to estimate your macros. This will replace the current items for this day.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex gap-2">
+                                        <Textarea 
+                                            value={smartEstimateText} 
+                                            onChange={(e) => setSmartEstimateText(e.target.value)}
+                                            placeholder="e.g., For breakfast I had 3 eggs and 50g of oats. For lunch, 200g chicken breast with 150g white rice..."
+                                        />
+                                        <Button onClick={handleSmartEstimate} disabled={isLoading} className="flex-shrink-0">
+                                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Estimate"}
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <div className="space-y-6">
+                                <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                                <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                                <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                                <MealEditor mealKey="supplements" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
                             </div>
-                        </CardContent>
-                    </Card>
-                    <div className="grid grid-cols-1 gap-6">
-                        <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                        <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                        <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                        <MealEditor mealKey="supplements" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                    </div>
-                </div>
-              </ScrollArea>
-            </TabsContent>
+                        </div>
+                    </ScrollArea>
+                </TabsContent>
+            </div>
             <div className="mt-4 pt-4 border-t flex-shrink-0">
               <div className="flex justify-between items-center">
                   <h3 className="text-lg font-semibold">Daily Totals for {activeTab}</h3>
