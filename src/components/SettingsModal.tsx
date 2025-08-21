@@ -27,6 +27,7 @@ interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
+  carryForwardEssentials: boolean;
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
@@ -36,6 +37,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     carryForward: false,
     autoPush: false,
     autoPushLimit: 100,
+    carryForwardEssentials: false,
   });
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
@@ -50,13 +52,14 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             carryForward: parsedSettings.carryForward || false,
             autoPush: parsedSettings.autoPush || false,
             autoPushLimit: parsedSettings.autoPushLimit || 100,
+            carryForwardEssentials: parsedSettings.carryForwardEssentials || false,
           });
         } else {
-          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100 });
+          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false });
         }
       } catch (error) {
         console.error("Failed to load settings from localStorage", error);
-        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100 });
+        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false });
       }
     }
   }, [isOpen, settingsKey]);
@@ -182,6 +185,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               />
               <Label htmlFor="carry-forward" className="font-normal">
                 Carry-forward yesterday's incomplete tasks.
+              </Label>
+            </div>
+             <div className="flex items-center space-x-2">
+              <Switch
+                id="carry-forward-essentials"
+                checked={settings.carryForwardEssentials}
+                onCheckedChange={(checked) => handleSettingChange('carryForwardEssentials', checked)}
+              />
+              <Label htmlFor="carry-forward-essentials" className="font-normal">
+                Carry-forward daily essentials.
               </Label>
             </div>
              <div className="flex items-center justify-between">

@@ -144,7 +144,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials';
 
 export interface PauseEvent {
   pauseTime: number;
@@ -600,6 +600,14 @@ export interface TaskContextPopupState {
   y: number;
   level: number;
   parentId?: string;
+}
+
+export interface ContentViewPopupState {
+    id: string;
+    resource: Resource;
+    point: ResourcePoint;
+    x: number;
+    y: number;
 }
 
 export interface PathNode {
