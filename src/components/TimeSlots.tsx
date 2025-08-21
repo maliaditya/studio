@@ -44,7 +44,7 @@ interface TimeSlotsProps {
   onAddActivity: (slotName: string, type: ActivityType) => void;
   onRemoveActivity: (slotName: string, activityId: string) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  onActivityClick: (slotName: string, activity: Activity) => void;
+  onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
 }
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
@@ -124,7 +124,7 @@ export function TimeSlots({
                       <div className="flex items-start justify-between gap-3">
                         <div
                           className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
-                          onClick={() => onActivityClick(slot.name, activity)}
+                          onClick={(e) => onActivityClick(slot.name, activity, e)}
                         >
                           <div className="pt-0.5">{activityIcons[activity.type]}</div>
                           <div className="flex-grow">
