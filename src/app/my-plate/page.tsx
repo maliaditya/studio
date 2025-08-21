@@ -559,6 +559,39 @@ function MyPlatePageContent() {
     
     return totalMinutes;
   };
+
+   const timeAllocationData = useMemo(() => {
+    const todaysSchedule = schedule[todayKey] || {};
+    const dailyActivities = Object.values(todaysSchedule).flat();
+    const totals: Record<string, number> = {
+      'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
+    };
+    
+    const activityNameMap: Record<ActivityType, string> = {
+      deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
+    }
+
+    dailyActivities.forEach(activity => {
+      const duration = parseDurationToMinutes(activityDurations[activity.id]);
+      const mappedName = activityNameMap[activity.type];
+      if (mappedName && totals[mappedName] !== undefined) {
+        totals[mappedName] += duration / 60;
+      }
+    });
+
+    const totalAllocated = Object.values(totals).reduce((sum, hours) => sum + hours, 0);
+    const freeTime = 24 - totalAllocated;
+
+    const data = Object.entries(totals)
+      .map(([name, time]) => ({ name, time, fill: `var(--chart-${Object.keys(totals).indexOf(name) + 1})` }))
+      .filter(item => item.time > 0);
+
+    if (freeTime > 0) {
+      data.push({ name: 'Free Time', time: freeTime, fill: 'hsl(var(--muted))' });
+    }
+    
+    return data;
+  }, [schedule, todayKey, activityDurations]);
   
   const handleOpenFocusModal = (activity: Activity) => {
     const duration = parseDurationToMinutes(activityDurations[activity.id]);
@@ -919,7 +952,7 @@ function MyPlatePageContent() {
               <div className="lg:col-span-3">
                 <ProductivitySnapshot 
                   stats={dashboardStats} 
-                  timeAllocationData={[]} 
+                  timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                 />
