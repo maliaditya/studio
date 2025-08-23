@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -1228,3 +1227,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
