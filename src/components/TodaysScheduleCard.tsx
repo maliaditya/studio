@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -82,7 +81,7 @@ function AgendaWidgetItem({
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
       <div 
-        className={cn("flex items-center gap-3 min-w-0 flex-grow", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
+        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
         onClick={handleItemClick}
       >
         {activity.completed 
@@ -330,21 +329,71 @@ export function TodaysScheduleCard({
   
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
-      <CardHeader
-        className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
-        onMouseDown={handleMouseDown}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex-grow">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base text-primary">
-                  Agenda
-              </CardTitle>
-              {timeSummary.total > 0 && (
-                <span className="font-mono text-sm font-medium text-muted-foreground mr-4">
-                  {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(1)}h
-                </span>
-              )}
+        <CardHeader
+            className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+            onMouseDown={handleMouseDown}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-base text-primary">Agenda</CardTitle>
+                <div className="flex items-center">
+                    {timeSummary.total > 0 && (
+                        <span className="font-mono text-sm font-medium text-muted-foreground">
+                            {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(1)}h
+                        </span>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
+                        <Focus className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
+                    </Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <History className="h-4 w-4" />
+                                <span className="sr-only">Pending Tasks</span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
+                            {pendingTasks.length > 0 ? (
+                            <ScrollArea className="h-64">
+                                <ul className="space-y-2">
+                                {pendingTasks.map(task => (
+                                    <li key={task.id} className="flex items-center justify-between text-sm">
+                                    <span className="truncate pr-2" title={task.details}>{task.details}</span>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-48 p-1">
+                                        <div className="flex flex-col">
+                                            {slotNames.map(slot => (
+                                            <Button
+                                                key={slot}
+                                                variant="ghost"
+                                                className="justify-start h-8 text-sm"
+                                                onClick={() => {
+                                                carryForwardTask(task, slot);
+                                                }}
+                                            >
+                                                {slot}
+                                            </Button>
+                                            ))}
+                                        </div>
+                                        </PopoverContent>
+                                    </Popover>
+                                    </li>
+                                ))}
+                                </ul>
+                            </ScrollArea>
+                            ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
+                            )}
+                        </PopoverContent>
+                    </Popover>
+                    <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
+                        {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
+                    </Button>
+                    {!isAgendaDocked && <Grab className="text-muted-foreground h-4 w-4" />}
+                </div>
             </div>
              <div className="flex items-center gap-2 mt-1">
                 <Popover open={purposePopoverOpen} onOpenChange={setPurposePopoverOpen}>
@@ -370,86 +419,30 @@ export function TodaysScheduleCard({
                     </PopoverContent>
                 </Popover>
             </div>
-          </div>
-          <div className="flex items-center">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
-                <Focus className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
-            </Button>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <History className="h-4 w-4" />
-                  <span className="sr-only">Pending Tasks</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
-                {pendingTasks.length > 0 ? (
-                  <ScrollArea className="h-64">
-                    <ul className="space-y-2">
-                      {pendingTasks.map(task => (
-                        <li key={task.id} className="flex items-center justify-between text-sm">
-                          <span className="truncate pr-2" title={task.details}>{task.details}</span>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-48 p-1">
-                              <div className="flex flex-col">
-                                {slotNames.map(slot => (
-                                  <Button
-                                    key={slot}
-                                    variant="ghost"
-                                    className="justify-start h-8 text-sm"
-                                    onClick={() => {
-                                      carryForwardTask(task, slot);
-                                    }}
-                                  >
-                                    {slot}
-                                  </Button>
-                                ))}
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </li>
-                      ))}
-                    </ul>
-                  </ScrollArea>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
-                )}
-              </PopoverContent>
-            </Popover>
-            <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
-              {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
-            </Button>
-            {!isAgendaDocked && <Grab className="text-muted-foreground ml-1 h-4 w-4" />}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-3">
-        {scheduledActivities.length > 0 ? (
-          <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
-            {scheduledActivities.map((activity) => (
-              <AgendaWidgetItem
-                key={activity.id}
-                activity={activity}
-                duration={activityDurations[activity.id]}
-                onLogLearning={onLogLearning}
-                onStartWorkoutLog={onStartWorkoutLog}
-                onToggleComplete={onToggleComplete}
-                onStartLeadGenLog={onStartLeadGenLog}
-                onOpenFocusModal={onOpenFocusModal}
-                onOpenTaskContext={onOpenTaskContext}
-              />
-            ))}
-          </ul>
-        ) : (
-          <div className="text-center text-muted-foreground py-4">
-            <p className="text-sm">No activities scheduled.</p>
-          </div>
-        )}
-      </CardContent>
+        </CardHeader>
+        <CardContent className="p-3">
+            {scheduledActivities.length > 0 ? (
+                <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
+                    {scheduledActivities.map((activity) => (
+                    <AgendaWidgetItem
+                        key={activity.id}
+                        activity={activity}
+                        duration={activityDurations[activity.id]}
+                        onLogLearning={onLogLearning}
+                        onStartWorkoutLog={onStartWorkoutLog}
+                        onToggleComplete={onToggleComplete}
+                        onStartLeadGenLog={onStartLeadGenLog}
+                        onOpenFocusModal={onOpenFocusModal}
+                        onOpenTaskContext={onOpenTaskContext}
+                    />
+                    ))}
+                </ul>
+            ) : (
+                <div className="text-center text-muted-foreground py-4">
+                    <p className="text-sm">No activities scheduled.</p>
+                </div>
+            )}
+        </CardContent>
     </Card>
   );
 
