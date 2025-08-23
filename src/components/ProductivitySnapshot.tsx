@@ -189,7 +189,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 {topSpecializations.length > 0 ? (
                     <ChartContainer config={{}} className="h-[150px] w-full">
                         <ResponsiveContainer>
-                            <BarChart data={topSpecializations} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                            <BarChart data={topSpecializations} layout="vertical" margin={{ left: -10, right: 10, top: 5, bottom: 5 }}>
                                 <CartesianGrid horizontal={false} />
                                 <XAxis type="number" dataKey="hours" domain={[0, 'dataMax + 10']} fontSize={12} />
                                 <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={10} interval={0} />
