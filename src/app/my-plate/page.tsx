@@ -598,8 +598,8 @@ function MyPlatePageContent() {
   };
 
   const timeAllocationData = useMemo(() => {
-    const todaysSchedule = schedule[todayKey] || {};
-    const dailyActivities = Object.values(todaysSchedule).flat() as Activity[];
+    const todaysScheduleForCalc = schedule[todayKey] || {};
+    const dailyActivities = Object.values(todaysScheduleForCalc).flat() as Activity[];
     const totals: Record<string, number> = {
       'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
     };
@@ -620,11 +620,11 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time]) => ({ name, time }))
+      .map(([name, time], index) => ({ name, time, fill: `hsl(var(--chart-${index + 1}))` }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
-      data.push({ name: 'Free Time', time: freeTime });
+      data.push({ name: 'Free Time', time: freeTime, fill: '#000000' });
     }
     
     return data;
@@ -997,6 +997,8 @@ function MyPlatePageContent() {
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
+                  todaysSchedule={schedule[todayKey] || {}}
+                  activityDurations={activityDurations}
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">

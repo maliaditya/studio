@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
-import { ChartContainer } from '@/components/ui/chart';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Release, ExerciseDefinition, SharingStatus } from '@/types/workout';
+import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -46,9 +46,11 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface ProductivitySnapshotProps {
   stats: any;
-  timeAllocationData: { name: string; time: number; }[];
+  timeAllocationData: { name: string; time: number; fill: string }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
+  todaysSchedule: DailySchedule;
+  activityDurations: Record<string, string>;
 }
 
 const useThemeColors = () => {
@@ -62,18 +64,50 @@ const useThemeColors = () => {
                 style.getPropertyValue('--chart-3').trim(),
                 style.getPropertyValue('--chart-4').trim(),
                 style.getPropertyValue('--chart-5').trim(),
-            ].map(color => `hsl(${color})`);
+            ];
             setColors(chartColors);
         }
     }, []);
     return colors;
 };
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
+const activityTypeMapping: Record<string, Activity['type']> = {
+    'Deep Work': 'deepwork',
+    'Learning': 'upskill',
+    'Workout': 'workout',
+    'Branding': 'branding',
+    'Essentials': 'essentials',
+    'Planning': 'planning',
+    'Tracking': 'tracking',
+    'Lead Gen': 'lead-generation',
+    'Interrupts': 'interrupt',
+    'Nutrition': 'nutrition',
+};
+
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    
+    return totalMinutes;
+};
+
+
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, todaysSchedule, activityDurations }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
+  
+  const [isAllocationDetailModalOpen, setIsAllocationDetailModalOpen] = useState(false);
+  const [allocationDetailData, setAllocationDetailData] = useState<{ category: string; tasks: { name: string; duration: number }[] } | null>(null);
   
   const themeColors = useThemeColors();
   
@@ -149,6 +183,27 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   
   const roadmapItems = stats.upcomingReleases || [];
   
+  const handleBarClick = (data: any) => {
+    if (!data || !data.activePayload) return;
+    const categoryName = data.activePayload[0].payload.name;
+    const activityType = activityTypeMapping[categoryName];
+
+    const tasksForCategory = Object.values(todaysSchedule)
+        .flat()
+        .filter((act): act is Activity => !!act && act.type === activityType)
+        .map(act => ({
+            name: act.details,
+            duration: parseDurationToMinutes(activityDurations[act.id])
+        }))
+        .filter(task => task.duration > 0);
+        
+    setAllocationDetailData({
+        category: categoryName,
+        tasks: tasksForCategory
+    });
+    setIsAllocationDetailModalOpen(true);
+  };
+
   return (
     <>
       <Card className="h-full bg-card/50">
@@ -211,7 +266,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 />
                                 <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
                                     {topSpecializations.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
+                                      <Cell key={`cell-${index}`} fill={`hsl(${themeColors[index % themeColors.length]})`} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -313,30 +368,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             {themeColors.length > 0 ? (
                 <ChartContainer config={{}} className="h-[150px] w-full">
                 <ResponsiveContainer>
-                    <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }}>
-                    <CartesianGrid horizontal={false} />
-                    <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} fontSize={12} />
-                    <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
-                    <RechartsTooltip
-                        cursor={{ fill: "hsl(var(--muted))" }}
-                        content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                            const data = payload[0].payload;
-                            return (
-                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                <p className="font-bold text-foreground">{data.name}</p>
-                                <p className="text-muted-foreground">{data.time.toFixed(1)} hours</p>
-                            </div>
-                            );
-                        }
-                        return null;
-                        }}
-                    />
-                    <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                        {timeAllocationData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
-                        ))}
-                    </Bar>
+                    <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
+                        <CartesianGrid horizontal={false} />
+                        <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} tickCount={7} fontSize={12} />
+                        <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
+                        <ChartTooltip
+                            cursor={{ fill: "hsl(var(--muted))" }}
+                            content={<ChartTooltipContent />}
+                        />
+                        <Bar dataKey="time" radius={[0, 4, 4, 0]}>
+                            {timeAllocationData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                            ))}
+                        </Bar>
                     </BarChart>
                 </ResponsiveContainer>
                 </ChartContainer>
@@ -393,6 +437,50 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <Button variant="outline" onClick={() => setIsProjectDetailsModalOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
+        </Dialog>
+      )}
+
+      {allocationDetailData && (
+        <Dialog open={isAllocationDetailModalOpen} onOpenChange={setIsAllocationDetailModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Time Allocation for {allocationDetailData.category}</DialogTitle>
+                    <DialogDescription>
+                        A breakdown of how your time was spent in this category today.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    {allocationDetailData.tasks.length > 0 ? (
+                        <ChartContainer config={{}} className="h-60 w-full">
+                            <ResponsiveContainer>
+                                <BarChart data={allocationDetailData.tasks} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                    <CartesianGrid horizontal={false} />
+                                    <XAxis type="number" dataKey="duration" domain={[0, 'dataMax + 5']} fontSize={12} tickFormatter={(value) => `${value}m`} />
+                                    <YAxis type="category" dataKey="name" width={120} tickLine={false} axisLine={false} fontSize={12} interval={0} />
+                                    <RechartsTooltip
+                                        cursor={{ fill: "hsl(var(--muted))" }}
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
+                                                return (
+                                                    <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                        <p className="font-bold text-foreground">{data.name}</p>
+                                                        <p className="text-muted-foreground">{data.duration} minutes</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Bar dataKey="duration" radius={[0, 4, 4, 0]} fill={`hsl(${themeColors[Math.abs(allocationDetailData.category.charCodeAt(0)) % themeColors.length]})`}/>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                    ) : (
+                        <p className="text-sm text-center text-muted-foreground py-8">No specific tasks with logged time for this category today.</p>
+                    )}
+                </div>
+            </DialogContent>
         </Dialog>
       )}
     </>
