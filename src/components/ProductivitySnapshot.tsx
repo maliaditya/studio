@@ -47,7 +47,7 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface ProductivitySnapshotProps {
   stats: any;
-  timeAllocationData: { name: string; time: number; fill: string }[];
+  timeAllocationData: { name: string; time: number }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
   todaysSchedule: DailySchedule;
@@ -206,6 +206,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     });
     setIsAllocationDetailModalOpen(true);
   };
+
+  const processedTimeData = useMemo(() => {
+    return timeAllocationData.map((entry, index) => ({
+      ...entry,
+      fill: entry.name === 'Free Time' ? '#000000' : themeColors[index % themeColors.length]
+    }));
+  }, [timeAllocationData, themeColors]);
 
   return (
     <>
@@ -368,10 +375,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <Separator className="my-6" />
           <div>
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-            {timeAllocationData.length > 0 && themeColors.length > 0 ? (
+            {processedTimeData.length > 0 ? (
                 <ChartContainer config={{}} className="h-[150px] w-full">
                 <ResponsiveContainer>
-                    <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
+                    <BarChart data={processedTimeData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
                         <CartesianGrid horizontal={false} />
                         <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} tickCount={7} fontSize={12} tickFormatter={(value) => value.toFixed(1)} />
                         <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
@@ -380,7 +387,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                             content={<ChartTooltipContent />}
                         />
                         <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                            {timeAllocationData.map((entry, index) => (
+                            {processedTimeData.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={entry.fill} />
                             ))}
                         </Bar>
@@ -475,7 +482,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                             return null;
                                         }}
                                     />
-                                    <Bar dataKey="duration" radius={[0, 4, 4, 0]} fill={`hsl(${themeColors[Math.abs(allocationDetailData.category.charCodeAt(0)) % themeColors.length]})`}/>
+                                    <Bar dataKey="duration" radius={[0, 4, 4, 0]}>
+                                        {allocationDetailData.tasks.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length] || themeColors[0]} />
+                                        ))}
+                                    </Bar>
                                 </BarChart>
                             </ResponsiveContainer>
                         </ChartContainer>

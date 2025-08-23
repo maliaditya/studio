@@ -63,6 +63,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     return totalMinutes;
 };
 
+
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -145,6 +146,7 @@ function MyPlatePageContent() {
   const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
   
   useEffect(() => {
+    // Correctly initialize date on client-side to prevent hydration mismatch
     setSelectedDate(new Date());
   }, []);
 
@@ -622,11 +624,11 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time], index) => ({ name, time, fill: `var(--chart-${index + 1})`}))
+      .map(([name, time]) => ({ name, time }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
-      data.push({ name: 'Free Time', time: freeTime, fill: '#000000' });
+      data.push({ name: 'Free Time', time: freeTime });
     }
     
     return data;
