@@ -214,9 +214,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 <div className="space-y-2 p-3 rounded-lg bg-muted/30">
                                   <div className="flex justify-between items-start">
                                     <span className="font-semibold text-sm text-foreground">{item.name}</span>
-                                    <span className="font-mono text-xs text-muted-foreground">{progress.toFixed(0)}%</span>
+                                    <span className="font-mono text-sm font-medium text-foreground">{progress.toFixed(0)}%</span>
                                   </div>
-                                  <Progress value={progress} className="h-1.5"/>
+                                  <Progress value={progress} className="h-2"/>
                                   <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>{item.logged.toFixed(1)}h logged</span>
                                     <span>{item.estimated.toFixed(1)}h est.</span>
