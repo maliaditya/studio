@@ -620,7 +620,7 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time]) => ({ name, time, fill: `var(--chart-${Object.keys(totals).indexOf(name) + 1})` }))
+      .map(([name, time]) => ({ name, time, fill: `hsl(var(--chart-${Object.keys(totals).indexOf(name) + 1}))` }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
@@ -1013,6 +1013,7 @@ function MyPlatePageContent() {
                         onToggleComplete={handleToggleComplete}
                         onOpenFocusModal={handleOpenFocusModal}
                         onOpenTaskContext={openTaskContextPopup}
+                        currentSlot={currentSlot}
                     />
                 )}
                 <WeightGoalCard 
@@ -1065,6 +1066,7 @@ function MyPlatePageContent() {
                 onToggleComplete={handleToggleComplete}
                 onOpenFocusModal={handleOpenFocusModal}
                 onOpenTaskContext={openTaskContextPopup}
+                currentSlot={currentSlot}
             />
         )}
 

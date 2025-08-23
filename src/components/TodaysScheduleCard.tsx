@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -165,10 +166,17 @@ interface TodaysScheduleCardProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  currentSlot: string;
 }
 
 const parseDurationToHours = (durationStr: string | undefined): number => {
     if (!durationStr) return 0;
+    
+    // Handle "30" as "30m"
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10) / 60;
+    }
+
     let totalHours = 0;
     
     const hourMatch = durationStr.match(/(\d+)\s*h/);
@@ -181,10 +189,6 @@ const parseDurationToHours = (durationStr: string | undefined): number => {
       totalHours += parseInt(minMatch[1], 10) / 60;
     }
     
-    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr)) {
-        totalHours += parseInt(durationStr, 10) / 60;
-    }
-  
     return totalHours;
 };
 
@@ -200,12 +204,14 @@ export function TodaysScheduleCard({
   onToggleComplete,
   onOpenFocusModal,
   onOpenTaskContext,
+  currentSlot,
 }: TodaysScheduleCardProps) {
   const { carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
+  const [showCurrentSlotOnly, setShowCurrentSlotOnly] = useState(false);
 
   useEffect(() => {
     setPurposeText(dailyPurposes[dayKey] || '');
@@ -221,19 +227,25 @@ export function TodaysScheduleCard({
   }, [schedule, dayKey]);
 
   const scheduledActivities = React.useMemo(() => {
-    return slotOrder.flatMap(slot => {
+    let allActivities = slotOrder.flatMap(slot => {
         const activities = todaysSchedule[slot];
         if (activities && Array.isArray(activities) && activities.length > 0) {
             return activities.map(activity => ({ slot, ...activity }));
         }
         return [];
-    }).sort((a, b) => {
+    });
+
+    if (showCurrentSlotOnly) {
+        allActivities = allActivities.filter(activity => activity.slot === currentSlot);
+    }
+    
+    return allActivities.sort((a, b) => {
         if (a.completed !== b.completed) {
             return a.completed ? 1 : -1;
         }
-        return 0; // Keep original order for items with the same completion status
+        return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
     });
-  }, [todaysSchedule]);
+  }, [todaysSchedule, showCurrentSlotOnly, currentSlot]);
 
   const timeSummary = React.useMemo(() => {
     const dailyActivities = Object.values(todaysSchedule).flat();
@@ -360,6 +372,9 @@ export function TodaysScheduleCard({
             </div>
           </div>
           <div className="flex items-center">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
+                <Filter className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
+            </Button>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
