@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Filter
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -373,7 +373,7 @@ export function TodaysScheduleCard({
           </div>
           <div className="flex items-center">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
-                <Filter className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
+                <Focus className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
             </Button>
             <Popover>
               <PopoverTrigger asChild>
