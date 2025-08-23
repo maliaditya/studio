@@ -596,7 +596,7 @@ function MyPlatePageContent() {
     return totalMinutes;
   };
 
-   const timeAllocationData = useMemo(() => {
+  const timeAllocationData = useMemo(() => {
     const todaysSchedule = schedule[todayKey] || {};
     const dailyActivities = Object.values(todaysSchedule).flat() as Activity[];
     const totals: Record<string, number> = {
@@ -619,11 +619,11 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time]) => ({ name, time, fill: `hsl(var(--chart-${Object.keys(totals).indexOf(name) + 1}))` }))
+      .map(([name, time], index) => ({ name, time, fill: `var(--chart-${index + 1})` }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
-      data.push({ name: 'Free Time', time: freeTime, fill: 'hsl(var(--muted))' });
+      data.push({ name: 'Free Time', time: freeTime, fill: 'var(--muted)' });
     }
     
     return data;
@@ -1227,5 +1227,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-    

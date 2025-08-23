@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -56,6 +56,17 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
+  
+  const [resolvedTimeData, setResolvedTimeData] = useState<{ name: string; time: number; fill: string; }[]>([]);
+  
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const resolvedData = timeAllocationData.map(item => ({
+        ...item,
+        fill: `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--${item.fill}`)})`
+    }));
+    setResolvedTimeData(resolvedData);
+  }, [timeAllocationData]);
 
   const microSkillsForRelease = React.useMemo(() => {
     if (!selectedReleaseInfo || !selectedReleaseInfo.release.focusAreaIds) {
@@ -121,7 +132,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         .map(([name, data]: [string, any], index) => ({ 
             name, 
             hours: data.logged || 0,
-            fill: `hsl(var(--chart-${(index % 5) + 1}))`
+            fill: `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--chart-${(index % 5) + 1}`)})`
         }))
         .sort((a, b) => b.hours - a.hours)
         .slice(0, 5)
@@ -293,7 +304,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
             <ChartContainer config={{}} className="h-[150px] w-full">
               <ResponsiveContainer>
-                <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                <BarChart data={resolvedTimeData} layout="vertical" margin={{ left: 10, right: 10 }}>
                   <CartesianGrid horizontal={false} />
                   <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} fontSize={12} />
                   <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
@@ -313,8 +324,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                     }}
                   />
                   <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                    {timeAllocationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
+                    {resolvedTimeData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
