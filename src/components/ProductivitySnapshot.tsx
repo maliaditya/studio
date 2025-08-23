@@ -147,7 +147,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
-              <p className="text-muted-foreground">Productivity Level</p>
+                <p className="text-muted-foreground">Productivity Level</p>
                 <p className="text-muted-foreground mt-2">Not enough data</p>
               <Separator className="my-4" />
               <p className="text-muted-foreground">Total Productive Hours</p>
@@ -210,7 +210,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 />
                                 <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
                                     {topSpecializations.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={`var(--chart-${index + 1})`} />
+                                      <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${index + 1}))`} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -368,3 +368,4 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     </>
   );
 }
+
