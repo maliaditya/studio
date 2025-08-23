@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ interface DashboardStatsProps {
 }
 
 const StatChange = ({ value }: { value: number }) => {
-  if (value === undefined || value === 0) return null;
+  if (value === undefined || value === 0 || !isFinite(value)) return null;
 
   const isPositive = value > 0;
 
@@ -76,7 +77,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
 
       <Popover>
         <PopoverTrigger asChild>
-          <Card className="cursor-pointer hover:bg-muted/50">
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/upskill')}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Growth</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
