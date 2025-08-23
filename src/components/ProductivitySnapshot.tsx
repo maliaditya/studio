@@ -118,7 +118,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
 
   const topSpecializations = useMemo(() => {
     return Object.entries(stats.learningStats || {})
-        .map(([name, data]: [string, any]) => ({ name, hours: data.logged || 0 }))
+        .map(([name, data]: [string, any], index) => ({ 
+            name, 
+            hours: data.logged || 0,
+            fill: `var(--chart-${(index % 5) + 1})`
+        }))
         .sort((a, b) => b.hours - a.hours)
         .slice(0, 5)
         .reverse();
@@ -162,28 +166,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             </div>
 
             <div className="md:col-span-2 space-y-4">
-              <div className="relative">
-                <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-                <motion.div layout>
-                  {learningItems.length > 0 ? (
-                      <Carousel
-                        items={learningItems}
-                        renderItem={(item) => (
-                            <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px]">
-                                <p className="font-bold text-foreground text-base truncate" title={item.name}>{item.name}</p>
-                                <p className="text-sm text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{item.logged.toFixed(1)}h</span> logged / <span className="font-semibold text-foreground">{item.estimated.toFixed(1)}h</span> est.
-                                </p>
-                                {item.estimated > 0 && <Progress value={(item.logged / item.estimated) * 100} className="h-2 mt-2" />}
-                            </div>
-                        )}
-                      />
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2">No learning stats yet. Log progress in the Upskill page.</p>
-                  )}
-                </motion.div>
-              </div>
-              <Separator className="my-2" />
                <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><BarChart3 /> Top Specializations</h4>
                 {topSpecializations.length > 0 ? (
