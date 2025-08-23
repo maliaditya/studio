@@ -1883,7 +1883,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={handleToggleReadyForBranding}
+                    onToggleReadyForBranding={onToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -419,7 +418,7 @@ export function SkillLibrary({
                exit={{ opacity: 0, x: 20 }}
                transition={{ duration: 0.2 }}
              >
-                <ScrollArea className="h-[calc(100vh-25rem)] pr-2">
+                <ScrollArea className="pr-2">
                    {renderContent()}
                 </ScrollArea>
              </motion.div>
