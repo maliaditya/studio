@@ -121,7 +121,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         .map(([name, data]: [string, any], index) => ({ 
             name, 
             hours: data.logged || 0,
-            fill: `var(--chart-${(index % 5) + 1})`
+            fill: `hsl(var(--chart-${(index % 5) + 1}))`
         }))
         .sort((a, b) => b.hours - a.hours)
         .slice(0, 5)
@@ -192,7 +192,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 />
                                 <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
                                     {topSpecializations.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
+                                      <Cell key={`cell-${index}`} fill={entry.fill} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -287,7 +287,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   />
                   <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                     {timeAllocationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Bar>
                 </BarChart>
