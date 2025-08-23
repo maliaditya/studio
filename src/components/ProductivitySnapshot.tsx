@@ -206,19 +206,20 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                <div className="relative">
                   <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
                   {learningItems.length > 0 ? (
-                    <div className="space-y-3">
-                      {learningItems.slice(0, 2).map((item, index) => (
-                        <div key={index} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="font-medium text-foreground">{item.name}</span>
-                            <span className="text-muted-foreground">{item.logged.toFixed(1)} / {item.estimated.toFixed(1)} hrs</span>
-                          </div>
-                          <Progress value={item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0} className="h-2"/>
-                        </div>
-                      ))}
-                    </div>
+                      <Carousel
+                          items={learningItems}
+                          renderItem={(item) => (
+                              <div className="space-y-1 px-1">
+                                <div className="flex justify-between text-xs">
+                                  <span className="font-medium text-foreground">{item.name}</span>
+                                  <span className="text-muted-foreground">{item.logged.toFixed(1)} / {item.estimated.toFixed(1)} hrs</span>
+                                </div>
+                                <Progress value={item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0} className="h-2"/>
+                              </div>
+                          )}
+                      />
                   ) : (
-                    <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time against estimated goals to see your learning progress.</p>
+                      <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time against estimated goals to see your learning progress.</p>
                   )}
               </div>
               <Separator className="my-2" />
