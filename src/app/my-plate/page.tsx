@@ -88,8 +88,7 @@ function MyPlatePageContent() {
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
-  const todayKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
-
+  
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
@@ -598,7 +597,7 @@ function MyPlatePageContent() {
   };
 
   const timeAllocationData = useMemo(() => {
-    const todaysScheduleForCalc = schedule[todayKey] || {};
+    const todaysScheduleForCalc = schedule[selectedDateKey] || {};
     const dailyActivities = Object.values(todaysScheduleForCalc).flat() as Activity[];
     const totals: Record<string, number> = {
       'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
@@ -620,7 +619,7 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time], index) => ({ name, time, fill: `hsl(var(--chart-${index + 1}))` }))
+      .map(([name, time], index) => ({ name, time, fill: `var(--chart-${index + 1})` }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
@@ -628,7 +627,7 @@ function MyPlatePageContent() {
     }
     
     return data;
-  }, [schedule, todayKey, activityDurations]);
+  }, [schedule, selectedDateKey, activityDurations]);
   
   const handleOpenFocusModal = (activity: Activity) => {
     const duration = parseDurationToMinutes(activityDurations[activity.id]);
@@ -652,14 +651,13 @@ function MyPlatePageContent() {
   }, []);
 
   const productivityStats = useMemo(() => {
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const yesterdayStr = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const yesterday = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
 
-    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, todayStr, 'upskill');
-    const yesterdayUpskillMinutes = getLoggedMinutes(allUpskillLogs, yesterdayStr, 'upskill');
+    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, selectedDateKey, 'upskill');
+    const yesterdayUpskillMinutes = getLoggedMinutes(allUpskillLogs, yesterday, 'upskill');
 
-    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, todayStr, 'deepwork');
-    const yesterdayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, yesterdayStr, 'deepwork');
+    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, selectedDateKey, 'deepwork');
+    const yesterdayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, yesterday, 'deepwork');
 
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
       if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
@@ -762,7 +760,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions, deepWorkDefinitions]);
+  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions, deepWorkDefinitions, selectedDate, selectedDateKey]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -805,8 +803,8 @@ function MyPlatePageContent() {
   }, [productizationPlans, offerizationPlans, projects, coreSkills]);
 
   const brandingStatus = useMemo(() => {
-    const todayLog = brandingLogs.find(log => log.date === todayKey);
-    const todaysBrandingTasks = schedule[todayKey]?.branding || [];
+    const todayLog = brandingLogs.find(log => log.date === selectedDateKey);
+    const todaysBrandingTasks = schedule[selectedDateKey]?.branding || [];
     
     const inProgressItems = (todaysBrandingTasks || [])
         .filter(act => !act.completed)
@@ -863,7 +861,7 @@ function MyPlatePageContent() {
         message,
         subMessage
     };
-}, [brandingLogs, schedule, todayKey, deepWorkDefinitions]);
+}, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
 
   
   const dashboardStats = useMemo(() => {
@@ -877,7 +875,7 @@ function MyPlatePageContent() {
       learningStats
     } = productivityStats;
   
-    const todaysActivities = schedule[todayKey] || {};
+    const todaysActivities = schedule[selectedDateKey] || {};
     const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
     const allCompleted = hasPlannedOrCompleted && Object.values(todaysActivities).flat().every(a => a.completed);
   
@@ -896,7 +894,7 @@ function MyPlatePageContent() {
       learningStats: learningStats,
       brandingStatus,
     };
-  }, [productivityStats, schedule, todayKey, upcomingReleases, brandingStatus]);
+  }, [productivityStats, schedule, selectedDateKey, upcomingReleases, brandingStatus]);
 
   useEffect(() => {
     const newDurations: Record<string, string> = {};
@@ -997,7 +995,7 @@ function MyPlatePageContent() {
                   timeAllocationData={timeAllocationData} 
                   onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
-                  todaysSchedule={schedule[todayKey] || {}}
+                  todaysSchedule={schedule[selectedDateKey] || {}}
                   activityDurations={activityDurations}
                 />
               </div>

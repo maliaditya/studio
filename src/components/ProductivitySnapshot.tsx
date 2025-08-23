@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -365,7 +366,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <Separator className="my-6" />
           <div>
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-            {themeColors.length > 0 ? (
+            {timeAllocationData.length > 0 && themeColors.length > 0 ? (
                 <ChartContainer config={{}} className="h-[150px] w-full">
                 <ResponsiveContainer>
                     <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
@@ -378,7 +379,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                         />
                         <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                             {timeAllocationData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                                <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
                             ))}
                         </Bar>
                     </BarChart>
