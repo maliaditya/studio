@@ -148,15 +148,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
               <p className="text-muted-foreground">Productivity Level</p>
-              {stats.currentLevel ? (
-                <>
-                  <h3 className="text-4xl font-bold text-primary">{stats.currentLevel.level}</h3>
-                  <p className="text-sm">{stats.currentLevel.description}</p>
-                  <p className="text-xs text-muted-foreground">{stats.currentLevel.zone}</p>
-                </>
-              ) : (
                 <p className="text-muted-foreground mt-2">Not enough data</p>
-              )}
               <Separator className="my-4" />
               <p className="text-muted-foreground">Total Productive Hours</p>
               <h3 className="text-2xl font-bold">{stats.totalProductiveHours.toFixed(2)}</h3>
