@@ -205,18 +205,25 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                <Separator className="my-2" />
                <div className="relative">
                   <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
-                  {learningItems.length > 0 ? (
+                   {learningItems.length > 0 ? (
                       <Carousel
                           items={learningItems}
-                          renderItem={(item) => (
-                              <div className="space-y-1 px-1">
-                                <div className="flex justify-between text-xs">
-                                  <span className="font-medium text-foreground">{item.name}</span>
-                                  <span className="text-muted-foreground">{item.logged.toFixed(1)} / {item.estimated.toFixed(1)} hrs</span>
+                          renderItem={(item) => {
+                              const progress = item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0;
+                              return (
+                                <div className="space-y-2 p-3 rounded-lg bg-muted/30">
+                                  <div className="flex justify-between items-start">
+                                    <span className="font-semibold text-sm text-foreground">{item.name}</span>
+                                    <span className="font-mono text-xs text-muted-foreground">{progress.toFixed(0)}%</span>
+                                  </div>
+                                  <Progress value={progress} className="h-1.5"/>
+                                  <div className="flex justify-between text-xs text-muted-foreground">
+                                    <span>{item.logged.toFixed(1)}h logged</span>
+                                    <span>{item.estimated.toFixed(1)}h est.</span>
+                                  </div>
                                 </div>
-                                <Progress value={item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0} className="h-2"/>
-                              </div>
-                          )}
+                              )
+                          }}
                       />
                   ) : (
                       <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time against estimated goals to see your learning progress.</p>
@@ -307,7 +314,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   />
                   <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                     {timeAllocationData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                      <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
                     ))}
                   </Bar>
                 </BarChart>
