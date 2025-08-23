@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -115,35 +114,18 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   };
 
 
-  const learningItems = Object.entries(stats.learningStats || {});
-  const inProgressBrandingItems = stats.brandingStatus?.items || [];
-  const publishedBrandingItems = stats.brandingStatus?.publishedItems || [];
+  const learningItems = Object.entries(stats.learningStats || {}).map(([topic, data]: [string, any]) => ({ name: topic, logged: data.logged, estimated: data.estimated }));
+
+  const topSpecializations = useMemo(() => {
+    return Object.entries(stats.learningStats || {})
+        .map(([name, data]: [string, any]) => ({ name, hours: data.logged || 0 }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5)
+        .reverse();
+  }, [stats.learningStats]);
+  
   const roadmapItems = stats.upcomingReleases || [];
   
-  const hasBrandingContent = inProgressBrandingItems.length > 0 || publishedBrandingItems.length > 0;
-  const showReadyForBrandingMessage = stats.brandingStatus?.readyForBrandingCount > 0 && !(inProgressBrandingItems.length > 0);
-
-  const renderBrandingItem = (item: any) => (
-    <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px] cursor-pointer" onClick={() => router.push('/personal-branding')}>
-        <div className="flex justify-between items-center">
-          <h5 className="font-bold text-foreground text-base truncate" title={item.taskName}>{item.taskName}</h5>
-          <div className="text-right text-xs ml-4 flex-shrink-0">
-              <div className="font-semibold text-foreground whitespace-nowrap">{item.stage}</div>
-              {item.progress && <div className="text-muted-foreground whitespace-nowrap">({item.progress})</div>}
-          </div>
-        </div>
-        {item.stage !== 'Published' ?
-          <p className="text-sm text-muted-foreground mt-1 truncate">Go to Personal Branding page to continue...</p>
-          : item.sharingStatus && 
-          <div className="flex items-center gap-3 text-muted-foreground mt-2">
-            {item.sharingStatus.twitter && <TwitterIcon className="h-4 w-4" />}
-            {item.sharingStatus.linkedin && <Linkedin className="h-4 w-4" />}
-            {item.sharingStatus.devto && <DevToIcon className="h-4 w-4" />}
-          </div>
-        }
-    </div>
-  );
-
   return (
     <>
       <Card className="h-full bg-card/50">
@@ -194,13 +176,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                   {learningItems.length > 0 ? (
                       <Carousel
                         items={learningItems}
-                        renderItem={([topic, topicStats]: [string, { logged: number, estimated: number }]) => (
+                        renderItem={(item) => (
                             <div className="flex flex-col justify-center p-3 rounded-md bg-muted/30 border-b-0 h-[88px]">
-                                <p className="font-bold text-foreground text-base truncate" title={topic}>{topic}</p>
+                                <p className="font-bold text-foreground text-base truncate" title={item.name}>{item.name}</p>
                                 <p className="text-sm text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{topicStats.logged.toFixed(1)}h</span> logged / <span className="font-semibold text-foreground">{topicStats.estimated.toFixed(1)}h</span> est.
+                                    <span className="font-semibold text-foreground">{item.logged.toFixed(1)}h</span> logged / <span className="font-semibold text-foreground">{item.estimated.toFixed(1)}h</span> est.
                                 </p>
-                                {topicStats.estimated > 0 && <Progress value={(topicStats.logged / topicStats.estimated) * 100} className="h-2 mt-2" />}
+                                {item.estimated > 0 && <Progress value={(item.logged / item.estimated) * 100} className="h-2 mt-2" />}
                             </div>
                         )}
                       />
@@ -210,32 +192,42 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 </motion.div>
               </div>
               <Separator className="my-2" />
-              <div className="relative">
-                <h4 className="font-semibold mb-2 flex items-center gap-2"><Share2 /> Personal Branding</h4>
-                <motion.div layout>
-                  {hasBrandingContent ? (
-                      <Carousel
-                          items={[...inProgressBrandingItems, ...publishedBrandingItems]}
-                          renderItem={renderBrandingItem}
-                      />
-                  ) : showReadyForBrandingMessage ? (
-                      <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
-                          <p>{stats.brandingStatus?.message}</p>
-                          <p className="text-xs mt-1">{stats.brandingStatus?.subMessage}</p>
-                      </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground p-2 min-h-[6rem] flex flex-col justify-center">
-                        <p>{stats.brandingStatus?.message || 'No branding tasks.'}</p>
-                        <p className="text-xs mt-1">{stats.brandingStatus?.subMessage || ''}</p>
-                    </div>
-                  )}
-                  {hasBrandingContent && showReadyForBrandingMessage && (
-                    <div className="mt-2 text-xs text-center text-muted-foreground border-t pt-2">
-                       <p>{stats.brandingStatus?.message} <a href="/personal-branding" className="text-primary hover:underline">Create a new bundle.</a></p>
-                    </div>
-                  )}
-                </motion.div>
-              </div>
+               <div className="relative">
+                <h4 className="font-semibold mb-2 flex items-center gap-2"><BarChart3 /> Top Specializations</h4>
+                {topSpecializations.length > 0 ? (
+                    <ChartContainer config={{}} className="h-[150px] w-full">
+                        <ResponsiveContainer>
+                            <BarChart data={topSpecializations} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                <CartesianGrid horizontal={false} />
+                                <XAxis type="number" dataKey="hours" domain={[0, 'dataMax + 10']} fontSize={12} />
+                                <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={10} interval={0} />
+                                <RechartsTooltip
+                                    cursor={{ fill: "hsl(var(--muted))" }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                    <p className="font-bold text-foreground">{data.name}</p>
+                                                    <p className="text-muted-foreground">{data.hours.toFixed(1)} hours logged</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
+                                    {topSpecializations.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={`var(--chart-${index + 1})`} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </ChartContainer>
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time for specializations to see your top 5 here.</p>
+                )}
+               </div>
               <Separator className="my-2" />
               <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
