@@ -66,7 +66,7 @@ const useThemeColors = () => {
                 style.getPropertyValue('--chart-4').trim(),
                 style.getPropertyValue('--chart-5').trim(),
             ];
-            setColors(chartColors);
+            setColors(chartColors.map(c => `hsl(${c})`));
         }
     }, []);
     return colors;
@@ -87,6 +87,8 @@ const activityTypeMapping: Record<string, Activity['type']> = {
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
     if (!durationStr) return 0;
+    
+    // Handle "30" as "30m"
     if (/^\d+$/.test(durationStr.trim())) {
         return parseInt(durationStr.trim(), 10);
     }
@@ -267,7 +269,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 />
                                 <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
                                     {topSpecializations.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={`hsl(${themeColors[index % themeColors.length]})`} />
+                                      <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -371,7 +373,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                 <ResponsiveContainer>
                     <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
                         <CartesianGrid horizontal={false} />
-                        <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} tickCount={7} fontSize={12} />
+                        <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} tickCount={7} fontSize={12} tickFormatter={(value) => value.toFixed(1)} />
                         <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
                         <ChartTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
@@ -379,7 +381,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                         />
                         <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                             {timeAllocationData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={`hsl(${entry.fill})`} />
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
                             ))}
                         </Bar>
                     </BarChart>
