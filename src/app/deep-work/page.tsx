@@ -1841,7 +1841,7 @@ function DeepWorkPageContent() {
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
-            <aside className="lg:col-span-1 space-y-6">
+            <aside className="lg:col-span-1 space-y-6 lg:sticky top-20">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><History />Recents</CardTitle>
@@ -2390,3 +2390,6 @@ export default function DeepWorkPage() {
 }
     
 
+
+
+    
