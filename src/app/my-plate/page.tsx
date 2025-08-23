@@ -46,6 +46,23 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    
+    // Handle "30" as "30m"
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    
+    return totalMinutes;
+};
+
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -86,7 +103,7 @@ function MyPlatePageContent() {
   const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -125,12 +142,17 @@ function MyPlatePageContent() {
   // State for productivity stats
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   
-  const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
+  const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
+  
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, []);
 
   useEffect(() => {
-    const now = new Date();
-    setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
-  }, []);
+    if (selectedDate) {
+      setOneYearAgo(subYears(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 1));
+    }
+  }, [selectedDate]);
 
   // Effect to set schedule as loaded once user is available
   useEffect(() => {
@@ -165,12 +187,12 @@ function MyPlatePageContent() {
 
   // Carry forward tasks logic
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
+    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     
-    const today = new Date();
+    const today = selectedDate;
     const todayDateKey = format(today, 'yyyy-MM-dd');
     const yesterday = addDays(today, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
@@ -217,7 +239,7 @@ function MyPlatePageContent() {
         toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate]);
   
     const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
@@ -250,8 +272,10 @@ function MyPlatePageContent() {
 
     switch (type) {
       case 'workout': 
-        const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
-        details = description.split(' for ')[1] || "Workout";
+        if (selectedDate) {
+            const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+            details = description.split(' for ')[1] || "Workout";
+        }
         newActivityDuration = 90;
         break;
       case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
@@ -407,7 +431,7 @@ function MyPlatePageContent() {
   const handleSelectMeal = (mealType: 'meal1' | 'meal2' | 'meal3' | 'supplements') => {
     if (!currentSlotForMeal) return;
 
-    const dayName = format(selectedDate, 'EEEE');
+    const dayName = selectedDate ? format(selectedDate, 'EEEE') : '';
     const dayPlan = dietPlan.find(p => p.day === dayName);
     
     let mealDetails = `Nutrition: ${mealType.replace('meal', 'Meal ')}`;
@@ -458,13 +482,15 @@ function MyPlatePageContent() {
   };
 
   const getTodaysWorkout = () => {
+    if(!selectedDate) return { exercises: [], description: ""};
     const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { exercises, muscleGroups };
   };
 
   const handleStartWorkoutLog = (activity: Activity) => {
-    const { exercises, muscleGroups } = getTodaysWorkout();
+    if(!selectedDate) return;
+    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
     setTodaysExercises(exercises);
     setTodaysMuscleGroups(muscleGroups);
     setWorkoutActivityToLog(activity);
@@ -477,9 +503,13 @@ function MyPlatePageContent() {
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (!activity || activity.completed) return;
+    if (!activity || activity.completed || !selectedDate) return;
     if (activity.type === 'workout') {
-      handleStartWorkoutLog(activity);
+      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+      setTodaysExercises(exercises);
+      setTodaysMuscleGroups(muscleGroups);
+      setWorkoutActivityToLog(activity);
+      setIsTodaysWorkoutModalOpen(true);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
       setEditingActivity({ slotName, activity });
       setIsLearningModalOpen(true);
@@ -592,7 +622,7 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time], index) => ({ name, time, fill: `hsl(var(--chart-${index + 1}))`}))
+      .map(([name, time], index) => ({ name, time, fill: `var(--chart-${index + 1})`}))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
@@ -624,6 +654,16 @@ function MyPlatePageContent() {
   }, []);
 
   const productivityStats = useMemo(() => {
+    if(!selectedDate) return {
+      todayUpskillHours: 0,
+      upskillChange: 0,
+      todayDeepWorkHours: 0,
+      deepWorkChange: 0,
+      totalProductiveHours: 0,
+      avgProductiveHoursChange: 0,
+      learningStats: {},
+    };
+    
     const yesterday = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
 
     const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, selectedDateKey, 'upskill');
@@ -938,6 +978,8 @@ function MyPlatePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
 
+
+  if (!selectedDate) return null;
 
   return (
     <>
