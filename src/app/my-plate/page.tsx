@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -600,7 +601,7 @@ function MyPlatePageContent() {
     const todaysSchedule = schedule[todayKey] || {};
     const dailyActivities = Object.values(todaysSchedule).flat() as Activity[];
     const totals: Record<string, number> = {
-        'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
+      'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
     };
     
     const activityNameMap: Record<ActivityType, string> = {
@@ -618,14 +619,12 @@ function MyPlatePageContent() {
     const totalAllocated = Object.values(totals).reduce((sum, hours) => sum + hours, 0);
     const freeTime = 24 - totalAllocated;
 
-    const chartColors = ['--chart-1', '--chart-2', '--chart-3', '--chart-4', '--chart-5'];
-    
     const data = Object.entries(totals)
-      .map(([name, time], index) => ({ name, time, fill: `hsl(var(${chartColors[index % chartColors.length]}))` }))
+      .map(([name, time]) => ({ name, time }))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
-      data.push({ name: 'Free Time', time: freeTime, fill: 'hsl(var(--muted))' });
+      data.push({ name: 'Free Time', time: freeTime });
     }
     
     return data;

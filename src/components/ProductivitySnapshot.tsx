@@ -46,10 +46,28 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface ProductivitySnapshotProps {
   stats: any;
-  timeAllocationData: { name: string; time: number; fill: string; }[];
+  timeAllocationData: { name: string; time: number; }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
 }
+
+const useThemeColors = () => {
+    const [colors, setColors] = useState<string[]>([]);
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const style = getComputedStyle(document.documentElement);
+            const chartColors = [
+                style.getPropertyValue('--chart-1').trim(),
+                style.getPropertyValue('--chart-2').trim(),
+                style.getPropertyValue('--chart-3').trim(),
+                style.getPropertyValue('--chart-4').trim(),
+                style.getPropertyValue('--chart-5').trim(),
+            ].map(color => `hsl(${color})`);
+            setColors(chartColors);
+        }
+    }, []);
+    return colors;
+};
 
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal }: ProductivitySnapshotProps) {
   const router = useRouter();
@@ -57,17 +75,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
   
-  const [resolvedTimeData, setResolvedTimeData] = useState<{ name: string; time: number; fill: string; }[]>([]);
+  const themeColors = useThemeColors();
   
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const resolvedData = timeAllocationData.map(item => ({
-        ...item,
-        fill: `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--${item.fill}`)})`
-    }));
-    setResolvedTimeData(resolvedData);
-  }, [timeAllocationData]);
-
+  const topSpecializations = useMemo(() => {
+    return Object.entries(stats.learningStats || {})
+        .map(([name, data]: [string, any]) => ({ 
+            name, 
+            hours: data.logged || 0,
+        }))
+        .sort((a, b) => b.hours - a.hours)
+        .slice(0, 5)
+        .reverse();
+  }, [stats.learningStats]);
+  
   const microSkillsForRelease = React.useMemo(() => {
     if (!selectedReleaseInfo || !selectedReleaseInfo.release.focusAreaIds) {
       return [];
@@ -126,18 +146,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
 
 
   const learningItems = Object.entries(stats.learningStats || {}).map(([topic, data]: [string, any]) => ({ name: topic, logged: data.logged, estimated: data.estimated }));
-
-  const topSpecializations = useMemo(() => {
-    return Object.entries(stats.learningStats || {})
-        .map(([name, data]: [string, any], index) => ({ 
-            name, 
-            hours: data.logged || 0,
-            fill: `hsl(${getComputedStyle(document.documentElement).getPropertyValue(`--chart-${(index % 5) + 1}`)})`
-        }))
-        .sort((a, b) => b.hours - a.hours)
-        .slice(0, 5)
-        .reverse();
-  }, [stats.learningStats]);
   
   const roadmapItems = stats.upcomingReleases || [];
   
@@ -179,7 +187,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <div className="md:col-span-2 space-y-4">
                <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><BarChart3 /> Top Specializations</h4>
-                {topSpecializations.length > 0 ? (
+                {topSpecializations.length > 0 && themeColors.length > 0 ? (
                     <ChartContainer config={{}} className="h-[150px] w-full">
                         <ResponsiveContainer>
                             <BarChart data={topSpecializations} layout="vertical" margin={{ left: -10, right: 10, top: 5, bottom: 5 }}>
@@ -203,7 +211,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 />
                                 <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
                                     {topSpecializations.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                                      <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -302,35 +310,37 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <Separator className="my-6" />
           <div>
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-            <ChartContainer config={{}} className="h-[150px] w-full">
-              <ResponsiveContainer>
-                <BarChart data={resolvedTimeData} layout="vertical" margin={{ left: 10, right: 10 }}>
-                  <CartesianGrid horizontal={false} />
-                  <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} fontSize={12} />
-                  <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
-                  <RechartsTooltip
-                    cursor={{ fill: "hsl(var(--muted))" }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                            <p className="font-bold text-foreground">{data.name}</p>
-                            <p className="text-muted-foreground">{data.time.toFixed(1)} hours</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                    {resolvedTimeData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            {themeColors.length > 0 ? (
+                <ChartContainer config={{}} className="h-[150px] w-full">
+                <ResponsiveContainer>
+                    <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10 }}>
+                    <CartesianGrid horizontal={false} />
+                    <XAxis type="number" dataKey="time" domain={[0, 24]} tickCount={7} fontSize={12} />
+                    <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
+                    <RechartsTooltip
+                        cursor={{ fill: "hsl(var(--muted))" }}
+                        content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                <p className="font-bold text-foreground">{data.name}</p>
+                                <p className="text-muted-foreground">{data.time.toFixed(1)} hours</p>
+                            </div>
+                            );
+                        }
+                        return null;
+                        }}
+                    />
+                    <Bar dataKey="time" radius={[0, 4, 4, 0]}>
+                        {timeAllocationData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length]} />
+                        ))}
+                    </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+                </ChartContainer>
+            ) : <div className="h-[150px] w-full bg-muted animate-pulse rounded-md" />}
           </div>
         </CardContent>
       </Card>
