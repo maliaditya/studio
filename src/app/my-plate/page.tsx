@@ -87,7 +87,6 @@ function MyPlatePageContent() {
   const [remainingTime, setRemainingTime] = useState('');
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -125,11 +124,11 @@ function MyPlatePageContent() {
   
   // State for productivity stats
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
-  const [today, setToday] = useState<Date | null>(null);
+  
+  const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
 
   useEffect(() => {
     const now = new Date();
-    setToday(now);
     setOneYearAgo(subYears(new Date(now.getFullYear(), now.getMonth(), now.getDate()), 1));
   }, []);
 
@@ -413,7 +412,12 @@ function MyPlatePageContent() {
     
     let mealDetails = `Nutrition: ${mealType.replace('meal', 'Meal ')}`;
     if (dayPlan) {
-      mealDetails = dayPlan[mealType] || mealDetails;
+      const mealItems = dayPlan[mealType];
+      if (Array.isArray(mealItems) && mealItems.length > 0) {
+        mealDetails = mealItems.map(item => `${item.quantity} ${item.content}`).join(', ');
+      } else if (typeof mealItems === 'string') {
+        mealDetails = mealItems; // Legacy support
+      }
     }
 
     const newActivity: Activity = {
@@ -565,37 +569,6 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
-  const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-  
-    const parts = durationStr.toLowerCase().split(' ');
-    let totalMinutes = 0;
-  
-    parts.forEach(part => {
-      if (part.includes('h')) {
-        const hours = parseFloat(part.replace('h', ''));
-        if (!isNaN(hours)) {
-          totalMinutes += hours * 60;
-        }
-      } else if (part.includes('m')) {
-        const minutes = parseFloat(part.replace('m', ''));
-        if (!isNaN(minutes)) {
-          totalMinutes += minutes;
-        }
-      }
-    });
-  
-    // Fallback for plain numbers, assuming they are minutes
-    if (totalMinutes === 0 && /^\d+(\.\d+)?$/.test(durationStr.trim())) {
-      const minutes = parseFloat(durationStr);
-      if(!isNaN(minutes)) {
-        totalMinutes = minutes
-      }
-    }
-    
-    return totalMinutes;
-  };
-
   const timeAllocationData = useMemo(() => {
     const todaysScheduleForCalc = schedule[selectedDateKey] || {};
     const dailyActivities = Object.values(todaysScheduleForCalc).flat() as Activity[];
@@ -619,7 +592,7 @@ function MyPlatePageContent() {
     const freeTime = 24 - totalAllocated;
 
     const data = Object.entries(totals)
-      .map(([name, time], index) => ({ name, time, fill: `var(--chart-${index + 1})` }))
+      .map(([name, time], index) => ({ name, time, fill: `hsl(var(--chart-${index + 1}))`}))
       .filter(item => item.time > 0);
 
     if (freeTime > 0) {
