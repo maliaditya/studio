@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, formatDistanceStrict } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart3 } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -19,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, BarChart3, LineChart, AreaChart, Area } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -132,7 +133,10 @@ function TimesheetPageContent() {
                 
                 const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
                 const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set[durationField], 0), 0);
+                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+            }
+            if (activity.type === 'interrupt' && activity.completed) {
+                return activity.duration || 0;
             }
             return 0;
         };
@@ -171,12 +175,17 @@ function TimesheetPageContent() {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
                             let duration = 0;
-                            if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                            if (activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill')) {
                                 duration = getLoggedMinutes(activity, dateKey);
-                            } else {
+                            } else if (activity.type === 'interrupt' && activity.completed) {
+                                duration = activity.duration || 0;
+                            } else if (activity.type !== 'interrupt') {
                                 duration = parseDurationToMinutes(activityDurations[activity.id]);
                             }
-                            processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
+
+                            if (duration > 0 || !activity.completed) { // Also include non-completed non-interrupt tasks for view
+                                processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
+                            }
                         }
                     });
                 }
@@ -230,7 +239,7 @@ function TimesheetPageContent() {
             });
             workIntervalsMs.push(activity.focusSessionEndTime - lastEventTime);
     
-            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000);
+            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
             const totalFocusMs = validWorkIntervalsMs.reduce((sum, i) => sum + i, 0);
             
             const totalBreakMs = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime) - totalFocusMs;
