@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer } from 'lucide-react';
@@ -34,11 +34,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       deepWorkDefinitions, upskillDefinitions,
       logSubTaskTime
   } = useAuth();
-  const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
-  const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
+  const [totalSeconds, setTotalSeconds] = useState(duration * 60);
+  const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
-  const [lastSubTaskCompletionTime, setLastSubTaskCompletionTime] = React.useState<number | null>(null);
-  const [completedSubTaskIds, setCompletedSubTaskIds] = React.useState<Set<string>>(new Set());
+  const [lastSubTaskCompletionTime, setLastSubTaskCompletionTime] = useState<number | null>(null);
+  const [completedSubTaskIds, setCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
@@ -47,18 +47,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
-  const popupRef = React.useRef<HTMLDivElement>(null);
-  const [activeSubTaskId, setActiveSubTaskId] = React.useState<string | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [activeSubTaskId, setActiveSubTaskId] = useState<string | null>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
   
-  const allDefinitions = React.useMemo(() => new Map(
+  const allDefinitions = useMemo(() => new Map(
       [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
   ), [deepWorkDefinitions, upskillDefinitions]);
 
-  const focusedObjective = React.useMemo(() => {
+  const focusedObjective = useMemo(() => {
     const parentId = activity.taskIds?.[0];
     if(!parentId) return null;
     // The definitionId in a workoutExercise is the full ID of the definition
@@ -70,7 +70,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return allDefinitions.get(defId);
   }, [activity.taskIds, allDefinitions]);
   
-  const subTasks = React.useMemo(() => {
+  const subTasks = useMemo(() => {
       if (!focusedObjective) return [];
       const childrenIds = [
           ...(focusedObjective.linkedDeepWorkIds || []), 
@@ -79,7 +79,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [focusedObjective, allDefinitions]);
 
-  const activeSubTask = React.useMemo(() => {
+  const activeSubTask = useMemo(() => {
     return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
   }, [activeSubTaskId, allDefinitions]);
 
@@ -91,7 +91,31 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
 
-  const handleStartSubTask = React.useCallback((subTask: ExerciseDefinition) => {
+  const handleStop = useCallback((completed: boolean) => {
+    setSessionState('idle');
+    setActiveSubTaskId(null);
+    setIsAudioPlaying(false);
+    
+    const elapsedSeconds = totalSeconds - secondsLeft;
+    
+    if (activity) {
+      const updatedActivity: Activity = {
+        ...activity,
+        focusSessionEndTime: Date.now(),
+      };
+      updateActivity(updatedActivity);
+
+      if (completed) {
+        onLogTime(updatedActivity, duration);
+        handleToggleComplete(activity.slot, activity.id, true);
+      } else if (elapsedSeconds > 0) {
+        onLogTime(updatedActivity, Math.floor(elapsedSeconds / 60));
+      }
+    }
+    onClose();
+  }, [activity, duration, onLogTime, onClose, setIsAudioPlaying, secondsLeft, totalSeconds, updateActivity, handleToggleComplete]);
+
+  const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
     const durationMins = subTask.estimatedDuration || 25;
     const durationSecs = durationMins * 60;
     
@@ -107,7 +131,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
   }, [WORK_DURATION, setIsAudioPlaying, lastSubTaskCompletionTime]);
 
-  const handleSubTaskComplete = React.useCallback((subTaskId: string, timerFinished: boolean = false) => {
+  const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
     if (completedSubTaskIds.has(subTaskId)) return;
     
     const now = Date.now();
@@ -139,10 +163,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         // All tasks done
         handleStop(true); // Automatically stop and mark complete
     }
-  }, [completedSubTaskIds, subTasks, totalSeconds, secondsLeft, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying]);
+  }, [completedSubTaskIds, subTasks, totalSeconds, secondsLeft, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
 
 
-  React.useEffect(() => {
+  useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
     if (isOpen && firstUncompletedTask && !activeSubTaskId) {
       handleStartSubTask(firstUncompletedTask);
@@ -150,7 +174,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [isOpen, subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask]);
 
 
-  React.useEffect(() => {
+  useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     
     if (sessionState === 'running') {
@@ -165,7 +189,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     };
   }, [sessionState]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
         if (activeSubTaskId) {
             handleSubTaskComplete(activeSubTaskId, true);
@@ -183,9 +207,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, handleSubTaskComplete]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, handleSubTaskComplete, BREAK_DURATION, WORK_DURATION]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
         const currentActivity = activeFocusSession?.activity?.id === activity.id ? activeFocusSession.activity : activity;
         setActiveFocusSession({ activity: currentActivity, duration: Math.ceil(totalSeconds / 60), secondsLeft });
@@ -193,29 +217,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [secondsLeft, sessionState, totalSeconds, activity, setActiveFocusSession, activeFocusSession?.activity]);
 
 
-  const handleStop = (completed: boolean) => {
-    setSessionState('idle');
-    setActiveSubTaskId(null);
-    setIsAudioPlaying(false);
-    
-    const elapsedSeconds = totalSeconds - secondsLeft;
-    
-    if (activity) {
-      const updatedActivity: Activity = {
-        ...activity,
-        focusSessionEndTime: Date.now(),
-      };
-      updateActivity(updatedActivity);
-
-      if (completed) {
-        onLogTime(updatedActivity, duration);
-        handleToggleComplete(activity.slot, activity.id, true);
-      } else if (elapsedSeconds > 0) {
-        onLogTime(updatedActivity, Math.floor(elapsedSeconds / 60));
-      }
-    }
-    onClose();
-  };
   
   const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
   const chartData = [{ value: progressPercentage }];
