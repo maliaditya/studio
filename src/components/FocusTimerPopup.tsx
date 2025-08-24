@@ -64,16 +64,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   ), [deepWorkDefinitions, upskillDefinitions]);
 
   const focusedObjective = useMemo(() => {
-    // The definitionId in a workoutExercise is the full ID of the definition
-    const defId = allDefinitions.get(activity.taskIds?.[0] || '')?.id;
-    if (!defId) {
-        // Fallback for older data structure where taskIds might be the definitionId directly
-        const parentId = activity.taskIds?.[0];
-        if (!parentId) return null;
-        return allDefinitions.get(parentId.split('-')[0]);
-    }
-    return allDefinitions.get(defId);
-  }, [activity.taskIds, allDefinitions]);
+    const parentId = activity.taskIds?.[0];
+    if (!parentId) return null;
+
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    return allDefs.find(def => parentId.startsWith(def.id));
+  }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const subTasks = useMemo(() => {
       if (!focusedObjective) return [];
@@ -244,6 +240,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const seconds = secondsLeft % 60;
   
   if (!activity) return null;
+
+  const chartData = [
+    {
+      name: 'completed',
+      value: progressPercentage,
+    },
+  ];
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
