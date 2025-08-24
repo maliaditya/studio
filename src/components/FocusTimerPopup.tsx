@@ -62,6 +62,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    // Find the definition that is the prefix of the instance ID.
     return allDefs.find(d => parentId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
@@ -90,22 +91,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     processLogs(allUpskillLogs, 'reps');
     return timeMap;
   }, [allDeepWorkLogs, allUpskillLogs]);
-
-
-  const activeSubTask = useMemo(() => {
-    return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
-  }, [activeSubTaskId, allDefinitions]);
-
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: '1.5rem', // 24px
-    right: '1.5rem', // 24px
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    willChange: 'transform',
-  };
   
+  // Initialize completed tasks only once
   useEffect(() => {
-    // Pre-populate completed tasks
     const preCompletedIds = new Set<string>();
     subTasks.forEach(task => {
         if (loggedTimeMap.has(task.id)) {
@@ -115,6 +103,27 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setCompletedSubTaskIds(preCompletedIds);
   }, [subTasks, loggedTimeMap]);
 
+
+  const activeSubTask = useMemo(() => {
+    return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
+  }, [activeSubTaskId, allDefinitions]);
+  
+  const pendingSubTasks = useMemo(() => {
+    return subTasks.filter(task => !completedSubTaskIds.has(task.id) && task.id !== activeSubTaskId);
+  }, [subTasks, completedSubTaskIds, activeSubTaskId]);
+
+  const completedSubTaskComponents = useMemo(() => {
+    return subTasks.filter(task => completedSubTaskIds.has(task.id));
+  }, [subTasks, completedSubTaskIds]);
+
+
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: '1.5rem', // 24px
+    right: '1.5rem', // 24px
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    willChange: 'transform',
+  };
 
   const handleStop = useCallback((completed: boolean) => {
     setSessionState('idle');
@@ -182,8 +191,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setSessionState('idle');
     setIsAudioPlaying(false);
 
-    // Auto-start next task
-    const nextTask = subTasks.find(st => !newCompletedIds.has(st.id));
+    // Auto-start next task from the *original* subTasks list
+    const currentIndex = subTasks.findIndex(st => st.id === subTaskId);
+    const nextTask = subTasks.slice(currentIndex + 1).find(st => !newCompletedIds.has(st.id));
+
     if (nextTask) {
         handleStartSubTask(nextTask);
     } else {
@@ -194,16 +205,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
 
   useEffect(() => {
-    const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
-    // Start the first available task if no task is active and the session is idle.
-    if (firstUncompletedTask && !activeSubTaskId && sessionState === 'idle') {
-      // Check if the would-be active task is somehow already completed. If so, don't start.
-      if (!completedSubTaskIds.has(firstUncompletedTask.id)) {
-        handleStartSubTask(firstUncompletedTask);
-      }
+    if (sessionState === 'idle' && !activeSubTaskId) {
+        const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
+        if (firstUncompletedTask) {
+            handleStartSubTask(firstUncompletedTask);
+        }
     }
   }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask, sessionState]);
-
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -264,17 +272,27 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const handleTogglePause = () => {
-    if (sessionState === 'running') {
-      setSessionState('paused');
-      setIsAudioPlaying(false);
-    } else if (sessionState === 'paused') {
-      setSessionState('running');
-      setIsAudioPlaying(true);
-    }
+    const newState = sessionState === 'running' ? 'paused' : 'running';
+    setSessionState(newState);
+    setIsAudioPlaying(newState === 'running');
   };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
   const progressPercentage = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
+  
+  const chartData = [
+    {
+      name: 'progress',
+      value: progressPercentage,
+      fill: 'hsl(var(--primary))',
+    },
+    {
+      name: 'remaining',
+      value: 100 - progressPercentage,
+      fill: 'hsl(var(--muted))',
+    },
+  ];
+
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
@@ -286,9 +304,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
-  
-  const pendingSubTasks = subTasks.filter(task => !completedSubTaskIds.has(task.id) && task.id !== activeSubTaskId);
-  const completedSubTaskComponents = subTasks.filter(task => completedSubTaskIds.has(task.id));
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
