@@ -43,9 +43,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = React.useState<'idle' | 'running' | 'paused'>('idle');
-  const [currentCycle, setCurrentCycle] = React.useState<'work' | 'break'>('work');
-  const [cycleSecondsLeft, setCycleSecondsLeft] = React.useState(WORK_DURATION);
+  const [sessionState, setSessionState] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
+  const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
   const popupRef = React.useRef<HTMLDivElement>(null);
   const [activeSubTaskId, setActiveSubTaskId] = React.useState<string | null>(null);
@@ -91,9 +91,64 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
 
+  const handleStartSubTask = React.useCallback((subTask: ExerciseDefinition) => {
+    const durationMins = subTask.estimatedDuration || 25;
+    const durationSecs = durationMins * 60;
+    
+    setTotalSeconds(durationSecs);
+    setSecondsLeft(durationSecs);
+    setCycleSecondsLeft(WORK_DURATION);
+    setCurrentCycle('work');
+    setActiveSubTaskId(subTask.id);
+    setSessionState('running');
+    setIsAudioPlaying(true);
+    if (!lastSubTaskCompletionTime) {
+      setLastSubTaskCompletionTime(Date.now());
+    }
+  }, [WORK_DURATION, setIsAudioPlaying, lastSubTaskCompletionTime]);
+
+  const handleSubTaskComplete = React.useCallback((subTaskId: string, timerFinished: boolean = false) => {
+    if (completedSubTaskIds.has(subTaskId)) return;
+    
+    const now = Date.now();
+    let durationMinutes = 0;
+
+    if (timerFinished) {
+        const subTask = subTasks.find(st => st.id === subTaskId);
+        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds - secondsLeft) / 60);
+    } else if (lastSubTaskCompletionTime) {
+        durationMinutes = Math.floor((now - lastSubTaskCompletionTime) / 60000);
+    }
+    
+    if (durationMinutes > 0) {
+        logSubTaskTime(subTaskId, durationMinutes);
+    }
+    
+    setLastSubTaskCompletionTime(now);
+    const newCompletedIds = new Set(completedSubTaskIds).add(subTaskId);
+    setCompletedSubTaskIds(newCompletedIds);
+    setActiveSubTaskId(null);
+    setSessionState('idle');
+    setIsAudioPlaying(false);
+
+    // Auto-start next task
+    const nextTask = subTasks.find(st => !newCompletedIds.has(st.id));
+    if (nextTask) {
+        handleStartSubTask(nextTask);
+    } else {
+        // All tasks done
+        handleStop(true); // Automatically stop and mark complete
+    }
+  }, [completedSubTaskIds, subTasks, totalSeconds, secondsLeft, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying]);
+
+
   React.useEffect(() => {
-    setLastSubTaskCompletionTime(Date.now());
-  }, []);
+    const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
+    if (isOpen && firstUncompletedTask && !activeSubTaskId) {
+      handleStartSubTask(firstUncompletedTask);
+    }
+  }, [isOpen, subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask]);
+
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -112,11 +167,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   React.useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
-        setSessionState('idle');
-        setIsAudioPlaying(false);
         if (activeSubTaskId) {
-            handleSubTaskComplete(activeSubTaskId, true); // Mark as complete when timer ends
-            setActiveSubTaskId(null);
+            handleSubTaskComplete(activeSubTaskId, true);
         }
     }
 
@@ -131,7 +183,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, handleSubTaskComplete]);
 
   React.useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -165,46 +217,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     onClose();
   };
   
-  const handleStartSubTask = (subTask: ExerciseDefinition) => {
-    const durationMins = subTask.estimatedDuration || 25;
-    const durationSecs = durationMins * 60;
-    
-    setTotalSeconds(durationSecs);
-    setSecondsLeft(durationSecs);
-    setCycleSecondsLeft(WORK_DURATION);
-    setCurrentCycle('work');
-    setActiveSubTaskId(subTask.id);
-    setSessionState('running');
-    setIsAudioPlaying(true);
-    setLastSubTaskCompletionTime(Date.now()); // Reset timer for this subtask
-  };
-
-  const handleSubTaskComplete = (subTaskId: string, timerFinished: boolean = false) => {
-    if (completedSubTaskIds.has(subTaskId)) return;
-    
-    const now = Date.now();
-    let durationMinutes = 0;
-
-    if (timerFinished) {
-        const subTask = subTasks.find(st => st.id === subTaskId);
-        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds - secondsLeft) / 60);
-    } else {
-        const timeSinceLast = lastSubTaskCompletionTime ? now - lastSubTaskCompletionTime : totalSeconds - secondsLeft;
-        durationMinutes = Math.floor(timeSinceLast / 60000);
-    }
-    
-    if (durationMinutes > 0) {
-        logSubTaskTime(subTaskId, durationMinutes);
-    }
-    
-    setLastSubTaskCompletionTime(now);
-    setCompletedSubTaskIds(prev => new Set(prev).add(subTaskId));
-    setActiveSubTaskId(null);
-    setSessionState('idle');
-    setIsAudioPlaying(false);
-  };
-
-
   const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
   const chartData = [{ value: progressPercentage }];
   const minutes = Math.floor(secondsLeft / 60);
@@ -214,6 +226,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
+  
+  const pendingSubTasks = subTasks.filter(task => !completedSubTaskIds.has(task.id) && task.id !== activeSubTaskId);
+  const completedSubTaskComponents = subTasks.filter(task => completedSubTaskIds.has(task.id));
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -272,25 +287,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
                   </div>
               </div>
-               <div className="mt-2 text-center">
-                    <p className="text-xs text-muted-foreground">Now Focusing On</p>
-                    <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                        {activeSubTask ? (
-                            <>
-                                <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
-                                    {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
-                                    <Check className="h-4 w-4 text-green-500" />
-                                </Button>
-                            </>
-                        ) : (
-                            <p className="text-sm italic text-muted-foreground">Select a task to begin</p>
-                        )}
-                    </div>
+              <div className="mt-2 text-center">
+                <p className="text-xs text-muted-foreground">Now Focusing On</p>
+                <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
+                  {activeSubTask ? (
+                    <>
+                      <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
+                        {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
+                        <Check className="h-4 w-4 text-green-500" />
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-sm italic text-muted-foreground">Select a task to begin</p>
+                  )}
+                </div>
               </div>
-               <div className="mt-2 pt-2 border-t border-border/20 text-center">
+              <div className="mt-2 pt-2 border-t border-border/20 text-center">
                   <p className="text-xs text-muted-foreground">Objective</p>
                   <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
                       {focusedObjective?.name || '...'}
@@ -299,31 +314,41 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             </div>
             
             <div className="col-span-1 border-l pl-4">
-              <h4 className="text-sm font-semibold mb-2">Sub-tasks for {focusedObjective?.name}</h4>
-              <ScrollArea className="h-80">
+              <h4 className="text-sm font-semibold mb-2">Pending Sub-tasks</h4>
+              <ScrollArea className="h-48 mb-2">
                 <div className="space-y-2 pr-2">
-                  {subTasks.filter(task => task.id !== activeSubTaskId).map(task => (
+                  {pendingSubTasks.map(task => (
                     <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-muted/30">
                         <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => handleStartSubTask(task)}
-                            disabled={sessionState === 'running' || completedSubTaskIds.has(task.id)}
+                            disabled={sessionState === 'running'}
                         >
                             <Play className="h-4 w-4" />
                         </Button>
-                        <label htmlFor={`subtask-${task.id}`} className="flex-grow">{task.name}</label>
-                        <Checkbox 
-                            id={`subtask-${task.id}`}
-                            checked={completedSubTaskIds.has(task.id)}
-                            onCheckedChange={() => handleSubTaskComplete(task.id)}
-                        />
+                        <label className="flex-grow">{task.name}</label>
                     </div>
                   ))}
-                  {subTasks.length === 0 && (
-                    <p className="text-xs text-center text-muted-foreground py-8">No sub-tasks found for this objective.</p>
+                  {pendingSubTasks.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground py-4">All tasks completed!</p>
                   )}
+                </div>
+              </ScrollArea>
+
+              <h4 className="text-sm font-semibold my-2">Completed</h4>
+              <ScrollArea className="h-28">
+                <div className="space-y-2 pr-2">
+                    {completedSubTaskComponents.map(task => (
+                       <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-green-500/10 text-muted-foreground">
+                            <Check className="h-4 w-4 text-green-500" />
+                            <span className="line-through">{task.name}</span>
+                       </div>
+                    ))}
+                    {completedSubTaskComponents.length === 0 && (
+                       <p className="text-xs text-center text-muted-foreground py-4">No tasks completed yet.</p>
+                    )}
                 </div>
               </ScrollArea>
             </div>
