@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, LineChart as LineChartIcon, PieChart as PieChartIcon } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -126,6 +126,14 @@ function TimesheetPageContent() {
         return totalMinutes;
     };
 
+    const getLoggedMinutesForDay = (dateKey: string, activityType: 'deepwork' | 'upskill') => {
+        const logs = activityType === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+        const log = logs.find(l => l.date === dateKey);
+        if (!log) return 0;
+        const durationField = activityType === 'deepwork' ? 'weight' : 'reps';
+        return log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField] || 0), 0), 0);
+    };
+
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
              if (activity.completed) {
@@ -220,25 +228,9 @@ function TimesheetPageContent() {
             if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
                 let duration = 0;
                 if (activity.type === 'deepwork') {
-                    const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                    if (dailyLog && activity.taskIds) {
-                      activity.taskIds.forEach((taskId: string) => {
-                          const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
-                          if (taskLog) {
-                              duration += taskLog.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                          }
-                      });
-                    }
+                    duration = getLoggedMinutesForDay(dateKey, 'deepwork');
                 } else if (activity.type === 'upskill') {
-                    const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
-                     if (dailyLog && activity.taskIds) {
-                      activity.taskIds.forEach((taskId: string) => {
-                          const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
-                          if (taskLog) {
-                              duration += taskLog.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                          }
-                      });
-                    }
+                    duration = getLoggedMinutesForDay(dateKey, 'upskill');
                 } else if (activity.type === 'interrupt' || activity.type === 'essentials') {
                     duration = activity.duration || 0;
                 } else {
@@ -267,7 +259,7 @@ function TimesheetPageContent() {
         return Object.entries(totals)
           .map(([name, time]) => ({ name, time }))
           .filter(item => item.time > 0);
-    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs]);
+    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs, getLoggedMinutesForDay]);
 
     const pieData = useMemo(() => {
         const totalMinutesInDay = 24 * 60;
@@ -304,7 +296,7 @@ function TimesheetPageContent() {
             });
             workIntervalsMs.push(activity.focusSessionEndTime - lastEventTime);
     
-            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000);
+            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
             const totalFocusMs = validWorkIntervalsMs.reduce((sum, i) => sum + i, 0);
             
             const totalBreakMs = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime) - totalFocusMs;
@@ -445,11 +437,27 @@ function TimesheetPageContent() {
                     {weekRange.map(day => {
                         const dateKey = format(day, 'yyyy-MM-dd');
                         const activities = timeData.dailyData[dateKey] || [];
-                        const dailyTotals: Record<string, number> = activities.reduce((acc, act) => {
-                            acc[act.type] = (acc[act.type] || 0) + act.calculatedDuration;
-                            return acc;
-                        }, {} as Record<string, number>);
-                        const totalDayMinutes = Object.values(dailyTotals).reduce((sum, d) => sum + d, 0);
+                        const totalDayMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
+                        
+                        const dailyPieData = useMemo(() => {
+                             const totals: Record<string, number> = {};
+                            const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
+                            
+                            activities.forEach(activity => {
+                                const mappedName = activityNameMap[activity.type];
+                                if (mappedName) {
+                                    totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
+                                }
+                            });
+
+                            const allocatedMinutes = Object.values(totals).reduce((sum, t) => sum + t, 0);
+                            const freeTime = (24 * 60) - allocatedMinutes;
+                            
+                            const data = Object.entries(totals).map(([name, value]) => ({ name, value }));
+                            if (freeTime > 0) data.push({ name: 'Free Time', value: freeTime });
+                            
+                            return data;
+                        }, [activities]);
 
                         return (
                             <Card 
@@ -457,25 +465,29 @@ function TimesheetPageContent() {
                                 onClick={() => setModalData({ date: day, activities })}
                                 className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
                             >
-                                <CardHeader className="p-4 pb-2 flex-row items-start justify-between">
-                                  <div className="flex-grow">
-                                    <CardTitle className="text-base">
-                                        {format(day, 'EEE, MMM d')}
-                                    </CardTitle>
-                                  </div>
+                                <CardHeader className="p-3 pb-0">
+                                  <CardTitle className="text-base flex justify-between items-center">
+                                      <span>{format(day, 'EEE, MMM d')}</span>
+                                      <span className="font-mono text-sm text-muted-foreground">{formatMinutes(totalDayMinutes)}</span>
+                                  </CardTitle>
                                 </CardHeader>
-                                <CardContent className="p-4 pt-0 text-sm space-y-2 flex-grow flex flex-col justify-end">
-                                    <p className="text-2xl font-bold">{totalDayMinutes > 0 ? formatMinutes(totalDayMinutes) : "-"}</p>
-                                    
-                                    <div className="space-y-1">
-                                        {Object.entries(dailyTotals).length > 0 ? Object.entries(dailyTotals).map(([type, minutes]) => (
-                                            minutes > 0 &&
-                                            <div key={type} className="flex justify-between text-muted-foreground text-xs">
-                                                <span className="capitalize">{type.replace('_', ' + ')}</span>
-                                                <span className="font-medium text-foreground">{formatMinutes(minutes)}</span>
-                                            </div>
-                                        )) : <p className="text-xs text-center text-muted-foreground">No activities</p>}
-                                    </div>
+                                <CardContent className="p-2 flex-grow flex items-center justify-center">
+                                    {dailyPieData.length > 0 ? (
+                                        <ChartContainer config={{}} className="h-32 w-32">
+                                            <ResponsiveContainer>
+                                                <PieChart>
+                                                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />} />
+                                                    <Pie data={dailyPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                                        {dailyPieData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                        ))}
+                                                    </Pie>
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </ChartContainer>
+                                    ) : (
+                                        <p className="text-xs text-center text-muted-foreground p-4">No activities</p>
+                                    )}
                                 </CardContent>
                             </Card>
                         )
