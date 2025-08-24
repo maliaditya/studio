@@ -127,24 +127,22 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (!activity.completed) return 0;
-            
-            if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                const dailyLog = logs.find(log => log.date === dateKey);
-                if (!dailyLog || !activity.taskIds) return 0;
-                
-                const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-                const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+            if (activity.completed) {
+                if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                    const dailyLog = logs.find(log => log.date === dateKey);
+                    if (!dailyLog || !activity.taskIds) return 0;
+                    
+                    const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+                    const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                    return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+                } else if (activity.type === 'interrupt') {
+                    return activity.duration || 0;
+                }
+                // Fallback for other completed tasks like essentials, planning, etc.
+                return parseDurationToMinutes(activityDurations[activity.id]);
             }
-             
-            if (activity.type === 'interrupt') {
-                return activity.duration || 0;
-            }
-
-            // Fallback for other completed tasks
-            return parseDurationToMinutes(activityDurations[activity.id]);
+            return 0; // Return 0 for incomplete tasks
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -181,7 +179,7 @@ function TimesheetPageContent() {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
                             let duration = getLoggedMinutes(activity, dateKey);
-                            if (duration === 0 && !activity.completed) { // If not logged, use planned duration for planned tasks
+                            if (duration === 0 && !activity.completed && activity.type !== 'interrupt') { 
                                  duration = parseDurationToMinutes(activityDurations[activity.id]);
                             }
 
