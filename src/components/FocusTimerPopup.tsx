@@ -283,9 +283,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   </Button>
               </div>
                <div className="mt-4 pt-4 border-t border-border/20 text-center">
-                  <p className="text-xs text-muted-foreground">Task</p>
-                  <p className="text-sm font-semibold truncate" title={activeSubTaskName}>
-                      {activeSubTaskName}
+                  <p className="text-xs text-muted-foreground">Objective</p>
+                  <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
+                      {focusedObjective?.name || '...'}
                   </p>
               </div>
             </div>
