@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -242,7 +243,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     const [isEditingName, setIsEditingName] = useState(false);
     const [currentName, setCurrentName] = useState(deepworkDef.name);
 
-    const setCombinedRefs = (node: HTMLElement | null) => {
+    const setCombinedRefs = (node: HTMLDivElement | null) => {
         if (typeof ref === 'function') {
             ref(node);
         } else if (ref) {
@@ -345,14 +346,10 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={false} type="resource" />;
                         })}
                     </div>
-                     {loggedMinutes > 0 && (
-                        <div className="mt-2 pt-2 border-t text-sm font-semibold text-primary">
-                            Logged: {formatDuration(loggedMinutes)}
-                        </div>
-                    )}
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
+                         {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                         {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
                     </div>
                 </CardFooter>
@@ -1555,7 +1552,7 @@ function DeepWorkPageContent() {
   };
   
   const handleStartEditResource = (res: Resource) => {
-    openGeneralPopup(res.id, new MouseEvent('click'));
+    openGeneralPopup(res.id, null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -1715,8 +1712,9 @@ function DeepWorkPageContent() {
   const handleCreateResource = (parentTask: ExerciseDefinition) => {
     const updatedTask = createResourceWithHierarchy(parentTask, 'card');
     if (updatedTask) {
+        const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
         setNavigationStack(prev => prev.map(item =>
-            item.id === updatedTask!.id ? { ...item, ...updatedTask } : item
+            item.id === taskWithType!.id ? { ...item, ...taskWithType } : item
         ));
     }
   };
@@ -1883,7 +1881,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={handleToggleReadyForBranding}
+                    onToggleReadyForBranding={onToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
