@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -27,6 +26,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setIsAudioPlaying,
       updateActivity, handleToggleComplete,
       deepWorkDefinitions, upskillDefinitions,
+      allDeepWorkLogs, allUpskillLogs,
       logSubTaskTime
   } = useAuth();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
@@ -72,6 +72,24 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       ];
       return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [focusedObjective, allDefinitions]);
+  
+  const loggedTimeMap = useMemo(() => {
+    const timeMap = new Map<string, number>();
+    const processLogs = (logs: any[], durationField: 'weight' | 'reps') => {
+        logs.forEach(log => {
+            log.exercises.forEach((ex: any) => {
+                const duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+                if (duration > 0) {
+                    timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
+                }
+            });
+        });
+    };
+    processLogs(allDeepWorkLogs, 'weight');
+    processLogs(allUpskillLogs, 'reps');
+    return timeMap;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+
 
   const activeSubTask = useMemo(() => {
     return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
@@ -84,6 +102,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
+  
+  useEffect(() => {
+    // Pre-populate completed tasks
+    const preCompletedIds = new Set<string>();
+    subTasks.forEach(task => {
+        if (loggedTimeMap.has(task.id)) {
+            preCompletedIds.add(task.id);
+        }
+    });
+    setCompletedSubTaskIds(preCompletedIds);
+  }, [subTasks, loggedTimeMap]);
+
 
   const handleStop = useCallback((completed: boolean) => {
     setSessionState('idle');
@@ -294,7 +324,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         stroke="hsl(var(--primary))"
                         strokeWidth="10"
                         strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={strokeDashoffset}
+                        strokeDashoffset={CIRCUMFERENCE - (elapsedSeconds / totalSeconds) * CIRCUMFERENCE}
                         transform="rotate(-90 80 80)"
                         style={{ transition: 'stroke-dashoffset 1s linear' }}
                     />
@@ -368,6 +398,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Play className="h-4 w-4" />
                         </Button>
                         <label className="flex-grow">{task.name}</label>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{task.estimatedDuration || 25}m est.</span>
                     </div>
                   ))}
                   {pendingSubTasks.length === 0 && (
@@ -380,9 +411,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
                     {completedSubTaskComponents.map(task => (
-                       <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-green-500/10 text-muted-foreground">
-                            <Check className="h-4 w-4 text-green-500" />
-                            <span className="line-through">{task.name}</span>
+                       <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Check className="h-4 w-4 text-green-500" />
+                                <span className="line-through">{task.name}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">{loggedTimeMap.get(task.id) || 0}m logged</span>
                        </div>
                     ))}
                     {completedSubTaskComponents.length === 0 && (
