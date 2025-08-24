@@ -77,32 +77,8 @@ export function TodaysLearningModal({
 
 
   const filteredProjects = useMemo(() => {
-    if (!projects) return [];
-
-    return projects.filter(project => {
-        // Check if the project is part of any offerization plan with a future release
-        const isOfferedAndActive = Object.values(offerizationPlans).some(plan =>
-            plan.releases?.some(release => {
-                if (release.name !== project.name) return false;
-                try {
-                    const releaseDate = parseISO(release.launchDate);
-                    const today = startOfToday();
-                    return isAfter(releaseDate, today) || format(releaseDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-                } catch {
-                    return false;
-                }
-            })
-        );
-        
-        if(isOfferedAndActive) return true;
-
-        // Check if the project has a product plan
-        const hasProductPlan = productizationPlans && productizationPlans[project.name];
-        if(hasProductPlan) return true;
-        
-        return false;
-    });
-  }, [projects, offerizationPlans, productizationPlans]);
+    return projects || [];
+  }, [projects]);
 
   useEffect(() => {
     if (isOpen) {
