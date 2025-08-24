@@ -228,8 +228,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setIsAudioPlaying(true);
   };
   
+  const handleTogglePause = () => {
+    setSessionState(prev => {
+        if (prev === 'running') {
+            setIsAudioPlaying(false);
+            return 'paused';
+        }
+        if (prev === 'paused') {
+            setIsAudioPlaying(true);
+            return 'running';
+        }
+        return prev;
+    });
+  };
+
   const elapsedSeconds = totalSeconds - secondsLeft;
-  const elapsedPercentage = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
+  const progressPercentage = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
@@ -237,7 +251,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (elapsedPercentage / 100) * CIRCUMFERENCE;
+  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -316,7 +330,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         </div>
                       ) : (
                         <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                             {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                           </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
