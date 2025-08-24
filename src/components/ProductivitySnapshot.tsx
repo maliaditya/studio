@@ -294,13 +294,21 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                           items={learningItems}
                           renderItem={(item) => {
                               const progress = item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0;
+                              const isOverspent = item.logged > item.estimated;
+                              const overspentHours = item.logged - item.estimated;
                               return (
                                 <div className="space-y-2 p-3 rounded-lg bg-muted/30">
                                   <div className="flex justify-between items-start">
                                     <span className="font-semibold text-sm text-foreground">{item.name}</span>
-                                    <span className="font-mono text-sm font-medium text-foreground">{progress.toFixed(0)}%</span>
+                                    {isOverspent ? (
+                                      <span className="font-mono text-sm font-medium text-orange-500">
+                                        +{overspentHours.toFixed(1)}h over
+                                      </span>
+                                    ) : (
+                                      <span className="font-mono text-sm font-medium text-foreground">{progress.toFixed(0)}%</span>
+                                    )}
                                   </div>
-                                  <Progress value={progress} className="h-2"/>
+                                  <Progress value={Math.min(100, progress)} className={cn(isOverspent && "[&>div]:bg-orange-500")} />
                                   <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>{item.logged.toFixed(1)}h logged</span>
                                     <span>{item.estimated.toFixed(1)}h est.</span>
@@ -405,7 +413,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <DialogHeader>
               <DialogTitle>Project Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                This view shows all associated micro-skills for this release, along with their linked curiosities and intentions.
+                {selectedReleaseInfo.release.description}
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
