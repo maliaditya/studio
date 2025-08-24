@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Legend, PolarRadiusAxis } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -198,18 +198,30 @@ function TimesheetPageContent() {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const dailySchedule = schedule[dateKey] || {};
         const allActivitiesForDay: ProcessedActivity[] = [];
-
+    
         Object.values(dailySchedule).flat().forEach((activity: any) => {
             if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
                 let duration = 0;
                 if (activity.type === 'deepwork') {
                     const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
-                    duration = taskLog?.loggedSets.reduce((sum, set) => sum + set.weight, 0) || 0;
+                    if (dailyLog && activity.taskIds) {
+                      activity.taskIds.forEach((taskId: string) => {
+                          const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
+                          if (taskLog) {
+                              duration += taskLog.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+                          }
+                      });
+                    }
                 } else if (activity.type === 'upskill') {
                     const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
-                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
-                    duration = taskLog?.loggedSets.reduce((sum, set) => sum + set.reps, 0) || 0;
+                     if (dailyLog && activity.taskIds) {
+                      activity.taskIds.forEach((taskId: string) => {
+                          const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
+                          if (taskLog) {
+                              duration += taskLog.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+                          }
+                      });
+                    }
                 } else if (activity.type === 'interrupt') {
                     duration = activity.duration || 0;
                 } else {
@@ -335,6 +347,7 @@ function TimesheetPageContent() {
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
+                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} />
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
