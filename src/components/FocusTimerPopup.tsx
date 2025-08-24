@@ -34,7 +34,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
   const [lastSubTaskCompletionTime, setLastSubTaskCompletionTime] = useState<number | null>(null);
-  const [completedSubTaskIds, setCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
@@ -62,7 +61,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    // Find the definition that is the prefix of the instance ID.
     return allDefs.find(d => parentId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
@@ -92,29 +90,26 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return timeMap;
   }, [allDeepWorkLogs, allUpskillLogs]);
   
-  // Initialize completed tasks only once
-  useEffect(() => {
-    const preCompletedIds = new Set<string>();
-    subTasks.forEach(task => {
-        if (loggedTimeMap.has(task.id)) {
-            preCompletedIds.add(task.id);
-        }
-    });
-    setCompletedSubTaskIds(preCompletedIds);
-  }, [subTasks, loggedTimeMap]);
+  const {
+    pendingSubTasks,
+    completedSubTaskComponents,
+    activeSubTask
+  } = useMemo(() => {
+    const completed = subTasks.filter(task => loggedTimeMap.has(task.id));
+    const completedIds = new Set(completed.map(t => t.id));
 
-
-  const activeSubTask = useMemo(() => {
-    return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
-  }, [activeSubTaskId, allDefinitions]);
-  
-  const pendingSubTasks = useMemo(() => {
-    return subTasks.filter(task => !completedSubTaskIds.has(task.id) && task.id !== activeSubTaskId);
-  }, [subTasks, completedSubTaskIds, activeSubTaskId]);
-
-  const completedSubTaskComponents = useMemo(() => {
-    return subTasks.filter(task => completedSubTaskIds.has(task.id));
-  }, [subTasks, completedSubTaskIds]);
+    let active: ExerciseDefinition | null = activeSubTaskId ? allDefinitions.get(activeSubTaskId) ?? null : null;
+    
+    const pending = subTasks.filter(task => 
+      !completedIds.has(task.id) && task.id !== activeSubTaskId
+    );
+    
+    return {
+        pendingSubTasks: pending,
+        completedSubTaskComponents: completed,
+        activeSubTask: active,
+    };
+  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
 
 
   const style: React.CSSProperties = {
@@ -167,7 +162,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [WORK_DURATION, setIsAudioPlaying, lastSubTaskCompletionTime]);
 
   const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
-    if (completedSubTaskIds.has(subTaskId)) return;
+    if (loggedTimeMap.has(subTaskId)) return;
     setPromptForCompletion(false);
     
     const now = Date.now();
@@ -185,15 +180,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     
     setLastSubTaskCompletionTime(now);
-    const newCompletedIds = new Set(completedSubTaskIds).add(subTaskId);
-    setCompletedSubTaskIds(newCompletedIds);
     setActiveSubTaskId(null);
     setSessionState('idle');
     setIsAudioPlaying(false);
 
-    // Auto-start next task from the *original* subTasks list
-    const currentIndex = subTasks.findIndex(st => st.id === subTaskId);
-    const nextTask = subTasks.slice(currentIndex + 1).find(st => !newCompletedIds.has(st.id));
+    // Auto-start next task
+    const completedIds = new Set(loggedTimeMap.keys());
+    completedIds.add(subTaskId);
+    const nextTask = subTasks.find(st => !completedIds.has(st.id));
 
     if (nextTask) {
         handleStartSubTask(nextTask);
@@ -201,17 +195,19 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         // All tasks done
         handleStop(true); // Automatically stop and mark complete
     }
-  }, [completedSubTaskIds, subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
+  }, [loggedTimeMap, subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
 
 
   useEffect(() => {
+    // This effect runs once on mount to start the first available task
     if (sessionState === 'idle' && !activeSubTaskId) {
-        const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
-        if (firstUncompletedTask) {
-            handleStartSubTask(firstUncompletedTask);
+        const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
+        if (firstPendingTask) {
+            handleStartSubTask(firstPendingTask);
         }
     }
-  }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask, sessionState]);
+  }, [subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask]);
+
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -272,27 +268,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const handleTogglePause = () => {
-    const newState = sessionState === 'running' ? 'paused' : 'running';
-    setSessionState(newState);
-    setIsAudioPlaying(newState === 'running');
+    const isCurrentlyRunning = sessionState === 'running';
+    setSessionState(isCurrentlyRunning ? 'paused' : 'running');
+    setIsAudioPlaying(!isCurrentlyRunning);
   };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
-  const progressPercentage = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
   
-  const chartData = [
-    {
-      name: 'progress',
-      value: progressPercentage,
-      fill: 'hsl(var(--primary))',
-    },
-    {
-      name: 'remaining',
-      value: 100 - progressPercentage,
-      fill: 'hsl(var(--muted))',
-    },
-  ];
-
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
