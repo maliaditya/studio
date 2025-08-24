@@ -559,7 +559,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleCreateResource,
 }, ref) => {
 
-    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, setEditingFocusArea } = useAuth();
+    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions } = useAuth();
     
     const getDomainForCategory = useCallback((category: string) => {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -1881,7 +1881,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={onToggleReadyForBranding}
+                    onToggleReadyForBranding={handleToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
@@ -2393,3 +2393,4 @@ export default function DeepWorkPage() {
     
 
     
+
