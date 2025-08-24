@@ -407,17 +407,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                       const data = payload[0].payload;
                                       const categoryName = data.name;
                                       const categoryData = timeAllocationData.find(item => item.name === categoryName);
+                                      
                                       if (categoryName === 'Free Time') {
                                         return (
                                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value * 60)}</p>
+                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.time * 60)}</p>
                                            </div>
                                         );
                                       }
+
                                       return (
                                           <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value * 60)}</p>
-                                              {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
+                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.time * 60)}</p>
+                                              {categoryData && categoryData.activities && (
                                                 <>
                                                   <Separator />
                                                   <ul className="space-y-1">
