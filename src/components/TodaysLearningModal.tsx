@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -169,9 +168,9 @@ export function TodaysLearningModal({
     }).sort((a,b) => a.name.localeCompare(b.name));
   }, [upskillDefinitions, selectedUpskillProject, pageType, getUpskillNodeType]);
 
-  const getVisualizationsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
+  const getObjectivesRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();
-      const visualizations: ExerciseDefinition[] = [];
+      const objectives: ExerciseDefinition[] = [];
       const queue: string[] = [nodeId];
   
       while (queue.length > 0) {
@@ -182,29 +181,28 @@ export function TodaysLearningModal({
           const node = upskillDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          if (getUpskillNodeType(node) === 'Visualization') {
-              visualizations.push(node);
-          } else if (getUpskillNodeType(node) === 'Objective' || getUpskillNodeType(node) === 'Curiosity') { // It's an Objective or Curiosity, so recurse
-              (node.linkedUpskillIds || []).forEach(childId => {
-                  if (!visited.has(childId)) {
-                      queue.push(childId);
-                  }
-              });
+          if (getUpskillNodeType(node) === 'Objective') {
+              objectives.push(node);
           }
+          (node.linkedUpskillIds || []).forEach(childId => {
+              if (!visited.has(childId)) {
+                  queue.push(childId);
+              }
+          });
       }
-      return visualizations.sort((a,b) => a.name.localeCompare(b.name));
+      return objectives.sort((a,b) => a.name.localeCompare(b.name));
   }, [upskillDefinitions, getUpskillNodeType]);
 
-  const visualizationsForCuriosity = useMemo(() => {
+  const objectivesForCuriosity = useMemo(() => {
     if (!selectedUpskillCuriosity || pageType !== 'upskill') return [];
-    return getVisualizationsRecursive(selectedUpskillCuriosity.id);
-  }, [selectedUpskillCuriosity, pageType, getVisualizationsRecursive]);
+    return getObjectivesRecursive(selectedUpskillCuriosity.id);
+  }, [selectedUpskillCuriosity, pageType, getObjectivesRecursive]);
 
 
   // ----- DEEPWORK-SPECIFIC LOGIC -----
-  const getActionsRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
+  const getObjectivesForIntentionRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
       const visited = new Set<string>();
-      const actions: ExerciseDefinition[] = [];
+      const objectives: ExerciseDefinition[] = [];
       const queue: string[] = [nodeId];
 
       while (queue.length > 0) {
@@ -215,15 +213,14 @@ export function TodaysLearningModal({
           const node = deepWorkDefinitions.find(d => d.id === currentId);
           if (!node) continue;
   
-          if(getDeepWorkNodeType(node) === 'Action') {
-              actions.push(node);
-          } else if (getDeepWorkNodeType(node) === 'Intention' || getDeepWorkNodeType(node) === 'Objective') { // It's an Intention or Objective, so recurse
-              (node.linkedDeepWorkIds || []).forEach(childId => {
-                  if (!visited.has(childId)) queue.push(childId);
-              });
+          if(getDeepWorkNodeType(node) === 'Objective') {
+              objectives.push(node);
           }
+          (node.linkedDeepWorkIds || []).forEach(childId => {
+              if (!visited.has(childId)) queue.push(childId);
+          });
       }
-      return actions.sort((a,b) => a.name.localeCompare(b.name));
+      return objectives.sort((a,b) => a.name.localeCompare(b.name));
   }, [deepWorkDefinitions, getDeepWorkNodeType]);
 
   const intentionsForProject = useMemo(() => {
@@ -235,10 +232,10 @@ export function TodaysLearningModal({
     }).sort((a,b) => a.name.localeCompare(b.name));
   }, [deepWorkDefinitions, selectedDeepWorkProject, pageType, getDeepWorkNodeType]);
 
-  const actionsForIntention = useMemo(() => {
+  const objectivesForIntention = useMemo(() => {
     if (!selectedDeepWorkIntention || pageType !== 'deepwork') return [];
-    return getActionsRecursive(selectedDeepWorkIntention.id);
-  }, [selectedDeepWorkIntention, pageType, getActionsRecursive]);
+    return getObjectivesForIntentionRecursive(selectedDeepWorkIntention.id);
+  }, [selectedDeepWorkIntention, pageType, getObjectivesForIntentionRecursive]);
 
 
   const pageInfo = {
@@ -332,19 +329,19 @@ export function TodaysLearningModal({
                     )}
                     {deepWorkSelectionStep === 'action' && (
                          <div className="space-y-2">
-                           {actionsForIntention.length > 0 ? (
+                           {objectivesForIntention.length > 0 ? (
                                 <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {actionsForIntention.map(action => (
-                                    <div key={action.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={action.id} id={`action-radio-${action.id}`} />
-                                        <Label htmlFor={`action-radio-${action.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                            <Bolt className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                            {action.name}
+                                {objectivesForIntention.map(objective => (
+                                    <div key={objective.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                        <RadioGroupItem value={objective.id} id={`objective-radio-${objective.id}`} />
+                                        <Label htmlFor={`objective-radio-${objective.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                            <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            {objective.name}
                                         </Label>
                                     </div>
                                 ))}
                                 </RadioGroup>
-                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable tasks found for this intention.</p>}
+                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable objectives found for this intention.</p>}
                         </div>
                     )}
                 </div>
@@ -477,19 +474,19 @@ export function TodaysLearningModal({
                     )}
                     {upskillSelectionStep === 'visualization' && (
                         <div className="space-y-2">
-                            {visualizationsForCuriosity.length > 0 ? (
+                            {objectivesForCuriosity.length > 0 ? (
                                 <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {visualizationsForCuriosity.map(viz => (
-                                    <div key={viz.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={viz.id} id={`viz-radio-${viz.id}`} />
-                                        <Label htmlFor={`viz-radio-${viz.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                            <Frame className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                            {viz.name}
+                                {objectivesForCuriosity.map(objective => (
+                                    <div key={objective.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                        <RadioGroupItem value={objective.id} id={`objective-radio-${objective.id}`} />
+                                        <Label htmlFor={`objective-radio-${objective.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                            <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
+                                            {objective.name}
                                         </Label>
                                     </div>
                                 ))}
                                 </RadioGroup>
-                            ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable visualizations found for this curiosity.</p>}
+                            ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable objectives found for this curiosity.</p>}
                         </div>
                     )}
                 </div>
