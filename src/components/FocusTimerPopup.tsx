@@ -68,7 +68,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    return allDefs.find(def => parentId.startsWith(def.id));
+    return allDefs.find(d => parentId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const subTasks = useMemo(() => {
@@ -241,12 +241,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   if (!activity) return null;
 
-  const chartData = [
-    {
-      name: 'completed',
-      value: progressPercentage,
-    },
-  ];
+  const RADIUS = 70;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -272,33 +269,28 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               </div>
               
               <div className="relative w-40 h-40 mx-auto">
-                 <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart
-                        innerRadius="80%"
-                        outerRadius="100%"
-                        data={chartData}
-                        startAngle={90}
-                        endAngle={-270}
-                    >
-                        <PolarAngleAxis
-                            type="number"
-                            domain={[0, 100]}
-                            angleAxisId={0}
-                            tick={false}
-                        />
-                        <RadialBar
-                            background
-                            dataKey="value"
-                            cornerRadius={10}
-                            className="fill-primary"
-                        />
-                         <style>{`
-                            .recharts-radial-bar-background-sector {
-                                fill: hsl(var(--muted));
-                            }
-                        `}</style>
-                    </RadialBarChart>
-                </ResponsiveContainer>
+                 <svg className="w-full h-full" viewBox="0 0 160 160">
+                    <circle
+                        cx="80"
+                        cy="80"
+                        r={RADIUS}
+                        fill="transparent"
+                        stroke="hsl(var(--muted))"
+                        strokeWidth="10"
+                    />
+                    <circle
+                        cx="80"
+                        cy="80"
+                        r={RADIUS}
+                        fill="transparent"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth="10"
+                        strokeDasharray={CIRCUMFERENCE}
+                        strokeDashoffset={strokeDashoffset}
+                        transform="rotate(-90 80 80)"
+                        style={{ transition: 'stroke-dashoffset 1s linear' }}
+                    />
+                </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-4xl font-bold font-mono">
                           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
