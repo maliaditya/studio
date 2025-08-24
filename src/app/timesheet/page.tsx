@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Legend, Radar, PolarRadiusAxis } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Radar, PolarRadiusAxis } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -277,7 +277,7 @@ function TimesheetPageContent() {
           'Essentials': 1,
           'Planning': 0.5,
           'Tracking': 0.5,
-          'Interrupts': 0,
+          'Interrupts': 4,
         };
 
         const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time]));
