@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar, LineChart as LineChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -130,13 +129,29 @@ function TimesheetPageContent() {
              if (activity.completed) {
                 if (activity.type === 'deepwork') {
                     const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
-                    return taskLog?.loggedSets.reduce((sum, set) => sum + set.weight, 0) || 0;
+                    let duration = 0;
+                    if (dailyLog && activity.taskIds) {
+                        activity.taskIds.forEach(taskId => {
+                            const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
+                            if (taskLog) {
+                                duration += taskLog.loggedSets.reduce((sum, set) => sum + set.weight, 0);
+                            }
+                        });
+                    }
+                    return duration;
                 }
                 if (activity.type === 'upskill') {
                     const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
-                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
-                    return taskLog?.loggedSets.reduce((sum, set) => sum + set.reps, 0) || 0;
+                    let duration = 0;
+                    if (dailyLog && activity.taskIds) {
+                        activity.taskIds.forEach(taskId => {
+                            const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
+                            if (taskLog) {
+                                duration += taskLog.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+                            }
+                        });
+                    }
+                    return duration;
                 }
                 if (activity.type === 'interrupt') {
                     return activity.duration || 0;
@@ -347,7 +362,7 @@ function TimesheetPageContent() {
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
-                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} />
+                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} axisId={0} />
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
@@ -362,8 +377,8 @@ function TimesheetPageContent() {
                                                 return null;
                                             }} />
                                             <Legend />
-                                            <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} angleAxisId={0} />
-                                            <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} angleAxisId={0} />
+                                            <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} angleAxisId={0} radiusAxisId={0} />
+                                            <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} angleAxisId={0} radiusAxisId={0} />
                                         </RadarChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
