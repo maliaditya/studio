@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar as RadarIcon, LineChart as LineChartIcon } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar as RadarIcon, LineChart as LineChartIcon, PieChart as PieChartIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -19,11 +19,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Radar, PolarRadiusAxis } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Radar, PolarRadiusAxis, PieChart, Pie } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
+type TimeAllocationView = "bar" | "radar" | "pie";
 
 const formatMinutes = (minutes: number) => {
     if (minutes <= 0) return "0m";
@@ -109,7 +110,7 @@ function TimesheetPageContent() {
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
-    const [timeAllocationView, setTimeAllocationView] = useState<'bar' | 'radar'>('bar');
+    const [timeAllocationView, setTimeAllocationView] = useState<TimeAllocationView>('bar');
 
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
         if (!durationStr) return 0;
@@ -153,7 +154,7 @@ function TimesheetPageContent() {
                     }
                     return duration;
                 }
-                if (activity.type === 'interrupt') {
+                if (activity.type === 'interrupt' || activity.type === 'essentials') {
                     return activity.duration || 0;
                 }
                 return parseDurationToMinutes(activityDurations[activity.id]);
@@ -237,7 +238,7 @@ function TimesheetPageContent() {
                           }
                       });
                     }
-                } else if (activity.type === 'interrupt') {
+                } else if (activity.type === 'interrupt' || activity.type === 'essentials') {
                     duration = activity.duration || 0;
                 } else {
                     duration = parseDurationToMinutes(activityDurations[activity.id]);
@@ -258,7 +259,7 @@ function TimesheetPageContent() {
         allActivitiesForDay.forEach(activity => {
             const mappedName = activityNameMap[activity.type];
             if (mappedName) {
-                totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration / 60;
+                totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
             }
         });
         
@@ -280,7 +281,7 @@ function TimesheetPageContent() {
           'Interrupts': 4,
         };
 
-        const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time]));
+        const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time/60]));
         const allSubjects = new Set([...Object.keys(idealHours), ...todayMap.keys()]);
     
         return Array.from(allSubjects).map(subject => ({
@@ -289,6 +290,19 @@ function TimesheetPageContent() {
           ideal: idealHours[subject] || 0,
         }));
     }, [timeAllocationData]);
+
+    const pieData = useMemo(() => {
+        const totalMinutesInDay = 24 * 60;
+        const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
+        const freeTime = totalMinutesInDay - totalAllocatedMinutes;
+
+        const data = timeAllocationData.map(item => ({ name: item.name, value: item.time }));
+        if (freeTime > 0) {
+            data.push({ name: 'Free Time', value: freeTime });
+        }
+        return data;
+    }, [timeAllocationData]);
+
     
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -332,8 +346,8 @@ function TimesheetPageContent() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base"><BarChartIcon/> Time Allocation</CardTitle>
-                        <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'radar' : 'bar')}>
-                            {timeAllocationView === 'bar' ? <RadarIcon className="h-4 w-4" /> : <BarChartIcon className="h-4 w-4" />}
+                        <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'radar' : v === 'radar' ? 'pie' : 'bar')}>
+                            {timeAllocationView === 'bar' ? <RadarIcon className="h-4 w-4" /> : timeAllocationView === 'radar' ? <PieChartIcon className="h-4 w-4"/> : <BarChartIcon className="h-4 w-4" />}
                         </Button>
                     </CardHeader>
                     <CardContent>
@@ -342,11 +356,11 @@ function TimesheetPageContent() {
                                 <ChartContainer config={{}} className="h-[200px] w-full">
                                     <ResponsiveContainer>
                                         <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
-                                            <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => value.toFixed(1) + 'h'} />
+                                            <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
                                             <ChartTooltip
                                                 cursor={{ fill: "hsl(var(--muted))" }}
-                                                content={<ChartTooltipContent />}
+                                                content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} />}
                                             />
                                             <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                                                 {timeAllocationData.map((entry, index) => (
@@ -356,13 +370,13 @@ function TimesheetPageContent() {
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
-                            ) : (
+                            ) : timeAllocationView === 'radar' ? (
                                 <ChartContainer config={{}} className="h-[250px] w-full">
                                     <ResponsiveContainer>
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
-                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} axisId={0} />
+                                            <PolarRadiusAxis angle={90} domain={[0, 8]} axisId={0} />
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
@@ -376,10 +390,25 @@ function TimesheetPageContent() {
                                                 }
                                                 return null;
                                             }} />
-                                            
                                             <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} radiusAxisId={0} />
-                                            <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} radiusAxisId={0} />
+                                            <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} radiusAxisId={0}/>
                                         </RadarChart>
+                                    </ResponsiveContainer>
+                                </ChartContainer>
+                            ) : (
+                                <ChartContainer config={{}} className="h-[250px] w-full">
+                                    <ResponsiveContainer>
+                                        <PieChart>
+                                            <RechartsTooltip
+                                                cursor={{ fill: "hsl(var(--muted))" }}
+                                                content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
+                                            />
+                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                                {pieData.map((entry, index) => (
+                                                  <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                ))}
+                                            </Pie>
+                                        </PieChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
                             )
