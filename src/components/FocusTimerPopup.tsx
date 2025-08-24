@@ -24,11 +24,11 @@ interface FocusTimerPopupProps {
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
   const { 
       activeFocusSession, setActiveFocusSession, 
-      setIsAudioPlaying,
       updateActivity, handleToggleComplete,
       deepWorkDefinitions, upskillDefinitions,
       allDeepWorkLogs, allUpskillLogs,
-      logSubTaskTime
+      logSubTaskTime,
+      setIsAudioPlaying,
   } = useAuth();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
@@ -282,7 +282,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = (progressPercentage / 100) * CIRCUMFERENCE;
+  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -325,7 +325,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         stroke="hsl(var(--primary))"
                         strokeWidth="10"
                         strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={CIRCUMFERENCE - strokeDashoffset}
+                        strokeDashoffset={strokeDashoffset}
                         transform="rotate(-90 80 80)"
                         style={{ transition: 'stroke-dashoffset 1s linear' }}
                     />
