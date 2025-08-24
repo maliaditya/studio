@@ -137,7 +137,7 @@ function TimesheetPageContent() {
                     const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
                     return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
                 }
-                if (activity.type === 'interrupt') {
+                 if (activity.type === 'interrupt') {
                     return activity.duration || 0;
                 }
             }
@@ -179,7 +179,11 @@ function TimesheetPageContent() {
                         if (filterActivity(activity)) {
                             let duration = getLoggedMinutes(activity, dateKey);
                             if (duration === 0) { // If no logged time, use planned duration
-                                duration = parseDurationToMinutes(activityDurations[activity.id]);
+                                 if (activity.type === 'interrupt') {
+                                     duration = activity.duration || 0;
+                                 } else {
+                                    duration = parseDurationToMinutes(activityDurations[activity.id]);
+                                 }
                             }
 
                             if (duration > 0 || !activity.completed) {
@@ -197,7 +201,33 @@ function TimesheetPageContent() {
     
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const activitiesForDay = timeData.dailyData[dateKey] || [];
+        // IMPORTANT: For the chart, we get *all* data for the day, ignoring the filter.
+        const dailySchedule = schedule[dateKey] || {};
+        const activitiesForDay: ProcessedActivity[] = [];
+
+        Object.values(dailySchedule).flat().forEach((activity: any) => {
+            if (activity && typeof activity === 'object' && 'type' in activity) {
+                let duration = 0;
+                 if (activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill')) {
+                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                    const dailyLog = logs.find(log => log.date === dateKey);
+                    if (dailyLog && activity.taskIds) {
+                        const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds.includes(ex.id));
+                        const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                        duration = relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+                    }
+                } else if (activity.type === 'interrupt' && activity.completed) {
+                    duration = activity.duration || 0;
+                } else if (activity.completed) {
+                    duration = parseDurationToMinutes(activityDurations[activity.id]);
+                }
+                
+                if (duration > 0) {
+                     activitiesForDay.push({ ...activity, calculatedDuration: duration });
+                }
+            }
+        });
+        
         const totals: Record<string, number> = {};
         
         const activityNameMap: Record<ActivityTypeType, string> = {
@@ -214,7 +244,7 @@ function TimesheetPageContent() {
         return Object.entries(totals)
           .map(([name, time]) => ({ name, time }))
           .filter(item => item.time > 0);
-    }, [selectedDate, timeData]);
+    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs]);
     
     const radarData = useMemo(() => {
         const idealHours: Record<string, number> = {
