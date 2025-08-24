@@ -264,17 +264,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
   
   const handleTogglePause = () => {
-    setSessionState(prev => {
-        if (prev === 'running') {
-            setIsAudioPlaying(false);
-            return 'paused';
-        }
-        if (prev === 'paused') {
-            setIsAudioPlaying(true);
-            return 'running';
-        }
-        return prev;
-    });
+    if (sessionState === 'running') {
+      setSessionState('paused');
+      setIsAudioPlaying(false);
+    } else if (sessionState === 'paused') {
+      setSessionState('running');
+      setIsAudioPlaying(true);
+    }
   };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
@@ -286,7 +282,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = elapsedSeconds / totalSeconds * CIRCUMFERENCE;
+  const strokeDashoffset = CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE);
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -329,7 +325,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         stroke="hsl(var(--primary))"
                         strokeWidth="10"
                         strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={CIRCUMFERENCE - strokeDashoffset}
+                        strokeDashoffset={strokeDashoffset}
                         transform="rotate(-90 80 80)"
                         style={{ transition: 'stroke-dashoffset 1s linear' }}
                     />
