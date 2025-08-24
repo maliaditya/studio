@@ -49,7 +49,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = React.useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
+  const [sessionState, setSessionState] = React.useState<'idle' | 'running' | 'paused'>('idle');
   const [currentCycle, setCurrentCycle] = React.useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = React.useState(WORK_DURATION);
   
@@ -110,7 +110,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   React.useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
-        setSessionState('finished');
+        setSessionState('idle');
         setIsAudioPlaying(false);
         if (activeSubTaskId) {
             handleSubTaskComplete(activeSubTaskId, true); // Mark as complete when timer ends
@@ -199,7 +199,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
 
-  const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;
+  const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
+  const chartData = [{ value: progressPercentage }];
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
@@ -212,13 +213,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
-        <Card ref={popupRef} className="w-96 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
+        <Card ref={popupRef} className="w-[600px] shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
             <CardContent className="p-4 grid grid-cols-2 gap-4">
             <div className="col-span-1 space-y-2">
               <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
                   <BrainCircuit className="h-5 w-5 text-primary" />
-                  <p className="text-sm font-medium">Focus</p>
+                  <p className="text-sm font-medium">Focus period...</p>
                   </div>
                   <div className="flex items-center">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
@@ -228,20 +229,61 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               </div>
               
               <div className="relative w-40 h-40 mx-auto">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <RadialBarChart
+                        innerRadius="80%"
+                        outerRadius="100%"
+                        data={chartData}
+                        startAngle={90}
+                        endAngle={-270}
+                    >
+                        <PolarAngleAxis
+                            type="number"
+                            domain={[0, 100]}
+                            angleAxisId={0}
+                            tick={false}
+                        />
+                        <RadialBar
+                            background
+                            dataKey="value"
+                            cornerRadius={10}
+                            className="fill-primary"
+                        />
+                         <style>{`
+                            .recharts-radial-bar-background-sector {
+                                fill: hsl(var(--muted));
+                            }
+                        `}</style>
+                    </RadialBarChart>
+                </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-3xl font-bold font-mono">
+                      <span className="text-4xl font-bold font-mono">
                           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
                       </span>
                   </div>
               </div>
-              <div className="text-center mt-2">
+              <div className="text-center -mt-2">
                   <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                       {sessionState === 'running' && (currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />)}
                       <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
                   </div>
               </div>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                 <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-12 w-12 rounded-full"
+                    onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}
+                    disabled={!activeSubTaskId || sessionState === 'idle'}
+                 >
+                    {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                 </Button>
+                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full">
+                     <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+              </div>
                <div className="mt-4 pt-4 border-t border-border/20 text-center">
-                  <p className="text-xs text-muted-foreground">Active Task</p>
+                  <p className="text-xs text-muted-foreground">Task</p>
                   <p className="text-sm font-semibold truncate" title={activeSubTaskName}>
                       {activeSubTaskName}
                   </p>
