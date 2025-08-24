@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, formatDistanceStrict } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart, Radar } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart as BarChartComponent, Bar as BarComponent, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, AreaChart, Area, RadarChart, PolarGrid, PolarAngleAxis, Legend } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -127,17 +127,19 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                const dailyLog = logs.find(log => log.date === dateKey);
-                if (!dailyLog || !activity.taskIds) return 0;
-                
-                const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-                const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-            }
-            if (activity.type === 'interrupt' && activity.completed) {
-                return activity.duration || 0;
+            if (activity.completed) {
+                if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                    const dailyLog = logs.find(log => log.date === dateKey);
+                    if (!dailyLog || !activity.taskIds) return 0;
+                    
+                    const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+                    const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                    return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+                }
+                if (activity.type === 'interrupt') {
+                    return activity.duration || 0;
+                }
             }
             return 0;
         };
@@ -175,16 +177,12 @@ function TimesheetPageContent() {
                 if (activities) {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
-                            let duration = 0;
-                            if (activity.completed) {
-                                if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'interrupt') {
-                                    duration = getLoggedMinutes(activity, dateKey);
-                                }
-                            } else if (activity.type !== 'interrupt') {
+                            let duration = getLoggedMinutes(activity, dateKey);
+                            if (duration === 0) { // If no logged time, use planned duration
                                 duration = parseDurationToMinutes(activityDurations[activity.id]);
                             }
 
-                            if (duration > 0 || !activity.completed) { // Also include non-completed non-interrupt tasks for view
+                            if (duration > 0 || !activity.completed) {
                                 processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
                             }
                         }
@@ -225,6 +223,10 @@ function TimesheetPageContent() {
           'Workout': 1,
           'Branding': 2,
           'Lead Gen': 1,
+          'Essentials': 1,
+          'Planning': 0.5,
+          'Tracking': 0.5,
+          'Interrupts': 0,
         };
     
         const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time]));
@@ -277,9 +279,9 @@ function TimesheetPageContent() {
                 </CardHeader>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-base"><BarChart/> Time Allocation</CardTitle>
+                        <CardTitle className="flex items-center gap-2 text-base"><BarChartIcon/> Time Allocation</CardTitle>
                         <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'radar' : 'bar')}>
-                            {timeAllocationView === 'bar' ? <Radar className="h-4 w-4" /> : <BarChart className="h-4 w-4" />}
+                            {timeAllocationView === 'bar' ? <Radar className="h-4 w-4" /> : <BarChartIcon className="h-4 w-4" />}
                         </Button>
                     </CardHeader>
                     <CardContent>
@@ -287,19 +289,19 @@ function TimesheetPageContent() {
                             timeAllocationView === 'bar' ? (
                                 <ChartContainer config={{}} className="h-[200px] w-full">
                                     <ResponsiveContainer>
-                                        <BarChartComponent data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                                             <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => value.toFixed(1) + 'h'} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
                                             <ChartTooltip
                                                 cursor={{ fill: "hsl(var(--muted))" }}
                                                 content={<ChartTooltipContent />}
                                             />
-                                            <BarComponent dataKey="time" radius={[0, 4, 4, 0]}>
+                                            <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                                                 {timeAllocationData.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
                                                 ))}
-                                            </BarComponent>
-                                        </BarChartComponent>
+                                            </Bar>
+                                        </BarChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
                             ) : (
