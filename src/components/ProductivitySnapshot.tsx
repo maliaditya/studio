@@ -417,7 +417,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                       return (
                                           <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                               <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value * 60)}</p>
-                                              {categoryData && categoryData.activities.length > 0 && (
+                                              {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
                                                 <>
                                                   <Separator />
                                                   <ul className="space-y-1">
