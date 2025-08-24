@@ -192,7 +192,7 @@ function TimesheetPageContent() {
 
         const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
         
-        const dailyData: Record<string, ProcessedActivity[]> = {};
+        const dailyData: Record<string, { activities: ProcessedActivity[]; pieData: { name: string, value: number }[] }> = {};
         
         for (const day of dateRange) {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -213,7 +213,25 @@ function TimesheetPageContent() {
                     });
                 }
             });
-            dailyData[dateKey] = processedActivities;
+
+            // Calculate pie data for this day
+            const totals: Record<string, number> = {};
+            const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
+            
+            processedActivities.forEach(activity => {
+                const mappedName = activityNameMap[activity.type];
+                if (mappedName) {
+                    totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
+                }
+            });
+            const allocatedMinutes = Object.values(totals).reduce((sum, t) => sum + t, 0);
+            const freeTime = (24 * 60) - allocatedMinutes;
+            
+            const pieData = Object.entries(totals).map(([name, value]) => ({ name, value }));
+            if (freeTime > 0) pieData.push({ name: 'Free Time', value: freeTime });
+
+
+            dailyData[dateKey] = { activities: processedActivities, pieData };
         }
 
         return { dailyData };
@@ -276,7 +294,7 @@ function TimesheetPageContent() {
     
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const activitiesForDay = timeData.dailyData[dateKey] || [];
+        const activitiesForDay = timeData.dailyData[dateKey]?.activities || [];
         
         const calculateAttentionMetrics = (activity: Activity) => {
             if (!activity.focusSessionInitialStartTime || !activity.focusSessionEndTime) {
@@ -436,28 +454,10 @@ function TimesheetPageContent() {
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {weekRange.map(day => {
                         const dateKey = format(day, 'yyyy-MM-dd');
-                        const activities = timeData.dailyData[dateKey] || [];
+                        const dayData = timeData.dailyData[dateKey];
+                        const activities = dayData?.activities || [];
+                        const pieData = dayData?.pieData || [];
                         const totalDayMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
-                        
-                        const dailyPieData = useMemo(() => {
-                             const totals: Record<string, number> = {};
-                            const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
-                            
-                            activities.forEach(activity => {
-                                const mappedName = activityNameMap[activity.type];
-                                if (mappedName) {
-                                    totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
-                                }
-                            });
-
-                            const allocatedMinutes = Object.values(totals).reduce((sum, t) => sum + t, 0);
-                            const freeTime = (24 * 60) - allocatedMinutes;
-                            
-                            const data = Object.entries(totals).map(([name, value]) => ({ name, value }));
-                            if (freeTime > 0) data.push({ name: 'Free Time', value: freeTime });
-                            
-                            return data;
-                        }, [activities]);
 
                         return (
                             <Card 
@@ -472,13 +472,13 @@ function TimesheetPageContent() {
                                   </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-2 flex-grow flex items-center justify-center">
-                                    {dailyPieData.length > 0 ? (
+                                    {pieData.length > 0 ? (
                                         <ChartContainer config={{}} className="h-32 w-32">
                                             <ResponsiveContainer>
                                                 <PieChart>
                                                     <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />} />
-                                                    <Pie data={dailyPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
-                                                        {dailyPieData.map((entry, index) => (
+                                                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                                        {pieData.map((entry, index) => (
                                                             <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
                                                         ))}
                                                     </Pie>
@@ -504,7 +504,8 @@ function TimesheetPageContent() {
         
         const monthlyData = monthRange.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
-            const activities = timeData.dailyData[dateKey] || [];
+            const dayData = timeData.dailyData[dateKey];
+            const activities = dayData?.activities || [];
             return {
                 day,
                 dateKey,
@@ -622,3 +623,4 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
