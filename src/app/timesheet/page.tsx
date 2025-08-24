@@ -48,6 +48,21 @@ interface ProcessedActivity extends Activity {
     calculatedDuration: number; // in minutes
 }
 
+const activityColorMapping: Record<string, string> = {
+    'Deep Work': 'hsl(var(--chart-1))',
+    'Learning': 'hsl(var(--chart-2))',
+    'Workout': 'hsl(var(--chart-3))',
+    'Branding': 'hsl(var(--chart-4))',
+    'Lead Gen': 'hsl(var(--chart-5))',
+    'Essentials': 'hsl(var(--chart-1))',
+    'Planning': 'hsl(var(--chart-2))',
+    'Tracking': 'hsl(var(--chart-3))',
+    'Interrupts': 'hsl(var(--destructive))',
+    'Nutrition': 'hsl(var(--chart-4))',
+    'Free Time': 'hsl(var(--muted))',
+};
+
+
 const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpenChange: (open: boolean) => void, data: { date: Date; activities: ProcessedActivity[] } }) => {
   const { date, activities } = data;
   const totalMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
@@ -306,9 +321,7 @@ function TimesheetPageContent() {
         const activities = new Set<string>();
         Object.values(timeData.dailyData).forEach(day => {
             day.pieData.forEach(p => {
-                if (p.name !== 'Free Time') {
-                    activities.add(p.name);
-                }
+                activities.add(p.name);
             });
         });
         return Array.from(activities).sort();
@@ -365,7 +378,13 @@ function TimesheetPageContent() {
                             timeAllocationView === 'bar' ? (
                                 <ChartContainer config={{}} className="h-[200px] w-full">
                                     <ResponsiveContainer>
-                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }} onClick={setModalData}>
+                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }} onClick={(data) => {
+                                            if (data && data.activePayload) {
+                                                const categoryName = data.activePayload[0].payload.name;
+                                                const categoryActivities = timeAllocationData.find(d => d.name === categoryName)?.activities || [];
+                                                setModalData({ date: selectedDate, activities: categoryActivities.map(a => ({...a, type: 'deepwork', slot: '', completed: true, calculatedDuration: a.duration})) });
+                                            }
+                                        }}>
                                             <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
                                             <Tooltip
@@ -390,7 +409,7 @@ function TimesheetPageContent() {
                                             />
                                             <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                                                 {timeAllocationData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                    <Cell key={`cell-${index}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                 ))}
                                             </Bar>
                                         </BarChart>
@@ -404,8 +423,8 @@ function TimesheetPageContent() {
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
                                             <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name }) => name}>
-                                                {pieData.map((entry, index) => (
-                                                  <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                {pieData.map((entry) => (
+                                                  <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                 ))}
                                             </Pie>
                                         </PieChart>
@@ -492,7 +511,7 @@ function TimesheetPageContent() {
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
                         {allActivitiesInView.map((name, index) => (
                             <div key={name} className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(var(--chart-${(index % 5) + 1}))` }}/>
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
                                 <span>{name}</span>
                             </div>
                         ))}
@@ -548,8 +567,8 @@ function TimesheetPageContent() {
                                                             }}
                                                         />
                                                         <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
-                                                            {pieData.map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                            {pieData.map((entry) => (
+                                                                <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
                                                     </PieChart>
