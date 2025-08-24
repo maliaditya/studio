@@ -365,7 +365,7 @@ function TimesheetPageContent() {
                             timeAllocationView === 'bar' ? (
                                 <ChartContainer config={{}} className="h-[200px] w-full">
                                     <ResponsiveContainer>
-                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }} onClick={setModalData}>
                                             <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
                                             <Tooltip
@@ -488,7 +488,7 @@ function TimesheetPageContent() {
                     <CardTitle>Week View: {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}</CardTitle>
                     <CardDescription>A summary of your time for the selected week. Click a card for details.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                 <CardContent>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
                         {allActivitiesInView.map((name, index) => (
                             <div key={name} className="flex items-center gap-2">
@@ -522,7 +522,31 @@ function TimesheetPageContent() {
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
                                                     <PieChart>
-                                                        <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />} />
+                                                        <ChartTooltip
+                                                            content={({ active, payload }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    const data = payload[0].payload;
+                                                                    const categoryName = data.name;
+                                                                    const categoryActivities = activities.filter(act => {
+                                                                        const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
+                                                                        return activityNameMap[act.type] === categoryName;
+                                                                    });
+
+                                                                    return (
+                                                                        <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                            <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
+                                                                            {categoryActivities.length > 0 && <Separator />}
+                                                                            <ul className="space-y-1">
+                                                                                {categoryActivities.map((act, index) => (
+                                                                                    <li key={index} className="text-muted-foreground">{act.details} ({formatMinutes(act.calculatedDuration)})</li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
+                                                        />
                                                         <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
                                                             {pieData.map((entry, index) => (
                                                                 <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
@@ -671,3 +695,6 @@ export default function TimesheetPage() {
     );
 }
 
+
+
+    
