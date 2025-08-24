@@ -1,4 +1,5 @@
 
+
       
 
 "use client";
@@ -149,6 +150,9 @@ function MyPlatePageContent() {
   
   const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
   
+  // New state to track if carry-over has run
+  const [carryOverComplete, setCarryOverComplete] = useState(false);
+  
   useEffect(() => {
     // Correctly initialize date on client-side to prevent hydration mismatch
     setSelectedDate(new Date());
@@ -193,7 +197,8 @@ function MyPlatePageContent() {
 
   // Carry forward tasks logic
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
+    if (!currentUser || !isScheduleLoaded || !selectedDate || carryOverComplete) return;
+
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
@@ -203,16 +208,18 @@ function MyPlatePageContent() {
     const yesterday = addDays(today, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
-    if (lastCarryForwardDate === todayDateKey) return;
-    
     const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
-    if (hasTodaysActivities) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
+    if (hasTodaysActivities) {
+        setCarryOverComplete(true);
+        return;
+    }
 
     const yesterdaysSchedule = schedule[yesterdayKey];
-    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) { localStorage.setItem(lastCarryForwardKey, todayDateKey); return; }
+    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
+        setCarryOverComplete(true);
+        return;
+    }
 
     const newTodaySchedule: DailySchedule = {};
     let carriedOver = false;
@@ -244,8 +251,8 @@ function MyPlatePageContent() {
         setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
         toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
-    localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate]);
+    setCarryOverComplete(true); 
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate, carryOverComplete]);
   
     const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
