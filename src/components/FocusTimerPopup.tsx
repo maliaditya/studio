@@ -62,7 +62,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    return allDefs.find(d => taskId.startsWith(d.id));
+    return allDefs.find(d => parentId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const subTasks = useMemo(() => {
@@ -195,8 +195,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
+    // Start the first available task if no task is active, the session is idle, and the task isn't already the one we would try to start.
     if (firstUncompletedTask && !activeSubTaskId && sessionState === 'idle') {
-      // Ensure we don't try to start a task that's already considered active for some reason
       if(firstUncompletedTask.id !== activeSubTaskId) {
         handleStartSubTask(firstUncompletedTask);
       }
