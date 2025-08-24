@@ -13,7 +13,7 @@ import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashbo
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart, Pie } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule } from '@/types/workout';
+import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule, ActivityType } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -47,12 +47,26 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 interface ProductivitySnapshotProps {
   stats: any;
-  timeAllocationData: { name: string; time: number }[];
+  timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
   todaysSchedule: DailySchedule;
   activityDurations: Record<string, string>;
 }
+
+const activityColorMapping: Record<string, string> = {
+    'Deep Work': 'hsl(var(--chart-1))',
+    'Learning': 'hsl(var(--chart-2))',
+    'Workout': 'hsl(var(--chart-3))',
+    'Branding': 'hsl(var(--chart-4))',
+    'Lead Gen': 'hsl(var(--chart-5))',
+    'Essentials': 'hsl(var(--chart-1))',
+    'Planning': 'hsl(var(--chart-2))',
+    'Tracking': 'hsl(var(--chart-3))',
+    'Interrupts': 'hsl(var(--destructive))',
+    'Nutrition': 'hsl(var(--chart-4))',
+    'Free Time': 'hsl(var(--muted))',
+};
 
 const useThemeColors = () => {
     const [colors, setColors] = useState<string[]>([]);
@@ -85,21 +99,13 @@ const activityTypeMapping: Record<string, Activity['type']> = {
     'Nutrition': 'nutrition',
 };
 
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    
-    // Handle "30" as "30m"
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
-
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-    
-    return totalMinutes;
+const formatMinutes = (minutes: number) => {
+    if (minutes <= 0) return "0m";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
 };
 
 
@@ -189,20 +195,12 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const handleBarClick = (data: any) => {
     if (!data || !data.activePayload) return;
     const categoryName = data.activePayload[0].payload.name;
-    const activityType = activityTypeMapping[categoryName];
+    
+    const categoryData = timeAllocationData.find(item => item.name === categoryName);
 
-    const tasksForCategory = Object.values(todaysSchedule)
-        .flat()
-        .filter((act): act is Activity => !!act && act.type === activityType)
-        .map(act => ({
-            name: act.details,
-            duration: parseDurationToMinutes(activityDurations[act.id])
-        }))
-        .filter(task => task.duration > 0);
-        
     setAllocationDetailData({
         category: categoryName,
-        tasks: tasksForCategory
+        tasks: categoryData ? categoryData.activities : []
     });
     setIsAllocationDetailModalOpen(true);
   };
@@ -210,7 +208,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   const processedTimeData = useMemo(() => {
     return timeAllocationData.map((entry, index) => ({
       ...entry,
-      fill: entry.name === 'Free Time' ? '#000000' : themeColors[index % themeColors.length]
+      fill: activityColorMapping[entry.name] || themeColors[index % themeColors.length]
     }));
   }, [timeAllocationData, themeColors]);
 
@@ -399,25 +397,61 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div>
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
             {processedTimeData.length > 0 ? (
-                <ChartContainer config={{}} className="h-[150px] w-full">
-                <ResponsiveContainer>
-                    <BarChart data={processedTimeData} layout="vertical" margin={{ left: 10, right: 10 }} onClick={handleBarClick}>
-                        <CartesianGrid horizontal={false} />
-                        <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} tickCount={7} fontSize={12} tickFormatter={(value) => value.toFixed(1)} />
-                        <YAxis type="category" dataKey="name" width={70} tickLine={false} axisLine={false} fontSize={12} />
-                        <ChartTooltip
-                            cursor={{ fill: "hsl(var(--muted))" }}
-                            content={<ChartTooltipContent />}
-                        />
-                        <Bar dataKey="time" radius={[0, 4, 4, 0]}>
-                            {processedTimeData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer" onClick={handleBarClick}>
+                  <ResponsiveContainer>
+                      <PieChart>
+                          <ChartTooltip
+                              cursor={{ fill: "hsl(var(--muted))" }}
+                              content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                      const data = payload[0].payload;
+                                      const categoryName = data.name;
+                                      const categoryData = timeAllocationData.find(item => item.name === categoryName);
+                                      if (categoryName === 'Free Time') {
+                                        return (
+                                           <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value * 60)}</p>
+                                           </div>
+                                        );
+                                      }
+                                      return (
+                                          <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value * 60)}</p>
+                                              {categoryData && categoryData.activities.length > 0 && (
+                                                <>
+                                                  <Separator />
+                                                  <ul className="space-y-1">
+                                                      {categoryData.activities.map((act, index) => (
+                                                          <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                      ))}
+                                                  </ul>
+                                                </>
+                                              )}
+                                          </div>
+                                      );
+                                  }
+                                  return null;
+                              }}
+                          />
+                          <Pie
+                              data={processedTimeData}
+                              dataKey="time"
+                              nameKey="name"
+                              cx="50%"
+                              cy="50%"
+                              outerRadius={80}
+                              innerRadius={50}
+                              labelLine={false}
+                              label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                          >
+                              {processedTimeData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                              ))}
+                          </Pie>
+                      </PieChart>
+                  </ResponsiveContainer>
                 </ChartContainer>
-            ) : <div className="h-[150px] w-full bg-muted animate-pulse rounded-md" />}
+            ) : <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />}
           </div>
         </CardContent>
       </Card>
