@@ -376,7 +376,7 @@ function TimesheetPageContent() {
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
-                                            <PolarRadiusAxis angle={90} domain={[0, 8]} axisId={0} />
+                                            <PolarRadiusAxis angle={90} domain={[0, 8]} axisId={0}/>
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
@@ -390,7 +390,7 @@ function TimesheetPageContent() {
                                                 }
                                                 return null;
                                             }} />
-                                            <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} radiusAxisId={0} />
+                                            <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} radiusAxisId={0}/>
                                             <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} radiusAxisId={0}/>
                                         </RadarChart>
                                     </ResponsiveContainer>
@@ -399,7 +399,7 @@ function TimesheetPageContent() {
                                 <ChartContainer config={{}} className="h-[250px] w-full">
                                     <ResponsiveContainer>
                                         <PieChart>
-                                            <RechartsTooltip
+                                            <ChartTooltip
                                                 cursor={{ fill: "hsl(var(--muted))" }}
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
