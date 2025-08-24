@@ -10,14 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, formatDistanceStrict } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart3 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
-import type { Activity, PauseEvent } from '@/types/workout';
+import type { Activity, PauseEvent, ActivityType as ActivityTypeType } from '@/types/workout';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import { BarChart, Bar, Cell, ResponsiveContainer } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -108,6 +110,18 @@ function TimesheetPageContent() {
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
 
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr) return 0;
+        if (/^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+        return totalMinutes;
+    };
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
@@ -121,16 +135,6 @@ function TimesheetPageContent() {
                 return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + set[durationField], 0), 0);
             }
             return 0;
-        };
-        
-        const parseDurationToMinutes = (durationStr: string | undefined): number => {
-            if (!durationStr) return 0;
-            let totalMinutes = 0;
-            const hourMatch = durationStr.match(/(\d+)\s*h/);
-            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-            const minMatch = durationStr.match(/(\d+)\s*m/);
-            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-            return totalMinutes;
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -183,6 +187,27 @@ function TimesheetPageContent() {
         return { dailyData };
     }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, activityDurations]);
     
+    const timeAllocationData = useMemo(() => {
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const activitiesForDay = timeData.dailyData[dateKey] || [];
+        const totals: Record<string, number> = {};
+        
+        const activityNameMap: Record<ActivityTypeType, string> = {
+            deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
+        };
+
+        activitiesForDay.forEach(activity => {
+            const mappedName = activityNameMap[activity.type];
+            if (mappedName) {
+                totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration / 60;
+            }
+        });
+        
+        return Object.entries(totals)
+          .map(([name, time]) => ({ name, time }))
+          .filter(item => item.time > 0);
+    }, [selectedDate, timeData]);
+    
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const activitiesForDay = timeData.dailyData[dateKey] || [];
@@ -222,6 +247,34 @@ function TimesheetPageContent() {
                     <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
                     <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
                 </CardHeader>
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base"><BarChart3/> Time Allocation</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {timeAllocationData.length > 0 ? (
+                             <ChartContainer config={{}} className="h-[200px] w-full">
+                                <ResponsiveContainer>
+                                    <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                        <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => value.toFixed(1) + 'h'} />
+                                        <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
+                                        <ChartTooltip
+                                            cursor={{ fill: "hsl(var(--muted))" }}
+                                            content={<ChartTooltipContent />}
+                                        />
+                                        <Bar dataKey="time" radius={[0, 4, 4, 0]}>
+                                            {timeAllocationData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        ) : (
+                            <p className="text-sm text-center text-muted-foreground py-8">No time logged for this day.</p>
+                        )}
+                    </CardContent>
+                </Card>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slotOrder.map(slot => {
                         const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
