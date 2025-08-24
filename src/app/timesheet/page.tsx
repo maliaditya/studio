@@ -192,7 +192,7 @@ function TimesheetPageContent() {
 
         const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
         
-        const dailyData: Record<string, { activities: ProcessedActivity[]; pieData: { name: string, value: number }[] }> = {};
+        const dailyData: Record<string, { activities: ProcessedActivity[]; pieData: { name: string; value: number }[] }> = {};
         
         for (const day of dateRange) {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -291,6 +291,17 @@ function TimesheetPageContent() {
         return data;
     }, [timeAllocationData]);
 
+    const allActivitiesInView = useMemo(() => {
+        const activities = new Set<string>();
+        Object.values(timeData.dailyData).forEach(day => {
+            day.pieData.forEach(p => {
+                if (p.name !== 'Free Time') {
+                    activities.add(p.name);
+                }
+            });
+        });
+        return Array.from(activities).sort();
+    }, [timeData.dailyData]);
     
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -334,7 +345,7 @@ function TimesheetPageContent() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base"><BarChartIcon/> Time Allocation</CardTitle>
-                        <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'pie' : 'bar')}>
+                         <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'pie' : 'bar')}>
                             {timeAllocationView === 'bar' ? <PieChartIcon className="h-4 w-4" /> : <BarChartIcon className="h-4 w-4" />}
                         </Button>
                     </CardHeader>
@@ -366,7 +377,7 @@ function TimesheetPageContent() {
                                                 cursor={{ fill: "hsl(var(--muted))" }}
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
-                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name }) => name} stroke="hsl(var(--background))" strokeWidth={2}>
+                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name }) => name}>
                                                 {pieData.map((entry, index) => (
                                                   <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
                                                 ))}
@@ -451,47 +462,57 @@ function TimesheetPageContent() {
                     <CardTitle>Week View: {format(startDate, 'MMM d')} - {format(endDate, 'MMM d, yyyy')}</CardTitle>
                     <CardDescription>A summary of your time for the selected week. Click a card for details.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {weekRange.map(day => {
-                        const dateKey = format(day, 'yyyy-MM-dd');
-                        const dayData = timeData.dailyData[dateKey];
-                        const activities = dayData?.activities || [];
-                        const pieData = dayData?.pieData || [];
-                        const totalDayMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
+                <CardContent>
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
+                        {allActivitiesInView.map((name, index) => (
+                            <div key={name} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: `hsl(var(--chart-${(index % 5) + 1}))` }}/>
+                                <span>{name}</span>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {weekRange.map(day => {
+                            const dateKey = format(day, 'yyyy-MM-dd');
+                            const dayData = timeData.dailyData[dateKey];
+                            const activities = dayData?.activities || [];
+                            const pieData = dayData?.pieData || [];
+                            const totalDayMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
 
-                        return (
-                            <Card 
-                                key={dateKey} 
-                                onClick={() => setModalData({ date: day, activities })}
-                                className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
-                            >
-                                <CardHeader className="p-3 pb-0">
-                                  <CardTitle className="text-base flex justify-between items-center">
-                                      <span>{format(day, 'EEE, MMM d')}</span>
-                                      <span className="font-mono text-sm text-muted-foreground">{formatMinutes(totalDayMinutes)}</span>
-                                  </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-2 flex-grow flex items-center justify-center">
-                                    {pieData.length > 0 ? (
-                                        <ChartContainer config={{}} className="h-32 w-32">
-                                            <ResponsiveContainer>
-                                                <PieChart>
-                                                    <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />} />
-                                                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
-                                                        {pieData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
-                                                        ))}
-                                                    </Pie>
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </ChartContainer>
-                                    ) : (
-                                        <p className="text-xs text-center text-muted-foreground p-4">No activities</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
+                            return (
+                                <Card 
+                                    key={dateKey} 
+                                    onClick={() => setModalData({ date: day, activities })}
+                                    className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
+                                >
+                                    <CardHeader className="p-3 pb-0">
+                                    <CardTitle className="text-base flex justify-between items-center">
+                                        <span>{format(day, 'EEE, MMM d')}</span>
+                                        <span className="font-mono text-sm text-muted-foreground">{formatMinutes(totalDayMinutes)}</span>
+                                    </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-2 flex-grow flex items-center justify-center">
+                                        {pieData.length > 0 ? (
+                                            <ChartContainer config={{}} className="h-32 w-32">
+                                                <ResponsiveContainer>
+                                                    <PieChart>
+                                                        <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />} />
+                                                        <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                                            {pieData.map((entry, index) => (
+                                                                <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
+                                                            ))}
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </ChartContainer>
+                                        ) : (
+                                            <p className="text-xs text-center text-muted-foreground p-4">No activities</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -624,3 +645,4 @@ export default function TimesheetPage() {
     );
 }
 
+```
