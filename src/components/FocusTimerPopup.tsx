@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -281,7 +282,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
+  const strokeDashoffset = (progressPercentage / 100) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -324,7 +325,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         stroke="hsl(var(--primary))"
                         strokeWidth="10"
                         strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={CIRCUMFERENCE - (elapsedSeconds / totalSeconds) * CIRCUMFERENCE}
+                        strokeDashoffset={CIRCUMFERENCE - strokeDashoffset}
                         transform="rotate(-90 80 80)"
                         style={{ transition: 'stroke-dashoffset 1s linear' }}
                     />
