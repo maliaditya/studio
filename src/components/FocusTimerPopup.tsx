@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { } from 'react';
@@ -50,12 +49,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = React.useState<'running' | 'paused' | 'finished'>('running');
+  const [sessionState, setSessionState] = React.useState<'idle' | 'running' | 'paused' | 'finished'>('idle');
   const [currentCycle, setCurrentCycle] = React.useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = React.useState(WORK_DURATION);
   
   const popupRef = React.useRef<HTMLDivElement>(null);
-  
+  const [activeSubTaskId, setActiveSubTaskId] = React.useState<string | null>(null);
+
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
@@ -88,10 +88,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
   React.useEffect(() => {
-    setIsAudioPlaying(true);
-    setCycleSecondsLeft(WORK_DURATION);
+    // We don't start the main music immediately anymore for Objectives
+    // setIsAudioPlaying(true); 
     setLastSubTaskCompletionTime(Date.now());
-  }, [setIsAudioPlaying]);
+  }, []);
 
   React.useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -112,20 +112,24 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (secondsLeft <= 0 && sessionState === 'running') {
         setSessionState('finished');
         setIsAudioPlaying(false);
+        if (activeSubTaskId) {
+            handleSubTaskComplete(activeSubTaskId, true); // Mark as complete when timer ends
+            setActiveSubTaskId(null);
+        }
     }
 
     if (cycleSecondsLeft <= 0 && sessionState === 'running') {
         if (currentCycle === 'work') {
             setCurrentCycle('break');
             setCycleSecondsLeft(BREAK_DURATION);
-            setIsAudioPlaying(false); // Stop music for break
-        } else { // Break is over
+            setIsAudioPlaying(false);
+        } else {
             setCurrentCycle('work');
             setCycleSecondsLeft(WORK_DURATION);
-            setIsAudioPlaying(true); // Resume music for work
+            setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId]);
 
   React.useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -149,7 +153,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       updateActivity(updatedActivity);
 
       if (completed) {
-        onLogTime(updatedActivity, duration); // Log the full intended duration
+        onLogTime(updatedActivity, duration);
         handleToggleComplete(activity.slot, activity.id, true);
       } else if (elapsedSeconds > 0) {
         onLogTime(updatedActivity, Math.floor(elapsedSeconds / 60));
@@ -158,54 +162,33 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     onClose();
   };
   
-  const togglePlayPause = () => {
-    const now = Date.now();
-    let updatedActivity = { ...activity };
-    let newSessionState: 'running' | 'paused';
-  
-    if (sessionState === 'running') {
-      newSessionState = 'paused';
-      const newPause: PauseEvent = { pauseTime: now, resumeTime: null };
-      updatedActivity.focusSessionPauses = [...(updatedActivity.focusSessionPauses || []), newPause];
-      setIsAudioPlaying(false); // Pause music on manual pause
-    } else { // Resuming from pause
-      newSessionState = 'running';
-      const lastPauseIndex = (updatedActivity.focusSessionPauses || []).length - 1;
-      if (lastPauseIndex >= 0 && updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime === null) {
-        updatedActivity.focusSessionPauses![lastPauseIndex].resumeTime = now;
-      }
-       if (currentCycle === 'work') {
-          setIsAudioPlaying(true); // Only resume music if it's a work cycle
-       }
-    }
+  const handleStartSubTask = (subTask: ExerciseDefinition) => {
+    const durationMins = subTask.estimatedDuration || 25;
+    const durationSecs = durationMins * 60;
     
-    updatedActivity.focusSessionStartTime = now;
-    updateActivity(updatedActivity);
-    setActiveFocusSession(prev => prev ? {...prev, activity: updatedActivity} : null);
-    setSessionState(newSessionState);
-  };
-  
-  const handleExtend = () => {
-    const newTotalSeconds = totalSeconds + 15 * 60;
-    setTotalSeconds(newTotalSeconds);
-    setSecondsLeft(prev => prev + (15 * 60));
+    setTotalSeconds(durationSecs);
+    setSecondsLeft(durationSecs);
+    setCycleSecondsLeft(WORK_DURATION);
+    setCurrentCycle('work');
+    setActiveSubTaskId(subTask.id);
     setSessionState('running');
     setIsAudioPlaying(true);
-  };
-  
-  const handleOpenContext = (e: React.MouseEvent) => {
-      if (activity.taskIds && activity.taskIds.length > 0 && popupRef.current) {
-          const timerRect = popupRef.current.getBoundingClientRect();
-          openTaskContextPopup(activity.id, timerRect);
-      }
+    setLastSubTaskCompletionTime(Date.now()); // Reset timer for this subtask
   };
 
-  const handleSubTaskComplete = (subTaskId: string) => {
+  const handleSubTaskComplete = (subTaskId: string, timerFinished: boolean = false) => {
     if (completedSubTaskIds.has(subTaskId)) return;
     
     const now = Date.now();
-    const timeSinceLastCompletion = lastSubTaskCompletionTime ? now - lastSubTaskCompletionTime : totalSeconds - secondsLeft;
-    const durationMinutes = Math.floor(timeSinceLastCompletion / 60000);
+    let durationMinutes = 0;
+
+    if (timerFinished) {
+        const subTask = subTasks.find(st => st.id === subTaskId);
+        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds - secondsLeft) / 60);
+    } else {
+        const timeSinceLast = lastSubTaskCompletionTime ? now - lastSubTaskCompletionTime : totalSeconds - secondsLeft;
+        durationMinutes = Math.floor(timeSinceLast / 60000);
+    }
     
     if (durationMinutes > 0) {
         logSubTaskTime(subTaskId, durationMinutes);
@@ -220,13 +203,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
-  const chartData = [{ name: 'progress', value: progressPercentage, fill: 'hsl(var(--primary))' }];
-  
   if (!activity) return null;
 
-  const isContextAvailable = (activity.type === 'deepwork' || activity.type === 'upskill') && (activity.taskIds?.length ?? 0) > 0;
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
+  
+  const activeSubTaskName = activeSubTaskId ? allDefinitions.get(activeSubTaskId)?.name : "None";
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -245,42 +227,23 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   </div>
               </div>
               
-              {sessionState !== 'finished' ? (
-                <>
-                  <div className="relative w-40 h-40 mx-auto">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadialBarChart innerRadius="80%" outerRadius="100%" data={chartData} startAngle={90} endAngle={-270} barSize={8}>
-                          <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-                          <RadialBar background={{ fill: 'hsl(var(--muted))' }} dataKey="value" cornerRadius={10} angleAxisId={0} />
-                      </RadialBarChart>
-                    </ResponsiveContainer>
-                    <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-40 h-40 mx-auto">
+                  <div className="absolute inset-0 flex items-center justify-center">
                       <span className="text-3xl font-bold font-mono">
                           {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
                       </span>
-                    </div>
                   </div>
-                  <div className="text-center mt-2">
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                          {currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />}
-                          <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
-                      </div>
+              </div>
+              <div className="text-center mt-2">
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      {sessionState === 'running' && (currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />)}
+                      <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
                   </div>
-                  <div className="flex justify-center items-center gap-4 mt-2">
-                      <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
-                        {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                      </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center gap-4 pt-4 pb-2">
-                  <Button className="w-full" onClick={() => handleStop(true)}><Check className="mr-2 h-4 w-4"/> Completed</Button>
-                  <Button variant="outline" className="w-full" onClick={handleExtend}><RefreshCw className="mr-2 h-4 w-4"/> Extend 15 mins</Button>
-                </div>
-              )}
-              <div className="mt-4 pt-4 border-t border-border/20 text-center">
-                  <p className="text-sm font-semibold truncate" title={activity.details}>
-                      Task: {activity.details}
+              </div>
+               <div className="mt-4 pt-4 border-t border-border/20 text-center">
+                  <p className="text-xs text-muted-foreground">Active Task</p>
+                  <p className="text-sm font-semibold truncate" title={activeSubTaskName}>
+                      {activeSubTaskName}
                   </p>
               </div>
             </div>
@@ -291,12 +254,21 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <div className="space-y-2 pr-2">
                   {subTasks.map(task => (
                     <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-muted/30">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleStartSubTask(task)}
+                            disabled={sessionState === 'running' || completedSubTaskIds.has(task.id)}
+                        >
+                            <Play className="h-4 w-4" />
+                        </Button>
+                        <label htmlFor={`subtask-${task.id}`} className="flex-grow">{task.name}</label>
                         <Checkbox 
                             id={`subtask-${task.id}`}
                             checked={completedSubTaskIds.has(task.id)}
                             onCheckedChange={() => handleSubTaskComplete(task.id)}
                         />
-                        <label htmlFor={`subtask-${task.id}`} className="flex-grow cursor-pointer">{task.name}</label>
                     </div>
                   ))}
                   {subTasks.length === 0 && (

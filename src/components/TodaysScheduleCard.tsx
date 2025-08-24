@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -169,29 +168,6 @@ interface TodaysScheduleCardProps {
   currentSlot: string;
 }
 
-const parseDurationToHours = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    
-    // Handle "30" as "30m"
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10) / 60;
-    }
-
-    let totalHours = 0;
-    
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) {
-      totalHours += parseInt(hourMatch[1], 10);
-    }
-  
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) {
-      totalHours += parseInt(minMatch[1], 10) / 60;
-    }
-    
-    return totalHours;
-};
-
 export function TodaysScheduleCard({ 
   schedule, 
   date,
@@ -252,6 +228,22 @@ export function TodaysScheduleCard({
     if (dailyActivities.length === 0) {
         return { completed: 0, total: 0 };
     }
+
+    const parseDurationToHours = (durationStr: string | undefined): number => {
+        if (!durationStr || typeof durationStr !== 'string') return 0;
+        
+        if (/^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10) / 60;
+        }
+    
+        let totalHours = 0;
+        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        if (hourMatch) totalHours += parseInt(hourMatch[1], 10);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+        if (minMatch) totalHours += parseInt(minMatch[1], 10) / 60;
+        
+        return totalHours;
+    };
 
     const totalScheduledHours = dailyActivities.reduce((sum, activity) => {
         const duration = activityDurations[activity.id];
