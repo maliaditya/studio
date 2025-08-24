@@ -2,15 +2,10 @@
 "use client";
 
 import React, { } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import {
   ResponsiveContainer,
   RadialBarChart,
@@ -18,8 +13,7 @@ import {
   PolarAngleAxis,
 } from "recharts"
 import { useAuth } from '@/contexts/AuthContext';
-import { DndContext, useDraggable } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
 import { Checkbox } from './ui/checkbox';
 
@@ -35,7 +29,7 @@ interface FocusTimerPopupProps {
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
   const { 
       activeFocusSession, setActiveFocusSession, 
-      setIsAudioPlaying, openTaskContextPopup, 
+      setIsAudioPlaying,
       updateActivity, handleToggleComplete,
       deepWorkDefinitions, upskillDefinitions,
       logSubTaskTime
@@ -67,7 +61,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const focusedObjective = React.useMemo(() => {
     const parentId = activity.taskIds?.[0];
     if(!parentId) return null;
-    return allDefinitions.get(parentId.split('-')[0]);
+    // The definitionId in a workoutExercise is the full ID of the definition
+    const defId = allDefinitions.get(parentId)?.definitionId;
+    if (!defId) {
+        // Fallback for older data structure where taskIds might be the definitionId directly
+        return allDefinitions.get(parentId.split('-')[0]);
+    }
+    return allDefinitions.get(defId);
   }, [activity.taskIds, allDefinitions]);
   
   const subTasks = React.useMemo(() => {
@@ -79,6 +79,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [focusedObjective, allDefinitions]);
 
+  const activeSubTask = React.useMemo(() => {
+    return activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
+  }, [activeSubTaskId, allDefinitions]);
+
   const style: React.CSSProperties = {
     position: 'fixed',
     top: '1.5rem', // 24px
@@ -88,8 +92,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
   React.useEffect(() => {
-    // We don't start the main music immediately anymore for Objectives
-    // setIsAudioPlaying(true); 
     setLastSubTaskCompletionTime(Date.now());
   }, []);
 
@@ -140,7 +142,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
 
   const handleStop = (completed: boolean) => {
-    setSessionState('paused');
+    setSessionState('idle');
+    setActiveSubTaskId(null);
     setIsAudioPlaying(false);
     
     const elapsedSeconds = totalSeconds - secondsLeft;
@@ -196,6 +199,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     
     setLastSubTaskCompletionTime(now);
     setCompletedSubTaskIds(prev => new Set(prev).add(subTaskId));
+    setActiveSubTaskId(null);
+    setSessionState('idle');
+    setIsAudioPlaying(false);
   };
 
 
@@ -208,8 +214,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
-  
-  const activeSubTaskName = activeSubTaskId ? allDefinitions.get(activeSubTaskId)?.name : "None";
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -268,21 +272,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
                   </div>
               </div>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                 <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-12 w-12 rounded-full"
-                    onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}
-                    disabled={!activeSubTaskId || sessionState === 'idle'}
-                 >
-                    {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                 </Button>
-                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-full">
-                     <MoreHorizontal className="h-5 w-5" />
-                  </Button>
+               <div className="mt-2 text-center">
+                    <p className="text-xs text-muted-foreground">Now Focusing On</p>
+                    <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
+                        {activeSubTask ? (
+                            <>
+                                <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
+                                    {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
+                                    <Check className="h-4 w-4 text-green-500" />
+                                </Button>
+                            </>
+                        ) : (
+                            <p className="text-sm italic text-muted-foreground">Select a task to begin</p>
+                        )}
+                    </div>
               </div>
-               <div className="mt-4 pt-4 border-t border-border/20 text-center">
+               <div className="mt-2 pt-2 border-t border-border/20 text-center">
                   <p className="text-xs text-muted-foreground">Objective</p>
                   <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
                       {focusedObjective?.name || '...'}
@@ -294,7 +302,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <h4 className="text-sm font-semibold mb-2">Sub-tasks for {focusedObjective?.name}</h4>
               <ScrollArea className="h-80">
                 <div className="space-y-2 pr-2">
-                  {subTasks.map(task => (
+                  {subTasks.filter(task => task.id !== activeSubTaskId).map(task => (
                     <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-muted/30">
                         <Button
                             variant="ghost"
