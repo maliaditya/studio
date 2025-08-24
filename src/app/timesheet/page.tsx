@@ -376,7 +376,7 @@ function TimesheetPageContent() {
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
                                             <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
-                                            <PolarRadiusAxis angle={90} domain={[0, 8]} axisId={0}/>
+                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} axisId={0} />
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
@@ -403,7 +403,7 @@ function TimesheetPageContent() {
                                                 cursor={{ fill: "hsl(var(--muted))" }}
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
-                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name }) => name}>
                                                 {pieData.map((entry, index) => (
                                                   <Cell key={`cell-${index}`} fill={`hsl(var(--chart-${(index % 5) + 1}))`} />
                                                 ))}
