@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -20,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip } from 'recharts';
 
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
@@ -237,46 +236,59 @@ function TimesheetPageContent() {
     }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, activityDurations]);
     
     const timeAllocationData = useMemo(() => {
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const dailySchedule = schedule[dateKey] || {};
-        const allActivitiesForDay: ProcessedActivity[] = [];
-    
-        Object.values(dailySchedule).flat().forEach((activity: any) => {
-            if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
-                let duration = 0;
-                if (activity.type === 'deepwork') {
-                    duration = getLoggedMinutesForDay(dateKey, 'deepwork');
-                } else if (activity.type === 'upskill') {
-                    duration = getLoggedMinutesForDay(dateKey, 'upskill');
-                } else if (activity.type === 'interrupt' || activity.type === 'essentials') {
-                    duration = activity.duration || 0;
-                } else {
-                    duration = parseDurationToMinutes(activityDurations[activity.id]);
-                }
-                
-                if (duration > 0) {
-                     allActivitiesForDay.push({ ...activity, calculatedDuration: duration });
-                }
-            }
-        });
-        
-        const totals: Record<string, number> = {};
-        
-        const activityNameMap: Record<ActivityTypeType, string> = {
-            deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
-        };
-
-        allActivitiesForDay.forEach(activity => {
-            const mappedName = activityNameMap[activity.type];
-            if (mappedName) {
-                totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
-            }
-        });
-        
-        return Object.entries(totals)
-          .map(([name, time]) => ({ name, time }))
-          .filter(item => item.time > 0);
-    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs, getLoggedMinutesForDay]);
+      const dateKey = format(selectedDate, 'yyyy-MM-dd');
+      const dailySchedule = schedule[dateKey] || {};
+      const allActivitiesForDay: ProcessedActivity[] = [];
+  
+      Object.values(dailySchedule).flat().forEach((activity: any) => {
+          if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
+              let duration = 0;
+              if (activity.type === 'deepwork') {
+                  const log = allDeepWorkLogs.find(l => l.date === dateKey);
+                  if (log) {
+                      duration = log.exercises
+                          .filter(ex => activity.taskIds?.includes(ex.id))
+                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
+                  }
+              } else if (activity.type === 'upskill') {
+                  const log = allUpskillLogs.find(l => l.date === dateKey);
+                  if (log) {
+                      duration = log.exercises
+                          .filter(ex => activity.taskIds?.includes(ex.id))
+                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
+                  }
+              } else if (activity.type === 'interrupt' || activity.type === 'essentials') {
+                  duration = activity.duration || 0;
+              } else {
+                  duration = parseDurationToMinutes(activityDurations[activity.id]);
+              }
+              
+              if (duration > 0) {
+                   allActivitiesForDay.push({ ...activity, calculatedDuration: duration });
+              }
+          }
+      });
+      
+      const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+      const activityNameMap: Record<ActivityTypeType, string> = {
+          deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
+      };
+  
+      allActivitiesForDay.forEach(activity => {
+          const mappedName = activityNameMap[activity.type];
+          if (mappedName) {
+              if (!totals[mappedName]) {
+                  totals[mappedName] = { time: 0, activities: [] };
+              }
+              totals[mappedName].time += activity.calculatedDuration;
+              totals[mappedName].activities.push({ name: activity.details, duration: activity.calculatedDuration });
+          }
+      });
+      
+      return Object.entries(totals)
+        .map(([name, data]) => ({ name, time: data.time, activities: data.activities }))
+        .filter(item => item.time > 0);
+    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs]);
 
     const pieData = useMemo(() => {
         const totalMinutesInDay = 24 * 60;
@@ -356,9 +368,25 @@ function TimesheetPageContent() {
                                         <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
                                             <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
-                                            <ChartTooltip
+                                            <Tooltip
                                                 cursor={{ fill: "hsl(var(--muted))" }}
-                                                content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} />}
+                                                content={({ active, payload }) => {
+                                                  if (active && payload && payload.length) {
+                                                    const data = payload[0].payload;
+                                                    return (
+                                                      <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.time)}</p>
+                                                        <Separator />
+                                                        <ul className="space-y-1">
+                                                            {data.activities.map((act: {name: string, duration: number}, index: number) => (
+                                                                <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                            ))}
+                                                        </ul>
+                                                      </div>
+                                                    );
+                                                  }
+                                                  return null;
+                                                }}
                                             />
                                             <Bar dataKey="time" radius={[0, 4, 4, 0]}>
                                                 {timeAllocationData.map((entry, index) => (
@@ -373,7 +401,6 @@ function TimesheetPageContent() {
                                     <ResponsiveContainer>
                                         <PieChart>
                                             <ChartTooltip
-                                                cursor={{ fill: "hsl(var(--muted))" }}
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
                                             <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name }) => name}>
@@ -643,3 +670,4 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
