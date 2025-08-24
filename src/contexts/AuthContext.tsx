@@ -96,6 +96,7 @@ interface AuthContextType {
   setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
   updateActivity: (updatedActivity: Activity) => void;
@@ -324,15 +325,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
 
-  const useTrackedState = <S,>(initialState: S | (() => S)): [S, React.Dispatch<React.SetStateAction<S>>] => {
-    const [state, setState] = useState(initialState);
-    const setterWithTracking: React.Dispatch<React.SetStateAction<S>> = useCallback((value) => {
-      setState(value);
-      setLocalChangeCount(c => c + 1);
-    }, []);
-    return [state, setterWithTracking];
-  };
-
   const prevUser = usePrevious(currentUser);
   
   const [isLoadingState, setIsLoadingState] = useState(true);
@@ -343,117 +335,117 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   // Health State
-  const [weightLogs, setWeightLogs] = useTrackedState<WeightLog[]>([]);
-  const [goalWeight, setGoalWeight] = useTrackedState<number | null>(null);
-  const [height, setHeight] = useTrackedState<number | null>(null);
-  const [dateOfBirth, setDateOfBirth] = useTrackedState<string | null>(null);
-  const [gender, setGender] = useTrackedState<Gender | null>(null);
-  const [dietPlan, setDietPlan] = useTrackedState<UserDietPlan>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+  const [goalWeight, setGoalWeight] = useState<number | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [dietPlan, setDietPlan] = useState<UserDietPlan>([]);
   
   // Schedule & Logs
-  const [schedule, setSchedule] = useTrackedState<FullSchedule>({});
-  const [dailyPurposes, setDailyPurposes] = useTrackedState<Record<string, string>>({});
-  const [isAgendaDocked, setIsAgendaDocked] = useTrackedState(true);
-  const [activityDurations, setActivityDurations] = useTrackedState<Record<string, string>>({});
-  const [allUpskillLogs, setAllUpskillLogs] = useTrackedState<DatedWorkout[]>([]);
-  const [allDeepWorkLogs, setAllDeepWorkLogs] = useTrackedState<DatedWorkout[]>([]);
-  const [allWorkoutLogs, setAllWorkoutLogs] = useTrackedState<DatedWorkout[]>([]);
-  const [brandingLogs, setAllBrandingLogs] = useTrackedState<DatedWorkout[]>([]);
-  const [allLeadGenLogs, setAllLeadGenLogs] = useTrackedState<DatedWorkout[]>([]);
+  const [schedule, setSchedule] = useState<FullSchedule>({});
+  const [dailyPurposes, setDailyPurposes] = useState<Record<string, string>>({});
+  const [isAgendaDocked, setIsAgendaDocked] = useState(true);
+  const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
+  const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
+  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
   
   // Data Definitions & Plans
-  const [workoutMode, setWorkoutMode] = useTrackedState<WorkoutMode>('two-muscle');
-  const [workoutPlanRotation, setWorkoutPlanRotation] = useTrackedState(true);
-  const [workoutPlans, setWorkoutPlans] = useTrackedState<AllWorkoutPlans>(INITIAL_PLANS);
-  const [exerciseDefinitions, setExerciseDefinitions] = useTrackedState<ExerciseDefinition[]>(DEFAULT_EXERCISE_DEFINITIONS);
-  const [upskillDefinitions, setUpskillDefinitions] = useTrackedState<ExerciseDefinition[]>([]);
-  const [topicGoals, setTopicGoals] = useTrackedState<Record<string, TopicGoal>>({});
-  const [deepWorkDefinitions, setDeepWorkDefinitions] = useTrackedState<ExerciseDefinition[]>([]);
-  const [leadGenDefinitions, setLeadGenDefinitions] = useTrackedState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
-  const [productizationPlans, setProductizationPlans] = useTrackedState<Record<string, ProductizationPlan>>({});
-  const [offerizationPlans, setOfferizationPlans] = useTrackedState<Record<string, ProductizationPlan>>({});
+  const [workoutMode, setWorkoutMode] = useState<WorkoutMode>('two-muscle');
+  const [workoutPlanRotation, setWorkoutPlanRotation] = useState(true);
+  const [workoutPlans, setWorkoutPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [exerciseDefinitions, setExerciseDefinitions] = useState<ExerciseDefinition[]>(DEFAULT_EXERCISE_DEFINITIONS);
+  const [upskillDefinitions, setUpskillDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
+  const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
+  const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
+  const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
   
   // Resources State
-  const [resources, setResources] = useTrackedState<Resource[]>([]);
-  const [resourceFolders, setResourceFolders] = useTrackedState<ResourceFolder[]>([]);
-  const [pinnedFolderIds, setPinnedFolderIds] = useTrackedState<Set<string>>(new Set());
-  const [activeResourceTabIds, setActiveResourceTabIds] = useTrackedState<string[]>([]);
-  const [selectedResourceFolderId, setSelectedResourceFolderId] = useTrackedState<string | null>(null);
-  const [lastSelectedHabitFolder, setLastSelectedHabitFolder] = useTrackedState<string | null>(null);
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
+  const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
+  const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
+  const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
+  const [lastSelectedHabitFolder, setLastSelectedHabitFolder] = useState<string | null>(null);
 
   // Resource Popups (Original system, kept for resources page)
-  const [openPopups, setOpenPopups] = useTrackedState<Map<string, PopupState>>(new Map());
-  const [playingAudio, setPlayingAudio] = useTrackedState<{ id: string; isPlaying: boolean } | null>(null);
+  const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
+  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Intention Popups
-  const [intentionPopups, setIntentionPopups] = useTrackedState<Map<string, PopupState>>(new Map());
+  const [intentionPopups, setIntentionPopups] = useState<Map<string, PopupState>>(new Map());
   
   // General Popups (New System)
-  const [generalPopups, setGeneralPopups] = useTrackedState<Map<string, PopupState>>(new Map());
+  const [generalPopups, setGeneralPopups] = useState<Map<string, PopupState>>(new Map());
 
   // Meta Rule Popup
-  const [ruleDetailPopup, setRuleDetailPopup] = useTrackedState<RuleDetailPopupState | null>(null);
+  const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
   // Task Context Popup
-  const [taskContextPopups, setTaskContextPopups] = useTrackedState<Map<string, TaskContextPopupState>>(new Map());
+  const [taskContextPopups, setTaskContextPopups] = useState<Map<string, TaskContextPopupState>>(new Map());
   
   // Content Viewer Popup
-  const [contentViewPopups, setContentViewPopups] = useTrackedState<Map<string, ContentViewPopupState>>(new Map());
+  const [contentViewPopups, setContentViewPopups] = useState<Map<string, ContentViewPopupState>>(new Map());
 
   // Today's Diet Popup
-  const [todaysDietPopup, setTodaysDietPopup] = useTrackedState<TodaysDietPopupState | null>(null);
+  const [todaysDietPopup, setTodaysDietPopup] = useState<TodaysDietPopupState | null>(null);
 
   // Sidebar State
-  const [expandedItems, setExpandedItems] = useTrackedState<string[]>([]);
-  const [selectedDomainId, setSelectedDomainId] = useTrackedState<string | null>(null);
-  const [selectedSkillId, setSelectedSkillId] = useTrackedState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useTrackedState<string | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useTrackedState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   
   // Focus Session
-  const [activeFocusSession, setActiveFocusSession] = useTrackedState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
+  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
 
   // Canvas State
-  const [canvasLayout, setCanvasLayout] = useTrackedState<CanvasLayout>({ nodes: [], edges: [] });
+  const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
 
   // Mindset State
-  const [mindsetCards, setMindsetCards] = useTrackedState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
+  const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
   
   // Pistons State
-  const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useTrackedState(false);
-  const [pistons, setPistons] = useTrackedState<PistonsCategoryData>({});
-  const [pistonsInitialState, setPistonsInitialState] = useTrackedState<PistonsInitialState | null>(null);
+  const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
+  const [pistons, setPistons] = useState<PistonsCategoryData>({});
+  const [pistonsInitialState, setPistonsInitialState] = useState<PistonsInitialState | null>(null);
   
   // Skill Page State
-  const [skillDomains, setSkillDomains] = useTrackedState<SkillDomain[]>([]);
-  const [coreSkills, setCoreSkills] = useTrackedState<CoreSkill[]>([]);
-  const [projects, setProjects] = useTrackedState<Project[]>([]);
+  const [skillDomains, setSkillDomains] = useState<SkillDomain[]>([]);
+  const [coreSkills, setCoreSkills] = useState<CoreSkill[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
 
   // Professional Experience
-  const [companies, setCompanies] = useTrackedState<Company[]>([]);
-  const [positions, setPositions] = useTrackedState<Position[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   
   // Purpose & Patterns Data
-  const [purposeData, setPurposeData] = useTrackedState<PurposeData>({ statement: '', specializationPurposes: {}, pillarCards: [] });
-  const [patterns, setPatterns] = useTrackedState<Pattern[]>([]);
-  const [metaRules, setMetaRules] = useTrackedState<MetaRule[]>([]);
-  const [pillarEquations, setPillarEquations] = useTrackedState<Record<string, HabitEquation[]>>({});
-  const [skillAcquisitionPlans, setSkillAcquisitionPlans] = useTrackedState<SkillAcquisitionPlan[]>([]);
+  const [purposeData, setPurposeData] = useState<PurposeData>({ statement: '', specializationPurposes: {}, pillarCards: [] });
+  const [patterns, setPatterns] = useState<Pattern[]>([]);
+  const [metaRules, setMetaRules] = useState<MetaRule[]>([]);
+  const [pillarEquations, setPillarEquations] = useState<Record<string, HabitEquation[]>>({});
+  const [skillAcquisitionPlans, setSkillAcquisitionPlans] = useState<SkillAcquisitionPlan[]>([]);
 
   // Persisted task state
-  const [selectedUpskillTask, setSelectedUpskillTask] = useTrackedState<ExerciseDefinition | null>(null);
-  const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useTrackedState<ExerciseDefinition | null>(null);
-  const [selectedMicroSkill, setSelectedMicroSkill] = useTrackedState<MicroSkill | null>(null);
+  const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
+  const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
+  const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
 
   // Auto Suggestion State
-  const [autoSuggestions, setAutoSuggestions] = useTrackedState<Record<string, AutoSuggestionEntry[]>>({});
+  const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
 
   // Recents State
-  const [recentItems, setRecentItems] = useTrackedState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
+  const [recentItems, setRecentItems] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
 
   // Path Diagram State
-  const [pathNodes, setPathNodes] = useTrackedState<PathNode[]>([]);
+  const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
 
   const getAllUserData = useCallback(() => {
     return {
@@ -480,29 +472,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
-  const saveData = useCallback(() => {
-    if (!currentUser?.username) return;
-    const allData = getAllUserData();
-    try {
-      localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
-      localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
-    } catch (e) {
-      console.error("Failed to save data to localStorage", e);
-      toast({
-        title: "Save Failed",
-        description: "Could not save your changes to the browser.",
-        variant: "destructive",
-      });
-    }
-  }, [currentUser, getAllUserData, toast]);
-
   useEffect(() => {
     if (!isLoadingState) {
-      saveData();
+        setLocalChangeCount(c => c + 1);
     }
   }, [
-    isLoadingState, saveData
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, isLoadingState
   ]);
+
+  useEffect(() => {
+    if (currentUser?.username) {
+        const settingsKey = `lifeos_settings_${currentUser.username}`;
+        const storedSettings = localStorage.getItem(settingsKey);
+        if (storedSettings) {
+          setSettings(JSON.parse(storedSettings));
+        }
+        loadState(currentUser.username);
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -597,45 +584,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    if (currentUser?.username) {
-        setLocalChangeCount(0);
-        const settingsKey = `lifeos_settings_${currentUser.username}`;
-        const storedSettings = localStorage.getItem(settingsKey);
-        if (storedSettings) {
-          setSettings(JSON.parse(storedSettings));
+    if (!isLoadingState) {
+        if (!currentUser?.username) return;
+        const allData = getAllUserData();
+        try {
+            localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
+            localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
+        } catch (e) {
+            console.error("Failed to save data to localStorage", e);
+            toast({
+                title: "Save Failed",
+                description: "Could not save your changes to the browser.",
+                variant: "destructive",
+            });
         }
-        loadState(currentUser.username);
-    } else {
-      // Clear all state when logging out
-      setWeightLogs([]); setGoalWeight(null); setHeight(null); setDateOfBirth(null); setGender(null); setDietPlan([]);
-      setSchedule({}); setDailyPurposes({});
-      setAllUpskillLogs([]); setAllDeepWorkLogs([]); setAllWorkoutLogs([]); setAllBrandingLogs([]); setAllLeadGenLogs([]);
-      setWorkoutMode('two-muscle'); setWorkoutPlanRotation(true); setWorkoutPlans(INITIAL_PLANS); setExerciseDefinitions(DEFAULT_EXERCISE_DEFINITIONS);
-      setUpskillDefinitions([]); setTopicGoals({});
-      setDeepWorkDefinitions([]);
-      setLeadGenDefinitions(LEAD_GEN_DEFINITIONS);
-      setProductizationPlans({});
-      setOfferizationPlans({});
-      setResources([]); setResourceFolders([]); setPinnedFolderIds(new Set());
-      setActiveResourceTabIds([]); setSelectedResourceFolderId(null);
-      setLastSelectedHabitFolder(null);
-      setCanvasLayout({ nodes: [], edges: [] });
-      setMindsetCards(DEFAULT_MINDSET_CARDS);
-      setPistons({});
-      setSkillDomains([]); setCoreSkills([]); setProjects([]);
-      setCompanies([]); setPositions([]);
-      setPurposeData({ statement: '', specializationPurposes: {}, pillarCards: [] }); 
-      setPatterns([]); setMetaRules([]); setPillarEquations({});
-      setSkillAcquisitionPlans([]);
-      setSelectedUpskillTask(null);
-      setSelectedDeepWorkTask(null);
-      setSelectedMicroSkill(null);
-      setExpandedItems([]); setSelectedDomainId(null); setSelectedSkillId(null); setSelectedProjectId(null);
-      setAutoSuggestions({});
-      setRecentItems([]);
-      setPathNodes([]);
     }
-  }, [currentUser]);
+  }, [
+    isLoadingState, currentUser, getAllUserData, toast
+  ]);
 
   useEffect(() => {
     if (prevUser && !currentUser) {
@@ -1112,6 +1078,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
   }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions]);
   
+  const logSubTaskTime = (subTaskId: string, durationMinutes: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const subTaskDef = allDefs.find(def => def.id === subTaskId);
+    if (!subTaskDef) {
+        toast({ title: "Error", description: "Could not find sub-task definition.", variant: "destructive" });
+        return;
+    }
+
+    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
+    logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+
+    logsUpdater(prevLogs => {
+        let logForToday = prevLogs.find(log => log.date === todayKey);
+        if (!logForToday) {
+            logForToday = { id: todayKey, date: todayKey, exercises: [] };
+        }
+
+        let exerciseInstance = logForToday.exercises.find(ex => ex.definitionId === subTaskId);
+        if (!exerciseInstance) {
+            exerciseInstance = {
+                id: `${subTaskDef.id}-${Date.now()}`,
+                definitionId: subTaskDef.id,
+                name: subTaskDef.name,
+                category: subTaskDef.category,
+                loggedSets: [],
+                targetSets: 1, // Default for sub-tasks
+                targetReps: '1',
+            };
+            logForToday.exercises.push(exerciseInstance);
+        }
+
+        const newSet: LoggedSet = {
+            id: `${Date.now()}`,
+            reps: isUpskill ? durationMinutes : 1, // For upskill, reps might mean minutes
+            weight: durationMinutes, // For deep work, weight is duration
+            timestamp: Date.now(),
+        };
+
+        exerciseInstance.loggedSets.push(newSet);
+
+        // Update the log in the state
+        const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
+        if (existingLogIndex > -1) {
+            const newLogs = [...prevLogs];
+            newLogs[existingLogIndex] = { ...logForToday };
+            return newLogs;
+        } else {
+            return [...prevLogs, logForToday];
+        }
+    });
+
+    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
+};
 
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2090,7 +2111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     settings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
-    handleToggleComplete, handleLogLearning, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
+    handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
@@ -2189,6 +2210,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 

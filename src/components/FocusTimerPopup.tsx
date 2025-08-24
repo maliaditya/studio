@@ -6,7 +6,7 @@ import React, { } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee } from 'lucide-react';
-import type { Activity, PauseEvent } from '@/types/workout';
+import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
 import {
   Popover,
   PopoverContent,
@@ -21,6 +21,8 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import { ScrollArea } from './ui/scroll-area';
+import { Checkbox } from './ui/checkbox';
 
 
 interface FocusTimerPopupProps {
@@ -32,10 +34,19 @@ interface FocusTimerPopupProps {
 }
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
-  const { activeFocusSession, setActiveFocusSession, setIsAudioPlaying, openTaskContextPopup, updateActivity, handleToggleComplete } = useAuth();
+  const { 
+      activeFocusSession, setActiveFocusSession, 
+      setIsAudioPlaying, openTaskContextPopup, 
+      updateActivity, handleToggleComplete,
+      deepWorkDefinitions, upskillDefinitions,
+      logSubTaskTime
+  } = useAuth();
   const [totalSeconds, setTotalSeconds] = React.useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = React.useState(initialSecondsLeft);
   
+  const [lastSubTaskCompletionTime, setLastSubTaskCompletionTime] = React.useState<number | null>(null);
+  const [completedSubTaskIds, setCompletedSubTaskIds] = React.useState<Set<string>>(new Set());
+
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
@@ -48,6 +59,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
+  
+  const allDefinitions = React.useMemo(() => new Map(
+      [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
+  ), [deepWorkDefinitions, upskillDefinitions]);
+
+  const focusedObjective = React.useMemo(() => {
+    const parentId = activity.taskIds?.[0];
+    if(!parentId) return null;
+    return allDefinitions.get(parentId.split('-')[0]);
+  }, [activity.taskIds, allDefinitions]);
+  
+  const subTasks = React.useMemo(() => {
+      if (!focusedObjective) return [];
+      const childrenIds = [
+          ...(focusedObjective.linkedDeepWorkIds || []), 
+          ...(focusedObjective.linkedUpskillIds || [])
+      ];
+      return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
+  }, [focusedObjective, allDefinitions]);
 
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -60,6 +90,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   React.useEffect(() => {
     setIsAudioPlaying(true);
     setCycleSecondsLeft(WORK_DURATION);
+    setLastSubTaskCompletionTime(Date.now());
   }, [setIsAudioPlaying]);
 
   React.useEffect(() => {
@@ -169,6 +200,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
   };
 
+  const handleSubTaskComplete = (subTaskId: string) => {
+    if (completedSubTaskIds.has(subTaskId)) return;
+    
+    const now = Date.now();
+    const timeSinceLastCompletion = lastSubTaskCompletionTime ? now - lastSubTaskCompletionTime : totalSeconds - secondsLeft;
+    const durationMinutes = Math.floor(timeSinceLastCompletion / 60000);
+    
+    if (durationMinutes > 0) {
+        logSubTaskTime(subTaskId, durationMinutes);
+    }
+    
+    setLastSubTaskCompletionTime(now);
+    setCompletedSubTaskIds(prev => new Set(prev).add(subTaskId));
+  };
+
+
   const progressPercentage = (totalSeconds - secondsLeft) / totalSeconds * 100;
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
@@ -183,76 +230,80 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
-        <Card ref={popupRef} className="w-64 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
-            <CardContent className="p-4">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
-                <BrainCircuit className="h-5 w-5 text-primary" />
-                <p className="text-sm font-medium">Focus period...</p>
-                </div>
-                <div className="flex items-center">
-                  {isContextAvailable && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenContext} title="View Task Context">
-                      <LinkIcon className="h-4 w-4" />
+        <Card ref={popupRef} className="w-96 shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
+            <CardContent className="p-4 grid grid-cols-2 gap-4">
+            <div className="col-span-1 space-y-2">
+              <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
+                  <BrainCircuit className="h-5 w-5 text-primary" />
+                  <p className="text-sm font-medium">Focus</p>
+                  </div>
+                  <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
+                        <X className="h-4 w-4" />
                     </Button>
-                  )}
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
-                      <X className="h-4 w-4" />
-                  </Button>
+                  </div>
+              </div>
+              
+              {sessionState !== 'finished' ? (
+                <>
+                  <div className="relative w-40 h-40 mx-auto">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart innerRadius="80%" outerRadius="100%" data={chartData} startAngle={90} endAngle={-270} barSize={8}>
+                          <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+                          <RadialBar background={{ fill: 'hsl(var(--muted))' }} dataKey="value" cornerRadius={10} angleAxisId={0} />
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-3xl font-bold font-mono">
+                          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-center mt-2">
+                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                          {currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />}
+                          <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
+                      </div>
+                  </div>
+                  <div className="flex justify-center items-center gap-4 mt-2">
+                      <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
+                        {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                      </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-4 pt-4 pb-2">
+                  <Button className="w-full" onClick={() => handleStop(true)}><Check className="mr-2 h-4 w-4"/> Completed</Button>
+                  <Button variant="outline" className="w-full" onClick={handleExtend}><RefreshCw className="mr-2 h-4 w-4"/> Extend 15 mins</Button>
                 </div>
+              )}
+              <div className="mt-4 pt-4 border-t border-border/20 text-center">
+                  <p className="text-sm font-semibold truncate" title={activity.details}>
+                      Task: {activity.details}
+                  </p>
+              </div>
             </div>
             
-            {sessionState !== 'finished' ? (
-              <>
-                <div className="relative w-40 h-40 mx-auto">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart innerRadius="80%" outerRadius="100%" data={chartData} startAngle={90} endAngle={-270} barSize={8}>
-                        <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-                        <RadialBar background={{ fill: 'hsl(var(--muted))' }} dataKey="value" cornerRadius={10} angleAxisId={0} />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-3xl font-bold font-mono">
-                        {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-center mt-2">
-                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                        {currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />}
-                        <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
+            <div className="col-span-1 border-l pl-4">
+              <h4 className="text-sm font-semibold mb-2">Sub-tasks for {focusedObjective?.name}</h4>
+              <ScrollArea className="h-80">
+                <div className="space-y-2 pr-2">
+                  {subTasks.map(task => (
+                    <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-muted/30">
+                        <Checkbox 
+                            id={`subtask-${task.id}`}
+                            checked={completedSubTaskIds.has(task.id)}
+                            onCheckedChange={() => handleSubTaskComplete(task.id)}
+                        />
+                        <label htmlFor={`subtask-${task.id}`} className="flex-grow cursor-pointer">{task.name}</label>
                     </div>
+                  ))}
+                  {subTasks.length === 0 && (
+                    <p className="text-xs text-center text-muted-foreground py-8">No sub-tasks found for this objective.</p>
+                  )}
                 </div>
-                <div className="flex justify-center items-center gap-4 mt-2">
-                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-full" onClick={togglePlayPause}>
-                      {sessionState === 'running' ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                    </Button>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-                                <MoreHorizontal className="h-5 w-5" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-1" side="top" align="center">
-                            <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => handleStop(false)}>
-                                <Square className="mr-2 h-4 w-4" /> Stop Session
-                            </Button>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-4 pt-4 pb-2">
-                <Button className="w-full" onClick={() => handleStop(true)}><Check className="mr-2 h-4 w-4"/> Completed</Button>
-                <Button variant="outline" className="w-full" onClick={handleExtend}><RefreshCw className="mr-2 h-4 w-4"/> Extend 15 mins</Button>
-              </div>
-            )}
-
-
-            <div className="mt-4 pt-4 border-t border-border/20 text-center">
-                <p className="text-sm font-semibold truncate" title={activity.details}>
-                    Task: {activity.details}
-                </p>
+              </ScrollArea>
             </div>
             </CardContent>
         </Card>
