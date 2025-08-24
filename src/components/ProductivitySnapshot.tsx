@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -300,18 +299,33 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                 <div className="space-y-2 p-3 rounded-lg bg-muted/30">
                                   <div className="flex justify-between items-start">
                                     <span className="font-semibold text-sm text-foreground">{item.name}</span>
+                                  </div>
+                                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
                                     {isOverspent ? (
-                                      <span className="font-mono text-sm font-medium text-orange-500">
-                                        +{overspentHours.toFixed(1)}h over
-                                      </span>
+                                        <>
+                                            <div 
+                                                className="h-full bg-primary" 
+                                                style={{ width: `${(item.estimated / item.logged) * 100}%` }}
+                                            />
+                                            <div 
+                                                className="h-full bg-orange-500"
+                                                style={{ width: `${((item.logged - item.estimated) / item.logged) * 100}%` }}
+                                            />
+                                        </>
                                     ) : (
-                                      <span className="font-mono text-sm font-medium text-foreground">{progress.toFixed(0)}%</span>
+                                        <div 
+                                            className="h-full bg-primary" 
+                                            style={{ width: `${progress}%` }} 
+                                        />
                                     )}
                                   </div>
-                                  <Progress value={Math.min(100, progress)} className={cn(isOverspent && "[&>div]:bg-orange-500")} />
                                   <div className="flex justify-between text-xs text-muted-foreground">
                                     <span>{item.logged.toFixed(1)}h logged</span>
-                                    <span>{item.estimated.toFixed(1)}h est.</span>
+                                    {isOverspent ? (
+                                        <span className="font-medium text-orange-500">+{overspentHours.toFixed(1)}h over</span>
+                                    ) : (
+                                        <span>{item.estimated.toFixed(1)}h est.</span>
+                                    )}
                                   </div>
                                 </div>
                               )
@@ -413,7 +427,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <DialogHeader>
               <DialogTitle>Project Details: "{selectedReleaseInfo.release.name}"</DialogTitle>
               <DialogDescription>
-                {selectedReleaseInfo.release.description}
+                 {selectedReleaseInfo.release.description}
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
