@@ -309,6 +309,10 @@ interface AuthContextType {
   // Recents
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
+
+  // New Completion Logic
+  permanentlyLoggedTaskIds: Set<string>;
+  getDescendantLeafNodes: (nodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -2099,6 +2103,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
 
+  const permanentlyLoggedTaskIds = useMemo(() => {
+    const loggedIds = new Set<string>();
+    const processLogs = (logs: DatedWorkout[]) => {
+      logs.forEach(log => {
+        log.exercises.forEach(ex => {
+          if (ex.loggedSets.length > 0) {
+            loggedIds.add(ex.definitionId);
+          }
+        });
+      });
+    };
+    processLogs(allDeepWorkLogs);
+    processLogs(allUpskillLogs);
+    return loggedIds;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+  
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+      const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+      const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+      const visited = new Set<string>();
+      const leafNodes: ExerciseDefinition[] = [];
+      const queue: string[] = [startNodeId];
+
+      while (queue.length > 0) {
+          const currentId = queue.shift()!;
+          if (visited.has(currentId)) continue;
+          visited.add(currentId);
+
+          const node = definitions.find(d => d.id === currentId);
+          if (!node) continue;
+
+          const children = node[linkKey] || [];
+          if (children.length === 0) {
+              leafNodes.push(node);
+          } else {
+              children.forEach(childId => {
+                  if (!visited.has(childId)) {
+                      queue.push(childId);
+                  }
+              });
+          }
+      }
+      return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2177,6 +2226,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedCompanyId, setSelectedCompanyId,
     autoSuggestions, setAutoSuggestions,
     recentItems, addToRecents,
+    permanentlyLoggedTaskIds,
+    getDescendantLeafNodes,
   };
 
   return (
@@ -2210,6 +2261,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
