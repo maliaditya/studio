@@ -206,10 +206,26 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   };
 
   const processedTimeData = useMemo(() => {
-    return timeAllocationData.map((entry, index) => ({
+    const totalMinutesInDay = 24 * 60;
+    const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
+    const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
+
+    const data = timeAllocationData.map((entry, index) => ({
       ...entry,
+      time: entry.time / 60, // Convert minutes to hours for display
       fill: activityColorMapping[entry.name] || themeColors[index % themeColors.length]
     }));
+
+    if (freeTimeMinutes > 0) {
+        data.push({
+            name: 'Free Time',
+            time: freeTimeMinutes / 60, // Convert minutes to hours for display
+            activities: [],
+            fill: activityColorMapping['Free Time'],
+        });
+    }
+
+    return data;
   }, [timeAllocationData, themeColors]);
 
   return (
@@ -419,7 +435,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                       return (
                                           <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                               <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.time * 60)}</p>
-                                              {categoryData && categoryData.activities && (
+                                              {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
                                                 <>
                                                   <Separator />
                                                   <ul className="space-y-1">
