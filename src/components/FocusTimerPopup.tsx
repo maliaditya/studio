@@ -195,9 +195,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
-    // Start the first available task if no task is active, the session is idle, and the task isn't already the one we would try to start.
+    // Start the first available task if no task is active and the session is idle.
     if (firstUncompletedTask && !activeSubTaskId && sessionState === 'idle') {
-      if(firstUncompletedTask.id !== activeSubTaskId) {
+      // Check if the would-be active task is somehow already completed. If so, don't start.
+      if (!completedSubTaskIds.has(firstUncompletedTask.id)) {
         handleStartSubTask(firstUncompletedTask);
       }
     }
@@ -285,7 +286,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (elapsedSeconds / totalSeconds) * CIRCUMFERENCE;
+  const strokeDashoffset = elapsedSeconds / totalSeconds * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
@@ -328,7 +329,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         stroke="hsl(var(--primary))"
                         strokeWidth="10"
                         strokeDasharray={CIRCUMFERENCE}
-                        strokeDashoffset={strokeDashoffset}
+                        strokeDashoffset={CIRCUMFERENCE - strokeDashoffset}
                         transform="rotate(-90 80 80)"
                         style={{ transition: 'stroke-dashoffset 1s linear' }}
                     />
