@@ -127,17 +127,23 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                const dailyLog = logs.find(log => log.date === dateKey);
-                if (!dailyLog || !activity.taskIds) return 0;
-                const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-                const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-            } else if (activity.type === 'interrupt') {
-                return activity.duration || 0;
+             if (activity.completed) {
+                if (activity.type === 'deepwork') {
+                    const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
+                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
+                    return taskLog?.loggedSets.reduce((sum, set) => sum + set.weight, 0) || 0;
+                }
+                if (activity.type === 'upskill') {
+                    const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
+                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
+                    return taskLog?.loggedSets.reduce((sum, set) => sum + set.reps, 0) || 0;
+                }
+                if (activity.type === 'interrupt') {
+                    return activity.duration || 0;
+                }
+                return parseDurationToMinutes(activityDurations[activity.id]);
             }
-            return parseDurationToMinutes(activityDurations[activity.id]);
+            return 0; // Return 0 if not completed
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -175,7 +181,7 @@ function TimesheetPageContent() {
                         if (filterActivity(activity)) {
                             let duration = getLoggedMinutes(activity, dateKey);
                             
-                            if (duration > 0 || !activity.completed) {
+                            if (duration > 0) {
                                 processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
                             }
                         }
@@ -194,19 +200,19 @@ function TimesheetPageContent() {
         const allActivitiesForDay: ProcessedActivity[] = [];
 
         Object.values(dailySchedule).flat().forEach((activity: any) => {
-            if (activity && typeof activity === 'object' && 'type' in activity) {
+            if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
                 let duration = 0;
-                if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                    const dailyLog = logs.find(log => log.date === dateKey);
-                    if (dailyLog && activity.taskIds) {
-                        const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds.includes(ex.id));
-                        const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                        duration = relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-                    }
-                } else if (activity.type === 'interrupt' && activity.completed) {
+                if (activity.type === 'deepwork') {
+                    const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
+                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
+                    duration = taskLog?.loggedSets.reduce((sum, set) => sum + set.weight, 0) || 0;
+                } else if (activity.type === 'upskill') {
+                    const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
+                    const taskLog = dailyLog?.exercises.find(ex => activity.taskIds?.includes(ex.id));
+                    duration = taskLog?.loggedSets.reduce((sum, set) => sum + set.reps, 0) || 0;
+                } else if (activity.type === 'interrupt') {
                     duration = activity.duration || 0;
-                } else if (activity.completed) {
+                } else {
                     duration = parseDurationToMinutes(activityDurations[activity.id]);
                 }
                 
@@ -246,13 +252,14 @@ function TimesheetPageContent() {
           'Tracking': 0.5,
           'Interrupts': 0,
         };
-    
+
         const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time]));
+        const allSubjects = new Set([...Object.keys(idealHours), ...todayMap.keys()]);
     
-        return Object.keys(idealHours).map(subject => ({
+        return Array.from(allSubjects).map(subject => ({
           subject,
           today: todayMap.get(subject) || 0,
-          ideal: idealHours[subject],
+          ideal: idealHours[subject] || 0,
         }));
     }, [timeAllocationData]);
     
