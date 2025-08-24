@@ -62,7 +62,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    return allDefs.find(d => parentId.startsWith(d.id));
+    return allDefs.find(d => taskId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const subTasks = useMemo(() => {
@@ -196,7 +196,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
     if (firstUncompletedTask && !activeSubTaskId && sessionState === 'idle') {
-      handleStartSubTask(firstUncompletedTask);
+      // Ensure we don't try to start a task that's already considered active for some reason
+      if(firstUncompletedTask.id !== activeSubTaskId) {
+        handleStartSubTask(firstUncompletedTask);
+      }
     }
   }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask, sessionState]);
 
@@ -282,7 +285,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
+  const strokeDashoffset = CIRCUMFERENCE - (elapsedSeconds / totalSeconds) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
