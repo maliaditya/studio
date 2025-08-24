@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -509,7 +510,7 @@ function TimesheetPageContent() {
                 </CardHeader>
                  <CardContent>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
-                        {allActivitiesInView.map((name, index) => (
+                        {allActivitiesInView.map((name) => (
                             <div key={name} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
                                 <span>{name}</span>
@@ -591,18 +592,6 @@ function TimesheetPageContent() {
         const startDate = startOfMonth(selectedDate);
         const endDate = endOfMonth(selectedDate);
         const monthRange = eachDayOfInterval({ start: startDate, end: endDate });
-        
-        const monthlyData = monthRange.map(day => {
-            const dateKey = format(day, 'yyyy-MM-dd');
-            const dayData = timeData.dailyData[dateKey];
-            const activities = dayData?.activities || [];
-            return {
-                day,
-                dateKey,
-                tasks: activities,
-                totalDuration: activities.reduce((sum, act) => sum + act.calculatedDuration, 0)
-            };
-        });
 
         return (
             <Card>
@@ -611,34 +600,78 @@ function TimesheetPageContent() {
                     <CardDescription>A high-level overview of your time this month. Click a card for details.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-[60vh]">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pr-4">
-                        {monthlyData.map(data => (
-                            data.totalDuration > 0 && (
-                                <Card 
-                                    key={data.dateKey}
-                                    onClick={() => setModalData({ date: data.day, activities: data.tasks })}
-                                    className="flex flex-col cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent"
-                                >
-                                    <CardHeader className="p-3 flex flex-row items-start justify-between">
-                                        <div className="flex-grow">
-                                          <CardTitle className="text-sm">
-                                              {format(data.day, 'EEE, MMM d')}
-                                          </CardTitle>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="p-3 pt-0 text-xs text-muted-foreground flex-grow flex flex-col justify-between">
-                                        <p className="text-xl font-bold text-primary mb-2">{formatMinutes(data.totalDuration)}</p>
-                                        <ul className="list-disc list-inside space-y-1">
-                                            {data.tasks.map((task, i) => (
-                                                task.calculatedDuration > 0 && <li key={i} className="truncate" title={task.details}>{task.details} ({formatMinutes(task.calculatedDuration)})</li>
-                                            ))}
-                                        </ul>
-                                    </CardContent>
-                                </Card>
-                            )
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
+                        {allActivitiesInView.map((name) => (
+                            <div key={name} className="flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
+                                <span>{name}</span>
+                            </div>
                         ))}
                     </div>
+                    <ScrollArea className="h-[60vh] pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {monthRange.map(day => {
+                                const dateKey = format(day, 'yyyy-MM-dd');
+                                const dayData = timeData.dailyData[dateKey];
+                                if (!dayData || dayData.activities.length === 0) return null;
+
+                                const activities = dayData.activities;
+                                const pieData = dayData.pieData;
+                                const totalDayMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
+
+                                return (
+                                    <Card 
+                                        key={dateKey} 
+                                        onClick={() => setModalData({ date: day, activities })}
+                                        className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
+                                    >
+                                        <CardHeader className="p-3 pb-0">
+                                        <CardTitle className="text-base flex justify-between items-center">
+                                            <span>{format(day, 'EEE, MMM d')}</span>
+                                            <span className="font-mono text-sm text-muted-foreground">{formatMinutes(totalDayMinutes)}</span>
+                                        </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-2 flex-grow flex items-center justify-center">
+                                            <ChartContainer config={{}} className="h-32 w-32">
+                                                <ResponsiveContainer>
+                                                    <PieChart>
+                                                        <ChartTooltip
+                                                            content={({ active, payload }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    const data = payload[0].payload;
+                                                                    const categoryName = data.name;
+                                                                    const categoryActivities = activities.filter(act => {
+                                                                        const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
+                                                                        return activityNameMap[act.type] === categoryName;
+                                                                    });
+                                                                    return (
+                                                                        <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                            <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
+                                                                            {categoryActivities.length > 0 && <Separator />}
+                                                                            <ul className="space-y-1">
+                                                                                {categoryActivities.map((act, index) => (
+                                                                                    <li key={index} className="text-muted-foreground">{act.details} ({formatMinutes(act.calculatedDuration)})</li>
+                                                                                ))}
+                                                                            </ul>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
+                                                        />
+                                                        <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="60%" outerRadius="100%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                                            {pieData.map((entry) => (
+                                                                <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
+                                                            ))}
+                                                        </Pie>
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </ChartContainer>
+                                        </CardContent>
+                                    </Card>
+                                )
+                            })}
+                        </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
