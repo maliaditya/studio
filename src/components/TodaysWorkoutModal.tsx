@@ -90,7 +90,7 @@ export function TodaysWorkoutModal({
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>
-            Log Workout: {muscleGroupsForDay.join(' & ') || 'Rest Day'}
+            Log Workout: {Array.isArray(muscleGroupsForDay) ? muscleGroupsForDay.join(' & ') : 'Rest Day'}
           </DialogTitle>
           <DialogDescription>
             Log your sets for each exercise. You can swap exercises if needed.
