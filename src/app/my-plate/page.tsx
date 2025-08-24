@@ -636,7 +636,7 @@ function MyPlatePageContent() {
         
         const mappedName = activityNameMap[activity.type];
         if (mappedName && totals[mappedName]) {
-            totals[mappedName].time += duration / 60;
+            totals[mappedName].time += duration; // Keep in minutes
             totals[mappedName].activities.push({ name: activity.details, duration });
         }
     });

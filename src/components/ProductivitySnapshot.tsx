@@ -205,21 +205,22 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     setIsAllocationDetailModalOpen(true);
   };
 
-  const processedTimeData = useMemo(() => {
+  const pieData = useMemo(() => {
     const totalMinutesInDay = 24 * 60;
     const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
     const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
 
     const data = timeAllocationData.map((entry, index) => ({
-      ...entry,
-      time: entry.time / 60, // Convert minutes to hours for display
+      name: entry.name,
+      value: entry.time, // value should be in minutes for the chart
+      activities: entry.activities,
       fill: activityColorMapping[entry.name] || themeColors[index % themeColors.length]
     }));
 
     if (freeTimeMinutes > 0) {
         data.push({
             name: 'Free Time',
-            time: freeTimeMinutes / 60, // Convert minutes to hours for display
+            value: freeTimeMinutes,
             activities: [],
             fill: activityColorMapping['Free Time'],
         });
@@ -412,7 +413,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <Separator className="my-6" />
           <div>
             <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-            {processedTimeData.length > 0 ? (
+            {pieData.length > 0 ? (
                 <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer" onClick={handleBarClick}>
                   <ResponsiveContainer>
                       <PieChart>
@@ -422,19 +423,20 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                                   if (active && payload && payload.length) {
                                       const data = payload[0].payload;
                                       const categoryName = data.name;
-                                      const categoryData = timeAllocationData.find(item => item.name === categoryName);
                                       
                                       if (categoryName === 'Free Time') {
                                         return (
                                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.time * 60)}</p>
+                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
                                            </div>
                                         );
                                       }
 
+                                      const categoryData = timeAllocationData.find(item => item.name === categoryName);
+
                                       return (
                                           <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.time * 60)}</p>
+                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
                                               {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
                                                 <>
                                                   <Separator />
@@ -452,8 +454,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                               }}
                           />
                           <Pie
-                              data={processedTimeData}
-                              dataKey="time"
+                              data={pieData}
+                              dataKey="value"
                               nameKey="name"
                               cx="50%"
                               cy="50%"
@@ -462,7 +464,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                               labelLine={false}
                               label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                           >
-                              {processedTimeData.map((entry, index) => (
+                              {pieData.map((entry, index) => (
                                   <Cell key={`cell-${index}`} fill={entry.fill} />
                               ))}
                           </Pie>
