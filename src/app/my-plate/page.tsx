@@ -1,4 +1,5 @@
 
+      
 
 "use client";
 
@@ -30,6 +31,7 @@ import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils } f
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan } from '@/types/workout';
@@ -120,6 +122,8 @@ function MyPlatePageContent() {
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
   const [interruptDetails, setInterruptDetails] = useState('');
   const [interruptDuration, setInterruptDuration] = useState('');
+  const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = useState(false);
+
 
   const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null, activity: Activity | null}>({ isOpen: false, slotName: null, activity: null });
   const [essentialDetails, setEssentialDetails] = useState('');
@@ -247,6 +251,9 @@ function MyPlatePageContent() {
     if (!currentUser?.username || !selectedDateKey) return;
     
     if (type === 'interrupt') {
+        setInterruptDetails('');
+        setInterruptDuration('');
+        setApplyInterruptToFutureSlots(false);
         setInterruptModalState({ isOpen: true, slotName });
         return;
     }
@@ -307,57 +314,43 @@ function MyPlatePageContent() {
 
   const handleSaveInterrupt = () => {
     const { slotName } = interruptModalState;
-    if (!slotName || !interruptDetails.trim() || !interruptDuration.trim()) {
-        toast({ title: 'Invalid Input', description: 'Please provide both a description and a duration.', variant: 'destructive' });
+    if (!slotName || !interruptDetails.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
         return;
     }
-    const durationMinutes = parseInt(interruptDuration, 10);
-    if (isNaN(durationMinutes) || durationMinutes <= 0) {
-        toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
-        return;
-    }
-
-    const newActivity: Activity = {
-        id: `interrupt-${Date.now()}`,
-        type: 'interrupt',
-        details: interruptDetails,
-        completed: true,
-        taskIds: [],
-        duration: durationMinutes,
-        slot: slotName,
-    };
-
-    setSchedule(prev => ({
-        ...prev,
-        [selectedDateKey]: {
-            ...(prev[selectedDateKey] || {}),
-            [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity],
-        },
-    }));
-
-    setInterruptDetails('');
-    setInterruptDuration('');
-    setInterruptModalState({ isOpen: false, slotName: null });
-    toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
-  };
-  
-  const handleSaveInterruptToAllSlots = () => {
-    if (!interruptDetails.trim() || !interruptDuration.trim()) {
-        toast({ title: 'Invalid Input', description: 'Please provide both a description and a duration.', variant: 'destructive' });
-        return;
-    }
-    const durationMinutes = parseInt(interruptDuration, 10);
-    if (isNaN(durationMinutes) || durationMinutes <= 0) {
+    
+    let durationMinutes = parseInt(interruptDuration, 10);
+    if (applyInterruptToFutureSlots) {
+        durationMinutes = 240;
+    } else if (isNaN(durationMinutes) || durationMinutes <= 0) {
         toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
         return;
     }
 
     setSchedule(prev => {
         const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
-        
-        slotEndHours && Object.keys(slotEndHours).forEach(slotName => {
+
+        if (applyInterruptToFutureSlots) {
+            const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
+            const slotsToUpdate = Object.keys(slotEndHours).slice(currentSlotIndex);
+            
+            slotsToUpdate.forEach(sName => {
+                const newActivity: Activity = {
+                    id: `interrupt-${Date.now()}-${Math.random()}`,
+                    type: 'interrupt',
+                    details: interruptDetails,
+                    completed: true,
+                    taskIds: [],
+                    duration: durationMinutes,
+                    slot: sName,
+                };
+                const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
+                newDaySchedule[sName] = [...currentActivities, newActivity];
+            });
+            toast({ title: 'Interrupt Logged', description: `Interruption added to all future slots.` });
+        } else {
             const newActivity: Activity = {
-                id: `interrupt-${Date.now()}-${Math.random()}`,
+                id: `interrupt-${Date.now()}`,
                 type: 'interrupt',
                 details: interruptDetails,
                 completed: true,
@@ -367,16 +360,17 @@ function MyPlatePageContent() {
             };
             const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
             newDaySchedule[slotName] = [...currentActivities, newActivity];
-        });
+            toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
+        }
 
         return { ...prev, [selectedDateKey]: newDaySchedule };
     });
 
     setInterruptDetails('');
     setInterruptDuration('');
+    setApplyInterruptToFutureSlots(false);
     setInterruptModalState({ isOpen: false, slotName: null });
-    toast({ title: 'Interrupt Logged', description: 'The interruption has been added to all slots for today.' });
-};
+  };
   
   const handleSaveEssential = () => {
     const { slotName, activity } = essentialsModalState;
@@ -1189,13 +1183,27 @@ function MyPlatePageContent() {
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
-                        <Input id="interrupt-duration" type="number" value={interruptDuration} onChange={(e) => setInterruptDuration(e.target.value)} placeholder="e.g., 30" />
+                        <Input 
+                          id="interrupt-duration" 
+                          type="number" 
+                          value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
+                          onChange={(e) => setInterruptDuration(e.target.value)} 
+                          placeholder="e.g., 30"
+                          disabled={applyInterruptToFutureSlots}
+                        />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                        <Checkbox 
+                            id="apply-all-slots" 
+                            checked={applyInterruptToFutureSlots} 
+                            onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
+                        />
+                        <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
                     </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
                     <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
-                    <Button onClick={handleSaveInterruptToAllSlots}>Save to All Slots</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -1245,3 +1253,6 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+      
+    
