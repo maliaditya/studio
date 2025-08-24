@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, formatDistanceStrict } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
 import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, Radar } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -127,22 +127,17 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (activity.completed) {
-                if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                    const dailyLog = logs.find(log => log.date === dateKey);
-                    if (!dailyLog || !activity.taskIds) return 0;
-                    
-                    const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-                    const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                    return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-                } else if (activity.type === 'interrupt') {
-                    return activity.duration || 0;
-                }
-                // Fallback for other completed tasks like essentials, planning, etc.
-                return parseDurationToMinutes(activityDurations[activity.id]);
+            if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                const dailyLog = logs.find(log => log.date === dateKey);
+                if (!dailyLog || !activity.taskIds) return 0;
+                const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+                const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
+            } else if (activity.type === 'interrupt') {
+                return activity.duration || 0;
             }
-            return 0; // Return 0 for incomplete tasks
+            return parseDurationToMinutes(activityDurations[activity.id]);
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -179,10 +174,7 @@ function TimesheetPageContent() {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
                             let duration = getLoggedMinutes(activity, dateKey);
-                            if (duration === 0 && !activity.completed && activity.type !== 'interrupt') { 
-                                 duration = parseDurationToMinutes(activityDurations[activity.id]);
-                            }
-
+                            
                             if (duration > 0 || !activity.completed) {
                                 processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
                             }
@@ -199,12 +191,12 @@ function TimesheetPageContent() {
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const dailySchedule = schedule[dateKey] || {};
-        const activitiesForDay: ProcessedActivity[] = [];
+        const allActivitiesForDay: ProcessedActivity[] = [];
 
         Object.values(dailySchedule).flat().forEach((activity: any) => {
-            if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
+            if (activity && typeof activity === 'object' && 'type' in activity) {
                 let duration = 0;
-                 if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                if (activity.type === 'deepwork' || activity.type === 'upskill') {
                     const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
                     const dailyLog = logs.find(log => log.date === dateKey);
                     if (dailyLog && activity.taskIds) {
@@ -212,14 +204,14 @@ function TimesheetPageContent() {
                         const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
                         duration = relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
                     }
-                } else if (activity.type === 'interrupt') {
+                } else if (activity.type === 'interrupt' && activity.completed) {
                     duration = activity.duration || 0;
-                } else {
+                } else if (activity.completed) {
                     duration = parseDurationToMinutes(activityDurations[activity.id]);
                 }
                 
                 if (duration > 0) {
-                     activitiesForDay.push({ ...activity, calculatedDuration: duration });
+                     allActivitiesForDay.push({ ...activity, calculatedDuration: duration });
                 }
             }
         });
@@ -230,7 +222,7 @@ function TimesheetPageContent() {
             deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
         };
 
-        activitiesForDay.forEach(activity => {
+        allActivitiesForDay.forEach(activity => {
             const mappedName = activityNameMap[activity.type];
             if (mappedName) {
                 totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration / 60;
@@ -286,7 +278,7 @@ function TimesheetPageContent() {
             });
             workIntervalsMs.push(activity.focusSessionEndTime - lastEventTime);
     
-            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
+            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000);
             const totalFocusMs = validWorkIntervalsMs.reduce((sum, i) => sum + i, 0);
             
             const totalBreakMs = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime) - totalFocusMs;
@@ -335,7 +327,7 @@ function TimesheetPageContent() {
                                     <ResponsiveContainer>
                                         <RadarChart data={radarData}>
                                             <PolarGrid />
-                                            <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0}/>
+                                            <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
                                             <ChartTooltip content={({ active, payload }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
