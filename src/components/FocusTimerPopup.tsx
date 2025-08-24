@@ -6,16 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
-import {
-  ResponsiveContainer,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
-} from "recharts"
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
-import { Checkbox } from './ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
 
@@ -235,7 +228,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setIsAudioPlaying(true);
   };
   
-  const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
+  const elapsedSeconds = totalSeconds - secondsLeft;
+  const elapsedPercentage = totalSeconds > 0 ? (elapsedSeconds / totalSeconds) * 100 : 0;
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
@@ -243,7 +237,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (progressPercentage / 100) * CIRCUMFERENCE;
+  const strokeDashoffset = CIRCUMFERENCE - (elapsedPercentage / 100) * CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
