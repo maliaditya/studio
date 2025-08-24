@@ -605,7 +605,7 @@ function MyPlatePageContent() {
     const todaysScheduleForCalc = schedule[selectedDateKey] || {};
     const dailyActivities = Object.values(todaysScheduleForCalc).flat() as Activity[];
     const totals: Record<string, number> = {
-      'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0,
+      'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0, 'Interrupts': 0,
     };
     
     const activityNameMap: Record<ActivityType, string> = {
