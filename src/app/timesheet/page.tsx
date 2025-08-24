@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -24,7 +25,7 @@ import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, LineChart, Area
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
-type TimeAllocationView = "bar" | "radar" | "pie";
+type TimeAllocationView = "bar" | "pie";
 
 const formatMinutes = (minutes: number) => {
     if (minutes <= 0) return "0m";
@@ -267,29 +268,6 @@ function TimesheetPageContent() {
           .map(([name, time]) => ({ name, time }))
           .filter(item => item.time > 0);
     }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs]);
-    
-    const radarData = useMemo(() => {
-        const idealHours: Record<string, number> = {
-          'Deep Work': 6,
-          'Learning': 3,
-          'Workout': 1,
-          'Branding': 2,
-          'Lead Gen': 1,
-          'Essentials': 1,
-          'Planning': 0.5,
-          'Tracking': 0.5,
-          'Interrupts': 4,
-        };
-
-        const todayMap = new Map(timeAllocationData.map(d => [d.name, d.time/60]));
-        const allSubjects = new Set([...Object.keys(idealHours), ...todayMap.keys()]);
-    
-        return Array.from(allSubjects).map(subject => ({
-          subject,
-          today: todayMap.get(subject) || 0,
-          ideal: idealHours[subject] || 0,
-        }));
-    }, [timeAllocationData]);
 
     const pieData = useMemo(() => {
         const totalMinutesInDay = 24 * 60;
@@ -346,8 +324,8 @@ function TimesheetPageContent() {
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base"><BarChartIcon/> Time Allocation</CardTitle>
-                        <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'radar' : v === 'radar' ? 'pie' : 'bar')}>
-                            {timeAllocationView === 'bar' ? <RadarIcon className="h-4 w-4" /> : timeAllocationView === 'radar' ? <PieChartIcon className="h-4 w-4"/> : <BarChartIcon className="h-4 w-4" />}
+                        <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'pie' : 'bar')}>
+                            {timeAllocationView === 'bar' ? <PieChartIcon className="h-4 w-4" /> : <BarChartIcon className="h-4 w-4" />}
                         </Button>
                     </CardHeader>
                     <CardContent>
@@ -368,31 +346,6 @@ function TimesheetPageContent() {
                                                 ))}
                                             </Bar>
                                         </BarChart>
-                                    </ResponsiveContainer>
-                                </ChartContainer>
-                            ) : timeAllocationView === 'radar' ? (
-                                <ChartContainer config={{}} className="h-[250px] w-full">
-                                    <ResponsiveContainer>
-                                        <RadarChart data={radarData}>
-                                            <PolarGrid />
-                                            <PolarAngleAxis dataKey="subject" tick={{fontSize: 12}} angleAxisId={0} />
-                                            <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} axisId={0} />
-                                            <ChartTooltip content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    const data = payload[0].payload;
-                                                    return (
-                                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                            <p className="font-bold text-foreground">{data.subject}</p>
-                                                            <p className="text-muted-foreground">Today: {data.today.toLocaleString()} hours</p>
-                                                            <p className="text-muted-foreground">Ideal: {data.ideal.toLocaleString()} hours</p>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }} />
-                                            <Radar name="Today" dataKey="today" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.6} radiusAxisId={0}/>
-                                            <Radar name="Ideal" dataKey="ideal" stroke="hsl(var(--chart-2))" fill="hsl(var(--chart-2))" fillOpacity={0.4} radiusAxisId={0}/>
-                                        </RadarChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
                             ) : (
