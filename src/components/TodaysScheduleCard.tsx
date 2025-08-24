@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -400,7 +401,7 @@ export function TodaysScheduleCard({
                     <PopoverTrigger asChild>
                         <button className="flex items-center gap-2 text-left cursor-pointer group">
                             <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <CardDescription className="text-xs group-hover:text-foreground transition-colors truncate" title={purposeText}>
+                            <CardDescription className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
                                 {purposeText || "Click to set a daily purpose..."}
                             </CardDescription>
                         </button>
