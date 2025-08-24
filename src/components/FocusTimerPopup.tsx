@@ -168,10 +168,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
-    if (isOpen && firstUncompletedTask && !activeSubTaskId) {
+    if (firstUncompletedTask && !activeSubTaskId) {
       handleStartSubTask(firstUncompletedTask);
     }
-  }, [isOpen, subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask]);
+  }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask]);
 
 
   useEffect(() => {
