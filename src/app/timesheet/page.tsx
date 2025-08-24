@@ -127,21 +127,24 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (activity.completed) {
-                if (activity.type === 'deepwork' || activity.type === 'upskill') {
-                    const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                    const dailyLog = logs.find(log => log.date === dateKey);
-                    if (!dailyLog || !activity.taskIds) return 0;
-                    
-                    const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
-                    const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                    return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-                }
-                 if (activity.type === 'interrupt') {
-                    return activity.duration || 0;
-                }
+            if (!activity.completed) return 0;
+            
+            if (activity.type === 'deepwork' || activity.type === 'upskill') {
+                const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                const dailyLog = logs.find(log => log.date === dateKey);
+                if (!dailyLog || !activity.taskIds) return 0;
+                
+                const relevantExercises = dailyLog.exercises.filter(ex => activity.taskIds!.includes(ex.id));
+                const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                return relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
             }
-            return 0;
+             
+            if (activity.type === 'interrupt') {
+                return activity.duration || 0;
+            }
+
+            // Fallback for other completed tasks
+            return parseDurationToMinutes(activityDurations[activity.id]);
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -178,12 +181,8 @@ function TimesheetPageContent() {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
                             let duration = getLoggedMinutes(activity, dateKey);
-                            if (duration === 0) { // If no logged time, use planned duration
-                                 if (activity.type === 'interrupt') {
-                                     duration = activity.duration || 0;
-                                 } else {
-                                    duration = parseDurationToMinutes(activityDurations[activity.id]);
-                                 }
+                            if (duration === 0 && !activity.completed) { // If not logged, use planned duration for planned tasks
+                                 duration = parseDurationToMinutes(activityDurations[activity.id]);
                             }
 
                             if (duration > 0 || !activity.completed) {
@@ -201,14 +200,13 @@ function TimesheetPageContent() {
     
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        // IMPORTANT: For the chart, we get *all* data for the day, ignoring the filter.
         const dailySchedule = schedule[dateKey] || {};
         const activitiesForDay: ProcessedActivity[] = [];
 
         Object.values(dailySchedule).flat().forEach((activity: any) => {
-            if (activity && typeof activity === 'object' && 'type' in activity) {
+            if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
                 let duration = 0;
-                 if (activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill')) {
+                 if (activity.type === 'deepwork' || activity.type === 'upskill') {
                     const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
                     const dailyLog = logs.find(log => log.date === dateKey);
                     if (dailyLog && activity.taskIds) {
@@ -216,9 +214,9 @@ function TimesheetPageContent() {
                         const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
                         duration = relevantExercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
                     }
-                } else if (activity.type === 'interrupt' && activity.completed) {
+                } else if (activity.type === 'interrupt') {
                     duration = activity.duration || 0;
-                } else if (activity.completed) {
+                } else {
                     duration = parseDurationToMinutes(activityDurations[activity.id]);
                 }
                 
