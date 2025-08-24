@@ -7,7 +7,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -604,35 +604,46 @@ function MyPlatePageContent() {
   
   const timeAllocationData = useMemo(() => {
     const todaysScheduleForCalc = schedule[selectedDateKey] || {};
-    const dailyActivities = Object.values(todaysScheduleForCalc).flat() as Activity[];
-    const totals: Record<string, number> = {
-      'Deep Work': 0, 'Learning': 0, 'Workout': 0, 'Branding': 0, 'Essentials': 0, 'Planning': 0, 'Tracking': 0, 'Lead Gen': 0, 'Interrupts': 0,
+    if (!todaysScheduleForCalc || Object.keys(todaysScheduleForCalc).length === 0) {
+      return [];
+    }
+  
+    const validActivities = Object.values(todaysScheduleForCalc)
+      .flat()
+      .filter((activity): activity is Activity => !!activity && typeof activity === 'object' && 'type' in activity);
+  
+    const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {
+        'Deep Work': { time: 0, activities: [] },
+        'Learning': { time: 0, activities: [] },
+        'Workout': { time: 0, activities: [] },
+        'Branding': { time: 0, activities: [] },
+        'Essentials': { time: 0, activities: [] },
+        'Planning': { time: 0, activities: [] },
+        'Tracking': { time: 0, activities: [] },
+        'Lead Gen': { time: 0, activities: [] },
+        'Interrupts': { time: 0, activities: [] },
+        'Nutrition': { time: 0, activities: [] },
     };
-    
+  
     const activityNameMap: Record<ActivityType, string> = {
         deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
     }
-
-    dailyActivities.forEach(activity => {
-        const duration = activity.type === 'essentials' || activity.type === 'interrupt' ? activity.duration || 0 : parseDurationToMinutes(activityDurations[activity.id]);
+  
+    validActivities.forEach(activity => {
+        const duration = activity.type === 'essentials' || activity.type === 'interrupt' 
+            ? activity.duration || 0 
+            : parseDurationToMinutes(activityDurations[activity.id]);
+        
         const mappedName = activityNameMap[activity.type];
-        if (mappedName && totals[mappedName] !== undefined) {
-            totals[mappedName] += duration / 60;
+        if (mappedName && totals[mappedName]) {
+            totals[mappedName].time += duration / 60;
+            totals[mappedName].activities.push({ name: activity.details, duration });
         }
     });
-
-    const totalAllocated = Object.values(totals).reduce((sum, hours) => sum + hours, 0);
-    const freeTime = 24 - totalAllocated;
-
-    const data = Object.entries(totals)
-      .map(([name, time]) => ({ name, time }))
+  
+    return Object.entries(totals)
+      .map(([name, data]) => ({ name, time: data.time, activities: data.activities }))
       .filter(item => item.time > 0);
-
-    if (freeTime > 0) {
-      data.push({ name: 'Free Time', time: freeTime });
-    }
-    
-    return data;
   }, [schedule, selectedDateKey, activityDurations]);
   
   const handleOpenFocusModal = (activity: Activity) => {
@@ -914,46 +925,54 @@ function MyPlatePageContent() {
 
   useEffect(() => {
     const newDurations: Record<string, string> = {};
+    if (!schedule) return;
+  
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+  
     for (const dateKey in schedule) {
-        const daySchedule = schedule[dateKey];
-        if (!daySchedule) continue;
-
-        for (const slotName in daySchedule) {
-            const activities = (daySchedule as any)[slotName] || [];
-            if(Array.isArray(activities)) {
-                for (const activity of activities) {
-                    if (!activity || !activity.id) continue;
-                    
-                    if (activity.completed) {
-                        let logs, durationField;
-                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                        
-                        if (logs && durationField) {
-                            const loggedDuration = logs.find(log => log.date === dateKey)
-                                ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0;
-                            if (loggedDuration > 0) {
-                                newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
-                            }
-                        } else if (activity.duration) {
-                            newDurations[activity.id] = `${activity.duration}m`;
-                        }
-                    } else {
-                        let totalMinutes = 0;
-                         if (activity.type === 'essentials' || activity.type === 'interrupt') {
-                            totalMinutes = activity.duration || 0;
-                        } else {
-                           // Logic to calculate estimated duration for other types if needed
-                        }
-                        if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
-                    }
+      const daySchedule = schedule[dateKey];
+      if (!daySchedule) continue;
+  
+      for (const slotName in daySchedule) {
+        const activities = (daySchedule as any)[slotName] || [];
+        if (Array.isArray(activities)) {
+          for (const activity of activities) {
+            if (!activity || !activity.id) continue;
+  
+            if (activity.completed) {
+              let logs, durationField;
+              if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+              else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+              
+              if (logs && durationField) {
+                const loggedDuration = (logs.find(log => log.date === dateKey)
+                  ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                if (loggedDuration > 0) {
+                  newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
                 }
+              } else if (activity.duration) {
+                newDurations[activity.id] = `${activity.duration}m`;
+              }
+            } else {
+              let totalMinutes = 0;
+              if (activity.type === 'essentials' || activity.type === 'interrupt') {
+                totalMinutes = activity.duration || 0;
+              } else if (activity.taskIds && activity.taskIds.length > 0) {
+                const mainTaskId = activity.taskIds[0];
+                const taskDefinition = allDefs.find(def => mainTaskId.startsWith(def.id));
+                if (taskDefinition?.estimatedDuration) {
+                  totalMinutes = taskDefinition.estimatedDuration;
+                }
+              }
+              if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
             }
+          }
         }
+      }
     }
     setActivityDurations(newDurations);
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, setActivityDurations]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, setActivityDurations, deepWorkDefinitions, upskillDefinitions]);
 
 
   const handleLogWeight = (weight: number, date: Date) => {
