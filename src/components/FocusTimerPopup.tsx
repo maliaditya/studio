@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
 import {
   ResponsiveContainer,
@@ -16,6 +16,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
 import { Checkbox } from './ui/checkbox';
+import { cn } from '@/lib/utils';
+import { Input } from './ui/input';
 
 
 interface FocusTimerPopupProps {
@@ -50,6 +52,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const popupRef = useRef<HTMLDivElement>(null);
   const [activeSubTaskId, setActiveSubTaskId] = useState<string | null>(null);
 
+  const [promptForCompletion, setPromptForCompletion] = useState(false);
+  const [extendMinutes, setExtendMinutes] = useState(5);
+
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
@@ -59,12 +64,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   ), [deepWorkDefinitions, upskillDefinitions]);
 
   const focusedObjective = useMemo(() => {
-    const parentId = activity.taskIds?.[0];
-    if(!parentId) return null;
     // The definitionId in a workoutExercise is the full ID of the definition
-    const defId = allDefinitions.get(parentId)?.definitionId;
+    const defId = allDefinitions.get(activity.taskIds?.[0] || '')?.id;
     if (!defId) {
         // Fallback for older data structure where taskIds might be the definitionId directly
+        const parentId = activity.taskIds?.[0];
+        if (!parentId) return null;
         return allDefinitions.get(parentId.split('-')[0]);
     }
     return allDefinitions.get(defId);
@@ -129,17 +134,19 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!lastSubTaskCompletionTime) {
       setLastSubTaskCompletionTime(Date.now());
     }
+    setPromptForCompletion(false);
   }, [WORK_DURATION, setIsAudioPlaying, lastSubTaskCompletionTime]);
 
   const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
     if (completedSubTaskIds.has(subTaskId)) return;
+    setPromptForCompletion(false);
     
     const now = Date.now();
     let durationMinutes = 0;
 
     if (timerFinished) {
         const subTask = subTasks.find(st => st.id === subTaskId);
-        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds - secondsLeft) / 60);
+        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
     } else if (lastSubTaskCompletionTime) {
         durationMinutes = Math.floor((now - lastSubTaskCompletionTime) / 60000);
     }
@@ -163,15 +170,15 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         // All tasks done
         handleStop(true); // Automatically stop and mark complete
     }
-  }, [completedSubTaskIds, subTasks, totalSeconds, secondsLeft, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
+  }, [completedSubTaskIds, subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
 
 
   useEffect(() => {
     const firstUncompletedTask = subTasks.find(st => !completedSubTaskIds.has(st.id));
-    if (firstUncompletedTask && !activeSubTaskId) {
+    if (firstUncompletedTask && !activeSubTaskId && sessionState === 'idle') {
       handleStartSubTask(firstUncompletedTask);
     }
-  }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask]);
+  }, [subTasks, completedSubTaskIds, activeSubTaskId, handleStartSubTask, sessionState]);
 
 
   useEffect(() => {
@@ -180,7 +187,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (sessionState === 'running') {
       interval = setInterval(() => {
         setSecondsLeft(s => Math.max(0, s - 1));
-        setCycleSecondsLeft(s => s - 1);
+        setCycleSecondsLeft(s => s > 0 ? s - 1 : 0);
       }, 1000);
     }
   
@@ -192,7 +199,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
         if (activeSubTaskId) {
-            handleSubTaskComplete(activeSubTaskId, true);
+            setSessionState('paused');
+            setIsAudioPlaying(false);
+            setPromptForCompletion(true);
         }
     }
 
@@ -207,7 +216,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, handleSubTaskComplete, BREAK_DURATION, WORK_DURATION]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION]);
 
   useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -216,10 +225,21 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
   }, [secondsLeft, sessionState, totalSeconds, activity, setActiveFocusSession, activeFocusSession?.activity]);
 
+  const handleExtendTimer = () => {
+    const additionalSeconds = extendMinutes * 60;
+    setTotalSeconds(prev => prev + additionalSeconds);
+    setSecondsLeft(prev => prev + additionalSeconds);
+    
+    const remainingCycleTime = cycleSecondsLeft > 0 ? cycleSecondsLeft : 0;
+    setCycleSecondsLeft(remainingCycleTime + additionalSeconds);
+    setCurrentCycle('work');
 
+    setPromptForCompletion(false);
+    setSessionState('running');
+    setIsAudioPlaying(true);
+  };
   
   const progressPercentage = totalSeconds > 0 ? (secondsLeft / totalSeconds) * 100 : 0;
-  const chartData = [{ value: progressPercentage }];
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
@@ -294,12 +314,27 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   {activeSubTask ? (
                     <>
                       <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
-                        {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
-                        <Check className="h-4 w-4 text-green-500" />
-                      </Button>
+                      {promptForCompletion ? (
+                        <div className="flex items-center gap-2">
+                           <Button size="sm" onClick={() => handleSubTaskComplete(activeSubTask.id, true)}>Complete</Button>
+                           <Input 
+                            type="number" 
+                            value={extendMinutes} 
+                            onChange={e => setExtendMinutes(Number(e.target.value))} 
+                            className="w-16 h-9 text-center"
+                           />
+                           <Button size="sm" onClick={handleExtendTimer}>Extend</Button>
+                        </div>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSessionState(s => s === 'running' ? 'paused' : 'running')}>
+                            {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
+                            <Check className="h-4 w-4 text-green-500" />
+                          </Button>
+                        </>
+                      )}
                     </>
                   ) : (
                     <p className="text-sm italic text-muted-foreground">Select a task to begin</p>
@@ -325,7 +360,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => handleStartSubTask(task)}
-                            disabled={sessionState === 'running'}
+                            disabled={sessionState === 'running' || promptForCompletion}
                         >
                             <Play className="h-4 w-4" />
                         </Button>
