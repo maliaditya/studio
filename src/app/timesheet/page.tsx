@@ -214,7 +214,6 @@ function TimesheetPageContent() {
                 }
             });
 
-            // Calculate pie data for this day
             const totals: Record<string, number> = {};
             const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
             
@@ -644,5 +643,3 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
-
-```
