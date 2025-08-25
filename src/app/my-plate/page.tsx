@@ -28,7 +28,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -44,6 +44,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
+import { ChartContainer } from '@/components/ui/chart';
+import { Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -66,11 +68,78 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     return totalMinutes;
 };
 
+const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[] }) => {
+    const { theme } = useAuth();
+
+    const pieData = useMemo(() => {
+        const totalMinutesInDay = 24 * 60;
+        const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
+        const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
+        
+        const activityColorMapping: Record<string, string> = {
+            'Deep Work': 'hsl(var(--chart-1))', 'Learning': 'hsl(var(--chart-2))',
+            'Workout': 'hsl(var(--chart-3))', 'Branding': 'hsl(var(--chart-4))',
+            'Lead Gen': 'hsl(var(--chart-5))', 'Essentials': 'hsl(var(--chart-1))',
+            'Planning': 'hsl(var(--chart-2))', 'Tracking': 'hsl(var(--chart-3))',
+            'Interrupts': 'hsl(var(--destructive))', 'Nutrition': 'hsl(var(--chart-4))',
+            'Free Time': 'hsl(var(--muted))',
+        };
+
+        const data = timeAllocationData.map(item => ({
+            name: item.name,
+            value: item.time,
+            fill: activityColorMapping[item.name] || '#8884d8'
+        }));
+
+        if (freeTimeMinutes > 0) {
+            data.push({ name: 'Free Time', value: freeTimeMinutes, fill: activityColorMapping['Free Time'] });
+        }
+        return data;
+    }, [timeAllocationData]);
+
+    const formatMinutes = (minutes: number) => {
+        if (minutes <= 0) return "0m";
+        const hours = Math.floor(minutes / 60);
+        const mins = Math.round(minutes % 60);
+        if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+        if (hours > 0) return `${hours}h`;
+        return `${mins}m`;
+    };
+
+    return (
+        <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
+            <ResponsiveContainer>
+                <RechartsPieChart>
+                    <RechartsTooltip
+                        cursor={{ fill: "hsl(var(--muted))" }}
+                        content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                                const data = payload[0].payload;
+                                return (
+                                    <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        }}
+                    />
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
+                        label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                    >
+                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                    </Pie>
+                </RechartsPieChart>
+            </ResponsiveContainer>
+        </ChartContainer>
+    );
+};
+
 
 function MyPlatePageContent() {
   const { 
     currentUser, 
-    weightLogs, setWeightLogs,
+    setWeightLogs,
     goalWeight, setGoalWeight,
     height, setHeight,
     dateOfBirth, setDateOfBirth,
@@ -103,7 +172,8 @@ function MyPlatePageContent() {
     microSkillMap,
     currentSlot,
     onOpenFocusModal,
-    activityDurations
+    activityDurations,
+    weightLogs,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -1003,10 +1073,11 @@ function MyPlatePageContent() {
                   onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                   todaysSchedule={schedule[selectedDateKey] || {}}
                   activityDurations={activityDurations}
+                  showTimeAllocation={isAgendaDocked}
                 />
               </div>
               <div className="lg:col-span-2 space-y-6">
-                 {currentUser && isAgendaDocked && (
+                 {isAgendaDocked ? (
                     <TodaysScheduleCard
                         schedule={schedule}
                         date={selectedDate}
@@ -1021,6 +1092,15 @@ function MyPlatePageContent() {
                         onOpenTaskContext={openTaskContextPopup}
                         currentSlot={currentSlot}
                     />
+                ) : (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
+                        </CardContent>
+                    </Card>
                 )}
                 <WeightGoalCard 
                   weightLogs={weightLogs}

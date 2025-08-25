@@ -52,6 +52,7 @@ interface ProductivitySnapshotProps {
   onOpenKanbanModal: () => void;
   todaysSchedule: DailySchedule;
   activityDurations: Record<string, string>;
+  showTimeAllocation?: boolean;
 }
 
 const activityColorMapping: Record<string, string> = {
@@ -109,7 +110,7 @@ const formatMinutes = (minutes: number) => {
 };
 
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, todaysSchedule, activityDurations }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
@@ -410,69 +411,73 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               </div>
             </div>
           </div>
-          <Separator className="my-6" />
-          <div>
-            <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-            {pieData.length > 0 ? (
-                <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer" onClick={handleBarClick}>
-                  <ResponsiveContainer>
-                      <PieChart>
-                          <ChartTooltip
-                              cursor={{ fill: "hsl(var(--muted))" }}
-                              content={({ active, payload }) => {
-                                  if (active && payload && payload.length) {
-                                      const data = payload[0].payload;
-                                      const categoryName = data.name;
-                                      
-                                      if (categoryName === 'Free Time') {
-                                        return (
-                                           <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
-                                           </div>
-                                        );
-                                      }
+          {showTimeAllocation && (
+            <>
+                <Separator className="my-6" />
+                <div>
+                    <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
+                    {pieData.length > 0 ? (
+                        <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer" onClick={handleBarClick}>
+                            <ResponsiveContainer>
+                                <RechartsPieChart>
+                                    <RechartsTooltip
+                                        cursor={{ fill: "hsl(var(--muted))" }}
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
+                                                const categoryName = data.name;
+                                                
+                                                if (categoryName === 'Free Time') {
+                                                    return (
+                                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                            <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
+                                                        </div>
+                                                    );
+                                                }
 
-                                      const categoryData = timeAllocationData.find(item => item.name === categoryName);
+                                                const categoryData = timeAllocationData.find(item => item.name === categoryName);
 
-                                      return (
-                                          <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                              <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
-                                              {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
-                                                <>
-                                                  <Separator />
-                                                  <ul className="space-y-1">
-                                                      {categoryData.activities.map((act, index) => (
-                                                          <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
-                                                      ))}
-                                                  </ul>
-                                                </>
-                                              )}
-                                          </div>
-                                      );
-                                  }
-                                  return null;
-                              }}
-                          />
-                          <Pie
-                              data={pieData}
-                              dataKey="value"
-                              nameKey="name"
-                              cx="50%"
-                              cy="50%"
-                              outerRadius={80}
-                              innerRadius={50}
-                              labelLine={false}
-                              label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                          >
-                              {pieData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={entry.fill} />
-                              ))}
-                          </Pie>
-                      </PieChart>
-                  </ResponsiveContainer>
-                </ChartContainer>
-            ) : <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />}
-          </div>
+                                                return (
+                                                    <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                        <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
+                                                        {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
+                                                        <>
+                                                            <Separator />
+                                                            <ul className="space-y-1">
+                                                                {categoryData.activities.map((act, index) => (
+                                                                    <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                                ))}
+                                                            </ul>
+                                                        </>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Pie
+                                        data={pieData}
+                                        dataKey="value"
+                                        nameKey="name"
+                                        cx="50%"
+                                        cy="50%"
+                                        outerRadius={80}
+                                        innerRadius={50}
+                                        labelLine={false}
+                                        label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                                    >
+                                        {pieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Pie>
+                                </RechartsPieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                    ) : <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />}
+                </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
