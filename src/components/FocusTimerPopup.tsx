@@ -170,33 +170,31 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [WORK_DURATION, setIsAudioPlaying]);
 
   const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
-    if (loggedTimeMap.has(subTaskId)) return;
     setPromptForCompletion(false);
     
-    const now = Date.now();
     let durationMinutes = 0;
-
     const subTask = subTasks.find(st => st.id === subTaskId);
     if(timerFinished) {
         durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
     } else if (lastSubTaskCompletionTime) {
-        durationMinutes = Math.floor((now - lastSubTaskCompletionTime) / 60000);
+        durationMinutes = Math.floor((Date.now() - lastSubTaskCompletionTime) / 60000);
     }
     
     if (durationMinutes > 0) {
         logSubTaskTime(subTaskId, durationMinutes);
     }
     
-    const newCompletedIds = new Set(loggedTimeMap.keys());
-    newCompletedIds.add(subTaskId);
-    const nextTask = subTasks.find(st => !newCompletedIds.has(st.id));
+    // We must manually create the next state of completed IDs to check if we are done.
+    const nextCompletedIds = new Set(loggedTimeMap.keys());
+    nextCompletedIds.add(subTaskId);
+    const nextTask = subTasks.find(st => !nextCompletedIds.has(st.id));
 
     if (nextTask) {
         handleStartSubTask(nextTask);
     } else {
         handleStop(true);
     }
-  }, [loggedTimeMap, subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
+  }, [subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, loggedTimeMap, handleStartSubTask, handleStop]);
 
 
   useEffect(() => {
@@ -205,7 +203,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         if (firstPendingTask) {
             handleStartSubTask(firstPendingTask);
         } else if (subTasks.length > 0) {
-            // All tasks were already complete when opening
             handleStop(true);
         }
     }
@@ -298,7 +295,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         setEditingDurationTaskId(null);
         setSubTaskDurationInput('');
       } else {
-        // If input is invalid, just cancel editing
         setEditingDurationTaskId(null);
       }
     }
