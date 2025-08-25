@@ -12,7 +12,7 @@ import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashbo
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart as RechartsPieChart } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip as RechartsTooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
