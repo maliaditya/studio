@@ -354,11 +354,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                  {showSubTasks && activeSubTask ? (
-                    <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
-                  ) : (
-                    <p className="text-sm font-semibold truncate" title={activity.details}>{activity.details}</p>
-                  )}
+                  <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
