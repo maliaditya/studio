@@ -99,17 +99,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   } = useMemo(() => {
     const completed = subTasks.filter(task => loggedTimeMap.has(task.id));
     const completedIds = new Set(completed.map(t => t.id));
-
+  
+    // Determine the active task first
     let active: ExerciseDefinition | null = activeSubTaskId ? allDefinitions.get(activeSubTaskId) ?? null : null;
-    
-    const pending = subTasks.filter(task => 
-      !completedIds.has(task.id) && task.id !== activeSubTaskId
-    );
-    
-    // If there is no active task explicitly set, find the first pending one.
-    if (!active && pending.length > 0) {
-        active = pending[0];
+    if (!active) {
+        active = subTasks.find(task => !completedIds.has(task.id)) || null;
     }
+  
+    // Now determine pending tasks, excluding the active one
+    const pending = subTasks.filter(task => 
+      !completedIds.has(task.id) && task.id !== active?.id
+    );
     
     return {
         pendingSubTasks: pending,
