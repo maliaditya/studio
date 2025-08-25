@@ -47,6 +47,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
+  const [skipBreaks, setSkipBreaks] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -111,7 +112,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     };
   }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
 
-  // Determine if the sub-task view should be shown
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
   }, [activity.type, subTasks]);
@@ -188,7 +188,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setSessionState('idle');
     setIsAudioPlaying(false);
 
-    // Auto-start next task
     const completedIds = new Set(loggedTimeMap.keys());
     completedIds.add(subTaskId);
     const nextTask = subTasks.find(st => !completedIds.has(st.id));
@@ -196,14 +195,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (nextTask) {
         handleStartSubTask(nextTask);
     } else {
-        // All tasks done
-        handleStop(true); // Automatically stop and mark complete
+        handleStop(true);
     }
   }, [loggedTimeMap, subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, handleStartSubTask, setIsAudioPlaying, handleStop]);
 
 
   useEffect(() => {
-    // This effect runs once on mount to start the first available task if in sub-task mode
     if (showSubTasks && sessionState === 'idle' && !activeSubTaskId) {
         const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
         if (firstPendingTask) {
@@ -219,28 +216,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (sessionState === 'running') {
       interval = setInterval(() => {
         setSecondsLeft(s => Math.max(0, s - 1));
-        setCycleSecondsLeft(s => s > 0 ? s - 1 : 0);
+        if (!skipBreaks) {
+          setCycleSecondsLeft(s => s > 0 ? s - 1 : 0);
+        }
       }, 1000);
     }
   
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [sessionState]);
+  }, [sessionState, skipBreaks]);
 
   useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
-        if (showSubTasks && activeSubTaskId) {
-            setSessionState('paused');
-            setIsAudioPlaying(false);
-            setPromptForCompletion(true);
-        } else if (!showSubTasks) {
-            // For simple tasks, just complete it.
-            handleStop(true);
-        }
+        setSessionState('paused');
+        setIsAudioPlaying(false);
+        setPromptForCompletion(true);
     }
 
-    if (cycleSecondsLeft <= 0 && sessionState === 'running') {
+    if (!skipBreaks && cycleSecondsLeft <= 0 && sessionState === 'running') {
         if (currentCycle === 'work') {
             setCurrentCycle('break');
             setCycleSecondsLeft(BREAK_DURATION);
@@ -251,7 +245,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION, showSubTasks, handleStop]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION, skipBreaks]);
 
   useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -265,9 +259,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setTotalSeconds(prev => prev + additionalSeconds);
     setSecondsLeft(prev => prev + additionalSeconds);
     
-    const remainingCycleTime = cycleSecondsLeft > 0 ? cycleSecondsLeft : 0;
-    setCycleSecondsLeft(remainingCycleTime + additionalSeconds);
-    setCurrentCycle('work');
+    if (!skipBreaks) {
+      const remainingCycleTime = cycleSecondsLeft > 0 ? cycleSecondsLeft : 0;
+      setCycleSecondsLeft(remainingCycleTime + additionalSeconds);
+      setCurrentCycle('work');
+    }
 
     setPromptForCompletion(false);
     setSessionState('running');
@@ -279,20 +275,28 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setSessionState(isCurrentlyRunning ? 'paused' : 'running');
     setIsAudioPlaying(!isCurrentlyRunning);
   };
+  
+  const handleCompleteClick = () => {
+      if(showSubTasks && activeSubTaskId) {
+          handleSubTaskComplete(activeSubTaskId, true);
+      } else {
+          handleStop(true);
+      }
+  };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
   
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
+  const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
+  const cycleSeconds = cycleSecondsLeft % 60;
+
   if (!activity) return null;
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const strokeDashoffset = totalSeconds > 0 ? CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE) : CIRCUMFERENCE;
-
-  const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
-  const cycleSeconds = cycleSecondsLeft % 60;
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -340,47 +344,37 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       </span>
                   </div>
               </div>
-              <div className="text-center -mt-2">
-                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      {sessionState === 'running' && (currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />)}
-                      <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
-                  </div>
-              </div>
+              {!skipBreaks && (
+                <div className="text-center -mt-2">
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                        {sessionState === 'running' && (currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />)}
+                        <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
+                    </div>
+                </div>
+              )}
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                   {showSubTasks && activeSubTask ? (
-                    <>
-                      <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
-                      {promptForCompletion ? (
-                        <div className="flex items-center gap-2">
-                           <Button size="sm" onClick={() => handleSubTaskComplete(activeSubTask.id, true)}>Complete</Button>
-                           <Input 
-                            type="number" 
-                            value={extendMinutes} 
-                            onChange={e => setExtendMinutes(Number(e.target.value))} 
-                            className="w-16 h-9 text-center"
-                           />
-                           <Button size="sm" onClick={handleExtendTimer}>Extend</Button>
-                        </div>
-                      ) : (
-                        <>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
-                            {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSubTaskComplete(activeSubTask.id)}>
-                            <Check className="h-4 w-4 text-green-500" />
-                          </Button>
-                        </>
-                      )}
-                    </>
+                    <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
                   ) : (
-                     <div className="flex items-center justify-center gap-2">
-                        <p className="text-sm font-semibold truncate" title={activity.details}>{activity.details}</p>
-                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
-                            {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
-                     </div>
+                    <p className="text-sm font-semibold truncate" title={activity.details}>{activity.details}</p>
+                  )}
+                  {promptForCompletion ? (
+                    <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
+                        <Input
+                        type="number"
+                        value={extendMinutes}
+                        onChange={e => setExtendMinutes(Number(e.target.value))}
+                        className="w-16 h-9 text-center"
+                        />
+                        <Button size="sm" onClick={handleExtendTimer}>Extend</Button>
+                    </div>
+                  ) : (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
+                        {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    </Button>
                   )}
                 </div>
               </div>
