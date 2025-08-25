@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -38,7 +39,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = useState<'idle' | 'running' | 'paused'>('running');
+  const [sessionState, setSessionState] = useState<'running' | 'paused'>('running');
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
@@ -129,8 +130,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setActiveSubTaskId(null);
     setIsAudioPlaying(false);
     
-    const elapsedSeconds = totalSeconds - secondsLeft;
-    
     if (activity) {
       const updatedActivity: Activity = {
         ...activity,
@@ -139,14 +138,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       updateActivity(updatedActivity);
 
       if (completed) {
-        onLogTime(updatedActivity, duration);
+        const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
+        const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+        onLogTime(updatedActivity, elapsedMinutes);
         handleToggleComplete(activity.slot, activity.id, true);
-      } else if (elapsedSeconds > 0) {
-        onLogTime(updatedActivity, Math.floor(elapsedSeconds / 60));
       }
     }
     onClose();
-  }, [activity, duration, onLogTime, onClose, setIsAudioPlaying, secondsLeft, totalSeconds, updateActivity, handleToggleComplete]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete]);
 
   const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
     const durationMins = subTask.estimatedDuration || 25;

@@ -93,7 +93,6 @@ interface AuthContextType {
   isAgendaDocked: boolean;
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
-  setActivityDurations: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
   logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
@@ -279,6 +278,9 @@ interface AuthContextType {
 
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
+  permanentlyLoggedTaskIds: Set<string>;
+  getDescendantLeafNodes: (startNodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
+
 
   // New state for selected subtopic/focus area
   selectedUpskillTask: ExerciseDefinition | null;
@@ -346,7 +348,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [schedule, setSchedule] = useState<FullSchedule>({});
   const [dailyPurposes, setDailyPurposes] = useState<Record<string, string>>({});
   const [isAgendaDocked, setIsAgendaDocked] = useState(true);
-  const [activityDurations, setActivityDurations] = useState<Record<string, string>>({});
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
@@ -446,6 +447,106 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+  
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
+    let total = 0;
+    const visited = new Set<string>();
+    
+    const definitions = [...deepWorkDefinitions, ...upskillDefinitions];
+
+    function recurse(d: ExerciseDefinition) {
+        if (visited.has(d.id)) return;
+        visited.add(d.id);
+  
+        const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
+  
+        if (hasChildren) {
+            (d.linkedDeepWorkIds || []).forEach(childId => {
+                const childDef = definitions.find(c => c.id === childId);
+                if (childDef) recurse(childDef);
+            });
+            (d.linkedUpskillIds || []).forEach(childId => {
+                const childDef = definitions.find(c => c.id === childId);
+                if (childDef) recurse(childDef);
+            });
+        }
+        else {
+            total += d.estimatedDuration || 0;
+        }
+    }
+  
+    recurse(def);
+    return total;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
+  const activityDurations = useMemo(() => {
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
+
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+
+    for (const dateKey in schedule) {
+        const daySchedule = schedule[dateKey];
+        if (!daySchedule) continue;
+
+        for (const slotName in daySchedule) {
+            const activities = (daySchedule as any)[slotName] || [];
+            if (Array.isArray(activities)) {
+                for (const activity of activities) {
+                    if (!activity || !activity.id) continue;
+
+                    let totalMinutes = 0;
+                    if (activity.completed) {
+                        let logs, durationField;
+                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                        
+                        if (logs && durationField) {
+                            const loggedDuration = (logs.find(log => log.date === dateKey)
+                              ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                              .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                            if (loggedDuration > 0) totalMinutes = loggedDuration;
+                        }
+                    } else {
+                        switch(activity.type) {
+                            case 'workout': totalMinutes = 90; break;
+                            case 'upskill':
+                            case 'deepwork':
+                            case 'branding':
+                                if (activity.taskIds && activity.taskIds.length > 0) {
+                                  const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                                  const taskDef = allDefs.get(mainTaskDefId)
+                                  if (taskDef) {
+                                    totalMinutes = calculateTotalEstimate(taskDef);
+                                  } else {
+                                    totalMinutes = 120;
+                                  }
+                                } else {
+                                    totalMinutes = 120;
+                                }
+                                break;
+                            case 'planning':
+                            case 'tracking':
+                                totalMinutes = 30; break;
+                            case 'lead-generation': totalMinutes = 45; break;
+                            case 'essentials':
+                            case 'interrupt':
+                                totalMinutes = activity.duration || 0; break;
+                            default: totalMinutes = 0;
+                        }
+                    }
+
+                    if (totalMinutes > 0) {
+                        const h = Math.floor(totalMinutes / 60);
+                        const m = Math.round(totalMinutes % 60);
+                        newDurations[activity.id] = `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() || '0m';
+                    }
+                }
+            }
+        }
+    }
+    return newDurations;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
 
   const getAllUserData = useCallback(() => {
     return {
@@ -987,14 +1088,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logsUpdater = setAllWorkoutLogs;
         allDefs = exerciseDefinitions;
         break;
-      // Handle simple time-based logging without specific logs
       case 'planning':
       case 'tracking':
       case 'lead-generation':
       case 'branding':
         handleToggleComplete(activity.slot, activity.id, true);
         toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
-        return; // Exit here for simple logs
+        return;
       default:
         toast({ title: "Error", description: `Cannot log progress for activity type: ${activity.type}.`, variant: "destructive" });
         return;
@@ -1002,8 +1102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
-      toast({ title: "Error", description: "Could not log progress. Task ID is missing.", variant: "destructive" });
-      handleToggleComplete(activity.slot, activity.id, true); // Still mark as complete
+      handleToggleComplete(activity.slot, activity.id, true);
       return;
     }
   
@@ -1016,9 +1115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   
     if (!definition) {
-      toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
-      console.error("Definition not found for task instance:", exerciseInstanceId);
-      handleToggleComplete(activity.slot, activity.id, true); // Still mark as complete
+      handleToggleComplete(activity.slot, activity.id, true);
       return;
     }
       
@@ -1026,12 +1123,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     if (activity.focusSessionInitialStartTime) {
         const { focusSessionInitialStartTime, focusSessionPauses = [] } = activity;
-        const endTime = Date.now();
+        const endTime = activity.focusSessionEndTime || Date.now();
         let totalPauseTime = 0;
           
         focusSessionPauses.forEach(p => {
             if (p.resumeTime) {
                 totalPauseTime += p.resumeTime - p.pauseTime;
+            } else {
+                // If a pause is not resumed, consider it paused until now
+                totalPauseTime += Date.now() - p.pauseTime;
             }
         });
   
@@ -2110,6 +2210,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
+  
+  const permanentlyLoggedTaskIds = useMemo(() => {
+    const loggedIds = new Set<string>();
+    const processLogs = (logs: DatedWorkout[]) => {
+      (logs || []).forEach(log => {
+        (log.exercises || []).forEach(ex => {
+          if ((ex.loggedSets?.length ?? 0) > 0) {
+            loggedIds.add(ex.definitionId);
+          }
+        });
+      });
+    };
+    processLogs(allDeepWorkLogs);
+    processLogs(allUpskillLogs);
+    return loggedIds;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+  
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    
+    const leafNodes: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        
+        const node = definitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const children = node[linkKey] || [];
+        if (children.length === 0) {
+            leafNodes.push(node);
+        } else {
+            children.forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -2122,7 +2268,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     globalVolume, setGlobalVolume,
     settings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations, setActivityDurations,
+    schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
@@ -2182,6 +2328,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
     microSkillMap,
+    permanentlyLoggedTaskIds, getDescendantLeafNodes,
     expandedItems, setExpandedItems, handleExpansionChange,
     selectedDomainId, setSelectedDomainId,
     selectedSkillId, setSelectedSkillId,
@@ -2222,6 +2369,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
