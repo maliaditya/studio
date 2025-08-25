@@ -182,7 +182,7 @@ export function TodaysScheduleCard({
   onOpenTaskContext,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
@@ -276,13 +276,30 @@ export function TodaysScheduleCard({
   const [position, setPosition] = useState({ x: 20, y: 80 });
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
+  const positionKey = currentUser ? `lifeos_agenda_widget_position_${currentUser.username}` : null;
+
   useEffect(() => {
-    if (!isAgendaDocked) {
-      const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
-      const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
-      setPosition({ x: initialX, y: initialY });
+    if (!isAgendaDocked && positionKey) {
+        const savedPosition = localStorage.getItem(positionKey);
+        if (savedPosition) {
+            try {
+                const parsed = JSON.parse(savedPosition);
+                setPosition(parsed);
+            } catch (e) {
+                 console.error("Failed to parse widget position from localStorage", e);
+                 // Fallback to default position if parsing fails
+                 const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
+                 const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
+                 setPosition({ x: initialX, y: initialY });
+            }
+        } else {
+             // Default position if nothing is saved
+            const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
+            const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
+            setPosition({ x: initialX, y: initialY });
+        }
     }
-  }, [isAgendaDocked]);
+  }, [isAgendaDocked, positionKey]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, [role="button"]') || isAgendaDocked) return;
@@ -304,6 +321,9 @@ export function TodaysScheduleCard({
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    if (positionKey) {
+        localStorage.setItem(positionKey, JSON.stringify(position));
+    }
   };
 
   useEffect(() => {
@@ -318,7 +338,7 @@ export function TodaysScheduleCard({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, dragStartOffset, isAgendaDocked]);
+  }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
   
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
