@@ -203,9 +203,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
         if (firstPendingTask) {
             handleStartSubTask(firstPendingTask);
+        } else {
+            // All tasks were already complete when opening
+            handleStop(true);
         }
     }
-  }, [showSubTasks, subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask]);
+  }, [showSubTasks, subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask, handleStop]);
 
 
   useEffect(() => {
@@ -424,12 +427,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             </form>
                         ) : (
                             <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                                {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'N/A est.'}
-                                {!task.estimatedDuration && (
+                                {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
+                                {task.estimatedDuration === undefined || task.estimatedDuration === null || task.estimatedDuration === 0 ? (
                                     <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
                                         <Timer className="h-3 w-3"/>
                                     </Button>
-                                )}
+                                ) : null}
                             </span>
                         )}
                     </div>
