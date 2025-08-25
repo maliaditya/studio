@@ -283,7 +283,7 @@ interface AuthContextType {
 
 
   // New global map
-  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
   permanentlyLoggedTaskIds: Set<string>;
   getDescendantLeafNodes: (startNodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
 
@@ -576,6 +576,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
+  
+  const permanentlyLoggedTaskIds = useMemo(() => {
+    const loggedIds = new Set<string>();
+    const processLogs = (logs: DatedWorkout[]) => {
+      (logs || []).forEach(log => {
+        (log.exercises || []).forEach(ex => {
+          if ((ex.loggedSets?.length ?? 0) > 0) {
+            loggedIds.add(ex.definitionId);
+          }
+        });
+      });
+    };
+    processLogs(allDeepWorkLogs);
+    processLogs(allUpskillLogs);
+    return loggedIds;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+  
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    
+    const leafNodes: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        
+        const node = definitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const children = node[linkKey] || [];
+        if (children.length === 0) {
+            leafNodes.push(node);
+        } else {
+            children.forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
 
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     setActiveFocusSession({
@@ -586,6 +632,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(false);
   };
   
+  const markObjectiveActivityAsComplete = (definitionId: string) => {
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let activityUpdated = false;
+      
+      for (const dateKey in newSchedule) {
+        const daySchedule = newSchedule[dateKey];
+        for (const slotName in daySchedule) {
+          const activities = daySchedule[slotName] as Activity[] | undefined;
+          if (Array.isArray(activities)) {
+            const activityIndex = activities.findIndex(act => act.taskIds?.some(tid => tid.startsWith(definitionId)));
+            if (activityIndex > -1) {
+              const updatedActivity = { ...activities[activityIndex], completed: true };
+              (newSchedule[dateKey][slotName] as Activity[])[activityIndex] = updatedActivity;
+              activityUpdated = true;
+              break;
+            }
+          }
+        }
+        if (activityUpdated) break;
+      }
+      return newSchedule;
+    });
+  };
+
   const onOpenFocusModal = (activity: Activity) => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
     const def = mainDefId ? [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === mainDefId) : null;
@@ -602,6 +673,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
             } else {
                 toast({ title: "Objective Complete", description: "All sub-tasks for this objective have been logged." });
+                markObjectiveActivityAsComplete(def.id);
             }
             return;
         }
@@ -2258,52 +2330,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       pillarCards: (prev.pillarCards || []).filter(c => c.id !== cardId)
     }));
   };
-
-  const permanentlyLoggedTaskIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    const processLogs = (logs: DatedWorkout[]) => {
-      (logs || []).forEach(log => {
-        (log.exercises || []).forEach(ex => {
-          if ((ex.loggedSets?.length ?? 0) > 0) {
-            loggedIds.add(ex.definitionId);
-          }
-        });
-      });
-    };
-    processLogs(allDeepWorkLogs);
-    processLogs(allUpskillLogs);
-    return loggedIds;
-  }, [allDeepWorkLogs, allUpskillLogs]);
-  
-  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
-    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-    
-    const leafNodes: ExerciseDefinition[] = [];
-    const queue: string[] = [startNodeId];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        
-        const node = definitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const children = node[linkKey] || [];
-        if (children.length === 0) {
-            leafNodes.push(node);
-        } else {
-            children.forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    return leafNodes;
-  }, [deepWorkDefinitions, upskillDefinitions]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
