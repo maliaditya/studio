@@ -171,32 +171,32 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [WORK_DURATION, setIsAudioPlaying]);
 
   const handleSubTaskComplete = useCallback(() => {
-    if (!activeSubTask) return;
+    if (showSubTasks) {
+        if (!activeSubTask) return;
 
-    setPromptForCompletion(false);
-  
-    // Use the timer's total duration for logging, as it's more accurate than `lastSubTaskCompletionTime`
-    const durationMinutes = Math.floor(totalSeconds / 60);
+        setPromptForCompletion(false);
+      
+        const durationMinutes = Math.floor(totalSeconds / 60);
 
-    if (durationMinutes > 0) {
-        logSubTaskTime(activeSubTask.id, durationMinutes);
-    }
-    
-    // Create an updated set of completed IDs *immediately* for the next check.
-    // This is the key fix to avoid stale state.
-    const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
-    setCompletedSubTaskIds(newCompletedSet);
+        if (durationMinutes > 0) {
+            logSubTaskTime(activeSubTask.id, durationMinutes);
+        }
+        
+        const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
+        setCompletedSubTaskIds(newCompletedSet);
 
-    // Now, find the next task based on this up-to-the-millisecond completed set.
-    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
+        const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
 
-    if (nextTask) {
-        handleStartSubTask(nextTask);
+        if (nextTask) {
+            handleStartSubTask(nextTask);
+        } else {
+            handleStop(true);
+        }
     } else {
-        // Only stop the session if there are truly no more tasks left.
+        // This is a standalone task
         handleStop(true);
     }
-  }, [activeSubTask, totalSeconds, completedSubTaskIds, subTasks, logSubTaskTime, handleStartSubTask, handleStop]);
+  }, [activeSubTask, totalSeconds, completedSubTaskIds, subTasks, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
 
   useEffect(() => {
