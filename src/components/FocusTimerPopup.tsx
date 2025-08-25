@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -283,11 +284,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleSetSubTaskDuration = (e: React.FormEvent) => {
     e.preventDefault();
-    if (activeSubTask) {
+    if (editingDurationTaskId) {
       const newDuration = parseInt(subTaskDurationInput, 10);
       if (!isNaN(newDuration) && newDuration > 0) {
-        updateTaskDuration(activeSubTask.id, newDuration);
-        if (activeSubTask.id === editingDurationTaskId) {
+        updateTaskDuration(editingDurationTaskId, newDuration);
+        if (activeSubTask?.id === editingDurationTaskId) {
           setTotalSeconds(newDuration * 60);
           setSecondsLeft(newDuration * 60);
         }
@@ -384,11 +385,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   ) : (
                     <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
                   )}
-                  {activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === null || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask.id && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-500" onClick={() => setEditingDurationTaskId(activeSubTask.id)}>
-                      <Timer className="h-4 w-4" />
-                    </Button>
-                  )}
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
@@ -434,7 +430,21 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Play className="h-4 w-4" />
                         </Button>
                         <label className="flex-grow">{task.name}</label>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{task.estimatedDuration || 'N/A'}m est.</span>
+                        {editingDurationTaskId === task.id ? (
+                            <form onSubmit={handleSetSubTaskDuration} className="flex items-center gap-1">
+                                <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={() => setEditingDurationTaskId(null)} />
+                                <Button size="xs" type="submit">Set</Button>
+                            </form>
+                        ) : (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                                {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'N/A est.'}
+                                {!task.estimatedDuration && (
+                                    <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
+                                        <Timer className="h-3 w-3"/>
+                                    </Button>
+                                )}
+                            </span>
+                        )}
                     </div>
                   ))}
                   {pendingSubTasks.length === 0 && (
