@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -282,7 +283,7 @@ interface AuthContextType {
 
 
   // New global map
-  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
   permanentlyLoggedTaskIds: Set<string>;
   getDescendantLeafNodes: (startNodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
 
@@ -586,25 +587,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const onOpenFocusModal = (activity: Activity) => {
-    const estDuration = activityDurations[activity.id];
-    let minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m',''), 10) : 45;
-
-    let def: ExerciseDefinition | undefined;
-    if (activity.type === 'upskill') {
-      def = upskillDefinitions.find(d => activity.taskIds?.[0]?.startsWith(d.id));
-    } else if (activity.type === 'deepwork') {
-      def = deepWorkDefinitions.find(d => activity.taskIds?.[0]?.startsWith(d.id));
-    }
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    const def = mainDefId ? [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === mainDefId) : null;
     
     if (def) {
-      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-      if (nodeType === 'Objective' || nodeType === 'Intention' || nodeType === 'Curiosity') {
-        handleStartFocusSession(activity, minutes > 0 ? minutes : 45);
-        return;
-      }
+        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+        
+        if (isParentNode) {
+            const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
+            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
+
+            if (firstPendingNode) {
+                handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
+            } else {
+                toast({ title: "Objective Complete", description: "All sub-tasks for this objective have been logged." });
+            }
+            return;
+        }
     }
 
-    setFocusDuration(minutes > 0 ? minutes : 45);
+    const estDuration = activityDurations[activity.id];
+    let minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m', ''), 10) : 45;
+    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+
+    setFocusDuration(minutes);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
   };
@@ -2423,6 +2430,9 @@ const usePrevious = <T,>(value: T) => {
 
 
 
+
+
+    
 
 
     
