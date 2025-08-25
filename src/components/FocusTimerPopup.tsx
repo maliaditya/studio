@@ -282,8 +282,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
   };
   
-  const handleSetSubTaskDuration = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSetSubTaskDuration = () => {
     if (editingDurationTaskId) {
       const newDuration = parseInt(subTaskDurationInput, 10);
       if (!isNaN(newDuration) && newDuration > 0) {
@@ -294,6 +293,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         }
         setEditingDurationTaskId(null);
         setSubTaskDurationInput('');
+      } else {
+        // If input is invalid, just cancel editing
+        setEditingDurationTaskId(null);
       }
     }
   };
@@ -369,22 +371,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                  {editingDurationTaskId === activeSubTask?.id ? (
-                      <form onSubmit={handleSetSubTaskDuration} className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          placeholder="Est. (min)"
-                          value={subTaskDurationInput}
-                          onChange={(e) => setSubTaskDurationInput(e.target.value)}
-                          className="w-24 h-8 text-xs"
-                          autoFocus
-                          onBlur={() => setEditingDurationTaskId(null)}
-                        />
-                        <Button size="sm" className="h-8" type="submit">Set</Button>
-                      </form>
-                  ) : (
                     <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
-                  )}
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
@@ -431,8 +418,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         </Button>
                         <label className="flex-grow">{task.name}</label>
                         {editingDurationTaskId === task.id ? (
-                            <form onSubmit={handleSetSubTaskDuration} className="flex items-center gap-1">
-                                <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={() => setEditingDurationTaskId(null)} />
+                            <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
+                                <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
                                 <Button size="xs" type="submit">Set</Button>
                             </form>
                         ) : (
