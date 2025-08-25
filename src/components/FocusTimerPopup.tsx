@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -35,7 +34,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
-  const [lastSubTaskCompletionTime, setLastSubTaskCompletionTime] = useState<number | null>(null);
+  // New state to reliably track completions *within this session*
+  const [completedSubTaskIds, setCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
@@ -97,28 +97,30 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [allDeepWorkLogs, allUpskillLogs]);
   
   const activeSubTask = useMemo(() => {
-    const completedIds = new Set(Array.from(loggedTimeMap.keys()));
+    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
+    
+    // Prioritize the explicitly set active task if it's not completed
     const activeTask = activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
-
-    if (activeTask && !completedIds.has(activeTask.id)) {
+    if (activeTask && !allCompletedIds.has(activeTask.id)) {
         return activeTask;
     }
     
-    return subTasks.find(task => !completedIds.has(task.id)) || null;
+    // Otherwise, find the first pending task
+    return subTasks.find(task => !allCompletedIds.has(task.id)) || null;
 
-  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
+  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap, completedSubTaskIds]);
   
   const pendingSubTasks = useMemo(() => {
-    const completedIds = new Set(loggedTimeMap.keys());
+    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
     return subTasks.filter(task => 
-      !completedIds.has(task.id) && task.id !== activeSubTask?.id
+      !allCompletedIds.has(task.id) && task.id !== activeSubTask?.id
     );
-  }, [subTasks, activeSubTask?.id, loggedTimeMap]);
+  }, [subTasks, activeSubTask?.id, loggedTimeMap, completedSubTaskIds]);
 
   const completedSubTaskComponents = useMemo(() => {
-    const completedIds = new Set(loggedTimeMap.keys());
-    return subTasks.filter(task => completedIds.has(task.id));
-  }, [subTasks, loggedTimeMap]);
+    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
+    return subTasks.filter(task => allCompletedIds.has(task.id));
+  }, [subTasks, loggedTimeMap, completedSubTaskIds]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
@@ -126,8 +128,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: '1.5rem', // 24px
-    right: '1.5rem', // 24px
+    top: '1.5rem',
+    right: '1.5rem',
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
@@ -165,48 +167,48 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setActiveSubTaskId(subTask.id);
     setSessionState('running');
     setIsAudioPlaying(true);
-    setLastSubTaskCompletionTime(Date.now());
     setPromptForCompletion(false);
   }, [WORK_DURATION, setIsAudioPlaying]);
 
-  const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
-      setPromptForCompletion(false);
+  const handleSubTaskComplete = useCallback(() => {
+    if (!activeSubTask) return;
+
+    setPromptForCompletion(false);
   
-      let durationMinutes = 0;
-      const subTask = subTasks.find(st => st.id === subTaskId);
-      if (timerFinished) {
-          durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
-      } else if (lastSubTaskCompletionTime) {
-          durationMinutes = Math.floor((Date.now() - lastSubTaskCompletionTime) / 60000);
-      }
-  
-      if (durationMinutes > 0) {
-          logSubTaskTime(subTaskId, durationMinutes);
-      }
-  
-      const updatedCompletedIds = new Set(loggedTimeMap.keys());
-      updatedCompletedIds.add(subTaskId);
-  
-      const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id));
-  
-      if (nextTask) {
-          handleStartSubTask(nextTask);
-      } else {
-          handleStop(true);
-      }
-  }, [subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, loggedTimeMap, handleStartSubTask, handleStop]);
+    // Use the timer's total duration for logging, as it's more accurate than `lastSubTaskCompletionTime`
+    const durationMinutes = Math.floor(totalSeconds / 60);
+
+    if (durationMinutes > 0) {
+        logSubTaskTime(activeSubTask.id, durationMinutes);
+    }
+    
+    // Create an updated set of completed IDs *immediately* for the next check.
+    // This is the key fix to avoid stale state.
+    const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
+    setCompletedSubTaskIds(newCompletedSet);
+
+    // Now, find the next task based on this up-to-the-millisecond completed set.
+    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
+
+    if (nextTask) {
+        handleStartSubTask(nextTask);
+    } else {
+        // Only stop the session if there are truly no more tasks left.
+        handleStop(true);
+    }
+  }, [activeSubTask, totalSeconds, completedSubTaskIds, subTasks, logSubTaskTime, handleStartSubTask, handleStop]);
 
 
   useEffect(() => {
     if (showSubTasks && sessionState === 'idle' && !activeSubTaskId) {
-        const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
+        const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id) && !completedSubTaskIds.has(st.id));
         if (firstPendingTask) {
             handleStartSubTask(firstPendingTask);
         } else if (subTasks.length > 0) {
             handleStop(true);
         }
     }
-  }, [showSubTasks, subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask, handleStop]);
+  }, [showSubTasks, subTasks, loggedTimeMap, completedSubTaskIds, sessionState, activeSubTaskId, handleStartSubTask, handleStop]);
 
 
   useEffect(() => {
@@ -273,14 +275,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const isCurrentlyRunning = sessionState === 'running';
     setSessionState(isCurrentlyRunning ? 'paused' : 'running');
     setIsAudioPlaying(!isCurrentlyRunning);
-  };
-  
-  const handleCompleteClick = () => {
-      if(showSubTasks && activeSubTaskId) {
-          handleSubTaskComplete(activeSubTaskId, true); // true indicates timer finished
-      } else {
-          handleStop(true);
-      }
   };
   
   const handleSetSubTaskDuration = () => {
@@ -385,7 +379,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     )}
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
+                        <Button size="sm" onClick={handleSubTaskComplete}>Complete</Button>
                         <Input
                         type="number"
                         value={extendMinutes}
