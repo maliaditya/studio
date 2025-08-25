@@ -170,30 +170,30 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [WORK_DURATION, setIsAudioPlaying]);
 
   const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
-    setPromptForCompletion(false);
-    
-    let durationMinutes = 0;
-    const subTask = subTasks.find(st => st.id === subTaskId);
-    if(timerFinished) {
-        durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
-    } else if (lastSubTaskCompletionTime) {
-        durationMinutes = Math.floor((Date.now() - lastSubTaskCompletionTime) / 60000);
-    }
-    
-    if (durationMinutes > 0) {
-        logSubTaskTime(subTaskId, durationMinutes);
-    }
-    
-    // We must manually create the next state of completed IDs to check if we are done.
-    const nextCompletedIds = new Set(loggedTimeMap.keys());
-    nextCompletedIds.add(subTaskId);
-    const nextTask = subTasks.find(st => !nextCompletedIds.has(st.id));
-
-    if (nextTask) {
-        handleStartSubTask(nextTask);
-    } else {
-        handleStop(true);
-    }
+      setPromptForCompletion(false);
+  
+      let durationMinutes = 0;
+      const subTask = subTasks.find(st => st.id === subTaskId);
+      if (timerFinished) {
+          durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
+      } else if (lastSubTaskCompletionTime) {
+          durationMinutes = Math.floor((Date.now() - lastSubTaskCompletionTime) / 60000);
+      }
+  
+      if (durationMinutes > 0) {
+          logSubTaskTime(subTaskId, durationMinutes);
+      }
+  
+      const updatedCompletedIds = new Set(loggedTimeMap.keys());
+      updatedCompletedIds.add(subTaskId);
+  
+      const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id));
+  
+      if (nextTask) {
+          handleStartSubTask(nextTask);
+      } else {
+          handleStop(true);
+      }
   }, [subTasks, totalSeconds, lastSubTaskCompletionTime, logSubTaskTime, loggedTimeMap, handleStartSubTask, handleStop]);
 
 
