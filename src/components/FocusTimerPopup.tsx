@@ -187,9 +187,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         logSubTaskTime(subTaskId, durationMinutes);
     }
     
-    const completedIds = new Set(loggedTimeMap.keys());
-    completedIds.add(subTaskId);
-    const nextTask = subTasks.find(st => !completedIds.has(st.id));
+    const newCompletedIds = new Set(loggedTimeMap.keys());
+    newCompletedIds.add(subTaskId);
+    const nextTask = subTasks.find(st => !newCompletedIds.has(st.id));
 
     if (nextTask) {
         handleStartSubTask(nextTask);
@@ -233,11 +233,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (secondsLeft <= 0 && sessionState === 'running') {
         setSessionState('paused');
         setIsAudioPlaying(false);
-        if (showSubTasks && activeSubTask) {
-            handleSubTaskComplete(activeSubTask.id, true);
-        } else {
-            setPromptForCompletion(true);
-        }
+        setPromptForCompletion(true);
     }
 
     if (!skipBreaks && cycleSecondsLeft <= 0 && sessionState === 'running') {
@@ -284,7 +280,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleCompleteClick = () => {
       if(showSubTasks && activeSubTaskId) {
-          handleSubTaskComplete(activeSubTaskId, false);
+          handleSubTaskComplete(activeSubTaskId, true); // true indicates timer finished
       } else {
           handleStop(true);
       }
