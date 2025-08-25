@@ -700,6 +700,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(true);
   }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, toast, markObjectiveActivityAsComplete]);
 
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const subTaskDef = allDefs.find(def => def.id === subTaskId);
+    if (!subTaskDef) {
+        toast({ title: "Error", description: "Could not find sub-task definition.", variant: "destructive" });
+        return;
+    }
+
+    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
+    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+
+    logsUpdater(prevLogs => {
+        const newLogs = [...prevLogs];
+        let logForToday = newLogs.find(log => log.date === todayKey);
+        
+        if (!logForToday) {
+            logForToday = { id: todayKey, date: todayKey, exercises: [] };
+            newLogs.push(logForToday);
+        }
+
+        let exerciseInstance = logForToday.exercises.find(ex => ex.definitionId === subTaskId);
+        if (!exerciseInstance) {
+            exerciseInstance = {
+                id: `${subTaskDef.id}-${Date.now()}`,
+                definitionId: subTaskDef.id,
+                name: subTaskDef.name,
+                category: subTaskDef.category,
+                loggedSets: [],
+                targetSets: 1,
+                targetReps: '1',
+            };
+            logForToday.exercises.push(exerciseInstance);
+        }
+
+        const newSet: LoggedSet = {
+            id: `${Date.now()}`,
+            reps: isUpskill ? durationMinutes : 1, // Store duration in reps for upskill
+            weight: durationMinutes, // Store duration in weight for deepwork
+            timestamp: Date.now(),
+        };
+
+        exerciseInstance.loggedSets.push(newSet);
+        
+        return newLogs;
+    });
+
+    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
+  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
+
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -1342,60 +1392,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
   }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, handleToggleComplete]);
   
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const subTaskDef = allDefs.find(def => def.id === subTaskId);
-    if (!subTaskDef) {
-        toast({ title: "Error", description: "Could not find sub-task definition.", variant: "destructive" });
-        return;
-    }
-
-    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
-    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
-
-    logsUpdater(prevLogs => {
-        let logForToday = prevLogs.find(log => log.date === todayKey);
-        if (!logForToday) {
-            logForToday = { id: todayKey, date: todayKey, exercises: [] };
-        }
-
-        let exerciseInstance = logForToday.exercises.find(ex => ex.definitionId === subTaskId);
-        if (!exerciseInstance) {
-            exerciseInstance = {
-                id: `${subTaskDef.id}-${Date.now()}`,
-                definitionId: subTaskDef.id,
-                name: subTaskDef.name,
-                category: subTaskDef.category,
-                loggedSets: [],
-                targetSets: 1,
-                targetReps: '1',
-            };
-            logForToday.exercises.push(exerciseInstance);
-        }
-
-        const newSet: LoggedSet = {
-            id: `${Date.now()}`,
-            reps: isUpskill ? durationMinutes : 1,
-            weight: durationMinutes,
-            timestamp: Date.now(),
-        };
-
-        exerciseInstance.loggedSets.push(newSet);
-
-        const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
-        if (existingLogIndex > -1) {
-            const newLogs = [...prevLogs];
-            newLogs[existingLogIndex] = { ...logForToday };
-            return newLogs;
-        } else {
-            return [...prevLogs, logForToday];
-        }
-    });
-
-    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
-  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
-
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
@@ -2472,6 +2468,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 

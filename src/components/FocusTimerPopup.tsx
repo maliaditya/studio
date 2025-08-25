@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -175,8 +176,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const now = Date.now();
     let durationMinutes = 0;
 
-    if (timerFinished) {
-        const subTask = subTasks.find(st => st.id === subTaskId);
+    const subTask = subTasks.find(st => st.id === subTaskId);
+    if(timerFinished) {
         durationMinutes = subTask?.estimatedDuration || Math.floor((totalSeconds) / 60);
     } else if (lastSubTaskCompletionTime) {
         durationMinutes = Math.floor((now - lastSubTaskCompletionTime) / 60000);
@@ -203,7 +204,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
         if (firstPendingTask) {
             handleStartSubTask(firstPendingTask);
-        } else {
+        } else if (subTasks.length > 0) {
             // All tasks were already complete when opening
             handleStop(true);
         }
@@ -375,6 +376,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                     <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
+                    {(activeSubTask?.estimatedDuration === undefined || activeSubTask?.estimatedDuration === null || activeSubTask?.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
+                            <Timer className="h-3 w-3" />
+                        </Button>
+                    )}
+                    {editingDurationTaskId === activeSubTask?.id && (
+                        <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
+                            <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
+                            <Button size="xs" type="submit">Set</Button>
+                        </form>
+                    )}
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
@@ -420,21 +432,20 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Play className="h-4 w-4" />
                         </Button>
                         <label className="flex-grow">{task.name}</label>
-                        {editingDurationTaskId === task.id ? (
-                            <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
-                                <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
-                                <Button size="xs" type="submit">Set</Button>
-                            </form>
-                        ) : (
-                            <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                                {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
-                                {task.estimatedDuration === undefined || task.estimatedDuration === null || task.estimatedDuration === 0 ? (
-                                    <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
-                                        <Timer className="h-3 w-3"/>
-                                    </Button>
-                                ) : null}
-                            </span>
-                        )}
+                         <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                            {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
+                            {(task.estimatedDuration === undefined || task.estimatedDuration === null || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
+                                <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
+                                    <Timer className="h-3 w-3"/>
+                                </Button>
+                            )}
+                            {editingDurationTaskId === task.id && (
+                                <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
+                                    <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
+                                    <Button size="xs" type="submit">Set</Button>
+                                </form>
+                            )}
+                        </span>
                     </div>
                   ))}
                   {pendingSubTasks.length === 0 && (
