@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -581,11 +582,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const updater = (definitions: ExerciseDefinition[]) => 
       definitions.map(d => d.id === taskId ? { ...d, estimatedDuration: duration } : d);
       
-    if (deepWorkDefinitions.some(d => d.id === taskId)) {
-      setDeepWorkDefinitions(updater);
-    } else if (upskillDefinitions.some(d => d.id === taskId)) {
-      setUpskillDefinitions(updater);
-    }
+    setDeepWorkDefinitions(prev => updater(prev));
+    setUpskillDefinitions(prev => updater(prev));
+    
+    toast({ title: 'Duration Updated', description: `Estimated duration has been set to ${duration} minutes.`});
   };
   
   const permanentlyLoggedTaskIds = useMemo(() => {
@@ -1722,7 +1722,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       prev.map(res => res.id === updatedResource.id ? updatedResource : res)
     );
   };
-
+  
   const handleClosePopup = useCallback((resourceId: string) => {
     setOpenPopups(prev => {
       const newPopups = new Map(prev);
@@ -2472,6 +2472,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
