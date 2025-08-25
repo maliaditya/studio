@@ -711,6 +711,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+    const logSource = isUpskill ? allUpskillLogs : allDeepWorkLogs;
 
     logsUpdater(prevLogs => {
         const newLogs = [...prevLogs];
@@ -736,9 +737,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const newSet: LoggedSet = {
-            id: `${Date.now()}`,
-            reps: isUpskill ? durationMinutes : 1, // Store duration in reps for upskill
-            weight: durationMinutes, // Store duration in weight for deepwork
+            id: `${Date.now()}-${Math.random()}`,
+            reps: isUpskill ? durationMinutes : 1,
+            weight: durationMinutes,
             timestamp: Date.now(),
         };
 
@@ -748,8 +749,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
-  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
-
+  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, allUpskillLogs, allDeepWorkLogs, toast]);
+  
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -2468,6 +2469,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 

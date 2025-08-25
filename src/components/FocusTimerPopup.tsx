@@ -233,7 +233,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (secondsLeft <= 0 && sessionState === 'running') {
         setSessionState('paused');
         setIsAudioPlaying(false);
-        setPromptForCompletion(true);
+        if (showSubTasks && activeSubTask) {
+            handleSubTaskComplete(activeSubTask.id, true);
+        } else {
+            setPromptForCompletion(true);
+        }
     }
 
     if (!skipBreaks && cycleSecondsLeft <= 0 && sessionState === 'running') {
@@ -247,7 +251,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION, skipBreaks]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTask, handleSubTaskComplete, showSubTasks, BREAK_DURATION, WORK_DURATION, skipBreaks]);
 
   useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -280,7 +284,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleCompleteClick = () => {
       if(showSubTasks && activeSubTaskId) {
-          handleSubTaskComplete(activeSubTaskId, true);
+          handleSubTaskComplete(activeSubTaskId, false);
       } else {
           handleStop(true);
       }
@@ -376,10 +380,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                     <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
-                    {(activeSubTask?.estimatedDuration === undefined || activeSubTask?.estimatedDuration === null || activeSubTask?.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
-                        <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
-                            <Timer className="h-3 w-3" />
-                        </Button>
+                    {showSubTasks && activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
+                        <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
+                            <Timer className="h-4 w-4" />
+                        </button>
                     )}
                     {editingDurationTaskId === activeSubTask?.id && (
                         <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
@@ -434,10 +438,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         <label className="flex-grow">{task.name}</label>
                          <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
                             {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
-                            {(task.estimatedDuration === undefined || task.estimatedDuration === null || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
-                                <Button variant="ghost" size="icon" className="h-5 w-5 text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
-                                    <Timer className="h-3 w-3"/>
-                                </Button>
+                            {(task.estimatedDuration === undefined || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
+                                <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
+                                    <Timer className="h-4 w-4"/>
+                                </button>
                             )}
                             {editingDurationTaskId === task.id && (
                                 <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
