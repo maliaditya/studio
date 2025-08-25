@@ -39,7 +39,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = useState<'running' | 'paused'>('running');
+  const [sessionState, setSessionState] = useState<'running' | 'paused' | 'idle'>('running');
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
