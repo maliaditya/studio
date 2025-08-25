@@ -1057,7 +1057,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
+      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayKey] || {}) } }));
       toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
     }
 
@@ -2477,6 +2477,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
