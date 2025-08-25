@@ -9,11 +9,11 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart as RechartsPieChart, Pie } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart, Pie } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
@@ -109,15 +109,101 @@ const formatMinutes = (minutes: number) => {
     return `${mins}m`;
 };
 
+const TimeAllocationChart = ({ data }: { data: any[] }) => {
+    const [allocationDetailModalData, setAllocationDetailModalData] = useState<{ category: string; tasks: { name: string; duration: number }[] } | null>(null);
+
+    const handlePieClick = (data: any) => {
+        if (data && data.name) {
+            setAllocationDetailModalData({
+                category: data.name,
+                tasks: data.activities || []
+            });
+        }
+    };
+    
+    return (
+        <>
+            <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
+                <ResponsiveContainer>
+                    <RechartsPieChart onClick={(data) => handlePieClick(data)}>
+                        <RechartsTooltip
+                            cursor={{ fill: "hsl(var(--muted))" }}
+                            content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    return (
+                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                            <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            }}
+                        />
+                        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
+                            label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                        >
+                            {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                        </Pie>
+                    </RechartsPieChart>
+                </ResponsiveContainer>
+            </ChartContainer>
+            
+            {allocationDetailModalData && (
+                <Dialog open={!!allocationDetailModalData} onOpenChange={() => setAllocationDetailModalData(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Time Allocation for {allocationDetailModalData.category}</DialogTitle>
+                            <DialogDescription>A breakdown of how your time was spent in this category today.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            {allocationDetailModalData.tasks.length > 0 ? (
+                                <ChartContainer config={{}} className="h-60 w-full">
+                                    <ResponsiveContainer>
+                                        <BarChart data={allocationDetailModalData.tasks} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                                            <CartesianGrid horizontal={false} />
+                                            <XAxis type="number" dataKey="duration" domain={[0, 'dataMax + 5']} fontSize={12} tickFormatter={(value) => `${value}m`} />
+                                            <YAxis type="category" dataKey="name" width={120} tickLine={false} axisLine={false} fontSize={12} interval={0} />
+                                            <RechartsTooltip
+                                                cursor={{ fill: "hsl(var(--muted))" }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const data = payload[0].payload;
+                                                        return (
+                                                            <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                                                <p className="font-bold text-foreground">{data.name}</p>
+                                                                <p className="text-muted-foreground">{data.duration} minutes</p>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="duration" radius={[0, 4, 4, 0]}>
+                                                {allocationDetailModalData.tasks.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={activityColorMapping[allocationDetailModalData.category]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </ChartContainer>
+                            ) : (
+                                <p className="text-sm text-center text-muted-foreground py-8">No specific tasks with logged time for this category today.</p>
+                            )}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </>
+    );
+};
+
 
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
-  
-  const [isAllocationDetailModalOpen, setIsAllocationDetailModalOpen] = useState(false);
-  const [allocationDetailData, setAllocationDetailData] = useState<{ category: string; tasks: { name: string; duration: number }[] } | null>(null);
   
   const themeColors = useThemeColors();
   
@@ -193,18 +279,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   
   const roadmapItems = stats.upcomingReleases || [];
   
-  const handleBarClick = (data: any) => {
-    if (!data || !data.activePayload) return;
-    const categoryName = data.activePayload[0].payload.name;
-    
-    const categoryData = timeAllocationData.find(item => item.name === categoryName);
-
-    setAllocationDetailData({
-        category: categoryName,
-        tasks: categoryData ? categoryData.activities : []
-    });
-    setIsAllocationDetailModalOpen(true);
-  };
 
   const pieData = useMemo(() => {
     const totalMinutesInDay = 24 * 60;
@@ -414,67 +488,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           {showTimeAllocation && (
             <>
                 <Separator className="my-6" />
-                <div>
-                    <h4 className="font-semibold mb-4 text-center">Daily Time Allocation (24h)</h4>
-                    {pieData.length > 0 ? (
-                        <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer" onClick={handleBarClick}>
-                            <ResponsiveContainer>
-                                <RechartsPieChart>
-                                    <RechartsTooltip
-                                        cursor={{ fill: "hsl(var(--muted))" }}
-                                        content={({ active, payload }) => {
-                                            if (active && payload && payload.length) {
-                                                const data = payload[0].payload;
-                                                const categoryName = data.name;
-                                                
-                                                if (categoryName === 'Free Time') {
-                                                    return (
-                                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                            <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
-                                                        </div>
-                                                    );
-                                                }
-
-                                                const categoryData = timeAllocationData.find(item => item.name === categoryName);
-
-                                                return (
-                                                    <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                        <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
-                                                        {categoryData && categoryData.activities && categoryData.activities.length > 0 && (
-                                                        <>
-                                                            <Separator />
-                                                            <ul className="space-y-1">
-                                                                {categoryData.activities.map((act, index) => (
-                                                                    <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
-                                                                ))}
-                                                            </ul>
-                                                        </>
-                                                        )}
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        }}
-                                    />
-                                    <Pie
-                                        data={pieData}
-                                        dataKey="value"
-                                        nameKey="name"
-                                        cx="50%"
-                                        cy="50%"
-                                        outerRadius={80}
-                                        innerRadius={50}
-                                        labelLine={false}
-                                        label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                                    >
-                                        {pieData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                        ))}
-                                    </Pie>
-                                </RechartsPieChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                    ) : <div className="h-[200px] w-full bg-muted animate-pulse rounded-md" />}
+                <div className="flex items-center justify-center">
+                  <TimeAllocationChart data={pieData} />
                 </div>
             </>
           )}
@@ -532,53 +547,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         </Dialog>
       )}
 
-      {allocationDetailData && (
-        <Dialog open={isAllocationDetailModalOpen} onOpenChange={setIsAllocationDetailModalOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Time Allocation for {allocationDetailData.category}</DialogTitle>
-                    <DialogDescription>
-                        A breakdown of how your time was spent in this category today.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    {allocationDetailData.tasks.length > 0 ? (
-                        <ChartContainer config={{}} className="h-60 w-full">
-                            <ResponsiveContainer>
-                                <BarChart data={allocationDetailData.tasks} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
-                                    <CartesianGrid horizontal={false} />
-                                    <XAxis type="number" dataKey="duration" domain={[0, 'dataMax + 5']} fontSize={12} tickFormatter={(value) => `${value}m`} />
-                                    <YAxis type="category" dataKey="name" width={120} tickLine={false} axisLine={false} fontSize={12} interval={0} />
-                                    <RechartsTooltip
-                                        cursor={{ fill: "hsl(var(--muted))" }}
-                                        content={({ active, payload }) => {
-                                            if (active && payload && payload.length) {
-                                                const data = payload[0].payload;
-                                                return (
-                                                    <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                        <p className="font-bold text-foreground">{data.name}</p>
-                                                        <p className="text-muted-foreground">{data.duration} minutes</p>
-                                                    </div>
-                                                );
-                                            }
-                                            return null;
-                                        }}
-                                    />
-                                    <Bar dataKey="duration" radius={[0, 4, 4, 0]}>
-                                        {allocationDetailData.tasks.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={themeColors[index % themeColors.length] || themeColors[0]} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                    ) : (
-                        <p className="text-sm text-center text-muted-foreground py-8">No specific tasks with logged time for this category today.</p>
-                    )}
-                </div>
-            </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

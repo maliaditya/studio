@@ -1065,7 +1065,7 @@ function MyPlatePageContent() {
           <CardContent>
             <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className={cn("lg:col-span-3", !isAgendaDocked && "lg:col-span-5")}>
+              <div className="lg:col-span-3">
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
                     timeAllocationData={timeAllocationData} 
@@ -1314,3 +1314,4 @@ export default function MyPlatePage() {
 
       
     
+
