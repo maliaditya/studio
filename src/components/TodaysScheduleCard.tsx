@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,7 +26,6 @@ interface AgendaWidgetItemProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -36,9 +36,9 @@ function AgendaWidgetItem({
     onStartWorkoutLog, 
     onToggleComplete, 
     onStartLeadGenLog, 
-    onOpenFocusModal,
     onOpenTaskContext,
 }: AgendaWidgetItemProps) {
+  const { onOpenFocusModal } = useAuth();
   const [openPopover, setOpenPopover] = useState(false);
   const [durationInput, setDurationInput] = useState('');
 

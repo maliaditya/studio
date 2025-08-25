@@ -26,6 +26,7 @@ import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
+import { FocusSessionModal } from '@/components/FocusSessionModal';
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -57,7 +58,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartLeadGenLog,
     openTaskContextPopup,
     currentSlot,
+    focusSessionModalOpen,
+    setFocusSessionModalOpen,
+    focusActivity,
     onOpenFocusModal,
+    handleStartFocusSession,
+    focusDuration,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -109,6 +115,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
+       <FocusSessionModal
+          isOpen={focusSessionModalOpen}
+          onOpenChange={setFocusSessionModalOpen}
+          activity={focusActivity}
+          onStartSession={handleStartFocusSession}
+          initialDuration={focusDuration}
+        />
       {activeFocusSession && (
           <FocusTimerPopup
             activity={activeFocusSession.activity}

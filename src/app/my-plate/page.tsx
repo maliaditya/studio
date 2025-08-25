@@ -21,7 +21,7 @@ import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { DashboardStats } from '@/components/DashboardStats';
-import { ProductivitySnapshot } from '@/components/ProductivitySnapshot';
+import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { Button } from '@/components/ui/button';
@@ -44,8 +44,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
-import { ChartContainer } from '@/components/ui/chart';
-import { Pie, PieChart as RechartsPieChart, ResponsiveContainer, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -67,74 +65,6 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     
     return totalMinutes;
 };
-
-const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[] }) => {
-    const { theme } = useAuth();
-
-    const pieData = useMemo(() => {
-        const totalMinutesInDay = 24 * 60;
-        const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
-        const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
-        
-        const activityColorMapping: Record<string, string> = {
-            'Deep Work': 'hsl(var(--chart-1))', 'Learning': 'hsl(var(--chart-2))',
-            'Workout': 'hsl(var(--chart-3))', 'Branding': 'hsl(var(--chart-4))',
-            'Lead Gen': 'hsl(var(--chart-5))', 'Essentials': 'hsl(var(--chart-1))',
-            'Planning': 'hsl(var(--chart-2))', 'Tracking': 'hsl(var(--chart-3))',
-            'Interrupts': 'hsl(var(--destructive))', 'Nutrition': 'hsl(var(--chart-4))',
-            'Free Time': 'hsl(var(--muted))',
-        };
-
-        const data = timeAllocationData.map(item => ({
-            name: item.name,
-            value: item.time,
-            fill: activityColorMapping[item.name] || '#8884d8'
-        }));
-
-        if (freeTimeMinutes > 0) {
-            data.push({ name: 'Free Time', value: freeTimeMinutes, fill: activityColorMapping['Free Time'] });
-        }
-        return data;
-    }, [timeAllocationData]);
-
-    const formatMinutes = (minutes: number) => {
-        if (minutes <= 0) return "0m";
-        const hours = Math.floor(minutes / 60);
-        const mins = Math.round(minutes % 60);
-        if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-        if (hours > 0) return `${hours}h`;
-        return `${mins}m`;
-    };
-
-    return (
-        <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
-            <ResponsiveContainer>
-                <RechartsPieChart>
-                    <RechartsTooltip
-                        cursor={{ fill: "hsl(var(--muted))" }}
-                        content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                                const data = payload[0].payload;
-                                return (
-                                    <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
-                                    </div>
-                                );
-                            }
-                            return null;
-                        }}
-                    />
-                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
-                        label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
-                    >
-                        {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
-                    </Pie>
-                </RechartsPieChart>
-            </ResponsiveContainer>
-        </ChartContainer>
-    );
-};
-
 
 function MyPlatePageContent() {
   const { 
@@ -160,7 +90,6 @@ function MyPlatePageContent() {
     productizationPlans,
     offerizationPlans,
     onOpenIntentionPopup,
-    activeFocusSession,
     setActiveFocusSession,
     setIsAudioPlaying,
     openTaskContextPopup,
@@ -200,12 +129,6 @@ function MyPlatePageContent() {
   const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null, activity: Activity | null}>({ isOpen: false, slotName: null, activity: null });
   const [essentialDetails, setEssentialDetails] = useState('');
   const [essentialDuration, setEssentialDuration] = useState('');
-
-
-  // Focus Session State
-  const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
-  const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
-  const [focusDuration, setFocusDuration] = useState(45);
   
   // Meal selection modal
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
@@ -737,18 +660,6 @@ function MyPlatePageContent() {
       .filter(item => item.time > 0);
   }, [schedule, selectedDateKey, activityDurations]);
   
-  const handleOpenFocusModal = (activity: Activity) => {
-    const duration = parseDurationToMinutes(activityDurations[activity.id]);
-    setFocusDuration(duration > 0 ? duration : 45);
-    setFocusActivity(activity);
-    setFocusSessionModalOpen(true);
-  };
-
-  const handleStartFocusSession = (activity: Activity, duration: number) => {
-    setActiveFocusSession({ activity, duration, secondsLeft: duration * 60 });
-    setIsAudioPlaying(true);
-  };
-
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
   const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
@@ -1065,7 +976,7 @@ function MyPlatePageContent() {
           <CardContent>
             <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className="lg:col-span-3">
+              <div className={cn("space-y-6", isAgendaDocked ? "lg:col-span-3" : "lg:col-span-5")}>
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
                     timeAllocationData={timeAllocationData} 
@@ -1220,14 +1131,6 @@ function MyPlatePageContent() {
           </DialogContent>
         </Dialog>
         
-         <FocusSessionModal
-          isOpen={focusSessionModalOpen}
-          onOpenChange={setFocusSessionModalOpen}
-          activity={focusActivity}
-          onStartSession={handleStartFocusSession}
-          initialDuration={focusDuration}
-        />
-
         <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
             <DialogContent>
                 <DialogHeader>
@@ -1314,4 +1217,3 @@ export default function MyPlatePage() {
 
       
     
-
