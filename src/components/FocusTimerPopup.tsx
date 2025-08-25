@@ -38,7 +38,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
 
-  const [sessionState, setSessionState] = useState<'idle' | 'running' | 'paused'>('idle');
+  const [sessionState, setSessionState] = useState<'idle' | 'running' | 'paused'>('running');
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
   const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
@@ -111,6 +111,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     };
   }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
 
+  // Determine if the sub-task view should be shown
+  const showSubTasks = useMemo(() => {
+      return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
+  }, [activity.type, subTasks]);
 
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -199,14 +203,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
 
   useEffect(() => {
-    // This effect runs once on mount to start the first available task
-    if (sessionState === 'idle' && !activeSubTaskId) {
+    // This effect runs once on mount to start the first available task if in sub-task mode
+    if (showSubTasks && sessionState === 'idle' && !activeSubTaskId) {
         const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id));
         if (firstPendingTask) {
             handleStartSubTask(firstPendingTask);
         }
     }
-  }, [subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask]);
+  }, [showSubTasks, subTasks, loggedTimeMap, sessionState, activeSubTaskId, handleStartSubTask]);
 
 
   useEffect(() => {
@@ -226,10 +230,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     if (secondsLeft <= 0 && sessionState === 'running') {
-        if (activeSubTaskId) {
+        if (showSubTasks && activeSubTaskId) {
             setSessionState('paused');
             setIsAudioPlaying(false);
             setPromptForCompletion(true);
+        } else if (!showSubTasks) {
+            // For simple tasks, just complete it.
+            handleStop(true);
         }
     }
 
@@ -244,7 +251,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTaskId, BREAK_DURATION, WORK_DURATION, showSubTasks, handleStop]);
 
   useEffect(() => {
     if (sessionState === 'running' || sessionState === 'paused') {
@@ -282,15 +289,15 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-  const strokeDashoffset = CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE);
+  const strokeDashoffset = totalSeconds > 0 ? CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE) : CIRCUMFERENCE;
 
   const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
   const cycleSeconds = cycleSecondsLeft % 60;
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
-        <Card ref={popupRef} className="w-[600px] shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm">
-            <CardContent className="p-4 grid grid-cols-2 gap-4">
+        <Card ref={popupRef} className={cn("shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm", showSubTasks ? "w-[600px]" : "w-[300px]")}>
+            <CardContent className={cn("p-4 grid gap-4", showSubTasks ? "grid-cols-2" : "grid-cols-1")}>
             <div className="col-span-1 space-y-2">
               <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
@@ -342,7 +349,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                  {activeSubTask ? (
+                  {showSubTasks && activeSubTask ? (
                     <>
                       <p className="text-sm font-semibold truncate" title={activeSubTask.name}>{activeSubTask.name}</p>
                       {promptForCompletion ? (
@@ -368,18 +375,26 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       )}
                     </>
                   ) : (
-                    <p className="text-sm italic text-muted-foreground">Select a task to begin</p>
+                     <div className="flex items-center justify-center gap-2">
+                        <p className="text-sm font-semibold truncate" title={activity.details}>{activity.details}</p>
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
+                            {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        </Button>
+                     </div>
                   )}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-border/20 text-center">
-                  <p className="text-xs text-muted-foreground">Objective</p>
-                  <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
-                      {focusedObjective?.name || '...'}
-                  </p>
-              </div>
+              {showSubTasks && (
+                <div className="mt-2 pt-2 border-t border-border/20 text-center">
+                    <p className="text-xs text-muted-foreground">Objective</p>
+                    <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
+                        {focusedObjective?.name || '...'}
+                    </p>
+                </div>
+              )}
             </div>
             
+            {showSubTasks && (
             <div className="col-span-1 border-l pl-4">
               <h4 className="text-sm font-semibold mb-2">Pending Sub-tasks</h4>
               <ScrollArea className="h-48 mb-2">
@@ -423,6 +438,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 </div>
               </ScrollArea>
             </div>
+            )}
             </CardContent>
         </Card>
         </div>
