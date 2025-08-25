@@ -76,8 +76,33 @@ export function TodaysLearningModal({
 
 
   const filteredProjects = useMemo(() => {
-    return projects || [];
-  }, [projects]);
+    const activeProjectIds = new Set<string>();
+    const today = startOfToday();
+
+    (projects || []).forEach(project => {
+        // Check productization plans - assuming any project with a plan is active
+        if (productizationPlans && productizationPlans[project.name]) {
+            activeProjectIds.add(project.id);
+            return;
+        }
+
+        // Check offerization plans for releases linked to this project by name
+        const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+            plan.releases?.some(release => {
+                if (release.name !== project.name) return false;
+                try {
+                    const launchDate = parseISO(release.launchDate);
+                    return isAfter(launchDate, today) || format(launchDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                } catch { return false; }
+            })
+        );
+        if (isOfferedAndActive) {
+            activeProjectIds.add(project.id);
+        }
+    });
+
+    return (projects || []).filter(p => activeProjectIds.has(p.id));
+  }, [projects, productizationPlans, offerizationPlans]);
 
   useEffect(() => {
     if (isOpen) {
