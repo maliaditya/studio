@@ -5,7 +5,7 @@
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -1065,19 +1065,19 @@ function MyPlatePageContent() {
           <CardContent>
             <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className="lg:col-span-3">
-                <ProductivitySnapshot 
-                  stats={dashboardStats} 
-                  timeAllocationData={timeAllocationData} 
-                  onOpenStatsModal={() => setIsStatsModalOpen(true)} 
-                  onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
-                  todaysSchedule={schedule[selectedDateKey] || {}}
-                  activityDurations={activityDurations}
-                  showTimeAllocation={isAgendaDocked}
+              <div className={cn("lg:col-span-3", !isAgendaDocked && "lg:col-span-5")}>
+                  <ProductivitySnapshot 
+                    stats={dashboardStats} 
+                    timeAllocationData={timeAllocationData} 
+                    onOpenStatsModal={() => setIsStatsModalOpen(true)} 
+                    onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
+                    todaysSchedule={schedule[selectedDateKey] || {}}
+                    activityDurations={activityDurations}
+                    showTimeAllocation={isAgendaDocked}
                 />
               </div>
-              <div className="lg:col-span-2 space-y-6">
-                 {isAgendaDocked ? (
+               <div className="lg:col-span-2 space-y-6">
+                {isAgendaDocked ? (
                     <TodaysScheduleCard
                         schedule={schedule}
                         date={selectedDate}
