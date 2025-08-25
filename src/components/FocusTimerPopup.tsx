@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -108,21 +106,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
   
-  const {
-    pendingSubTasks,
-    completedSubTaskComponents,
-  } = useMemo(() => {
+  const pendingSubTasks = useMemo(() => {
     const completedIds = new Set(loggedTimeMap.keys());
-    const completed = subTasks.filter(task => completedIds.has(task.id));
-    const pending = subTasks.filter(task => 
+    return subTasks.filter(task => 
       !completedIds.has(task.id) && task.id !== activeSubTask?.id
     );
-    
-    return {
-        pendingSubTasks: pending,
-        completedSubTaskComponents: completed,
-    };
   }, [subTasks, activeSubTask?.id, loggedTimeMap]);
+
+  const completedSubTaskComponents = useMemo(() => {
+    const completedIds = new Set(loggedTimeMap.keys());
+    return subTasks.filter(task => completedIds.has(task.id));
+  }, [subTasks, loggedTimeMap]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
@@ -169,11 +163,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setActiveSubTaskId(subTask.id);
     setSessionState('running');
     setIsAudioPlaying(true);
-    if (!lastSubTaskCompletionTime) {
-      setLastSubTaskCompletionTime(Date.now());
-    }
+    setLastSubTaskCompletionTime(Date.now());
     setPromptForCompletion(false);
-  }, [WORK_DURATION, setIsAudioPlaying, lastSubTaskCompletionTime]);
+  }, [WORK_DURATION, setIsAudioPlaying]);
 
   const handleSubTaskComplete = useCallback((subTaskId: string, timerFinished: boolean = false) => {
     if (loggedTimeMap.has(subTaskId)) return;
@@ -193,11 +185,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         logSubTaskTime(subTaskId, durationMinutes);
     }
     
-    setLastSubTaskCompletionTime(now);
-    setActiveSubTaskId(null);
-    setSessionState('idle');
-    setIsAudioPlaying(false);
-
     const completedIds = new Set(loggedTimeMap.keys());
     completedIds.add(subTaskId);
     const nextTask = subTasks.find(st => !completedIds.has(st.id));

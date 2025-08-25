@@ -643,7 +643,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(false);
   };
   
-  const markObjectiveActivityAsComplete = (definitionId: string) => {
+  const markObjectiveActivityAsComplete = useCallback((definitionId: string) => {
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
       let activityUpdated = false;
@@ -654,10 +654,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const activities = daySchedule[slotName] as Activity[] | undefined;
           if (Array.isArray(activities)) {
             const activityIndex = activities.findIndex(act => act.taskIds?.some(tid => tid.startsWith(definitionId)));
-            if (activityIndex > -1) {
+            if (activityIndex > -1 && !activities[activityIndex].completed) {
               const updatedActivity = { ...activities[activityIndex], completed: true };
               (newSchedule[dateKey][slotName] as Activity[])[activityIndex] = updatedActivity;
               activityUpdated = true;
+              toast({ title: "Objective Complete!", description: `Objective "${updatedActivity.details}" has been marked as complete.` });
               break;
             }
           }
@@ -666,11 +667,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return newSchedule;
     });
-  };
+  }, [setSchedule, toast]);
 
-  const onOpenFocusModal = (activity: Activity) => {
+  const onOpenFocusModal = useCallback((activity: Activity) => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const def = mainDefId ? [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === mainDefId) : null;
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
     
     if (def) {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
@@ -696,7 +698,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusDuration(minutes);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
-  };
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, toast, markObjectiveActivityAsComplete]);
 
   const getAllUserData = useCallback(() => {
     return {
@@ -1340,7 +1342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
   }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, handleToggleComplete]);
   
-  const logSubTaskTime = (subTaskId: string, durationMinutes: number) => {
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const subTaskDef = allDefs.find(def => def.id === subTaskId);
@@ -1349,9 +1351,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
     const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
-    logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
 
     logsUpdater(prevLogs => {
         let logForToday = prevLogs.find(log => log.date === todayKey);
@@ -1367,7 +1368,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 name: subTaskDef.name,
                 category: subTaskDef.category,
                 loggedSets: [],
-                targetSets: 1, // Default for sub-tasks
+                targetSets: 1,
                 targetReps: '1',
             };
             logForToday.exercises.push(exerciseInstance);
@@ -1375,14 +1376,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const newSet: LoggedSet = {
             id: `${Date.now()}`,
-            reps: isUpskill ? durationMinutes : 1, // For upskill, reps might mean minutes
-            weight: durationMinutes, // For deep work, weight is duration
+            reps: isUpskill ? durationMinutes : 1,
+            weight: durationMinutes,
             timestamp: Date.now(),
         };
 
         exerciseInstance.loggedSets.push(newSet);
 
-        // Update the log in the state
         const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
         if (existingLogIndex > -1) {
             const newLogs = [...prevLogs];
@@ -1394,7 +1394,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
-};
+  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
 
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2284,7 +2284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const microSkillMap = useMemo(() => {
-    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>();
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
     coreSkills.forEach(coreSkill => {
         coreSkill.skillAreas.forEach(skillArea => {
             skillArea.microSkills.forEach(microSkill => {
@@ -2472,6 +2472,9 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
+
+
 
 
 
