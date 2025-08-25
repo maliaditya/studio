@@ -101,9 +101,11 @@ function MyPlatePageContent() {
     getUpskillNodeType,
     skillDomains,
     microSkillMap,
+    currentSlot,
+    onOpenFocusModal,
+    activityDurations
   } = useAuth();
   const { toast } = useToast();
-  const [currentSlot, setCurrentSlot] = useState('');
   const [remainingTime, setRemainingTime] = useState('');
   const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -173,15 +175,7 @@ function MyPlatePageContent() {
   useEffect(() => {
     const timerInterval = setInterval(() => {
         const now = new Date();
-        const currentHour = now.getHours();
-        let activeSlot = 'Night';
-        if (currentHour >= 0 && currentHour < 4) activeSlot = 'Late Night';
-        else if (currentHour >= 4 && currentHour < 8) activeSlot = 'Dawn';
-        else if (currentHour >= 8 && currentHour < 12) activeSlot = 'Morning';
-        else if (currentHour >= 12 && currentHour < 16) activeSlot = 'Afternoon';
-        else if (currentHour >= 16 && currentHour < 20) activeSlot = 'Evening';
-        setCurrentSlot(activeSlot);
-        const slotEndHour = slotEndHours[activeSlot];
+        const slotEndHour = slotEndHours[currentSlot];
         const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
         const diff = slotEndTime.getTime() - now.getTime();
         if (diff > 0) {
@@ -192,7 +186,7 @@ function MyPlatePageContent() {
         } else { setRemainingTime('00:00:00'); }
     }, 1000);
     return () => clearInterval(timerInterval);
-  }, []);
+  }, [currentSlot]);
 
   // Carry forward tasks logic
   useEffect(() => {
@@ -630,85 +624,6 @@ function MyPlatePageContent() {
 
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
-  
-  const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
-
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
-    for (const dateKey in schedule) {
-        const daySchedule = schedule[dateKey];
-        if (!daySchedule) continue;
-
-        for (const slotName in daySchedule) {
-            const activities = (daySchedule as any)[slotName] || [];
-            if (Array.isArray(activities)) {
-                for (const activity of activities) {
-                    if (!activity || !activity.id) continue;
-
-                    let totalMinutes = 0;
-                    if (activity.completed) {
-                        let logs: DatedWorkout[] | undefined;
-                        let durationField: 'reps' | 'weight' | 'none' = 'none';
-
-                        if (activity.type === 'upskill') { 
-                            logs = allUpskillLogs; 
-                            durationField = 'reps'; 
-                        } else if (activity.type === 'deepwork') { 
-                            logs = allDeepWorkLogs; 
-                            durationField = 'weight'; 
-                        } else if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                            const pauseDuration = (activity.focusSessionPauses || []).reduce((sum, p) => sum + (p.resumeTime ? p.resumeTime - p.pauseTime : 0), 0);
-                            totalMinutes = Math.floor((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseDuration) / 60000);
-                        }
-                        
-                        if (logs && durationField !== 'none') {
-                            const loggedDuration = (logs.find(log => log.date === dateKey)
-                              ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                              .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                            if (loggedDuration > 0) totalMinutes = loggedDuration;
-                        }
-                    } else {
-                        switch(activity.type) {
-                            case 'workout': totalMinutes = 90; break;
-                            case 'upskill':
-                            case 'deepwork':
-                            case 'branding':
-                                if (activity.taskIds && activity.taskIds.length > 0) {
-                                    const mainTaskId = activity.taskIds[0].split('-')[0]; // Handle instance ID
-                                    const taskDef = allDefs.get(mainTaskId);
-                                    if (taskDef) {
-                                        totalMinutes = calculateTotalEstimate(taskDef);
-                                    } else {
-                                        totalMinutes = 120;
-                                    }
-                                } else {
-                                    totalMinutes = 120;
-                                }
-                                break;
-                            case 'planning':
-                            case 'tracking':
-                                totalMinutes = 30; break;
-                            case 'lead-generation': totalMinutes = 45; break;
-                            case 'essentials':
-                            case 'interrupt':
-                                totalMinutes = activity.duration || 0; break;
-                            default: totalMinutes = 0;
-                        }
-                    }
-
-                    if (totalMinutes > 0) {
-                        const h = Math.floor(totalMinutes / 60);
-                        const m = Math.round(totalMinutes % 60);
-                        newDurations[activity.id] = `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() || '0m';
-                    }
-                }
-            }
-        }
-    }
-    return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
 
   const timeAllocationData = useMemo(() => {
     const todaysScheduleForCalc = schedule[selectedDateKey] || {};
@@ -1102,7 +1017,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={handleOpenFocusModal}
+                        onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={openTaskContextPopup}
                         currentSlot={currentSlot}
                     />
@@ -1143,23 +1058,6 @@ function MyPlatePageContent() {
         </Card>
         
         <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
-
-        {currentUser && !isAgendaDocked && (
-            <TodaysScheduleCard
-                schedule={schedule}
-                date={selectedDate}
-                activityDurations={activityDurations}
-                isAgendaDocked={isAgendaDocked}
-                onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onLogLearning={handleLogLearning}
-                onStartWorkoutLog={handleStartWorkoutLog}
-                onStartLeadGenLog={handleStartLeadGenLog}
-                onToggleComplete={handleToggleComplete}
-                onOpenFocusModal={handleOpenFocusModal}
-                onOpenTaskContext={openTaskContextPopup}
-                currentSlot={currentSlot}
-            />
-        )}
 
         {currentUser && (
           <TodaysWorkoutModal

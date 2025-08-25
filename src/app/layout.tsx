@@ -25,6 +25,7 @@ import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { DietPlanModal } from '@/components/DietPlanModal';
+import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -47,6 +48,16 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     todaysDietPopup,
     closeTodaysDietPopup,
     handleTodaysDietPopupDragEnd,
+    isAgendaDocked,
+    setIsAgendaDocked,
+    schedule,
+    activityDurations,
+    handleToggleComplete,
+    handleStartWorkoutLog,
+    handleStartLeadGenLog,
+    openTaskContextPopup,
+    currentSlot,
+    onOpenFocusModal,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -107,6 +118,22 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onLogTime={handleLogLearning}
           />
         )}
+      {!isAgendaDocked && (
+        <TodaysScheduleCard
+            schedule={schedule}
+            date={new Date()}
+            activityDurations={activityDurations}
+            isAgendaDocked={isAgendaDocked}
+            onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+            onLogLearning={handleLogLearning}
+            onStartWorkoutLog={handleStartWorkoutLog}
+            onStartLeadGenLog={handleStartLeadGenLog}
+            onToggleComplete={handleToggleComplete}
+            onOpenFocusModal={onOpenFocusModal}
+            onOpenTaskContext={openTaskContextPopup}
+            currentSlot={currentSlot}
+        />
+      )}
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
@@ -212,4 +239,3 @@ export default function RootLayout({
     </html>
   );
 }
-
