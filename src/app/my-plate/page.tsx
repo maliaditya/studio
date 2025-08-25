@@ -97,6 +97,7 @@ function MyPlatePageContent() {
     coreSkills,
     openTodaysDietPopup,
     getUpskillNodeType,
+    getDeepWorkNodeType,
     skillDomains,
     microSkillMap,
     currentSlot,
@@ -499,8 +500,24 @@ function MyPlatePageContent() {
       setWorkoutActivityToLog(activity);
       setIsTodaysWorkoutModalOpen(true);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
-      setEditingActivity({ slotName, activity });
-      setIsLearningModalOpen(true);
+      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+      const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+      const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+      
+      let nodeType = '';
+      if (mainDef) {
+        if(activity.type === 'upskill') nodeType = getUpskillNodeType(mainDef);
+        if(activity.type === 'deepwork') nodeType = getDeepWorkNodeType(mainDef);
+      }
+      
+      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+      
+      if (isParentNode && activity.taskIds && activity.taskIds.length > 0) {
+        onOpenFocusModal(activity);
+      } else {
+        setEditingActivity({ slotName, activity });
+        setIsLearningModalOpen(true);
+      }
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
     } else if (activity.type === 'essentials') {
@@ -1144,5 +1161,6 @@ export default function MyPlatePage() {
 
       
     
+
 
 
