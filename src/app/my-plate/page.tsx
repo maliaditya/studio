@@ -649,11 +649,21 @@ function MyPlatePageContent() {
 
                     let totalMinutes = 0;
                     if (activity.completed) {
-                        let logs, durationField;
-                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                        let logs: DatedWorkout[] | undefined;
+                        let durationField: 'reps' | 'weight' | 'none' = 'none';
+
+                        if (activity.type === 'upskill') { 
+                            logs = allUpskillLogs; 
+                            durationField = 'reps'; 
+                        } else if (activity.type === 'deepwork') { 
+                            logs = allDeepWorkLogs; 
+                            durationField = 'weight'; 
+                        } else if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                            const pauseDuration = (activity.focusSessionPauses || []).reduce((sum, p) => sum + (p.resumeTime ? p.resumeTime - p.pauseTime : 0), 0);
+                            totalMinutes = Math.floor((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseDuration) / 60000);
+                        }
                         
-                        if (logs && durationField) {
+                        if (logs && durationField !== 'none') {
                             const loggedDuration = (logs.find(log => log.date === dateKey)
                               ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
                               .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
@@ -666,8 +676,8 @@ function MyPlatePageContent() {
                             case 'deepwork':
                             case 'branding':
                                 if (activity.taskIds && activity.taskIds.length > 0) {
-                                    const mainTaskId = activity.taskIds[0];
-                                    const taskDef = allDefs.get(mainTaskId.split('-')[0]) || allDefs.get(mainTaskId);
+                                    const mainTaskId = activity.taskIds[0].split('-')[0]; // Handle instance ID
+                                    const taskDef = allDefs.get(mainTaskId);
                                     if (taskDef) {
                                         totalMinutes = calculateTotalEstimate(taskDef);
                                     } else {
