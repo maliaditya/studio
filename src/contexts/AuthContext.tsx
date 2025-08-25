@@ -309,10 +309,6 @@ interface AuthContextType {
   // Recents
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
-
-  // New Completion Logic
-  permanentlyLoggedTaskIds: Set<string>;
-  getDescendantLeafNodes: (nodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -975,45 +971,55 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleLogLearning = useCallback((activity: Activity, progress: number, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
-    let allDefs: ExerciseDefinition[];
-    
+    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
+    let allDefs: ExerciseDefinition[] = [];
+  
     switch (activity.type) {
-        case 'upskill':
-            logsUpdater = setAllUpskillLogs;
-            allDefs = upskillDefinitions;
-            break;
-        case 'deepwork':
-            logsUpdater = setAllDeepWorkLogs;
-            allDefs = deepWorkDefinitions;
-            break;
-        case 'workout':
-            logsUpdater = setAllWorkoutLogs;
-            allDefs = exerciseDefinitions;
-            break;
-        default:
-            toast({ title: "Error", description: `Cannot log progress for activity type: ${activity.type}.`, variant: "destructive" });
-            return;
+      case 'upskill':
+        logsUpdater = setAllUpskillLogs;
+        allDefs = upskillDefinitions;
+        break;
+      case 'deepwork':
+        logsUpdater = setAllDeepWorkLogs;
+        allDefs = deepWorkDefinitions;
+        break;
+      case 'workout':
+        logsUpdater = setAllWorkoutLogs;
+        allDefs = exerciseDefinitions;
+        break;
+      // Handle simple time-based logging without specific logs
+      case 'planning':
+      case 'tracking':
+      case 'lead-generation':
+      case 'branding':
+        handleToggleComplete(activity.slot, activity.id, true);
+        toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
+        return; // Exit here for simple logs
+      default:
+        toast({ title: "Error", description: `Cannot log progress for activity type: ${activity.type}.`, variant: "destructive" });
+        return;
     }
   
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
-        toast({ title: "Error", description: "Could not log progress. Task ID is missing.", variant: "destructive" });
-        return;
+      toast({ title: "Error", description: "Could not log progress. Task ID is missing.", variant: "destructive" });
+      handleToggleComplete(activity.slot, activity.id, true); // Still mark as complete
+      return;
     }
   
     let definition: ExerciseDefinition | undefined;
     for (const def of allDefs) {
-        if (exerciseInstanceId.startsWith(def.id)) {
-            definition = def;
-            break;
-        }
+      if (exerciseInstanceId.startsWith(def.id)) {
+        definition = def;
+        break;
+      }
     }
   
     if (!definition) {
-        toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
-        console.error("Definition not found for task instance:", exerciseInstanceId);
-        return;
+      toast({ title: "Error", description: "Could not log progress. Please ensure the task is correctly linked.", variant: "destructive" });
+      console.error("Definition not found for task instance:", exerciseInstanceId);
+      handleToggleComplete(activity.slot, activity.id, true); // Still mark as complete
+      return;
     }
       
     let totalDurationMinutes = duration;
@@ -1033,50 +1039,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         totalDurationMinutes = Math.floor(totalWorkTimeMs / 60000);
     }
       
-    logsUpdater(prevLogs => {
-        let currentLog = prevLogs.find(log => log.date === todayKey);
-        const newSet: LoggedSet = {
-            id: `${Date.now()}-${Math.random()}`,
-            reps: activity.type === 'upskill' ? totalDurationMinutes : 1,
-            weight: activity.type === 'upskill' ? progress : totalDurationMinutes,
-            timestamp: Date.now(),
-        };
-  
-        const newLogs = [...prevLogs];
-        let logIndex = prevLogs.findIndex(log => log.date === todayKey);
-          
-        if (logIndex === -1) {
-            currentLog = { id: todayKey, date: todayKey, exercises: [] };
-            newLogs.push(currentLog);
-            logIndex = newLogs.length - 1;
-        } else {
-            currentLog = { ...newLogs[logIndex] };
-        }
-          
-        let exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseInstanceId);
-  
-        let updatedExercises;
-        if (exerciseIndex > -1) {
-            updatedExercises = [...currentLog.exercises];
-            updatedExercises[exerciseIndex] = {
-                ...updatedExercises[exerciseIndex],
-                loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
-            };
-        } else {
-            const newExercise: WorkoutExercise = {
-                id: exerciseInstanceId,
-                definitionId: definition!.id,
-                name: definition!.name,
-                category: definition!.category,
-                loggedSets: [newSet],
-                targetSets: 1,
-                targetReps: '25'
-            };
-            updatedExercises = [...currentLog.exercises, newExercise];
-        }
-        newLogs[logIndex] = { ...currentLog, exercises: updatedExercises };
-        return newLogs;
-    });
+    if (logsUpdater) {
+      logsUpdater(prevLogs => {
+          let currentLog = prevLogs.find(log => log.date === todayKey);
+          const newSet: LoggedSet = {
+              id: `${Date.now()}-${Math.random()}`,
+              reps: activity.type === 'upskill' ? totalDurationMinutes : 1,
+              weight: activity.type === 'upskill' ? progress : totalDurationMinutes,
+              timestamp: Date.now(),
+          };
+    
+          const newLogs = [...prevLogs];
+          let logIndex = prevLogs.findIndex(log => log.date === todayKey);
+            
+          if (logIndex === -1) {
+              currentLog = { id: todayKey, date: todayKey, exercises: [] };
+              newLogs.push(currentLog);
+              logIndex = newLogs.length - 1;
+          } else {
+              currentLog = { ...newLogs[logIndex] };
+          }
+            
+          let exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseInstanceId);
+    
+          let updatedExercises;
+          if (exerciseIndex > -1) {
+              updatedExercises = [...currentLog.exercises];
+              updatedExercises[exerciseIndex] = {
+                  ...updatedExercises[exerciseIndex],
+                  loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
+              };
+          } else {
+              const newExercise: WorkoutExercise = {
+                  id: exerciseInstanceId,
+                  definitionId: definition!.id,
+                  name: definition!.name,
+                  category: definition!.category,
+                  loggedSets: [newSet],
+                  targetSets: 1,
+                  targetReps: '25'
+              };
+              updatedExercises = [...currentLog.exercises, newExercise];
+          }
+          newLogs[logIndex] = { ...currentLog, exercises: updatedExercises };
+          return newLogs;
+      });
+    }
   
     handleToggleComplete(activity.slot, activity.id, true);
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
@@ -2103,51 +2111,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
 
-  const permanentlyLoggedTaskIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    const processLogs = (logs: DatedWorkout[]) => {
-      logs.forEach(log => {
-        log.exercises.forEach(ex => {
-          if (ex.loggedSets.length > 0) {
-            loggedIds.add(ex.definitionId);
-          }
-        });
-      });
-    };
-    processLogs(allDeepWorkLogs);
-    processLogs(allUpskillLogs);
-    return loggedIds;
-  }, [allDeepWorkLogs, allUpskillLogs]);
-  
-  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
-      const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-      const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-      const visited = new Set<string>();
-      const leafNodes: ExerciseDefinition[] = [];
-      const queue: string[] = [startNodeId];
-
-      while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
-
-          const node = definitions.find(d => d.id === currentId);
-          if (!node) continue;
-
-          const children = node[linkKey] || [];
-          if (children.length === 0) {
-              leafNodes.push(node);
-          } else {
-              children.forEach(childId => {
-                  if (!visited.has(childId)) {
-                      queue.push(childId);
-                  }
-              });
-          }
-      }
-      return leafNodes;
-  }, [deepWorkDefinitions, upskillDefinitions]);
-
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2226,8 +2189,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedCompanyId, setSelectedCompanyId,
     autoSuggestions, setAutoSuggestions,
     recentItems, addToRecents,
-    permanentlyLoggedTaskIds,
-    getDescendantLeafNodes,
   };
 
   return (
@@ -2261,6 +2222,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
