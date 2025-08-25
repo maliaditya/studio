@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -13,7 +12,7 @@ import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashbo
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, CartesianGrid, XAxis, YAxis, PieChart as RechartsPieChart } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
@@ -109,9 +108,10 @@ const formatMinutes = (minutes: number) => {
     return `${mins}m`;
 };
 
-const TimeAllocationChart = ({ data }: { data: any[] }) => {
+export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[] }) => {
     const [allocationDetailModalData, setAllocationDetailModalData] = useState<{ category: string; tasks: { name: string; duration: number }[] } | null>(null);
-
+    const themeColors = useThemeColors();
+    
     const handlePieClick = (data: any) => {
         if (data && data.name) {
             setAllocationDetailModalData({
@@ -121,6 +121,30 @@ const TimeAllocationChart = ({ data }: { data: any[] }) => {
         }
     };
     
+    const pieData = useMemo(() => {
+      const totalMinutesInDay = 24 * 60;
+      const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
+      const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
+
+      const data = timeAllocationData.map((entry, index) => ({
+        name: entry.name,
+        value: entry.time, // value should be in minutes for the chart
+        activities: entry.activities,
+        fill: activityColorMapping[entry.name] || themeColors[index % themeColors.length]
+      }));
+
+      if (freeTimeMinutes > 0) {
+          data.push({
+              name: 'Free Time',
+              value: freeTimeMinutes,
+              activities: [],
+              fill: activityColorMapping['Free Time'],
+          });
+      }
+
+      return data;
+    }, [timeAllocationData, themeColors]);
+
     return (
         <>
             <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
@@ -140,10 +164,10 @@ const TimeAllocationChart = ({ data }: { data: any[] }) => {
                                 return null;
                             }}
                         />
-                        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
+                        <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
                             label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
                         >
-                            {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                            {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                         </Pie>
                     </RechartsPieChart>
                 </ResponsiveContainer>
@@ -279,7 +303,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
   
   const roadmapItems = stats.upcomingReleases || [];
   
-
   const pieData = useMemo(() => {
     const totalMinutesInDay = 24 * 60;
     const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
@@ -489,7 +512,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <>
                 <Separator className="my-6" />
                 <div className="flex items-center justify-center">
-                  <TimeAllocationChart data={pieData} />
+                  <TimeAllocationChart timeAllocationData={pieData} />
                 </div>
             </>
           )}
