@@ -12,7 +12,7 @@ import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashbo
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip as RechartsTooltip } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
@@ -512,7 +512,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <>
                 <Separator className="my-6" />
                 <div className="flex items-center justify-center">
-                  <TimeAllocationChart timeAllocationData={pieData} />
+                  <TimeAllocationChart timeAllocationData={timeAllocationData} />
                 </div>
             </>
           )}
