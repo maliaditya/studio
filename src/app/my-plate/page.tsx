@@ -90,7 +90,7 @@ function MyPlatePageContent() {
     productizationPlans,
     offerizationPlans,
     onOpenIntentionPopup,
-    setActiveFocusSession,
+    onOpenFocusModal,
     setIsAudioPlaying,
     openTaskContextPopup,
     metaRules,
@@ -100,7 +100,6 @@ function MyPlatePageContent() {
     skillDomains,
     microSkillMap,
     currentSlot,
-    onOpenFocusModal,
     activityDurations,
     weightLogs,
   } = useAuth();
@@ -588,78 +587,6 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
-  const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
-    let total = 0;
-    const visited = new Set<string>();
-
-    function recurse(d: ExerciseDefinition, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds') {
-        if (visited.has(d.id)) return;
-        visited.add(d.id);
-
-        const childrenIds = d[linkKey] || [];
-        if (childrenIds.length > 0) {
-            childrenIds.forEach(childId => {
-                const childDef = definitions.find(c => c.id === childId);
-                if (childDef) recurse(childDef, definitions, linkKey);
-            });
-        } else {
-            total += d.estimatedDuration || 0;
-        }
-    }
-
-    if (deepWorkDefinitions.some(d => d.id === def.id)) {
-        recurse(def, deepWorkDefinitions, 'linkedDeepWorkIds');
-    } else if (upskillDefinitions.some(d => d.id === def.id)) {
-        recurse(def, upskillDefinitions, 'linkedUpskillIds');
-    } else {
-        total = def.estimatedDuration || 0;
-    }
-
-    return total;
-  }, [deepWorkDefinitions, upskillDefinitions]);
-
-  const timeAllocationData = useMemo(() => {
-    const todaysScheduleForCalc = schedule[selectedDateKey] || {};
-    if (!todaysScheduleForCalc || Object.keys(todaysScheduleForCalc).length === 0) {
-      return [];
-    }
-  
-    const validActivities = Object.values(todaysScheduleForCalc)
-      .flat()
-      .filter((activity): activity is Activity => !!activity && typeof activity === 'object' && 'type' in activity);
-  
-    const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {
-        'Deep Work': { time: 0, activities: [] },
-        'Learning': { time: 0, activities: [] },
-        'Workout': { time: 0, activities: [] },
-        'Branding': { time: 0, activities: [] },
-        'Essentials': { time: 0, activities: [] },
-        'Planning': { time: 0, activities: [] },
-        'Tracking': { time: 0, activities: [] },
-        'Lead Gen': { time: 0, activities: [] },
-        'Interrupts': { time: 0, activities: [] },
-        'Nutrition': { time: 0, activities: [] },
-    };
-  
-    const activityNameMap: Record<ActivityType, string> = {
-        deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
-    }
-  
-    validActivities.forEach(activity => {
-        const duration = parseDurationToMinutes(activityDurations[activity.id]);
-        
-        const mappedName = activityNameMap[activity.type];
-        if (mappedName && totals[mappedName]) {
-            totals[mappedName].time += duration; // Keep in minutes
-            totals[mappedName].activities.push({ name: activity.details, duration });
-        }
-    });
-  
-    return Object.entries(totals)
-      .map(([name, data]) => ({ name, time: data.time, activities: data.activities }))
-      .filter(item => item.time > 0);
-  }, [schedule, selectedDateKey, activityDurations]);
-  
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
   const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
@@ -979,7 +906,7 @@ function MyPlatePageContent() {
               <div className={cn("space-y-6", isAgendaDocked ? "lg:col-span-3" : "lg:col-span-5")}>
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
-                    timeAllocationData={timeAllocationData} 
+                    timeAllocationData={[]} 
                     onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                     onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
@@ -1009,7 +936,7 @@ function MyPlatePageContent() {
                             <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
+                            <TimeAllocationChart timeAllocationData={[]} />
                         </CardContent>
                     </Card>
                 )}
@@ -1217,3 +1144,4 @@ export default function MyPlatePage() {
 
       
     
+

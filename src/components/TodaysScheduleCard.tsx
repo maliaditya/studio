@@ -44,37 +44,16 @@ function AgendaWidgetItem({
 
   const canLogProgress = (activity.type === 'upskill' || activity.type === 'deepwork') && (activity.taskIds?.length ?? 0) > 0;
 
-  const handleItemClick = () => {
+  const handleItemClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (activity.completed) {
       onToggleComplete(activity.slot, activity.id, false); // Allow un-checking
     } else if (activity.type === 'workout') {
         onStartWorkoutLog(activity);
     } else if (activity.type === 'lead-generation') {
         onStartLeadGenLog(activity);
-    } else if (canLogProgress) {
-      setOpenPopover(true);
     } else if (activity.type !== 'interrupt') {
-      onToggleComplete(activity.slot, activity.id, true);
-    }
-  };
-
-  const handleLogSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const duration = parseInt(durationInput);
-
-    if(activity.type === 'upskill') {
-      if(!isNaN(duration) && duration > 0) {
-        onLogLearning(activity, 0, duration); // Progress (weight) is now always 0 for upskill
-        setOpenPopover(false);
-        setDurationInput('');
-      }
-    } else { // deepwork or branding
-      if(!isNaN(duration) && duration > 0) {
-        onLogLearning(activity, 0, duration);
-        setOpenPopover(false);
-        setDurationInput('');
-      }
+      onOpenFocusModal(activity);
     }
   };
 
@@ -101,7 +80,7 @@ function AgendaWidgetItem({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => onOpenFocusModal(activity)}
+                onClick={(e) => { e.stopPropagation(); onOpenFocusModal(activity); }}
             >
                 <Timer className="h-4 w-4" />
             </Button>
@@ -119,36 +98,6 @@ function AgendaWidgetItem({
     </div>
   );
   
-  if (canLogProgress && !activity.completed) {
-    return (
-      <Popover open={openPopover} onOpenChange={setOpenPopover}>
-        <PopoverTrigger asChild>
-          <li>
-            {itemContent}
-          </li>
-        </PopoverTrigger>
-        <PopoverContent className="w-64" align="start">
-          <form onSubmit={handleLogSubmit} className="space-y-4">
-            <div className="space-y-1">
-              <h4 className="font-medium leading-none text-sm">Log Progress</h4>
-              <p className="text-sm text-muted-foreground">Log your session for '{activity.details}'.</p>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <Label htmlFor="duration">Duration (minutes)</Label>
-                <Input id="duration" type="number" value={durationInput} onChange={e => setDurationInput(e.target.value)} className="h-8" />
-              </div>
-            </div>
-            <Button type="submit" size="sm" className="w-full">
-              <Save className="mr-2 h-4 w-4" />
-              Log & Complete
-            </Button>
-          </form>
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
   return <li>{itemContent}</li>;
 }
 

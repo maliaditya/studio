@@ -101,6 +101,12 @@ interface AuthContextType {
   updateActivity: (updatedActivity: Activity) => void;
 
   // Focus Timer
+  focusSessionModalOpen: boolean;
+  setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  focusActivity: Activity | null;
+  focusDuration: number;
+  onOpenFocusModal: (activity: Activity) => void;
+  handleStartFocusSession: (activity: Activity, duration: number) => void;
   activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number; } | null>>;
 
@@ -405,6 +411,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   
   // Focus Session
+  const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
+  const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
+  const [focusDuration, setFocusDuration] = useState(45);
   const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
 
   // Canvas State
@@ -547,6 +556,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+  
+  const onOpenFocusModal = (activity: Activity) => {
+    const estDuration = activityDurations[activity.id];
+    const minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m',''), 10) : 45;
+    setFocusDuration(minutes > 0 ? minutes : 45);
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
+  };
+
+  const handleStartFocusSession = (activity: Activity, duration: number) => {
+    setActiveFocusSession({
+        activity,
+        duration: duration,
+        secondsLeft: duration * 60,
+    });
+    setFocusSessionModalOpen(false);
+  };
 
   const getAllUserData = useCallback(() => {
     return {
@@ -2270,6 +2296,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
+    focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
@@ -2369,6 +2396,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
