@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -95,29 +96,33 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return timeMap;
   }, [allDeepWorkLogs, allUpskillLogs]);
   
+  const activeSubTask = useMemo(() => {
+    const completedIds = new Set(Array.from(loggedTimeMap.keys()));
+    const activeTask = activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
+
+    if (activeTask && !completedIds.has(activeTask.id)) {
+        return activeTask;
+    }
+    
+    return subTasks.find(task => !completedIds.has(task.id)) || null;
+
+  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
+  
   const {
     pendingSubTasks,
     completedSubTaskComponents,
-    activeSubTask
   } = useMemo(() => {
-    const completed = subTasks.filter(task => loggedTimeMap.has(task.id));
-    const completedIds = new Set(completed.map(t => t.id));
-  
-    let active: ExerciseDefinition | null = activeSubTaskId ? allDefinitions.get(activeSubTaskId) ?? null : null;
-    if (!active) {
-        active = subTasks.find(task => !completedIds.has(task.id)) || null;
-    }
-  
+    const completedIds = new Set(loggedTimeMap.keys());
+    const completed = subTasks.filter(task => completedIds.has(task.id));
     const pending = subTasks.filter(task => 
-      !completedIds.has(task.id) && task.id !== active?.id
+      !completedIds.has(task.id) && task.id !== activeSubTask?.id
     );
     
     return {
         pendingSubTasks: pending,
         completedSubTaskComponents: completed,
-        activeSubTask: active,
     };
-  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap]);
+  }, [subTasks, activeSubTask?.id, loggedTimeMap]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
@@ -392,7 +397,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   ) : (
                     <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
                   )}
-                  {activeSubTask && activeSubTask.estimatedDuration === undefined && editingDurationTaskId !== activeSubTask.id && (
+                  {activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === null || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask.id && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-500" onClick={() => setEditingDurationTaskId(activeSubTask.id)}>
                       <Timer className="h-4 w-4" />
                     </Button>
