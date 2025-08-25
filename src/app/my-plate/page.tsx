@@ -82,7 +82,6 @@ function MyPlatePageContent() {
     allWorkoutLogs,
     allLeadGenLogs,
     brandingLogs, setAllBrandingLogs,
-    activityDurations, setActivityDurations,
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
@@ -602,6 +601,105 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
+  const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
+    let total = 0;
+    const visited = new Set<string>();
+
+    function recurse(d: ExerciseDefinition, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds') {
+        if (visited.has(d.id)) return;
+        visited.add(d.id);
+
+        const childrenIds = d[linkKey] || [];
+        if (childrenIds.length > 0) {
+            childrenIds.forEach(childId => {
+                const childDef = definitions.find(c => c.id === childId);
+                if (childDef) recurse(childDef, definitions, linkKey);
+            });
+        } else {
+            total += d.estimatedDuration || 0;
+        }
+    }
+
+    if (deepWorkDefinitions.some(d => d.id === def.id)) {
+        recurse(def, deepWorkDefinitions, 'linkedDeepWorkIds');
+    } else if (upskillDefinitions.some(d => d.id === def.id)) {
+        recurse(def, upskillDefinitions, 'linkedUpskillIds');
+    } else {
+        total = def.estimatedDuration || 0;
+    }
+
+    return total;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+  
+  const activityDurations = useMemo(() => {
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
+
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+
+    for (const dateKey in schedule) {
+        const daySchedule = schedule[dateKey];
+        if (!daySchedule) continue;
+
+        for (const slotName in daySchedule) {
+            const activities = (daySchedule as any)[slotName] || [];
+            if (Array.isArray(activities)) {
+                for (const activity of activities) {
+                    if (!activity || !activity.id) continue;
+
+                    let totalMinutes = 0;
+                    if (activity.completed) {
+                        let logs, durationField;
+                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                        
+                        if (logs && durationField) {
+                            const loggedDuration = (logs.find(log => log.date === dateKey)
+                              ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                              .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                            if (loggedDuration > 0) totalMinutes = loggedDuration;
+                        }
+                    } else {
+                        switch(activity.type) {
+                            case 'workout': totalMinutes = 90; break;
+                            case 'upskill':
+                            case 'deepwork':
+                            case 'branding':
+                                if (activity.taskIds && activity.taskIds.length > 0) {
+                                    const mainTaskId = activity.taskIds[0];
+                                    const taskDef = allDefs.get(mainTaskId.split('-')[0]) || allDefs.get(mainTaskId);
+                                    if (taskDef) {
+                                        totalMinutes = calculateTotalEstimate(taskDef);
+                                    } else {
+                                        totalMinutes = 120;
+                                    }
+                                } else {
+                                    totalMinutes = 120;
+                                }
+                                break;
+                            case 'planning':
+                            case 'tracking':
+                                totalMinutes = 30; break;
+                            case 'lead-generation': totalMinutes = 45; break;
+                            case 'essentials':
+                            case 'interrupt':
+                                totalMinutes = activity.duration || 0; break;
+                            default: totalMinutes = 0;
+                        }
+                    }
+
+                    if (totalMinutes > 0) {
+                        const h = Math.floor(totalMinutes / 60);
+                        const m = Math.round(totalMinutes % 60);
+                        newDurations[activity.id] = `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() || '0m';
+                    }
+                }
+            }
+        }
+    }
+    return newDurations;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+
   const timeAllocationData = useMemo(() => {
     const todaysScheduleForCalc = schedule[selectedDateKey] || {};
     if (!todaysScheduleForCalc || Object.keys(todaysScheduleForCalc).length === 0) {
@@ -630,9 +728,7 @@ function MyPlatePageContent() {
     }
   
     validActivities.forEach(activity => {
-        const duration = activity.type === 'essentials' || activity.type === 'interrupt' 
-            ? activity.duration || 0 
-            : parseDurationToMinutes(activityDurations[activity.id]);
+        const duration = parseDurationToMinutes(activityDurations[activity.id]);
         
         const mappedName = activityNameMap[activity.type];
         if (mappedName && totals[mappedName]) {
@@ -922,84 +1018,6 @@ function MyPlatePageContent() {
       brandingStatus,
     };
   }, [productivityStats, schedule, selectedDateKey, upcomingReleases, brandingStatus]);
-
-  useEffect(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return;
-  
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-  
-    for (const dateKey in schedule) {
-      const daySchedule = schedule[dateKey];
-      if (!daySchedule) continue;
-  
-      for (const slotName in daySchedule) {
-        const activities = (daySchedule as any)[slotName] || [];
-        if (Array.isArray(activities)) {
-          for (const activity of activities) {
-            if (!activity || !activity.id) continue;
-  
-            if (activity.completed) {
-              let logs, durationField;
-              if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-              else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-              
-              if (logs && durationField) {
-                const loggedDuration = (logs.find(log => log.date === dateKey)
-                  ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                if (loggedDuration > 0) {
-                  newDurations[activity.id] = `${Math.round(loggedDuration)}m`;
-                }
-              } else if (activity.duration) {
-                newDurations[activity.id] = `${activity.duration}m`;
-              }
-            } else {
-              let totalMinutes = 0;
-              if (activity.type === 'essentials' || activity.type === 'interrupt') {
-                totalMinutes = activity.duration || 0;
-              } else if (activity.taskIds && activity.taskIds.length > 0) {
-                const mainTaskId = activity.taskIds[0];
-                const taskDefinition = allDefs.find(def => mainTaskId.startsWith(def.id));
-                if (taskDefinition?.estimatedDuration) {
-                  totalMinutes = taskDefinition.estimatedDuration;
-                }
-              }
-              if (totalMinutes > 0) newDurations[activity.id] = `${totalMinutes}m`;
-            }
-          }
-        }
-      }
-    }
-    setActivityDurations(newDurations);
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, setActivityDurations, deepWorkDefinitions, upskillDefinitions]);
-
-
-  const handleLogWeight = (weight: number, date: Date) => {
-    if (!currentUser || isNaN(weight) || weight <= 0) {
-      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
-      return;
-    }
-    const year = getISOWeekYear(date);
-    const week = getISOWeek(date).toString().padStart(2, '0');
-    const weekKey = `${year}-W${week}`;
-
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        
-        if (logIndex > -1) {
-            const updatedLogs = [...prevLogs];
-            updatedLogs[logIndex] = newLog;
-            return updatedLogs;
-        } else {
-            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
-        }
-    });
-
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
-  };
-
 
   if (!selectedDate) return null;
 
