@@ -106,6 +106,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       !completedIds.has(task.id) && task.id !== activeSubTaskId
     );
     
+    // If there is no active task explicitly set, find the first pending one.
+    if (!active && pending.length > 0) {
+        active = pending[0];
+    }
+    
     return {
         pendingSubTasks: pending,
         completedSubTaskComponents: completed,
