@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -283,7 +282,7 @@ interface AuthContextType {
 
 
   // New global map
-  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string; }>;
+  microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
   permanentlyLoggedTaskIds: Set<string>;
   getDescendantLeafNodes: (startNodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
 
@@ -557,13 +556,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
   
-  const onOpenFocusModal = (activity: Activity) => {
-    const estDuration = activityDurations[activity.id];
-    const minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m',''), 10) : 45;
-    setFocusDuration(minutes > 0 ? minutes : 45);
-    setFocusActivity(activity);
-    setFocusSessionModalOpen(true);
-  };
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+    
+    if (isParent) {
+        return isChild ? 'Objective' : 'Intention';
+    }
+    return isChild ? 'Action' : 'Standalone';
+  }, [deepWorkDefinitions]);
+
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+  
+    if(isParent) {
+      return isChild ? 'Objective' : 'Curiosity';
+    }
+    return isChild ? 'Visualization' : 'Standalone';
+  }, [upskillDefinitions]);
 
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     setActiveFocusSession({
@@ -572,6 +583,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         secondsLeft: duration * 60,
     });
     setFocusSessionModalOpen(false);
+  };
+  
+  const onOpenFocusModal = (activity: Activity) => {
+    const estDuration = activityDurations[activity.id];
+    let minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m',''), 10) : 45;
+
+    let def: ExerciseDefinition | undefined;
+    if (activity.type === 'upskill') {
+      def = upskillDefinitions.find(d => activity.taskIds?.[0]?.startsWith(d.id));
+    } else if (activity.type === 'deepwork') {
+      def = deepWorkDefinitions.find(d => activity.taskIds?.[0]?.startsWith(d.id));
+    }
+    
+    if (def) {
+      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+      if (nodeType === 'Objective' || nodeType === 'Intention' || nodeType === 'Curiosity') {
+        handleStartFocusSession(activity, minutes > 0 ? minutes : 45);
+        return;
+      }
+    }
+
+    setFocusDuration(minutes > 0 ? minutes : 45);
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
   };
 
   const getAllUserData = useCallback(() => {
@@ -2217,26 +2252,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-    
-    if (isParent) {
-        return isChild ? 'Objective' : 'Intention';
-    }
-    return isChild ? 'Action' : 'Standalone';
-  }, [deepWorkDefinitions]);
-
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-  
-    if(isParent) {
-      return isChild ? 'Objective' : 'Curiosity';
-    }
-    return isChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions]);
-  
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
     const processLogs = (logs: DatedWorkout[]) => {
@@ -2408,3 +2423,6 @@ const usePrevious = <T,>(value: T) => {
 
 
 
+
+
+    
