@@ -549,7 +549,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     if (totalMinutes > 0) {
                         const h = Math.floor(totalMinutes / 60);
                         const m = Math.round(totalMinutes % 60);
-                        newDurations[activity.id] = `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() || '0m';
+                        newDurations[activity.id] = (`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m';
                     }
                 }
             }
@@ -1233,14 +1233,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const importedData = JSON.parse(text);
             const username = currentUser!.username;
             
-            // Validate top-level keys
-            if (!importedData.main || !importedData.ui) {
-                throw new Error("Invalid backup file. Missing 'main' or 'ui' data.");
-            }
+            // Handle both old and new backup formats
+            const mainData = importedData.main || importedData;
+            const uiData = importedData.ui || {};
+
+            // Map old keys to new keys for backward compatibility
+            const dataToLoad = {
+              ...mainData,
+              allWorkoutLogs: mainData.allWorkoutLogs || mainData.workoutLogs || [],
+              allUpskillLogs: mainData.allUpskillLogs || mainData.upskillLogs || [],
+              allDeepWorkLogs: mainData.allDeepWorkLogs || mainData.deepWorkLogs || [],
+              topicGoals: mainData.topicGoals || mainData.upskillTopicGoals || {},
+            };
   
             // Save both main data and UI state to localStorage
-            localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(importedData.main));
-            localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(importedData.ui));
+            localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(dataToLoad));
+            localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(uiData));
   
             toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
             setTimeout(() => window.location.reload(), 1500);
@@ -2469,6 +2477,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
