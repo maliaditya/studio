@@ -1019,6 +1019,32 @@ function MyPlatePageContent() {
     };
   }, [productivityStats, schedule, selectedDateKey, upcomingReleases, brandingStatus]);
 
+  const handleLogWeight = (weight: number, date: Date) => {
+    if (!currentUser || isNaN(weight) || weight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    const year = getISOWeekYear(date);
+    const week = getISOWeek(date).toString().padStart(2, '0');
+    const weekKey = `${year}-W${week}`;
+
+    setWeightLogs(prevLogs => {
+        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+        const newLog: WeightLog = { date: weekKey, weight: weight };
+        
+        if (logIndex > -1) {
+            const updatedLogs = [...prevLogs];
+            updatedLogs[logIndex] = newLog;
+            return updatedLogs;
+        } else {
+            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+        }
+    });
+
+    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
+  };
+
+
   if (!selectedDate) return null;
 
   return (
