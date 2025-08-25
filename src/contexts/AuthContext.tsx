@@ -94,7 +94,7 @@ interface AuthContextType {
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
   handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  handleLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  handleLogLearning: (activity: Activity, duration: number) => void;
   logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
@@ -1070,7 +1070,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const handleLogLearning = useCallback((activity: Activity, progress: number, duration: number) => {
+  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
     let allDefs: ExerciseDefinition[] = [];
@@ -1145,7 +1145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const newSet: LoggedSet = {
               id: `${Date.now()}-${Math.random()}`,
               reps: activity.type === 'upskill' ? totalDurationMinutes : 1,
-              weight: activity.type === 'upskill' ? progress : totalDurationMinutes,
+              weight: totalDurationMinutes, // For both upskill (progress) and deepwork (duration)
               timestamp: Date.now(),
           };
     
@@ -1188,7 +1188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     handleToggleComplete(activity.slot, activity.id, true);
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions]);
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, handleToggleComplete]);
   
   const logSubTaskTime = (subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2369,6 +2369,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
