@@ -30,6 +30,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       allDeepWorkLogs, allUpskillLogs,
       logSubTaskTime,
       setIsAudioPlaying,
+      updateTaskDuration,
   } = useAuth();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
@@ -49,6 +50,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
   const [skipBreaks, setSkipBreaks] = useState(false);
+
+  const [subTaskDurationInput, setSubTaskDurationInput] = useState('');
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -288,6 +291,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
   };
 
+  const handleSetSubTaskDuration = () => {
+    if (activeSubTask && subTaskDurationInput) {
+      const newDuration = parseInt(subTaskDurationInput, 10);
+      if (!isNaN(newDuration) && newDuration > 0) {
+        updateTaskDuration(activeSubTask.id, newDuration);
+        setTotalSeconds(newDuration * 60);
+        setSecondsLeft(newDuration * 60);
+        setSubTaskDurationInput('');
+      }
+    }
+  };
+
   const elapsedSeconds = totalSeconds - secondsLeft;
   
   const minutes = Math.floor(secondsLeft / 60);
@@ -377,6 +392,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </Button>
                   )}
                 </div>
+                 {activeSubTask && activeSubTask.estimatedDuration === undefined && (
+                    <div className="flex items-center justify-center gap-2 mt-2">
+                        <Input
+                            type="number"
+                            placeholder="Est. (min)"
+                            value={subTaskDurationInput}
+                            onChange={(e) => setSubTaskDurationInput(e.target.value)}
+                            className="w-24 h-8 text-xs"
+                        />
+                        <Button size="sm" className="h-8" onClick={handleSetSubTaskDuration}>Set Time</Button>
+                    </div>
+                )}
               </div>
               {showSubTasks && (
                 <div className="mt-2 pt-2 border-t border-border/20 text-center">
@@ -405,7 +432,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Play className="h-4 w-4" />
                         </Button>
                         <label className="flex-grow">{task.name}</label>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{task.estimatedDuration || 25}m est.</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{task.estimatedDuration || 'N/A'}m est.</span>
                     </div>
                   ))}
                   {pendingSubTasks.length === 0 && (

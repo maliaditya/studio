@@ -141,6 +141,7 @@ interface AuthContextType {
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   getDeepWorkNodeType: (def: ExerciseDefinition) => string;
   getUpskillNodeType: (def: ExerciseDefinition) => string;
+  updateTaskDuration: (taskId: string, duration: number) => void;
   
   leadGenDefinitions: ExerciseDefinition[];
   setLeadGenDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
@@ -576,6 +577,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
+
+  const updateTaskDuration = (taskId: string, duration: number) => {
+    const updater = (definitions: ExerciseDefinition[]) => 
+      definitions.map(d => d.id === taskId ? { ...d, estimatedDuration: duration } : d);
+      
+    if (deepWorkDefinitions.some(d => d.id === taskId)) {
+      setDeepWorkDefinitions(updater);
+    } else if (upskillDefinitions.some(d => d.id === taskId)) {
+      setUpskillDefinitions(updater);
+    }
+  };
   
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -2353,7 +2365,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
-    deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType,
+    deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, updateTaskDuration,
     leadGenDefinitions, setLeadGenDefinitions,
     productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
@@ -2466,4 +2478,5 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
