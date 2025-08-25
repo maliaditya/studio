@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2 } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -49,7 +49,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
   const [skipBreaks, setSkipBreaks] = useState(false);
-
+  
+  const [editingDurationTaskId, setEditingDurationTaskId] = useState<string | null>(null);
   const [subTaskDurationInput, setSubTaskDurationInput] = useState('');
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -80,9 +81,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const loggedTimeMap = useMemo(() => {
     const timeMap = new Map<string, number>();
     const processLogs = (logs: any[], durationField: 'weight' | 'reps') => {
-        logs.forEach(log => {
-            log.exercises.forEach((ex: any) => {
-                const duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+        (logs || []).forEach(log => {
+            (log.exercises || []).forEach((ex: any) => {
+                const duration = (ex.loggedSets || []).reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
                 if (duration > 0) {
                     timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
                 }
@@ -102,13 +103,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const completed = subTasks.filter(task => loggedTimeMap.has(task.id));
     const completedIds = new Set(completed.map(t => t.id));
   
-    // Determine the active task first
     let active: ExerciseDefinition | null = activeSubTaskId ? allDefinitions.get(activeSubTaskId) ?? null : null;
     if (!active) {
         active = subTasks.find(task => !completedIds.has(task.id)) || null;
     }
   
-    // Now determine pending tasks, excluding the active one
     const pending = subTasks.filter(task => 
       !completedIds.has(task.id) && task.id !== active?.id
     );
@@ -290,13 +289,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
   };
 
-  const handleSetSubTaskDuration = () => {
-    if (activeSubTask && subTaskDurationInput) {
+  const handleSetSubTaskDuration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeSubTask) {
       const newDuration = parseInt(subTaskDurationInput, 10);
       if (!isNaN(newDuration) && newDuration > 0) {
         updateTaskDuration(activeSubTask.id, newDuration);
-        setTotalSeconds(newDuration * 60);
-        setSecondsLeft(newDuration * 60);
+        if (activeSubTask.id === editingDurationTaskId) {
+          setTotalSeconds(newDuration * 60);
+          setSecondsLeft(newDuration * 60);
+        }
+        setEditingDurationTaskId(null);
         setSubTaskDurationInput('');
       }
     }
@@ -373,7 +376,27 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                  <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
+                  {editingDurationTaskId === activeSubTask?.id ? (
+                      <form onSubmit={handleSetSubTaskDuration} className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          placeholder="Est. (min)"
+                          value={subTaskDurationInput}
+                          onChange={(e) => setSubTaskDurationInput(e.target.value)}
+                          className="w-24 h-8 text-xs"
+                          autoFocus
+                          onBlur={() => setEditingDurationTaskId(null)}
+                        />
+                        <Button size="sm" className="h-8" type="submit">Set</Button>
+                      </form>
+                  ) : (
+                    <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
+                  )}
+                  {activeSubTask && activeSubTask.estimatedDuration === undefined && editingDurationTaskId !== activeSubTask.id && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-yellow-500" onClick={() => setEditingDurationTaskId(activeSubTask.id)}>
+                      <Timer className="h-4 w-4" />
+                    </Button>
+                  )}
                   {promptForCompletion ? (
                     <div className="flex items-center gap-2">
                         <Button size="sm" onClick={handleCompleteClick}>Complete</Button>
@@ -391,18 +414,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </Button>
                   )}
                 </div>
-                 {activeSubTask && activeSubTask.estimatedDuration === undefined && (
-                    <div className="flex items-center justify-center gap-2 mt-2">
-                        <Input
-                            type="number"
-                            placeholder="Est. (min)"
-                            value={subTaskDurationInput}
-                            onChange={(e) => setSubTaskDurationInput(e.target.value)}
-                            className="w-24 h-8 text-xs"
-                        />
-                        <Button size="sm" className="h-8" onClick={handleSetSubTaskDuration}>Set Time</Button>
-                    </div>
-                )}
               </div>
               {showSubTasks && (
                 <div className="mt-2 pt-2 border-t border-border/20 text-center">
