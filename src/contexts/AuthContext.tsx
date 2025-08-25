@@ -670,15 +670,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
 
             if (firstPendingNode) {
+                // We found a pending sub-task, start a session for it.
+                // We pass the *parent* activity but the sub-task's duration.
                 handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
             } else {
+                // All sub-tasks are done, so complete the objective.
                 toast({ title: "Objective Complete", description: "All sub-tasks for this objective have been logged." });
                 markObjectiveActivityAsComplete(def.id);
             }
-            return;
+            return; // Exit here, we've handled the parent node case.
         }
     }
 
+    // For non-parent tasks or tasks without a definition, open the configuration modal.
     const estDuration = activityDurations[activity.id];
     let minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m', ''), 10) : 45;
     if (isNaN(minutes) || minutes <= 0) minutes = 45;
@@ -2462,3 +2466,4 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
