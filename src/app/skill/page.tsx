@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -305,7 +305,8 @@ function SkillPageContent() {
 
         } catch (error) {
             console.error("Failed to parse specialization JSON", error);
-            toast({ title: "Upload Failed", description: "Invalid JSON format.", variant: 'destructive' });
+            const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+            toast({ title: "Upload Failed", description: `Invalid JSON format: ${errorMessage}`, variant: 'destructive' });
         }
     };
     reader.readAsText(file);
@@ -1281,5 +1282,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
