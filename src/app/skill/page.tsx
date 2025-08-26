@@ -1,12 +1,13 @@
 
+
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink } from '@/types/workout';
@@ -197,6 +198,113 @@ function SkillPageContent() {
   const [editingPosition, setEditingPosition] = useState<Position | null>(null);
   const [newPositionTitle, setNewPositionTitle] = useState<Record<string, string>>({});
   const [editingWorkProject, setEditingWorkProject] = useState<{ positionId: string; project: Partial<WorkProject> } | null>(null);
+  
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const [uploadDomainId, setUploadDomainId] = useState<string | null>(null);
+
+  const handleUploadClick = (domainId: string) => {
+    setUploadDomainId(domainId);
+    uploadInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uploadDomainId) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const content = e.target?.result;
+            if (typeof content !== 'string') throw new Error("Invalid file content");
+            
+            const specializationData = JSON.parse(content);
+            
+            // --- DATA INGESTION LOGIC ---
+            const newCoreSkill: CoreSkill = {
+                id: `cs_${Date.now()}`,
+                domainId: uploadDomainId,
+                name: specializationData.name,
+                type: 'Specialization',
+                skillAreas: [],
+                parentId: null
+            };
+
+            const newUpskillDefs: ExerciseDefinition[] = [];
+
+            specializationData.skillAreas.forEach((areaData: any) => {
+                const newSkillArea: SkillArea = {
+                    id: `sa_${Date.now()}_${Math.random()}`,
+                    name: areaData.name,
+                    purpose: areaData.purpose || '',
+                    microSkills: []
+                };
+
+                areaData.microSkills.forEach((microData: any) => {
+                    const newMicroSkill: MicroSkill = {
+                        id: `ms_${Date.now()}_${Math.random()}`,
+                        name: microData.name,
+                    };
+
+                    microData.curiosities.forEach((curiosityData: any) => {
+                        const newCuriosity: ExerciseDefinition = {
+                            id: `def_${Date.now()}_${Math.random()}`,
+                            name: curiosityData.name,
+                            category: newMicroSkill.name as any,
+                            description: curiosityData.description,
+                            link: curiosityData.link,
+                            estimatedDuration: curiosityData.estimatedDuration,
+                            linkedUpskillIds: []
+                        };
+
+                        curiosityData.objectives.forEach((objectiveData: any) => {
+                            const newObjective: ExerciseDefinition = {
+                                id: `def_${Date.now()}_${Math.random()}`,
+                                name: objectiveData.name,
+                                category: newMicroSkill.name as any,
+                                description: objectiveData.description,
+                                link: objectiveData.link,
+                                estimatedDuration: objectiveData.estimatedDuration,
+                                linkedUpskillIds: []
+                            };
+
+                            objectiveData.visualizations.forEach((vizData: any) => {
+                                const newViz: ExerciseDefinition = {
+                                    id: `def_${Date.now()}_${Math.random()}`,
+                                    name: vizData.name,
+                                    category: newMicroSkill.name as any,
+                                    description: vizData.description,
+                                    link: vizData.link,
+                                    estimatedDuration: vizData.estimatedDuration,
+                                };
+                                newObjective.linkedUpskillIds!.push(newViz.id);
+                                newUpskillDefs.push(newViz);
+                            });
+                            newCuriosity.linkedUpskillIds!.push(newObjective.id);
+                            newUpskillDefs.push(newObjective);
+                        });
+                        newUpskillDefs.push(newCuriosity);
+                    });
+                    newSkillArea.microSkills.push(newMicroSkill);
+                });
+                newCoreSkill.skillAreas.push(newSkillArea);
+            });
+            
+            setCoreSkills(prev => [...prev, newCoreSkill]);
+            setUpskillDefinitions(prev => [...prev, ...newUpskillDefs]);
+
+            toast({ title: "Upload Successful", description: `Specialization "${newCoreSkill.name}" has been added.` });
+
+        } catch (error) {
+            console.error("Failed to parse specialization JSON", error);
+            toast({ title: "Upload Failed", description: "Invalid JSON format.", variant: 'destructive' });
+        }
+    };
+    reader.readAsText(file);
+    // Reset file input to allow uploading the same file again
+    if (event.target) {
+      event.target.value = '';
+    }
+  };
 
 
   const handleAddDomain = (e: React.FormEvent) => {
@@ -635,6 +743,9 @@ function SkillPageContent() {
                                           </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center opacity-0 group-hover:opacity-100 ml-2">
+                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleUploadClick(domain.id); }}>
+                                                <Upload className="h-4 w-4 text-blue-500" />
+                                            </Button>
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditingDomain(domain); }}><Edit className="h-4 w-4"/></Button>
                                           <AlertDialog>
                                             <AlertDialogTrigger asChild>
@@ -990,6 +1101,13 @@ function SkillPageContent() {
           </Card>
         </main>
       </div>
+      <input
+        type="file"
+        ref={uploadInputRef}
+        onChange={handleFileChange}
+        accept=".json"
+        className="hidden"
+      />
        {editingDomain && (
         <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setEditingDomain(null)}>
             <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" onClick={(e) => e.stopPropagation()}>
