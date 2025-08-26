@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -317,6 +318,8 @@ interface AuthContextType {
   // Recents
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
+
+  currentSlot: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -332,6 +335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
+  const [currentSlot, setCurrentSlot] = useState('');
 
   const prevUser = usePrevious(currentUser);
   
@@ -812,6 +816,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
     setTheme(savedTheme);
+  }, []);
+  
+   useEffect(() => {
+    const interval = setInterval(() => {
+        const now = new Date();
+        const currentHour = now.getHours();
+        if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+        else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+        else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+        else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+        else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+        else setCurrentSlot('Night');
+    }, 60000); // Update every minute
+
+    // Initial call
+    const now = new Date();
+    const currentHour = now.getHours();
+    if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+    else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+    else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+    else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+    else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+    else setCurrentSlot('Night');
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadState = (username: string) => {
@@ -2408,6 +2437,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedCompanyId, setSelectedCompanyId,
     autoSuggestions, setAutoSuggestions,
     recentItems, addToRecents,
+    currentSlot,
   };
 
   return (
@@ -2482,5 +2512,7 @@ const usePrevious = <T,>(value: T) => {
 
 
 
+
+    
 
     
