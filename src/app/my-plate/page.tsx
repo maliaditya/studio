@@ -835,7 +835,39 @@ function MyPlatePageContent() {
         subMessage
     };
 }, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
+  
+  const timeAllocationData = useMemo(() => {
+    const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
+    const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+    const activityNameMap: Record<ActivityType, string> = {
+        deepwork: 'Deep Work',
+        upskill: 'Learning',
+        workout: 'Workout',
+        branding: 'Branding',
+        essentials: 'Essentials',
+        planning: 'Planning',
+        tracking: 'Tracking',
+        'lead-generation': 'Lead Gen',
+        interrupt: 'Interrupts',
+        nutrition: 'Nutrition',
+    };
 
+    dailyActivities.forEach((activity) => {
+        if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
+            const mappedName = activityNameMap[activity.type];
+            if (mappedName) {
+                if (!totals[mappedName]) {
+                    totals[mappedName] = { time: 0, activities: [] };
+                }
+                const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                totals[mappedName].time += duration;
+                totals[mappedName].activities.push({ name: activity.details, duration });
+            }
+        }
+    });
+
+    return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
+  }, [schedule, selectedDateKey, activityDurations]);
   
   const dashboardStats = useMemo(() => {
     const {
@@ -923,7 +955,7 @@ function MyPlatePageContent() {
               <div className="space-y-6 lg:col-span-3">
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
-                    timeAllocationData={[]} 
+                    timeAllocationData={timeAllocationData}
                     onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                     onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
@@ -953,7 +985,7 @@ function MyPlatePageContent() {
                             <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <TimeAllocationChart timeAllocationData={[]} />
+                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
                         </CardContent>
                     </Card>
                 )}
@@ -1161,6 +1193,7 @@ export default function MyPlatePage() {
 
       
     
+
 
 
 

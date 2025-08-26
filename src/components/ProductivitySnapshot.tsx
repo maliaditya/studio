@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -149,7 +150,7 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
         <>
             <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
                 <ResponsiveContainer>
-                    <RechartsPieChart onClick={(data) => handlePieClick(data)}>
+                    <RechartsPieChart onClick={(data) => handlePieClick(data.payload)}>
                         <RechartsTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
                             content={({ active, payload }) => {
