@@ -508,27 +508,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             let totalMinutes = 0;
             let suffix = '';
             
-            // For completed tasks, calculate actual logged time
             if (activity.completed) {
-              let logs, durationField;
-              if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-              else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-              
-              if (logs && durationField) {
-                  const loggedDuration = (logs.find(log => log.date === dateKey)
-                    ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                  if (loggedDuration > 0) {
-                      totalMinutes = loggedDuration;
-                      suffix = ' logged';
+              if (activity.duration) { // Check for explicit logged duration first
+                totalMinutes = activity.duration;
+                suffix = ' logged';
+              } else {
+                  let logs, durationField;
+                  if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                  else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                  
+                  if (logs && durationField) {
+                      const loggedDuration = (logs.find(log => log.date === dateKey)
+                        ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                        .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                      if (loggedDuration > 0) {
+                          totalMinutes = loggedDuration;
+                          suffix = ' logged';
+                      }
                   }
               }
-              // For other completed tasks, use their inherent duration if available
-              if (totalMinutes === 0 && (activity.type === 'essentials' || activity.type === 'interrupt')) {
-                totalMinutes = activity.duration || 0;
-                suffix = ' logged';
-              }
-
             } else {
               // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
@@ -1319,7 +1317,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       case 'essentials':
       case 'nutrition':
       case 'interrupt':
-        handleToggleComplete(activity.slot, activity.id, true);
+        updateActivity({ ...activity, completed: true, duration: duration });
         if(activity.type !== 'interrupt') {
             toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
         }
@@ -1331,7 +1329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
-      handleToggleComplete(activity.slot, activity.id, true);
+      updateActivity({ ...activity, completed: true, duration: duration });
       return;
     }
   
@@ -1344,7 +1342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   
     if (!definition) {
-      handleToggleComplete(activity.slot, activity.id, true);
+      updateActivity({ ...activity, completed: true, duration: duration });
       return;
     }
       
@@ -1415,9 +1413,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     }
   
-    handleToggleComplete(activity.slot, activity.id, true);
+    updateActivity({ ...activity, completed: true, duration: totalDurationMinutes });
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, handleToggleComplete]);
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions]);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2495,6 +2493,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 

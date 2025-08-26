@@ -178,32 +178,33 @@ export function TodaysScheduleCard({
         return { completed: 0, total: 0 };
     }
 
-    const parseDurationToHours = (durationStr: string | undefined): number => {
+    const parseDurationToHours = (activity: Activity): number => {
+        if (activity.completed && activity.duration) {
+            return activity.duration / 60;
+        }
+        const durationStr = activityDurations[activity.id];
         if (!durationStr || typeof durationStr !== 'string') return 0;
         
+        let totalMinutes = 0;
         if (/^\d+$/.test(durationStr.trim())) {
-            return parseInt(durationStr.trim(), 10) / 60;
+            totalMinutes = parseInt(durationStr.trim(), 10);
+        } else {
+            const hourMatch = durationStr.match(/(\d+)\s*h/);
+            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+            const minMatch = durationStr.match(/(\d+)\s*m/);
+            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
         }
-    
-        let totalHours = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
-        if (hourMatch) totalHours += parseInt(hourMatch[1], 10);
-        const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalHours += parseInt(minMatch[1], 10) / 60;
-        
-        return totalHours;
+        return totalMinutes / 60;
     };
 
     const totalScheduledHours = dailyActivities.reduce((sum, activity) => {
-        const duration = activityDurations[activity.id];
-        return sum + parseDurationToHours(duration);
+        return sum + parseDurationToHours(activity);
     }, 0);
 
     const completedHours = dailyActivities
         .filter(activity => activity.completed)
         .reduce((sum, activity) => {
-            const duration = activityDurations[activity.id];
-            return sum + parseDurationToHours(duration);
+            return sum + parseDurationToHours(activity);
         }, 0);
 
     return { completed: completedHours, total: totalScheduledHours };
