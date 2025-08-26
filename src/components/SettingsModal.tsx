@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -141,7 +142,24 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                           "name": "Visualization Task (e.g., Code a simple kernel)",
                           "description": "Specific, loggable task.",
                           "link": "",
-                          "estimatedDuration": 30
+                          "estimatedDuration": 30,
+                          "resourceCards": [
+                            {
+                              "name": "Elements",
+                              "type": "Elements",
+                              "points": [{ "text": "e.g., CUDA Grid, Block, Thread" }]
+                            },
+                            {
+                              "name": "Tools",
+                              "type": "Tools",
+                              "points": [{ "text": "e.g., Nsight Systems, cuda-memcheck" }]
+                            },
+                            {
+                              "name": "Patterns",
+                              "type": "Patterns",
+                              "points": [{ "text": "e.g., Parallel Reduction, Tiled Matrix Multiplication" }]
+                            }
+                          ]
                         }
                       ]
                     }

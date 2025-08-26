@@ -73,6 +73,7 @@ export interface ExerciseDefinition {
     demo?: string;
   };
   sharingStatus?: SharingStatus;
+  resourceCards?: { name: string, type: 'Elements' | 'Tools' | 'Patterns', points: { text: string }[] }[];
 }
 
 export interface TopicGoal {

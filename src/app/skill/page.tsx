@@ -10,7 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
-import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink } from '@/types/workout';
+import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource } from '@/types/workout';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -149,7 +149,8 @@ function SkillPageContent() {
     microSkillMap,
     upskillDefinitions, setUpskillDefinitions,
     deepWorkDefinitions, setDeepWorkDefinitions,
-    resources,
+    resources, setResources,
+    resourceFolders, setResourceFolders,
     openPistonsFor,
     handleUpdateSkillArea,
     handleDeleteSkillArea,
@@ -219,7 +220,6 @@ function SkillPageContent() {
             
             const specializationData = JSON.parse(content);
             
-            // --- DATA INGESTION LOGIC ---
             const newCoreSkill: CoreSkill = {
                 id: `cs_${Date.now()}`,
                 domainId: uploadDomainId,
@@ -230,52 +230,59 @@ function SkillPageContent() {
             };
 
             const newUpskillDefs: ExerciseDefinition[] = [];
+            const newResources: Resource[] = [];
+            let newResourceFolders = [...resourceFolders];
+
+            let currentFolderPath: string[] = ["Skills & Project Resources", uploadDomainId, specializationData.name];
+            let currentFolderId: string | null = null;
+            
+            const findOrCreateFolder = (path: string[]): string => {
+                let parentId: string | null = null;
+                path.forEach(folderName => {
+                    let folder = newResourceFolders.find(f => f.name === folderName && f.parentId === parentId);
+                    if (!folder) {
+                        folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderName, parentId: parentId };
+                        newResourceFolders.push(folder);
+                    }
+                    parentId = folder.id;
+                });
+                return parentId!;
+            };
 
             specializationData.skillAreas.forEach((areaData: any) => {
-                const newSkillArea: SkillArea = {
-                    id: `sa_${Date.now()}_${Math.random()}`,
-                    name: areaData.name,
-                    purpose: areaData.purpose || '',
-                    microSkills: []
-                };
+                const areaFolderPath = [...currentFolderPath, areaData.name];
+                const newSkillArea: SkillArea = { id: `sa_${Date.now()}_${Math.random()}`, name: areaData.name, purpose: areaData.purpose || '', microSkills: [] };
 
                 areaData.microSkills.forEach((microData: any) => {
-                    const newMicroSkill: MicroSkill = {
-                        id: `ms_${Date.now()}_${Math.random()}`,
-                        name: microData.name,
-                    };
+                    const microSkillFolderPath = [...areaFolderPath, microData.name];
+                    const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name };
 
                     microData.curiosities.forEach((curiosityData: any) => {
-                        const newCuriosity: ExerciseDefinition = {
-                            id: `def_${Date.now()}_${Math.random()}`,
-                            name: curiosityData.name,
-                            category: newMicroSkill.name as any,
-                            description: curiosityData.description,
-                            link: curiosityData.link,
-                            estimatedDuration: curiosityData.estimatedDuration,
-                            linkedUpskillIds: []
-                        };
+                        const curiosityFolderPath = [...microSkillFolderPath, curiosityData.name];
+                        const newCuriosity: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: curiosityData.name, category: newMicroSkill.name as any, description: curiosityData.description, link: curiosityData.link, estimatedDuration: curiosityData.estimatedDuration, linkedUpskillIds: [] };
 
                         curiosityData.objectives.forEach((objectiveData: any) => {
-                            const newObjective: ExerciseDefinition = {
-                                id: `def_${Date.now()}_${Math.random()}`,
-                                name: objectiveData.name,
-                                category: newMicroSkill.name as any,
-                                description: objectiveData.description,
-                                link: objectiveData.link,
-                                estimatedDuration: objectiveData.estimatedDuration,
-                                linkedUpskillIds: []
-                            };
+                            const objectiveFolderPath = [...curiosityFolderPath, objectiveData.name];
+                            const newObjective: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: objectiveData.name, category: newMicroSkill.name as any, description: objectiveData.description, link: objectiveData.link, estimatedDuration: objectiveData.estimatedDuration, linkedUpskillIds: [] };
 
                             objectiveData.visualizations.forEach((vizData: any) => {
-                                const newViz: ExerciseDefinition = {
-                                    id: `def_${Date.now()}_${Math.random()}`,
-                                    name: vizData.name,
-                                    category: newMicroSkill.name as any,
-                                    description: vizData.description,
-                                    link: vizData.link,
-                                    estimatedDuration: vizData.estimatedDuration,
-                                };
+                                const vizFolderPath = [...objectiveFolderPath, vizData.name];
+                                const newViz: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: vizData.name, category: newMicroSkill.name as any, description: vizData.description, link: vizData.link, estimatedDuration: vizData.estimatedDuration, linkedResourceIds: [] };
+
+                                (vizData.resourceCards || []).forEach((cardData: any) => {
+                                    const cardFolderId = findOrCreateFolder(vizFolderPath);
+                                    const newResource: Resource = {
+                                        id: `res_${Date.now()}_${Math.random()}`,
+                                        name: `${vizData.name} - ${cardData.name}`,
+                                        folderId: cardFolderId,
+                                        type: 'card',
+                                        createdAt: new Date().toISOString(),
+                                        points: (cardData.points || []).map((p: any) => ({ id: `point_${Date.now()}_${Math.random()}`, text: p.text, type: 'text' }))
+                                    };
+                                    newResources.push(newResource);
+                                    newViz.linkedResourceIds!.push(newResource.id);
+                                });
+                                
                                 newObjective.linkedUpskillIds!.push(newViz.id);
                                 newUpskillDefs.push(newViz);
                             });
@@ -291,6 +298,8 @@ function SkillPageContent() {
             
             setCoreSkills(prev => [...prev, newCoreSkill]);
             setUpskillDefinitions(prev => [...prev, ...newUpskillDefs]);
+            setResources(prev => [...prev, ...newResources]);
+            setResourceFolders(newResourceFolders);
 
             toast({ title: "Upload Successful", description: `Specialization "${newCoreSkill.name}" has been added.` });
 
@@ -300,7 +309,6 @@ function SkillPageContent() {
         }
     };
     reader.readAsText(file);
-    // Reset file input to allow uploading the same file again
     if (event.target) {
       event.target.value = '';
     }
