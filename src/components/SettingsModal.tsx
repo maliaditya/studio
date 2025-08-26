@@ -146,17 +146,26 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             {
                               "name": "Elements",
                               "type": "Elements",
-                              "points": [{ "text": "e.g., CUDA Grid, Block, Thread" }]
+                              "points": [
+                                { "type": "text", "text": "Core Concept 1" },
+                                { "type": "text", "text": "Core Concept 2" }
+                              ]
                             },
                             {
                               "name": "Tools",
                               "type": "Tools",
-                              "points": [{ "text": "e.g., Nsight Systems, cuda-memcheck" }]
+                              "points": [
+                                { "type": "text", "text": "Tool or command-line utility" },
+                                { "type": "code", "text": "printf('Hello, World!');" }
+                              ]
                             },
                             {
                               "name": "Patterns",
                               "type": "Patterns",
-                              "points": [{ "text": "e.g., Parallel Reduction, Tiled Matrix Multiplication" }]
+                              "points": [
+                                { "type": "text", "text": "A common workflow or design pattern." },
+                                { "type": "markdown", "text": "A **Markdown** formatted note with `code` snippets and [links](https://example.com)." }
+                              ]
                             }
                           ]
                         }
@@ -175,7 +184,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
 **Your Role:** You are an expert curriculum designer and technical writer. Your task is to take a high-level technical specialization and break it down into a comprehensive, hierarchical learning plan.
 
-**Your Goal:** Generate a JSON object that represents a complete learning path for the specialization: **\`${specializationName}\`**.
+**Your Goal:** Generate a single, valid JSON object that represents a complete learning path for the specialization: **\`${specializationName}\`**.
 
 **Crucial Instructions:**
 
@@ -183,6 +192,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON object matching the structure provided below.
 3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Skill Areas" are broad. "Micro-Skills" are specific competencies within an area. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
 4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks (\`curiosities\`, \`objectives\`, and \`visualizations\`).
+5.  **Resource Card Points:** For the \`points\` array inside each \`resourceCards\` object, you can use different types: \`"type": "text"\`, \`"type": "code"\`, or \`"type": "markdown"\`. Use these to structure the reference material appropriately.
 
 **JSON Schema Definition & Example:**
 
