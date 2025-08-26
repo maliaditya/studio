@@ -95,11 +95,12 @@ export function TimeSlots({
         return (
           <Card
             key={slot.name}
-            className={`transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col ${
+            className={cn(
+              "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
               currentSlot === slot.name
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60'
-              }`}
+            )}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
