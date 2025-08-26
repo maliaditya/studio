@@ -172,29 +172,31 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const handleSubTaskComplete = useCallback(() => {
     if (showSubTasks) {
-        if (!activeSubTask) return;
-
-        setPromptForCompletion(false);
+      if (!activeSubTask) return;
+  
+      setPromptForCompletion(false);
       
-        const durationMinutes = Math.floor(totalSeconds / 60);
-
-        if (durationMinutes > 0) {
-            logSubTaskTime(activeSubTask.id, durationMinutes);
-        }
-        
-        const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
-        setCompletedSubTaskIds(newCompletedSet);
-
-        const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
-
-        if (nextTask) {
-            handleStartSubTask(nextTask);
-        } else {
-            handleStop(true);
-        }
-    } else {
-        // This is a standalone task
+      const durationMinutes = Math.floor(totalSeconds / 60);
+  
+      if (durationMinutes > 0) {
+        logSubTaskTime(activeSubTask.id, durationMinutes);
+      }
+      
+      const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
+      setCompletedSubTaskIds(newCompletedSet);
+  
+      // Check for the next task *after* the current one has been marked as complete
+      const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
+  
+      if (nextTask) {
+        handleStartSubTask(nextTask);
+      } else {
+        // All sub-tasks are now complete for this objective
         handleStop(true);
+      }
+    } else {
+      // This is a standalone task
+      handleStop(true);
     }
   }, [activeSubTask, totalSeconds, completedSubTaskIds, subTasks, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
@@ -468,4 +470,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
-
