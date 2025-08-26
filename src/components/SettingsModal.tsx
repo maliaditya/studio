@@ -123,8 +123,57 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     const template = {
       name: isMicro ? undefined : topicName,
       microSkills: isMicro ? [{
-        "name": topicName,
-        "curiosities": []
+        "name": "Vertex, Edge, Face editing",
+        "curiosities": [
+          {
+            "name": "Mastering Component-Level Edits",
+            "description": "Learn the fundamentals of manipulating mesh components.",
+            "link": "",
+            "estimatedDuration": 240,
+            "objectives": [
+              {
+                "name": "Efficiently Use Basic Transform Tools",
+                "description": "Understand how to use Move, Rotate, and Scale on vertices, edges, and faces.",
+                "link": "",
+                "estimatedDuration": 120,
+                "visualizations": [
+                  {
+                    "name": "Practical Application: Model a Simple Chair",
+                    "description": "Create a basic chair model using only component transformations.",
+                    "link": "",
+                    "estimatedDuration": 60,
+                    "resourceCards": [
+                      {
+                        "name": "Elements",
+                        "points": [
+                          { "type": "text", "text": "Vertex: A single point in 3D space." },
+                          { "type": "text", "text": "Edge: A line connecting two vertices." },
+                          { "type": "text", "text": "Face: A flat surface enclosed by edges." }
+                        ]
+                      },
+                      {
+                        "name": "Tools",
+                        "points": [
+                          { "type": "text", "text": "Move Tool (G-key): Repositions selected components." },
+                          { "type": "text", "text": "Rotate Tool (R-key): Rotates components around a pivot." },
+                          { "type": "text", "text": "Scale Tool (S-key): Resizes components relative to a pivot." },
+                          { "type": "code", "text": "import bpy; bpy.ops.transform.translate(value=(1, 0, 0))" }
+                        ]
+                      },
+                      {
+                        "name": "Patterns",
+                        "points": [
+                          { "type": "markdown", "text": "A common workflow is to **block out** the main shape with object-level transforms, then **refine** the shape using component-level edits." },
+                          { "type": "text", "text": "Select an edge loop (Alt + Click) to modify entire sections of a mesh at once." }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }] : [],
       skillAreas: isMicro ? undefined : [
         {
@@ -154,7 +203,6 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                           "resourceCards": [
                             {
                               "name": "Elements",
-                              "type": "Elements",
                               "points": [
                                 { "type": "text", "text": "Core Concept 1 (e.g. Vertex, Edge, Face)" },
                                 { "type": "text", "text": "Core Concept 2 (e.g. Component, State, Prop)" }
@@ -162,7 +210,6 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             },
                             {
                               "name": "Tools",
-                              "type": "Tools",
                               "points": [
                                 { "type": "text", "text": "Tool or operation (e.g. Extrude, Bevel)" },
                                 { "type": "code", "text": "printf('Hello, World!');" }
@@ -170,9 +217,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             },
                             {
                               "name": "Patterns",
-                              "type": "Patterns",
                               "points": [
-                                { "type": "text", "text": "A common workflow or design pattern." },
                                 { "type": "markdown", "text": "A **Markdown** formatted note with `code` snippets and [links](https://example.com)." }
                               ]
                             }
