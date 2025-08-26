@@ -30,12 +30,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       logSubTaskTime,
       setIsAudioPlaying,
       updateTaskDuration,
+      permanentlyLoggedTaskIds,
   } = useAuth();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
-  // New state to reliably track completions *within this session*
-  const [completedSubTaskIds, setCompletedSubTaskIds] = useState<Set<string>>(new Set());
+  const [sessionCompletedSubTaskIds, setSessionCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
@@ -45,8 +45,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   
   const popupRef = useRef<HTMLDivElement>(null);
-  const [activeSubTaskId, setActiveSubTaskId] = useState<string | null>(null);
-
+  
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
   const [skipBreaks, setSkipBreaks] = useState(false);
@@ -79,48 +78,24 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [focusedObjective, allDefinitions]);
   
-  const loggedTimeMap = useMemo(() => {
-    const timeMap = new Map<string, number>();
-    const processLogs = (logs: any[], durationField: 'weight' | 'reps') => {
-        (logs || []).forEach(log => {
-            (log.exercises || []).forEach((ex: any) => {
-                const duration = (ex.loggedSets || []).reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
-                if (duration > 0) {
-                    timeMap.set(ex.definitionId, (timeMap.get(ex.definitionId) || 0) + duration);
-                }
-            });
-        });
-    };
-    processLogs(allDeepWorkLogs, 'weight');
-    processLogs(allUpskillLogs, 'reps');
-    return timeMap;
-  }, [allDeepWorkLogs, allUpskillLogs]);
-  
-  const activeSubTask = useMemo(() => {
-    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
-    
-    // Prioritize the explicitly set active task if it's not completed
-    const activeTask = activeSubTaskId ? allDefinitions.get(activeSubTaskId) : null;
-    if (activeTask && !allCompletedIds.has(activeTask.id)) {
-        return activeTask;
-    }
-    
-    // Otherwise, find the first pending task
-    return subTasks.find(task => !allCompletedIds.has(task.id)) || null;
+  const allCompletedSubTaskIds = useMemo(() => new Set([
+      ...Array.from(permanentlyLoggedTaskIds), 
+      ...Array.from(sessionCompletedSubTaskIds)
+  ]), [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds]);
 
-  }, [subTasks, activeSubTaskId, allDefinitions, loggedTimeMap, completedSubTaskIds]);
+  const activeSubTask = useMemo(() => {
+    return subTasks.find(task => !allCompletedSubTaskIds.has(task.id)) || null;
+  }, [subTasks, allCompletedSubTaskIds]);
   
   const pendingSubTasks = useMemo(() => {
-    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
     return subTasks.filter(task => 
-      !allCompletedIds.has(task.id) && task.id !== activeSubTask?.id
+      !allCompletedSubTaskIds.has(task.id) && task.id !== activeSubTask?.id
     );
-  }, [subTasks, activeSubTask?.id, loggedTimeMap, completedSubTaskIds]);
+  }, [subTasks, activeSubTask?.id, allCompletedSubTaskIds]);
 
   const completedSubTaskComponents = useMemo(() => {
-    const allCompletedIds = new Set([...Array.from(loggedTimeMap.keys()), ...Array.from(completedSubTaskIds)]);
-    return subTasks.filter(task => allCompletedIds.has(task.id));
-  }, [subTasks, loggedTimeMap, completedSubTaskIds]);
+    return subTasks.filter(task => allCompletedSubTaskIds.has(task.id));
+  }, [subTasks, allCompletedSubTaskIds]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
@@ -136,7 +111,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const handleStop = useCallback((completed: boolean) => {
     setSessionState('idle');
-    setActiveSubTaskId(null);
     setIsAudioPlaying(false);
     
     if (activity) {
@@ -164,53 +138,48 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setSecondsLeft(durationSecs);
     setCycleSecondsLeft(WORK_DURATION);
     setCurrentCycle('work');
-    setActiveSubTaskId(subTask.id);
     setSessionState('running');
     setIsAudioPlaying(true);
     setPromptForCompletion(false);
   }, [WORK_DURATION, setIsAudioPlaying]);
 
   const handleSubTaskComplete = useCallback(() => {
-    if (showSubTasks) {
-      if (!activeSubTask) return;
-  
-      setPromptForCompletion(false);
-      
-      const durationMinutes = Math.floor(totalSeconds / 60);
-  
-      if (durationMinutes > 0) {
-        logSubTaskTime(activeSubTask.id, durationMinutes);
-      }
-      
-      const newCompletedSet = new Set(completedSubTaskIds).add(activeSubTask.id);
-      setCompletedSubTaskIds(newCompletedSet);
-  
-      // Check for the next task *after* the current one has been marked as complete
-      const nextTask = subTasks.find(st => !newCompletedSet.has(st.id));
-  
-      if (nextTask) {
-        handleStartSubTask(nextTask);
-      } else {
-        // All sub-tasks are now complete for this objective
-        handleStop(true);
-      }
-    } else {
-      // This is a standalone task
-      handleStop(true);
+    if (!activeSubTask) {
+        if (!showSubTasks) handleStop(true); // Standalone task
+        return;
     }
-  }, [activeSubTask, totalSeconds, completedSubTaskIds, subTasks, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
+    setPromptForCompletion(false);
+    
+    const durationMinutes = Math.floor(totalSeconds / 60);
+    if (durationMinutes > 0) {
+        logSubTaskTime(activeSubTask.id, durationMinutes);
+    }
+    
+    const newCompletedSet = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
+    setSessionCompletedSubTaskIds(newCompletedSet);
+    
+    // Crucially, check against the *updated* set of completed tasks
+    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id));
+
+    if (nextTask) {
+        handleStartSubTask(nextTask);
+    } else {
+        // All sub-tasks for this objective are now complete
+        handleStop(true);
+    }
+  }, [activeSubTask, totalSeconds, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
   useEffect(() => {
-    if (showSubTasks && sessionState === 'idle' && !activeSubTaskId) {
-        const firstPendingTask = subTasks.find(st => !loggedTimeMap.has(st.id) && !completedSubTaskIds.has(st.id));
-        if (firstPendingTask) {
-            handleStartSubTask(firstPendingTask);
-        } else if (subTasks.length > 0) {
+    if (sessionState === 'idle' && showSubTasks) {
+        if (activeSubTask) {
+             handleStartSubTask(activeSubTask);
+        } else if (subTasks.length > 0 && completedSubTaskComponents.length === subTasks.length) {
+            // This case handles when the component opens and all tasks are already done
             handleStop(true);
         }
     }
-  }, [showSubTasks, subTasks, loggedTimeMap, completedSubTaskIds, sessionState, activeSubTaskId, handleStartSubTask, handleStop]);
+  }, [sessionState, showSubTasks, activeSubTask, handleStartSubTask, subTasks.length, completedSubTaskComponents.length, handleStop]);
 
 
   useEffect(() => {
@@ -455,7 +424,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{loggedTimeMap.get(task.id) || 0}m logged</span>
+                            <span className="text-xs text-muted-foreground">{permanentlyLoggedTaskIds.has(task.id) ? `${(deepWorkDefinitions.find(d => d.id === task.id)?.estimatedDuration || 0)}m logged` : 'Just completed'}</span>
                        </div>
                     ))}
                     {completedSubTaskComponents.length === 0 && (
