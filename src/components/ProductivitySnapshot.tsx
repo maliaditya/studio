@@ -148,7 +148,7 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 
     return (
         <>
-            <ChartContainer config={{}} className="h-[200px] w-full cursor-pointer">
+            <ChartContainer config={{}} className="h-[250px] w-full cursor-pointer">
                 <ResponsiveContainer>
                     <RechartsPieChart onClick={(data) => handlePieClick(data.payload)}>
                         <RechartsTooltip
