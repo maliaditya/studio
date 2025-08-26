@@ -147,15 +147,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               "name": "Elements",
                               "type": "Elements",
                               "points": [
-                                { "type": "text", "text": "Core Concept 1" },
-                                { "type": "text", "text": "Core Concept 2" }
+                                { "type": "text", "text": "Core Concept 1 (e.g. Vertex, Edge, Face)" },
+                                { "type": "text", "text": "Core Concept 2 (e.g. Component, State, Prop)" }
                               ]
                             },
                             {
                               "name": "Tools",
                               "type": "Tools",
                               "points": [
-                                { "type": "text", "text": "Tool or command-line utility" },
+                                { "type": "text", "text": "Tool or operation (e.g. Extrude, Bevel)" },
                                 { "type": "code", "text": "printf('Hello, World!');" }
                               ]
                             },
@@ -192,7 +192,11 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON object matching the structure provided below.
 3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Skill Areas" are broad. "Micro-Skills" are specific competencies within an area. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
 4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks (\`curiosities\`, \`objectives\`, and \`visualizations\`).
-5.  **Resource Card Points:** For the \`points\` array inside each \`resourceCards\` object, you can use different types: \`"type": "text"\`, \`"type": "code"\`, or \`"type": "markdown"\`. Use these to structure the reference material appropriately.
+5.  **Define \`resourceCards\` with Meaningful Structure:** For each \`visualization\` task, populate the \`resourceCards\` array. Use the following mental model:
+    *   **Elements Card:** List the fundamental nouns or concepts. What *exists* in this domain? (e.g., for 3D modeling: Vertex, Edge, Face; for React: Component, State, Prop).
+    *   **Tools Card:** List the verbs or operations that act upon the Elements. How do you *interact* with them? (e.g., for 3D modeling: Extrude, Bevel, Loop Cut; for React: \`useState\`, \`useEffect\`, \`.map()\`).
+    *   **Patterns Card:** Describe recurring use cases or workflows that combine Elements and Tools to achieve a specific goal.
+6.  **Use Diverse Content Types:** Within the \`points\` array of a \`resourceCard\`, demonstrate the use of different types: \`"type": "text"\`, \`"type": "code"\`, and \`"type": "markdown"\`.
 
 **JSON Schema Definition & Example:**
 
