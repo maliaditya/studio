@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -943,54 +942,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
-  const pushDataToCloud = async () => {
-    if (!currentUser?.username) {
-        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-        return;
-    }
-
-    const username = currentUser.username;
-
-    if (username === 'demo') {
-        setIsDemoTokenModalOpen(true);
-        return;
-    }
-    
-    toast({ title: "Syncing...", description: "Pushing your local data to the cloud." });
-    try {
-        const allUserData = getAllUserData().main; // Only push main data
-        const requestBody = { username, data: allUserData };
-        const response = await fetch('/api/blob-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-        });
-        const result = await response.json();
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to push data.');
-        }
-        setLocalChangeCount(0); // Reset change count on successful push
-        toast({ title: "Success", description: "Your data has been saved to the cloud." });
-    } catch (error) {
-        console.error("Push to cloud failed:", error);
-        toast({
-            title: "Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-        });
-    }
-  };
-
-  useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
-    
-    if (settings.autoPush && localChangeCount >= settings.autoPushLimit) {
-        if (currentUser.username !== 'demo') {
-            pushDataToCloud();
-        }
-    }
-  }, [localChangeCount, currentUser, isScheduleLoaded, settings.autoPush, settings.autoPushLimit]);
-
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
     
@@ -1144,6 +1095,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const pushDataToCloud = async () => {
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+        return;
+    }
+
+    if (currentUser.username === 'demo') {
+        setIsDemoTokenModalOpen(true);
+        return;
+    }
+
+    toast({ title: "Syncing...", description: "Pushing your data to the cloud." });
+
+    try {
+        const allUserData = getAllUserData();
+        const requestBody = { username: currentUser.username, data: allUserData };
+        const response = await fetch('/api/blob-sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to push data.');
+        }
+
+        toast({ title: "Success", description: "Your data has been saved to the cloud." });
+        setLocalChangeCount(0); // Reset change count on successful push
+
+    } catch (error) {
+        console.error("Push to cloud failed:", error);
+        toast({
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
 
   const pullDataFromCloud = async (usernameOverride?: string) => {
     const username = usernameOverride || currentUser?.username;
@@ -1178,7 +1168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
 
-        localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data));
+        localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data.main));
+        localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(data.ui));
         
         toast({
           title: "Sync Successful",
@@ -1294,6 +1285,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
+    
+    // Check if it's a parent objective
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    const isUpskill = upskillDefinitions.some(d => d.id === mainDefId);
+    const defs = isUpskill ? upskillDefinitions : deepWorkDefinitions;
+    const mainDef = mainDefId ? defs.find(d => d.id === mainDefId) : null;
+    
+    let totalObjectiveMinutes = 0;
+    let objectiveCompleted = false;
+
+    if (mainDef) {
+        const leafNodes = getDescendantLeafNodes(mainDef.id, isUpskill ? 'upskill' : 'deepwork');
+        if (leafNodes.length > 0) {
+            objectiveCompleted = true; // Assume complete until a pending leaf is found
+            
+            leafNodes.forEach(node => {
+                const logs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
+                let nodeLogged = false;
+                for (const log of logs) {
+                    const exercise = log.exercises.find(ex => ex.definitionId === node.id);
+                    if (exercise && exercise.loggedSets.length > 0) {
+                        const time = exercise.loggedSets.reduce((sum, set) => sum + (isUpskill ? set.reps : set.weight), 0);
+                        totalObjectiveMinutes += time;
+                        nodeLogged = true;
+                        break; 
+                    }
+                }
+                if (!nodeLogged) {
+                  objectiveCompleted = false;
+                }
+            });
+             // Add the final session's duration
+            totalObjectiveMinutes += duration;
+        }
+    }
+  
+    if (objectiveCompleted) {
+        updateActivity({ ...activity, completed: true, duration: totalObjectiveMinutes });
+        toast({ title: "Objective Complete!", description: `Total time logged: ${totalObjectiveMinutes} minutes.` });
+        return;
+    }
+  
+    // Default behavior for single tasks or incomplete objectives
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
     let allDefs: ExerciseDefinition[] = [];
   
@@ -1357,7 +1391,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (p.resumeTime) {
                 totalPauseTime += p.resumeTime - p.pauseTime;
             } else {
-                // If a pause is not resumed, consider it paused until now
                 totalPauseTime += Date.now() - p.pauseTime;
             }
         });
@@ -1415,7 +1448,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     updateActivity({ ...activity, completed: true, duration: totalDurationMinutes });
     toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions]);
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, getDescendantLeafNodes, allDeepWorkLogs, allUpskillLogs]);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2510,3 +2543,6 @@ const usePrevious = <T,>(value: T) => {
 
 
 
+
+
+    
