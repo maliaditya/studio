@@ -15,7 +15,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus } from 'lucide-react';
+import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save } from 'lucide-react';
 import type { Activity, HabitEquation, Resource } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -34,6 +34,7 @@ interface FocusSessionModalProps {
   onOpenChange: (isOpen: boolean) => void;
   activity: Activity | null;
   onStartSession: (activity: Activity, duration: number) => void;
+  onLogDuration: (activity: Activity, duration: number) => void;
   initialDuration: number;
 }
 
@@ -42,6 +43,7 @@ export function FocusSessionModal({
   onOpenChange,
   activity,
   onStartSession,
+  onLogDuration,
   initialDuration,
 }: FocusSessionModalProps) {
   const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession, updateActivity } = useAuth();
@@ -181,6 +183,13 @@ export function FocusSessionModal({
     return allEquations.filter(eq => activity.habitEquationIds!.includes(eq.id));
   }, [activity, allEquations]);
 
+  const handleLogDurationClick = () => {
+    if (activity) {
+      onLogDuration(activity, duration);
+      onOpenChange(false);
+    }
+  };
+
   if (!activity) return null;
 
   return (
@@ -204,9 +213,12 @@ export function FocusSessionModal({
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
             </div>
         </fieldset>
-        <DialogFooter>
+        <DialogFooter className="grid grid-cols-2 gap-2">
+          <Button variant="outline" className="w-full" onClick={handleLogDurationClick} disabled={!!activeFocusSession}>
+            <Save className="mr-2 h-4 w-4" /> Log Duration
+          </Button>
           <Button className="w-full" onClick={handleStartClick} disabled={!!activeFocusSession}>
-            <Play className="mr-2 h-4 w-4" /> Start focus session
+            <Play className="mr-2 h-4 w-4" /> Start Focus Session
           </Button>
         </DialogFooter>
       </DialogContent>

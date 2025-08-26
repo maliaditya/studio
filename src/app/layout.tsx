@@ -120,6 +120,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           onOpenChange={setFocusSessionModalOpen}
           activity={focusActivity}
           onStartSession={handleStartFocusSession}
+          onLogDuration={handleLogLearning}
           initialDuration={focusDuration}
         />
       {activeFocusSession && (
