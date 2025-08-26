@@ -492,68 +492,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
-
+  
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
+  
     for (const dateKey in schedule) {
-        const daySchedule = schedule[dateKey];
-        if (!daySchedule) continue;
+      const daySchedule = schedule[dateKey];
+      if (!daySchedule) continue;
+  
+      for (const slotName in daySchedule) {
+        const activities = (daySchedule as any)[slotName] || [];
+        if (Array.isArray(activities)) {
+          for (const activity of activities) {
+            if (!activity || !activity.id) continue;
+  
+            let totalMinutes = 0;
+            let suffix = '';
+            
+            // For completed tasks, calculate actual logged time
+            if (activity.completed) {
+              let logs, durationField;
+              if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+              else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+              
+              if (logs && durationField) {
+                  const loggedDuration = (logs.find(log => log.date === dateKey)
+                    ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                  if (loggedDuration > 0) {
+                      totalMinutes = loggedDuration;
+                      suffix = ' logged';
+                  }
+              }
+              // For other completed tasks, use their inherent duration if available
+              if (totalMinutes === 0 && (activity.type === 'essentials' || activity.type === 'interrupt')) {
+                totalMinutes = activity.duration || 0;
+                suffix = ' logged';
+              }
 
-        for (const slotName in daySchedule) {
-            const activities = (daySchedule as any)[slotName] || [];
-            if (Array.isArray(activities)) {
-                for (const activity of activities) {
-                    if (!activity || !activity.id) continue;
-
-                    let totalMinutes = 0;
-                    if (activity.completed) {
-                        let logs, durationField;
-                        if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                        else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                        
-                        if (logs && durationField) {
-                            const loggedDuration = (logs.find(log => log.date === dateKey)
-                              ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                              .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                            if (loggedDuration > 0) totalMinutes = loggedDuration;
-                        }
+            } else {
+              // For non-completed tasks, calculate estimated duration
+              switch(activity.type) {
+                case 'workout': totalMinutes = 90; break;
+                case 'upskill':
+                case 'deepwork':
+                case 'branding':
+                  if (activity.taskIds && activity.taskIds.length > 0) {
+                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                    const taskDef = allDefs.get(mainTaskDefId);
+                    if (taskDef) {
+                      totalMinutes = calculateTotalEstimate(taskDef);
                     } else {
-                        switch(activity.type) {
-                            case 'workout': totalMinutes = 90; break;
-                            case 'upskill':
-                            case 'deepwork':
-                            case 'branding':
-                                if (activity.taskIds && activity.taskIds.length > 0) {
-                                  const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                                  const taskDef = allDefs.get(mainTaskDefId)
-                                  if (taskDef) {
-                                    totalMinutes = calculateTotalEstimate(taskDef);
-                                  } else {
-                                    totalMinutes = 120;
-                                  }
-                                } else {
-                                    totalMinutes = 120;
-                                }
-                                break;
-                            case 'planning':
-                            case 'tracking':
-                                totalMinutes = 30; break;
-                            case 'lead-generation': totalMinutes = 45; break;
-                            case 'essentials':
-                            case 'interrupt':
-                                totalMinutes = activity.duration || 0; break;
-                            default: totalMinutes = 0;
-                        }
+                      totalMinutes = 120;
                     }
-
-                    if (totalMinutes > 0) {
-                        const h = Math.floor(totalMinutes / 60);
-                        const m = Math.round(totalMinutes % 60);
-                        newDurations[activity.id] = (`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m';
-                    }
-                }
+                  } else {
+                    totalMinutes = 120;
+                  }
+                  break;
+                case 'planning':
+                case 'tracking':
+                  totalMinutes = 30; break;
+                case 'lead-generation': totalMinutes = 45; break;
+                case 'essentials':
+                case 'interrupt':
+                  totalMinutes = activity.duration || 0; break;
+                default: totalMinutes = 0;
+              }
             }
+
+            if (totalMinutes > 0) {
+              const h = Math.floor(totalMinutes / 60);
+              const m = Math.round(totalMinutes % 60);
+              newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
+            }
+          }
         }
+      }
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
@@ -1305,8 +1318,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       case 'branding':
       case 'essentials':
       case 'nutrition':
+      case 'interrupt':
         handleToggleComplete(activity.slot, activity.id, true);
-        toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
+        if(activity.type !== 'interrupt') {
+            toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
+        }
         return;
       default:
         toast({ title: "Error", description: `Cannot log progress for activity type: ${activity.type}.`, variant: "destructive" });
@@ -2479,6 +2495,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
