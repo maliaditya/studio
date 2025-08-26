@@ -1303,6 +1303,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       case 'tracking':
       case 'lead-generation':
       case 'branding':
+      case 'essentials':
+      case 'nutrition':
         handleToggleComplete(activity.slot, activity.id, true);
         toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
         return;
@@ -2477,6 +2479,7 @@ const usePrevious = <T,>(value: T) => {
 
 
     
+
 
 
 
