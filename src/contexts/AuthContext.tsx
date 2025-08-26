@@ -1935,19 +1935,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleDeleteMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string) => {
-    setCoreSkills(prev => prev.map(s => {
+    let microSkillName = '';
+    const updatedCoreSkills = coreSkills.map(s => {
         if (s.id === coreSkillId) {
-            return { ...s, skillAreas: s.skillAreas.map(area => {
+            const updatedSkillAreas = s.skillAreas.map(area => {
                 if (area.id === areaId) {
+                    const microSkillToDelete = area.microSkills.find(ms => ms.id === microSkillId);
+                    if (microSkillToDelete) {
+                        microSkillName = microSkillToDelete.name;
+                    }
                     return { ...area, microSkills: area.microSkills.filter(ms => ms.id !== microSkillId) };
                 }
                 return area;
-            }) };
+            });
+            return { ...s, skillAreas: updatedSkillAreas };
         }
         return s;
-    }));
-    toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill has been removed.' });
-  };
+    });
+
+    setCoreSkills(updatedCoreSkills);
+
+    if (microSkillName) {
+        setUpskillDefinitions(prev => prev.filter(def => def.category !== microSkillName));
+        setDeepWorkDefinitions(prev => prev.filter(def => def.category !== microSkillName));
+    }
+
+    toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill and all associated tasks have been removed.' });
+};
 
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
