@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -171,10 +170,30 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         }
       ]
     };
-    navigator.clipboard.writeText(JSON.stringify(template, null, 2));
+    
+    const fullPrompt = `### AI Prompt for Generating a Comprehensive Specialization JSON
+
+**Your Role:** You are an expert curriculum designer and technical writer. Your task is to take a high-level technical specialization and break it down into a comprehensive, hierarchical learning plan.
+
+**Your Goal:** Generate a JSON object that represents a complete learning path for the specialization: **\`${specializationName}\`**.
+
+**Crucial Instructions:**
+
+1.  **Be Thorough and Expansive:** Do not provide a minimal or superficial outline. The goal is a detailed, rich curriculum. Each level of the hierarchy (\`skillAreas\`, \`microSkills\`, \`curiosities\`, \`objectives\`, \`visualizations\`) should contain **multiple entries** where appropriate. For example, a "Skill Area" should have several "Micro-Skills," and a "Curiosity" should branch into multiple "Objectives."
+2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON object matching the structure provided below.
+3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Skill Areas" are broad. "Micro-Skills" are specific competencies within an area. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
+4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks (\`curiosities\`, \`objectives\`, and \`visualizations\`).
+
+**JSON Schema Definition & Example:**
+
+\`\`\`json
+${JSON.stringify(template, null, 2)}
+\`\`\``;
+
+    navigator.clipboard.writeText(fullPrompt);
     toast({
-      title: "Template Copied",
-      description: `The JSON template for "${specializationName}" has been copied.`,
+      title: "Prompt Copied!",
+      description: `The AI prompt for "${specializationName}" has been copied.`,
     });
     setSpecializationName('');
     setIsCopyModalOpen(false);
@@ -302,7 +321,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 </Label>
                 <Button id="copy-template" variant="outline" size="sm" onClick={() => setIsCopyModalOpen(true)}>
                   <Copy className="mr-2 h-4 w-4" />
-                  Copy Template
+                  Copy Prompt
                 </Button>
               </div>
             </div>
@@ -326,7 +345,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsCopyModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleCopyTemplate}>Copy Template</Button>
+            <Button onClick={handleCopyTemplate}>Copy Prompt</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
