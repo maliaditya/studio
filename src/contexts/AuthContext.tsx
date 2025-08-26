@@ -1270,67 +1270,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
-        const daySchedule = { ...(prev[todayKey] || {}) };
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
         const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
         const activityIndex = activities.findIndex(act => act.id === activityId);
 
         if (activityIndex > -1) {
             activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
             daySchedule[slotName] = activities;
+            newSchedule[todayKey] = daySchedule;
         }
-
-        return { ...prev, [todayKey]: daySchedule };
+        
+        return newSchedule;
     });
   };
   
-  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+ const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
-    // Check if it's a parent objective
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const isUpskill = upskillDefinitions.some(d => d.id === mainDefId);
-    const defs = isUpskill ? upskillDefinitions : deepWorkDefinitions;
-    const mainDef = mainDefId ? defs.find(d => d.id === mainDefId) : null;
-    
-    let totalObjectiveMinutes = 0;
-    let objectiveCompleted = false;
-
-    if (mainDef) {
-        const leafNodes = getDescendantLeafNodes(mainDef.id, isUpskill ? 'upskill' : 'deepwork');
-        if (leafNodes.length > 0) {
-            objectiveCompleted = true; // Assume complete until a pending leaf is found
-            
-            leafNodes.forEach(node => {
-                const logs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
-                let nodeLogged = false;
-                for (const log of logs) {
-                    const exercise = log.exercises.find(ex => ex.definitionId === node.id);
-                    if (exercise && exercise.loggedSets.length > 0) {
-                        const time = exercise.loggedSets.reduce((sum, set) => sum + (isUpskill ? set.reps : set.weight), 0);
-                        totalObjectiveMinutes += time;
-                        nodeLogged = true;
-                        break; 
-                    }
+    // Find the activity in the schedule to update it directly
+    const updateActivityInSchedule = (updatedActivityProps: Partial<Activity>) => {
+      setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+          if (newSchedule[dateKey]) {
+            for (const slotName in newSchedule[dateKey]) {
+              const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+              if (Array.isArray(activities)) {
+                const activityIndex = activities.findIndex(a => a.id === activity.id);
+                if (activityIndex > -1) {
+                  const updatedActivities = [...activities];
+                  updatedActivities[activityIndex] = { ...activities[activityIndex], ...updatedActivityProps };
+                  newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
+                  return newSchedule; // Exit after updating
                 }
-                if (!nodeLogged) {
-                  objectiveCompleted = false;
-                }
-            });
-             // Add the final session's duration
-            totalObjectiveMinutes += duration;
+              }
+            }
+          }
         }
-    }
-  
-    if (objectiveCompleted) {
-        updateActivity({ ...activity, completed: true, duration: totalObjectiveMinutes });
-        toast({ title: "Objective Complete!", description: `Total time logged: ${totalObjectiveMinutes} minutes.` });
-        return;
-    }
-  
-    // Default behavior for single tasks or incomplete objectives
+        return newSchedule;
+      });
+    };
+
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
     let allDefs: ExerciseDefinition[] = [];
-  
+    
     switch (activity.type) {
       case 'upskill':
         logsUpdater = setAllUpskillLogs;
@@ -1340,115 +1324,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         logsUpdater = setAllDeepWorkLogs;
         allDefs = deepWorkDefinitions;
         break;
-      case 'workout':
-        logsUpdater = setAllWorkoutLogs;
-        allDefs = exerciseDefinitions;
-        break;
-      case 'planning':
-      case 'tracking':
-      case 'lead-generation':
-      case 'branding':
-      case 'essentials':
-      case 'nutrition':
-      case 'interrupt':
-        updateActivity({ ...activity, completed: true, duration: duration });
-        if(activity.type !== 'interrupt') {
-            toast({ title: "Session Completed", description: `Logged ${duration} minutes for "${activity.details}".` });
-        }
-        return;
       default:
-        toast({ title: "Error", description: `Cannot log progress for activity type: ${activity.type}.`, variant: "destructive" });
+        // For simple activities, just mark as complete and set duration
+        updateActivityInSchedule({ completed: true, duration });
+        toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
         return;
     }
   
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
-      updateActivity({ ...activity, completed: true, duration: duration });
+      updateActivityInSchedule({ completed: true, duration });
       return;
     }
   
-    let definition: ExerciseDefinition | undefined;
-    for (const def of allDefs) {
-      if (exerciseInstanceId.startsWith(def.id)) {
-        definition = def;
-        break;
-      }
-    }
-  
+    const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
     if (!definition) {
-      updateActivity({ ...activity, completed: true, duration: duration });
+      updateActivityInSchedule({ completed: true, duration });
       return;
-    }
-      
-    let totalDurationMinutes = duration;
-  
-    if (activity.focusSessionInitialStartTime) {
-        const { focusSessionInitialStartTime, focusSessionPauses = [] } = activity;
-        const endTime = activity.focusSessionEndTime || Date.now();
-        let totalPauseTime = 0;
-          
-        focusSessionPauses.forEach(p => {
-            if (p.resumeTime) {
-                totalPauseTime += p.resumeTime - p.pauseTime;
-            } else {
-                totalPauseTime += Date.now() - p.pauseTime;
-            }
-        });
-  
-        const totalWorkTimeMs = (endTime - focusSessionInitialStartTime) - totalPauseTime;
-        totalDurationMinutes = Math.floor(totalWorkTimeMs / 60000);
     }
       
     if (logsUpdater) {
       logsUpdater(prevLogs => {
-          let currentLog = prevLogs.find(log => log.date === todayKey);
-          const newSet: LoggedSet = {
-              id: `${Date.now()}-${Math.random()}`,
-              reps: activity.type === 'upskill' ? totalDurationMinutes : 1,
-              weight: totalDurationMinutes, // For both upskill (progress) and deepwork (duration)
-              timestamp: Date.now(),
-          };
-    
           const newLogs = [...prevLogs];
-          let logIndex = prevLogs.findIndex(log => log.date === todayKey);
-            
-          if (logIndex === -1) {
-              currentLog = { id: todayKey, date: todayKey, exercises: [] };
-              newLogs.push(currentLog);
-              logIndex = newLogs.length - 1;
-          } else {
-              currentLog = { ...newLogs[logIndex] };
+          let logForToday = newLogs.find(log => log.date === todayKey);
+          
+          if (!logForToday) {
+              logForToday = { id: todayKey, date: todayKey, exercises: [] };
+              newLogs.push(logForToday);
           }
-            
-          let exerciseIndex = currentLog.exercises.findIndex(ex => ex.id === exerciseInstanceId);
-    
-          let updatedExercises;
-          if (exerciseIndex > -1) {
-              updatedExercises = [...currentLog.exercises];
-              updatedExercises[exerciseIndex] = {
-                  ...updatedExercises[exerciseIndex],
-                  loggedSets: [...updatedExercises[exerciseIndex].loggedSets, newSet]
-              };
-          } else {
-              const newExercise: WorkoutExercise = {
+
+          let exerciseInstance = logForToday.exercises.find(ex => ex.id === exerciseInstanceId);
+          if (!exerciseInstance) {
+              exerciseInstance = {
                   id: exerciseInstanceId,
                   definitionId: definition!.id,
                   name: definition!.name,
                   category: definition!.category,
-                  loggedSets: [newSet],
+                  loggedSets: [],
                   targetSets: 1,
                   targetReps: '25'
               };
-              updatedExercises = [...currentLog.exercises, newExercise];
+              logForToday.exercises.push(exerciseInstance);
           }
-          newLogs[logIndex] = { ...currentLog, exercises: updatedExercises };
+          
+          const newSet: LoggedSet = {
+              id: `${Date.now()}-${Math.random()}`,
+              reps: activity.type === 'upskill' ? duration : 1,
+              weight: duration,
+              timestamp: Date.now(),
+          };
+
+          exerciseInstance.loggedSets.push(newSet);
           return newLogs;
       });
     }
   
-    updateActivity({ ...activity, completed: true, duration: totalDurationMinutes });
-    toast({ title: "Progress Logged", description: `Logged ${totalDurationMinutes} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, setAllWorkoutLogs, toast, upskillDefinitions, deepWorkDefinitions, exerciseDefinitions, getDescendantLeafNodes, allDeepWorkLogs, allUpskillLogs]);
+    updateActivityInSchedule({ completed: true, duration });
+    toast({ title: "Progress Logged", description: `Logged ${duration} minutes for "${definition.name}".` });
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions]);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2548,3 +2481,6 @@ const usePrevious = <T,>(value: T) => {
     
 
 
+
+
+    
