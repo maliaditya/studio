@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -18,6 +17,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Copy } from 'lucide-react';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -102,6 +102,52 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     toast({
       title: "Preference Reset",
       description: "The landing page will now be shown on your next visit.",
+    });
+  };
+
+  const handleCopyTemplate = () => {
+    const template = {
+      "name": "Name of the Specialization",
+      "skillAreas": [
+        {
+          "name": "Name of Skill Area 1",
+          "purpose": "A brief description of what this skill area is for.",
+          "microSkills": [
+            {
+              "name": "Name of Micro-Skill 1.1",
+              "curiosities": [
+                {
+                  "name": "Curiosity Name (e.g., Learn CUDA Basics)",
+                  "description": "Optional description for the curiosity.",
+                  "link": "https://example.com/resource",
+                  "estimatedDuration": 120,
+                  "objectives": [
+                    {
+                      "name": "Objective Name (e.g., Understand Memory Management)",
+                      "description": "Optional description.",
+                      "link": "",
+                      "estimatedDuration": 60,
+                      "visualizations": [
+                        {
+                          "name": "Visualization Task (e.g., Code a simple kernel)",
+                          "description": "Specific, loggable task.",
+                          "link": "",
+                          "estimatedDuration": 30
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+    navigator.clipboard.writeText(JSON.stringify(template, null, 2));
+    toast({
+      title: "Template Copied",
+      description: "The JSON template for skill upload has been copied to your clipboard.",
     });
   };
 
@@ -217,6 +263,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
               </Label>
               <Button id="reset-landing" variant="outline" size="sm" onClick={handleResetLandingPage}>
                 Reset
+              </Button>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <Label htmlFor="copy-template" className="font-normal">
+                Copy skill upload JSON template.
+              </Label>
+              <Button id="copy-template" variant="outline" size="sm" onClick={handleCopyTemplate}>
+                <Copy className="mr-2 h-4 w-4" />
+                Copy Template
               </Button>
             </div>
           </div>
