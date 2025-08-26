@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -47,6 +48,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [specializationName, setSpecializationName] = useState('');
+  const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
 
@@ -110,14 +112,21 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     });
   };
 
+  const handleOpenCopyModal = (type: 'specialization' | 'micro-skills') => {
+    setCopyType(type);
+    setIsCopyModalOpen(true);
+  };
+
   const handleCopyTemplate = () => {
-    if (!specializationName.trim()) {
-        toast({ title: "Name Required", description: "Please enter a name for the specialization.", variant: "destructive" });
-        return;
-    }
+    const isMicro = copyType === 'micro-skills';
+    const topicName = specializationName.trim() || `[YOUR ${isMicro ? 'MICRO-SKILL CLUSTER' : 'SPECIALIZATION'} NAME]`;
     const template = {
-      "name": specializationName,
-      "skillAreas": [
+      name: isMicro ? undefined : topicName,
+      microSkills: isMicro ? [{
+        "name": topicName,
+        "curiosities": []
+      }] : [],
+      skillAreas: isMicro ? undefined : [
         {
           "name": "Name of Skill Area 1",
           "purpose": "A brief description of what this skill area is for.",
@@ -180,28 +189,36 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       ]
     };
     
-    const fullPrompt = `### AI Prompt for Generating a Comprehensive Specialization JSON
+    const finalTemplate = isMicro ? template.microSkills : template;
+    const roleText = isMicro
+        ? "Your task is to take a cluster of related micro-skills and break them down into a comprehensive, hierarchical learning plan."
+        : "Your task is to take a high-level technical specialization and break it down into a comprehensive, hierarchical learning plan.";
+    const goalText = isMicro 
+        ? `Generate a single, valid JSON array that represents a complete learning path for the micro-skill cluster: **\`${topicName}\`**.`
+        : `Generate a single, valid JSON object that represents a complete learning path for the specialization: **\`${topicName}\`**.`;
 
-**Your Role:** You are an expert curriculum designer and technical writer. Your task is to take a high-level technical specialization and break it down into a comprehensive, hierarchical learning plan.
+    const fullPrompt = `### AI Prompt for Generating a Comprehensive ${isMicro ? 'Micro-Skill Cluster' : 'Specialization'} JSON
 
-**Your Goal:** Generate a single, valid JSON object that represents a complete learning path for the specialization: **\`${specializationName}\`**.
+**Your Role:** You are an expert curriculum designer and technical writer. ${roleText}
+
+**Your Goal:** ${goalText}
 
 **Crucial Instructions:**
 
-1.  **Be Thorough and Expansive:** Do not provide a minimal or superficial outline. The goal is a detailed, rich curriculum. Each level of the hierarchy (\`skillAreas\`, \`microSkills\`, \`curiosities\`, \`objectives\`, \`visualizations\`) should contain **multiple entries** where appropriate. For example, a "Skill Area" should have several "Micro-Skills," and a "Curiosity" should branch into multiple "Objectives."
-2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON object matching the structure provided below.
-3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Skill Areas" are broad. "Micro-Skills" are specific competencies within an area. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
-4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks (\`curiosities\`, \`objectives\`, and \`visualizations\`).
-5.  **Define \`resourceCards\` with Meaningful Structure:** For each \`visualization\` task, populate the \`resourceCards\` array. Use the following mental model:
-    *   **Elements Card:** List the fundamental nouns or concepts. What *exists* in this domain? (e.g., for 3D modeling: Vertex, Edge, Face; for React: Component, State, Prop).
-    *   **Tools Card:** List the verbs or operations that act upon the Elements. How do you *interact* with them? (e.g., for 3D modeling: Extrude, Bevel, Loop Cut; for React: \`useState\`, \`useEffect\`, \`.map()\`).
-    *   **Patterns Card:** Describe recurring use cases or workflows that combine Elements and Tools to achieve a specific goal.
+1.  **Be Thorough and Expansive:** Do not provide a minimal or superficial outline. The goal is a detailed, rich curriculum. Each level of the hierarchy should contain **multiple entries** where appropriate. For example, a "Curiosity" should branch into multiple "Objectives," and an "Objective" should have multiple "Visualizations."
+2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON ${isMicro ? 'array' : 'object'} matching the structure provided below.
+3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
+4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks.
+5.  **Define \`resourceCards\` with Meaningful Structure:** For each \`visualization\` task, populate the \`resourceCards\` array. Use this mental model:
+    *   **Elements Card:** What exists? List fundamental nouns or concepts (e.g., for 3D modeling: Vertex, Edge, Face; for React: Component, State, Prop).
+    *   **Tools Card:** How does it interact? List verbs or operations that act upon the Elements (e.g., for 3D modeling: Extrude, Bevel; for React: \`useState\`, \`useEffect\`, \`.map()\`).
+    *   **Patterns Card:** What are the recurring use cases? Describe workflows combining Elements and Tools to achieve a specific goal.
 6.  **Use Diverse Content Types:** Within the \`points\` array of a \`resourceCard\`, demonstrate the use of different types: \`"type": "text"\`, \`"type": "code"\`, and \`"type": "markdown"\`.
 
 **JSON Schema Definition & Example:**
 
 \`\`\`json
-${JSON.stringify(template, null, 2)}
+${JSON.stringify(finalTemplate, null, 2)}
 \`\`\``;
 
     navigator.clipboard.writeText(fullPrompt);
@@ -329,13 +346,22 @@ ${JSON.stringify(template, null, 2)}
                 </Button>
               </div>
               <Separator />
-              <div className="flex items-center justify-between">
-                <Label htmlFor="copy-template" className="font-normal">
-                  Copy skill upload JSON template.
+               <div className="flex items-center justify-between">
+                <Label htmlFor="copy-spec-template" className="font-normal">
+                  Copy specialization upload prompt.
                 </Label>
-                <Button id="copy-template" variant="outline" size="sm" onClick={() => setIsCopyModalOpen(true)}>
+                <Button id="copy-spec-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('specialization')}>
                   <Copy className="mr-2 h-4 w-4" />
-                  Copy Prompt
+                  Copy
+                </Button>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="copy-micro-template" className="font-normal">
+                  Copy micro-skill upload prompt.
+                </Label>
+                <Button id="copy-micro-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('micro-skills')}>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy
                 </Button>
               </div>
             </div>
@@ -345,7 +371,7 @@ ${JSON.stringify(template, null, 2)}
       <Dialog open={isCopyModalOpen} onOpenChange={setIsCopyModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enter Specialization Name</DialogTitle>
+            <DialogTitle>Enter {copyType === 'specialization' ? 'Specialization' : 'Micro-Skill Cluster'} Name</DialogTitle>
             <DialogDescription>This name will be added to the JSON template before copying.</DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -353,7 +379,7 @@ ${JSON.stringify(template, null, 2)}
               id="spec-name-input"
               value={specializationName}
               onChange={(e) => setSpecializationName(e.target.value)}
-              placeholder="e.g., GPU Programming & Graphics"
+              placeholder={copyType === 'specialization' ? "e.g., GPU Programming" : "e.g., Advanced CSS"}
               autoFocus
             />
           </div>
