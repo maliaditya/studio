@@ -196,7 +196,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     deepworkDef: ExerciseDefinition;
     getDeepWorkNodeType: (def: ExerciseDefinition) => string;
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
-    permanentlyLoggedActionIds: Set<string>;
     handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
     handleCardClick: (def: ExerciseDefinition) => void;
     handleToggleReadyForBranding: (id: string) => void;
@@ -217,7 +216,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     deepworkDef,
     getDeepWorkNodeType,
     getDeepWorkLoggedMinutes,
-    permanentlyLoggedActionIds,
     handleAddTaskToSession,
     handleCardClick,
     handleToggleReadyForBranding,
@@ -235,6 +233,8 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal,
     handleCreateAndLinkChild,
 }, ref) => {
+    const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
+
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `card-deepwork-${deepworkDef.id}`,
         data: { type: 'card', itemType: 'deepwork', definition: deepworkDef, id: deepworkDef.id }
@@ -255,6 +255,25 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
+    const leafNodes = useMemo(() => {
+        if (nodeType === 'Objective' || nodeType === 'Intention') {
+            return getDescendantLeafNodes(deepworkDef.id, 'deepwork');
+        }
+        return [];
+    }, [deepworkDef.id, nodeType, getDescendantLeafNodes]);
+    
+    const completedCount = useMemo(() => {
+        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+    }, [leafNodes, permanentlyLoggedTaskIds]);
+
+    const isObjectiveComplete = useMemo(() => {
+        if (leafNodes.length === 0) {
+            return permanentlyLoggedTaskIds.has(deepworkDef.id);
+        }
+        return completedCount >= leafNodes.length;
+    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
+
+
     const getIcon = () => {
       switch (nodeType) {
         case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
@@ -266,8 +285,8 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
       }
     };
 
-    const isActionable = ['Action', 'Standalone', 'Intention'].includes(nodeType);
-    const isComplete = isActionable && permanentlyLoggedActionIds.has(deepworkDef.id);
+    const isActionable = ['Action', 'Standalone'].includes(nodeType);
+    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -333,7 +352,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                             const childDef = deepWorkDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={permanentlyLoggedActionIds.has(childId)} type="deepwork" />;
+                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={permanentlyLoggedTaskIds.has(childId)} type="deepwork" />;
                         })}
                         {(deepworkDef.linkedUpskillIds || []).map(childId => {
                             const childDef = upskillDefinitions.find(d => d.id === childId);
@@ -349,6 +368,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
+                         {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
                          {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                         {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
                     </div>
@@ -494,14 +514,12 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     deepWorkDefinitions: ExerciseDefinition[];
     upskillDefinitions: ExerciseDefinition[];
     resources: Resource[];
-    permanentlyLoggedActionIds: Set<string>;
     getDeepWorkNodeType: (def: ExerciseDefinition) => string;
     getUpskillNodeType: (def: ExerciseDefinition) => string;
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
     getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
     calculateTotalEstimate: (def: ExerciseDefinition) => number;
     formatMinutes: (minutes: number) => string;
-    isUpskillObjectiveComplete: (id: string) => boolean;
     handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
     handleCardClick: (def: ExerciseDefinition) => void;
     handleSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
@@ -528,14 +546,12 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     deepWorkDefinitions,
     upskillDefinitions,
     resources,
-    permanentlyLoggedActionIds,
     getDeepWorkNodeType,
     getUpskillNodeType,
     getDeepWorkLoggedMinutes,
     getUpskillLoggedMinutesRecursive,
     calculateTotalEstimate,
     formatMinutes,
-    isUpskillObjectiveComplete,
     handleAddTaskToSession,
     handleCardClick,
     handleSelectFocusArea,
@@ -559,7 +575,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleCreateResource,
 }, ref) => {
 
-    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions } = useAuth();
+    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
     
     const getDomainForCategory = useCallback((category: string) => {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -708,7 +724,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             deepworkDef={def}
                             getDeepWorkNodeType={getDeepWorkNodeType}
                             getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                            permanentlyLoggedActionIds={permanentlyLoggedActionIds}
                             handleAddTaskToSession={handleAddTaskToSession}
                             handleCardClick={handleCardClick}
                             handleToggleReadyForBranding={handleToggleReadyForBranding}
@@ -733,30 +748,30 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     if (!def) return null;
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
+                    const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
+                    const isComplete = leafNodes.length > 0 && leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id));
+
                     return (
                         <LinkedUpskillCard 
                             key={id} 
                             upskillDef={def} 
-                            nodeType={getUpskillNodeType(def)}
-                            handleAddTaskToSession={(def: ExerciseDefinition, slot: string) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} 
-                            setSelectedSubtopic={(d: ExerciseDefinition | null) => handleSelectFocusArea(d, 'upskill')}
-                            setViewMode={setViewMode}
-                            handleUnlinkItem={handleUnlinkItem} 
+                            getUpskillNodeType={getUpskillNodeType}
+                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                            isComplete={isComplete}
+                            calculatedEstimate={calculateTotalEstimate(def)}
+                            handleAddTaskToSession={scheduleTaskFromMindMap}
+                            handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
-                            handleViewProgress={(d: ExerciseDefinition) => handleViewProgress(d, 'upskill')} 
-                            isComplete={isUpskillObjectiveComplete(def.id)} 
-                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} 
-                            upskillDefinitions={upskillDefinitions} 
-                            resources={resources} 
-                            calculatedEstimate={calculateTotalEstimate(def)} 
-                            setEmbedUrl={setEmbedUrl} 
-                            setFloatingVideoUrl={setFloatingVideoUrl} 
-                            linkedUpskillChildIds={new Set(upskillDefinitions.flatMap((d: ExerciseDefinition) => d.linkedUpskillIds || []))} 
-                            onUpdateName={handleUpdateFocusAreaName} 
-                            projectsInDomain={projectsInDomainForChild} 
-                            onLinkProject={() => handleOpenLinkProjectModal(def)}
+                            handleUnlinkItem={handleUnlinkItem}
+                            handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onCreateAndLinkChild={handleCreateAndLinkChild}
+                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenMindMap={onOpenMindMap}
+                            onUpdateName={handleUpdateFocusAreaName}
+                            resources={resources}
+                            upskillDefinitions={upskillDefinitions}
+                            projectsInDomain={projectsInDomainForChild}
+                            handleCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     );
                 })}
@@ -833,6 +848,8 @@ function DeepWorkPageContent() {
     deleteResource,
     getDeepWorkNodeType,
     getUpskillNodeType,
+    permanentlyLoggedTaskIds,
+    getDescendantLeafNodes,
   } = useAuth();
   const router = useRouter();
   
@@ -952,22 +969,6 @@ function DeepWorkPageContent() {
     if (!domain) return [];
     return projects.filter(p => p.domainId === domain.id);
   }, [linkingTask, getDomainForCategory, projects]);
-
-  const permanentlyLoggedActionIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    const processLogs = (logs: DatedWorkout[]) => {
-      logs.forEach(log => {
-        log.exercises.forEach(ex => {
-          if (ex.loggedSets.length > 0) {
-            loggedIds.add(ex.definitionId);
-          }
-        });
-      });
-    };
-    if (allDeepWorkLogs) processLogs(allDeepWorkLogs);
-    if (allUpskillLogs) processLogs(allUpskillLogs);
-    return loggedIds;
-  }, [allDeepWorkLogs, allUpskillLogs]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
@@ -1619,37 +1620,6 @@ function DeepWorkPageContent() {
   
   const currentTaskIsIntention = currentTask && getDeepWorkNodeType(currentTask) === 'Intention';
 
-  const isUpskillObjectiveComplete = useCallback((objectiveId: string): boolean => {
-    const visited = new Set<string>();
-    const visualizationIds = new Set<string>();
-    const queue: string[] = [objectiveId];
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-
-        const node = upskillDefinitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const isParent = (node.linkedUpskillIds?.length ?? 0) > 0;
-        
-        if (!isParent) { // It's a Visualization
-            visualizationIds.add(node.id);
-        } else { // It's an Objective or Curiosity, so recurse
-            (node.linkedUpskillIds || []).forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    
-    if (visualizationIds.size === 0) return false;
-
-    return Array.from(visualizationIds).every(vizId => permanentlyLoggedActionIds.has(vizId));
-  }, [upskillDefinitions, permanentlyLoggedActionIds]);
-
   const handleCreateAndLinkChild = useCallback((parentId: string, type: 'deepwork' | 'upskill') => {
       const parentDef = deepWorkDefinitions.find(d => d.id === parentId) || upskillDefinitions.find(d => d.id === parentId);
       if (!parentDef) return;
@@ -1950,14 +1920,12 @@ function DeepWorkPageContent() {
                                 deepWorkDefinitions={deepWorkDefinitions}
                                 upskillDefinitions={upskillDefinitions}
                                 resources={resources}
-                                permanentlyLoggedActionIds={permanentlyLoggedActionIds}
                                 getDeepWorkNodeType={getDeepWorkNodeType}
                                 getUpskillNodeType={getUpskillNodeType}
                                 getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
                                 getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                 calculateTotalEstimate={calculateTotalEstimate}
                                 formatMinutes={formatMinutes}
-                                isUpskillObjectiveComplete={isUpskillObjectiveComplete}
                                 handleAddTaskToSession={handleAddTaskToSession}
                                 handleCardClick={handleCardClick}
                                 handleSelectFocusArea={handleSelectFocusArea}
@@ -1988,7 +1956,6 @@ function DeepWorkPageContent() {
                                         deepworkDef={def}
                                         getDeepWorkNodeType={getDeepWorkNodeType}
                                         getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                                        permanentlyLoggedActionIds={permanentlyLoggedActionIds}
                                         handleAddTaskToSession={handleAddTaskToSession}
                                         handleCardClick={handleCardClick}
                                         handleToggleReadyForBranding={handleToggleReadyForBranding}
@@ -2007,32 +1974,34 @@ function DeepWorkPageContent() {
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
                                     />
                                 ))}
-                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
-                                    <LinkedUpskillCard 
-                                        key={def.id} 
-                                        upskillDef={def}
-                                        nodeType={getUpskillNodeType(def)}
-                                        handleAddTaskToSession={handleAddTaskToSession} 
-                                        setSelectedSubtopic={(def) => handleSelectFocusArea(def, 'upskill')}
-                                        setViewMode={setViewMode}
-                                        handleUnlinkItem={handleUnlinkItem} 
-                                        handleDeleteSubtopic={handleDeleteFocusArea}
-                                        handleViewProgress={(d) => handleViewProgress(d, 'upskill')} 
-                                        isComplete={isUpskillObjectiveComplete(def.id)} 
-                                        getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} 
-                                        upskillDefinitions={upskillDefinitions} 
-                                        resources={resources} 
-                                        calculatedEstimate={calculateTotalEstimate(def)} 
-                                        setEmbedUrl={setEmbedUrl} 
-                                        setFloatingVideoUrl={setFloatingVideoUrl} 
-                                        linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
-                                        onUpdateName={handleUpdateFocusAreaName} 
-                                        projectsInDomain={projects} 
-                                        onLinkProject={() => handleOpenLinkProjectModal(def)}
-                                        onEdit={setEditingFocusArea} 
-                                        onCreateAndLinkChild={handleCreateAndLinkChild}
-                                    />
-                                ))}
+                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
+                                    const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
+                                    const isComplete = leafNodes.length > 0 && leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id));
+                                    
+                                    return (
+                                        <LinkedUpskillCard 
+                                            key={def.id} 
+                                            upskillDef={def}
+                                            getUpskillNodeType={getUpskillNodeType}
+                                            isComplete={isComplete}
+                                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                                            calculatedEstimate={calculateTotalEstimate(def)}
+                                            handleAddTaskToSession={scheduleTaskFromMindMap} 
+                                            handleCardClick={handleCardClick}
+                                            handleDeleteSubtopic={handleDeleteFocusArea}
+                                            handleUnlinkItem={handleUnlinkItem}
+                                            handleViewProgress={handleViewProgress}
+                                            onEdit={setEditingFocusArea}
+                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                            onOpenMindMap={onOpenMindMap}
+                                            onUpdateName={handleUpdateFocusAreaName}
+                                            resources={resources}
+                                            upskillDefinitions={upskillDefinitions}
+                                            projectsInDomain={projects}
+                                            handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                        />
+                                    );
+                                })}
                                 {selectedMicroSkill && (
                                     <Card
                                         onClick={() => handleOpenNewFocusAreaModal(libraryView)}
@@ -2326,7 +2295,6 @@ function DeepWorkPageContent() {
                             deepworkDef={activeDragItem as ExerciseDefinition}
                             getDeepWorkNodeType={getDeepWorkNodeType}
                             getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                            permanentlyLoggedActionIds={permanentlyLoggedActionIds}
                             handleAddTaskToSession={handleAddTaskToSession}
                             handleCardClick={handleCardClick}
                             handleToggleReadyForBranding={handleToggleReadyForBranding}
@@ -2348,26 +2316,23 @@ function DeepWorkPageContent() {
                     {activeId.startsWith('card-upskill-') && (
                          <LinkedUpskillCard 
                             upskillDef={activeDragItem as ExerciseDefinition}
-                            nodeType={getUpskillNodeType(activeDragItem as ExerciseDefinition)}
-                            handleAddTaskToSession={(def, slot) => scheduleTaskFromMindMap(def.id, 'upskill', slot)} 
-                            setSelectedSubtopic={(d) => handleSelectFocusArea(d, 'upskill')}
-                            setViewMode={setViewMode}
-                            handleUnlinkItem={handleUnlinkItem} 
+                            getUpskillNodeType={getUpskillNodeType}
+                            isComplete={permanentlyLoggedTaskIds.has(activeDragItem.id)}
+                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
+                            calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
+                            handleAddTaskToSession={scheduleTaskFromMindMap} 
+                            handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
-                            handleViewProgress={(d) => handleViewProgress(d, 'upskill')} 
-                            isComplete={isUpskillObjectiveComplete(activeDragItem.id)} 
-                            getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive} 
-                            upskillDefinitions={upskillDefinitions} 
-                            resources={resources} 
-                            calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)} 
-                            setEmbedUrl={setEmbedUrl} 
-                            setFloatingVideoUrl={setFloatingVideoUrl} 
-                            linkedUpskillChildIds={new Set(upskillDefinitions.flatMap(d => d.linkedUpskillIds || []))} 
-                            onUpdateName={handleUpdateFocusAreaName} 
-                            projectsInDomain={[]} 
-                            onLinkProject={() => handleOpenLinkProjectModal(activeDragItem as ExerciseDefinition)}
-                            onEdit={setEditingFocusArea} 
-                            onCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleUnlinkItem={handleUnlinkItem}
+                            handleViewProgress={handleViewProgress}
+                            onEdit={setEditingFocusArea}
+                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenMindMap={onOpenMindMap}
+                            onUpdateName={handleUpdateFocusAreaName}
+                            resources={resources}
+                            upskillDefinitions={upskillDefinitions}
+                            projectsInDomain={[]}
+                            handleCreateAndLinkChild={handleCreateAndLinkChild}
                         />
                     )}
                     {activeId.startsWith('subtask-') && (
@@ -2393,4 +2358,5 @@ export default function DeepWorkPage() {
     
 
     
+
 

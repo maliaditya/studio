@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Trash2, Edit3, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, TrendingUp, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, BookCopy, Briefcase } from 'lucide-react';
+import { PlusCircle, Trash2, Edit3, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, TrendingUp, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, BookCopy, Briefcase, CheckSquare } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ExerciseDefinition, Resource, Project, DailySchedule } from '@/types/workout';
@@ -124,48 +124,83 @@ const DraggableSubtaskItem: React.FC<{
     );
 };
 
-export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession, setSelectedSubtopic, setViewMode, handleUnlinkItem, handleDeleteSubtopic, handleViewProgress, isComplete, getUpskillLoggedMinutesRecursive, upskillDefinitions, resources, calculatedEstimate, setEmbedUrl, setFloatingVideoUrl, linkedUpskillChildIds, onUpdateName, projectsInDomain, onLinkProject, onEdit, onCreateAndLinkChild }: {
+export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   upskillDef: ExerciseDefinition;
-  nodeType: string;
-  handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
-  setSelectedSubtopic: (def: ExerciseDefinition | null) => void;
-  setViewMode: (mode: 'session' | 'library') => void;
-  handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
-  handleDeleteSubtopic: (id: string) => void;
-  handleViewProgress: (def: ExerciseDefinition) => void;
-  isComplete: boolean;
+  getUpskillNodeType: (def: ExerciseDefinition) => string;
   getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
-  upskillDefinitions: ExerciseDefinition[];
-  resources: Resource[];
+  isComplete: boolean;
   calculatedEstimate: number;
-  setEmbedUrl: (url: string | null) => void;
-  setFloatingVideoUrl: (url: string | null) => void;
-  linkedUpskillChildIds: Set<string>;
-  onUpdateName: (id: string, newName: string) => void;
-  projectsInDomain: Project[];
-  onLinkProject: (curiosityId: string, projectId: string | null) => void;
+  handleAddTaskToSession: (definitionId: string, activityType: 'upskill', slotName: string) => void;
+  handleCardClick: (def: ExerciseDefinition) => void;
+  handleDeleteSubtopic: (id: string) => void;
+  handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
+  handleViewProgress: (def: ExerciseDefinition) => void;
   onEdit: (def: ExerciseDefinition) => void;
-  onCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
-}) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-      id: upskillDef.id,
-      data: {
-          type: 'card',
-          id: upskillDef.id,
-          itemType: 'upskill'
-      }
+  onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
+  onOpenMindMap: (id: string) => void;
+  onUpdateName: (id: string, newName: string) => void;
+  resources: Resource[];
+  upskillDefinitions: ExerciseDefinition[];
+  projectsInDomain: Project[];
+  handleCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
+}>(({ 
+  upskillDef, 
+  getUpskillNodeType,
+  getUpskillLoggedMinutesRecursive,
+  isComplete,
+  calculatedEstimate,
+  handleAddTaskToSession, 
+  handleCardClick,
+  handleDeleteSubtopic, 
+  handleUnlinkItem,
+  handleViewProgress,
+  onEdit, 
+  onOpenLinkProjectModal,
+  onOpenMindMap,
+  onUpdateName,
+  resources,
+  upskillDefinitions,
+  projectsInDomain,
+  handleCreateAndLinkChild,
+}, ref) => {
+  const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+      id: `card-upskill-${upskillDef.id}`,
+      data: { type: 'card', itemType: 'upskill', definition: upskillDef, id: upskillDef.id }
   });
-  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: upskillDef.id });
-  const router = useRouter();
+  const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: `card-upskill-${upskillDef.id}`, data: { type: 'card', itemType: 'upskill', definition: upskillDef, id: upskillDef.id } });
   const [isEditingName, setIsEditingName] = useState(false);
   const [currentName, setCurrentName] = useState(upskillDef.name);
 
-  const setCombinedRefs = (node: HTMLElement | null) => {
-    setNodeRef(node);
+  const setCombinedRefs = (node: HTMLDivElement | null) => {
+    if (typeof ref === 'function') {
+        ref(node);
+    } else if (ref) {
+        ref.current = node;
+    }
     setDroppableNodeRef(node);
+    setNodeRef(node);
   };
   
-  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: isDragging ? 100 : 'auto', } : undefined;
+  const nodeType = getUpskillNodeType(upskillDef);
+  
+  const leafNodes = useMemo(() => {
+    if (nodeType === 'Objective' || nodeType === 'Curiosity') {
+        return getDescendantLeafNodes(upskillDef.id, 'upskill');
+    }
+    return [];
+  }, [upskillDef.id, nodeType, getDescendantLeafNodes]);
+
+  const completedCount = useMemo(() => {
+    return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+  }, [leafNodes, permanentlyLoggedTaskIds]);
+
+  const isObjectiveComplete = useMemo(() => {
+    if (leafNodes.length === 0) {
+        return permanentlyLoggedTaskIds.has(upskillDef.id);
+    }
+    return completedCount >= leafNodes.length;
+  }, [leafNodes, completedCount, permanentlyLoggedTaskIds, upskillDef.id]);
   
   const getIcon = () => {
     switch(nodeType) {
@@ -178,8 +213,7 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
   };
 
   const loggedMinutes = getUpskillLoggedMinutesRecursive(upskillDef);
-  const isParent = nodeType === 'Curiosity' || nodeType === 'Objective';
-  const estDuration = isParent ? calculatedEstimate : upskillDef.estimatedDuration;
+  const estDuration = calculatedEstimate;
   
   const formatMinutes = (minutes: number) => {
     if (minutes === 0) return "0m";
@@ -192,7 +226,7 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
     if (currentName.trim()) {
       onUpdateName(upskillDef.id, currentName.trim());
     } else {
-      setCurrentName(upskillDef.name); // Revert if empty
+      setCurrentName(upskillDef.name);
     }
     setIsEditingName(false);
   };
@@ -201,10 +235,12 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
     .map(pid => projectsInDomain.find(p => p.id === pid))
     .filter((p): p is Project => !!p);
   const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone';
+  
+  const finalIsComplete = isActionable ? permanentlyLoggedTaskIds.has(upskillDef.id) : isObjectiveComplete;
 
   return (
-    <div ref={setCombinedRefs} style={style} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg")}>
-      <Card className={cn("relative group transition-all duration-300 hover:shadow-xl", isComplete && "opacity-70 bg-muted/30")}>
+    <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
+      <Card className={cn("relative group transition-all duration-300 hover:shadow-xl min-h-[230px]", finalIsComplete && "opacity-70 bg-muted/30")}>
         <div className="absolute inset-0 z-0" onMouseDown={(e) => isDragging && e.stopPropagation()}/>
          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
@@ -213,7 +249,7 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
                 <TooltipTrigger asChild>
                   <span tabIndex={isActionable ? 0 : -1}>
                     {isActionable ? (
-                      <AddToSessionPopover definition={upskillDef} onSelectSlot={(slot) => handleAddTaskToSession(upskillDef, slot)} />
+                      <AddToSessionPopover definition={upskillDef} onSelectSlot={(slot) => handleAddTaskToSession(upskillDef.id, 'upskill', slot)} />
                     ) : (
                       <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled>
                         <PlusCircle className="h-4 w-4" />
@@ -224,13 +260,14 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
                 <TooltipContent>{isActionable ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); setSelectedSubtopic(upskillDef); setViewMode('library'); }}><ArrowRight className="h-4 w-4" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleCardClick(upskillDef); }}><ArrowRight className="h-4 w-4" /></Button>
             <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuItem onSelect={() => onEdit(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onOpenMindMap(upskillDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
             <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3" onDoubleClick={() => setIsEditingName(true)}>
             <div className="flex items-center gap-2">
                 {getIcon()}
                 {isEditingName ? (
@@ -243,11 +280,11 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
                         autoFocus
                     />
                 ) : (
-                    <CardTitle className="text-base flex items-center gap-2 cursor-pointer min-w-0" onClick={() => setIsEditingName(true)}>
+                    <CardTitle className="text-base flex items-center gap-2 min-w-0" onClick={() => setIsEditingName(true)}>
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
+                                    <span className={cn("truncate", finalIsComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
                                         {upskillDef.name.length > 25 ? `${upskillDef.name.substring(0, 25)}...` : upskillDef.name}
                                     </span>
                                 </TooltipTrigger>
@@ -270,35 +307,22 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
             )}
         </CardHeader>
         <CardContent className="min-h-[50px]">
-            {isParent ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                    {(upskillDef.linkedUpskillIds || []).map(childId => {
-                        const childDef = upskillDefinitions.find(d => d.id === childId);
-                        if (!childDef) return null;
-                        return (
-                            <DraggableSubtaskItem 
-                                key={childId} 
-                                childId={childId} 
-                                parentId={upskillDef.id} 
-                                childName={childDef.name} 
-                                isLogged={isComplete} // This might need refinement for sub-task completion status
-                                type="upskill" 
-                                onClick={() => { setSelectedSubtopic(childDef); setViewMode('library'); }}
-                            />
-                        );
-                    })}
-                     {(upskillDef.linkedResourceIds || []).map(childId => {
-                        const childDef = resources.find(d => d.id === childId);
-                        if (!childDef) return null;
-                        return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => { router.push('/resources') }}/>;
-                    })}
-                </div>
-            ) : (
-                <p className="text-sm text-muted-foreground line-clamp-2">{upskillDef.description || "This is a visualization task. Add it to a session to log time."}</p>
-            )}
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                {(upskillDef.linkedUpskillIds || []).map(childId => {
+                    const childDef = upskillDefinitions.find(d => d.id === childId);
+                    if (!childDef) return null;
+                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={finalIsComplete} type="upskill" onClick={() => handleCardClick(childDef)} />;
+                })}
+                 {(upskillDef.linkedResourceIds || []).map(childId => {
+                    const childDef = resources.find(d => d.id === childId);
+                    if (!childDef) return null;
+                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => router.push('/resources')} />;
+                })}
+            </div>
         </CardContent>
         <CardFooter className="pt-3 flex items-center justify-end">
             <div className="flex items-center gap-1 flex-shrink-0">
+                {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
                 {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(estDuration)}</Badge>}
                 {loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}
             </div>
@@ -306,4 +330,5 @@ export function LinkedUpskillCard({ upskillDef, nodeType, handleAddTaskToSession
       </Card>
     </div>
   );
-}
+});
+LinkedUpskillCard.displayName = 'LinkedUpskillCard';
