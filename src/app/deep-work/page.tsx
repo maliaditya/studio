@@ -284,8 +284,8 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [nodeType, deepworkDef.id, deepWorkDefinitions]);
 
     const isAddToSessionEnabled = useMemo(() => {
-        const isActionable = nodeType === 'Action' || nodeType === 'Standalone';
-        if (isActionable) return true;
+        const isActionableNode = nodeType === 'Action' || nodeType === 'Standalone';
+        if (isActionableNode) return true;
     
         if (nodeType === 'Objective' && parentIntention) {
           return (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id));
@@ -2406,6 +2406,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 

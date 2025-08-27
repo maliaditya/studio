@@ -714,7 +714,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
   }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, toast, markObjectiveActivityAsComplete]);
-
+  
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -1794,7 +1794,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [resources]);
   
-  const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
+  const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setGeneralPopups(prev => {
         const newPopups = new Map(prev);
         const resource = resources.find(r => r.id === resourceId);
@@ -1819,8 +1819,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             parentId = undefined;
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-            x = (screenWidth - popupWidth) / 2;
-            y = (screenHeight - popupHeight) / 2;
+            x = event ? event.clientX : (screenWidth - popupWidth) / 2;
+            y = event ? event.clientY : (screenHeight - popupHeight) / 2;
         }
         
         newPopups.set(resourceId, { 
@@ -2559,3 +2559,4 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+

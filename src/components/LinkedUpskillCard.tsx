@@ -51,13 +51,17 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-function AddToSessionPopover({ definition, onSelectSlot }: { definition: ExerciseDefinition; onSelectSlot: (slotName: string) => void; }) {
+function AddToSessionPopover({ definition, onSelectSlot, disabled = false }: { 
+    definition: ExerciseDefinition; 
+    onSelectSlot: (slotName: string) => void; 
+    disabled?: boolean;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled={disabled}>
           <PlusCircle className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
@@ -142,6 +146,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   upskillDefinitions: ExerciseDefinition[];
   projectsInDomain: Project[];
   handleCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
+  activeProjectIds: Set<string>;
 }>(({ 
   upskillDef, 
   getUpskillNodeType,
@@ -161,6 +166,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   upskillDefinitions,
   projectsInDomain,
   handleCreateAndLinkChild,
+  activeProjectIds,
 }, ref) => {
   const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -201,6 +207,22 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
     return completedCount >= leafNodes.length;
   }, [leafNodes, completedCount, permanentlyLoggedTaskIds, upskillDef.id]);
   
+  const parentCuriosity = useMemo(() => {
+    if (nodeType !== 'Objective') return null;
+    return upskillDefinitions.find(d => (d.linkedUpskillIds || []).includes(upskillDef.id));
+  }, [nodeType, upskillDef.id, upskillDefinitions]);
+
+  const isAddToSessionEnabled = useMemo(() => {
+    const isActionableNode = nodeType === 'Visualization' || nodeType === 'Standalone';
+    if (isActionableNode) return true;
+
+    if (nodeType === 'Objective' && parentCuriosity) {
+      return (parentCuriosity.linkedProjectIds || []).some(id => activeProjectIds.has(id));
+    }
+
+    return false;
+  }, [nodeType, parentCuriosity, activeProjectIds]);
+  
   const getIcon = () => {
     switch(nodeType) {
         case 'Curiosity': return <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />;
@@ -233,7 +255,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   const linkedProjects = (upskillDef.linkedProjectIds || [])
     .map(pid => projectsInDomain.find(p => p.id === pid))
     .filter((p): p is Project => !!p);
-  const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone';
+  const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone' || nodeType === 'Objective';
   
   const finalIsComplete = isActionable ? permanentlyLoggedTaskIds.has(upskillDef.id) : isObjectiveComplete;
 
@@ -246,17 +268,19 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span tabIndex={isActionable ? 0 : -1}>
-                    {isActionable ? (
-                      <AddToSessionPopover definition={upskillDef} onSelectSlot={(slot) => handleAddTaskToSession(upskillDef.id, 'upskill', slot)} />
-                    ) : (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled>
-                        <PlusCircle className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </span>
+                  <div>
+                    <AddToSessionPopover 
+                      definition={upskillDef} 
+                      onSelectSlot={(slot) => handleAddTaskToSession(upskillDef.id, 'upskill', slot)} 
+                      disabled={!isAddToSessionEnabled}
+                    />
+                  </div>
                 </TooltipTrigger>
-                <TooltipContent>{isActionable ? 'Add to Session' : 'Add sub-tasks instead'}</TooltipContent>
+                {!isAddToSessionEnabled && (
+                  <TooltipContent>
+                    <p>Link parent to an active project to enable.</p>
+                  </TooltipContent>
+                )}
               </Tooltip>
             </TooltipProvider>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); handleCardClick(upskillDef); }}><ArrowRight className="h-4 w-4" /></Button>
@@ -315,7 +339,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
                  {(upskillDef.linkedResourceIds || []).map(childId => {
                     const childDef = resources.find(d => d.id === childId);
                     if (!childDef) return null;
-                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => router.push('/resources')} />;
+                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={false} type="resource" onClick={() => {}} />;
                 })}
             </div>
         </CardContent>
