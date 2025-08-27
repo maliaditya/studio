@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -282,7 +281,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     const parentIntention = useMemo(() => {
         if (nodeType !== 'Objective') return null;
         return deepWorkDefinitions.find(d => (d.linkedDeepWorkIds || []).includes(deepworkDef.id));
-    }, [nodeType, deepWorkDef.id, deepWorkDefinitions]);
+    }, [nodeType, deepworkDef.id, deepWorkDefinitions]);
 
     const isAddToSessionEnabled = useMemo(() => {
         const isActionable = nodeType === 'Action' || nodeType === 'Standalone';
@@ -2407,6 +2406,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
