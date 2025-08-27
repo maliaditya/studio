@@ -12,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfToday, isAfter } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -320,6 +320,7 @@ interface AuthContextType {
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
 
   currentSlot: string;
+  activeProjectIds: Set<string>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -2371,6 +2372,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const activeProjectIds = useMemo(() => {
+    const activeIds = new Set<string>();
+    const today = startOfToday();
+
+    (projects || []).forEach(project => {
+        // Check productization plans
+        if (productizationPlans && productizationPlans[project.name]) {
+            activeIds.add(project.id);
+            return;
+        }
+
+        // Check offerization plans
+        const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+            plan.releases?.some(release => {
+                if (release.name !== project.name) return false;
+                try {
+                    return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                } catch { return false; }
+            })
+        );
+        if (isOfferedAndActive) {
+            activeIds.add(project.id);
+        }
+    });
+    return activeIds;
+  }, [projects, productizationPlans, offerizationPlans]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2452,6 +2480,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     autoSuggestions, setAutoSuggestions,
     recentItems, addToRecents,
     currentSlot,
+    activeProjectIds,
   };
 
   return (
