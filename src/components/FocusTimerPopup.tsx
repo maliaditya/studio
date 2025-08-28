@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -43,7 +42,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const [sessionState, setSessionState] = useState<'running' | 'paused' | 'idle'>('running');
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
-  const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
   const [subTaskStartTime, setSubTaskStartTime] = useState<number | null>(null);
   
   const popupRef = useRef<HTMLDivElement>(null);
@@ -113,11 +111,52 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
 
+  const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
+    const durationMins = subTask.estimatedDuration || 25;
+    const durationSecs = durationMins * 60;
+    
+    setTotalSeconds(durationSecs);
+    setSecondsLeft(durationSecs);
+    setCycleSecondsLeft(WORK_DURATION);
+    setCurrentCycle('work');
+    setSessionState('running');
+    setSubTaskStartTime(Date.now());
+    setIsAudioPlaying(true);
+    setPromptForCompletion(false);
+  }, [WORK_DURATION, setIsAudioPlaying]);
+
+  const handleStop = useCallback((completed: boolean) => {
+    setSessionState('idle');
+    setIsAudioPlaying(false);
+    
+    if (activity) {
+      const updatedActivity: Activity = {
+        ...activity,
+        focusSessionEndTime: Date.now(),
+      };
+      updateActivity(updatedActivity);
+
+      if (completed) {
+        if (!showSubTasks) { // Standalone task
+            const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
+            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+            if (elapsedMinutes > 0) {
+              onLogTime(updatedActivity, elapsedMinutes);
+            }
+        }
+        handleToggleComplete(activity.slot, activity.id, true);
+      }
+    }
+    onClose();
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks]);
+
   const handleSubTaskComplete = useCallback(() => {
-    if (!activeSubTask) {
-        if (!showSubTasks) handleStop(true); // Standalone task
+    if (!activeSubTask && !showSubTasks) {
+        handleStop(true);
         return;
     }
+
+    if (!activeSubTask) return;
 
     setPromptForCompletion(false);
     
@@ -141,48 +180,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
   }, [activeSubTask, subTaskStartTime, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
-  const handleStop = useCallback((completed: boolean) => {
-    setSessionState('idle');
-    setIsAudioPlaying(false);
-    
-    if (activity) {
-      const updatedActivity: Activity = {
-        ...activity,
-        focusSessionEndTime: Date.now(),
-      };
-      updateActivity(updatedActivity);
 
-      if (completed) {
-        if (showSubTasks && activeSubTask) {
-            handleSubTaskComplete();
-        } else {
-            const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
-            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-            if (elapsedMinutes > 0) {
-              onLogTime(updatedActivity, elapsedMinutes);
-            }
-        }
-        handleToggleComplete(activity.slot, activity.id, true);
-      }
-    }
-    onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, activeSubTask, handleSubTaskComplete]);
-
-
-  const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
-    const durationMins = subTask.estimatedDuration || 25;
-    const durationSecs = durationMins * 60;
-    
-    setTotalSeconds(durationSecs);
-    setSecondsLeft(durationSecs);
-    setCycleSecondsLeft(WORK_DURATION);
-    setCurrentCycle('work');
-    setSessionState('running');
-    setSubTaskStartTime(Date.now());
-    setIsAudioPlaying(true);
-    setPromptForCompletion(false);
-  }, [WORK_DURATION, setIsAudioPlaying]);
-  
   useEffect(() => {
     if (sessionState === 'idle' && showSubTasks) {
         if (activeSubTask) {
@@ -483,3 +481,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
+
+    
