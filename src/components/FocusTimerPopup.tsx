@@ -39,6 +39,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const BREAK_DURATION = 5 * 60; // 5 minutes
   const WORK_DURATION = 25 * 60; // 25 minutes
+  const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
 
   const [sessionState, setSessionState] = useState<'running' | 'paused' | 'idle'>('running');
   const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
@@ -110,7 +111,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
     willChange: 'transform',
   };
-
+  
   const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
     const durationMins = subTask.estimatedDuration || 25;
     const durationSecs = durationMins * 60;
@@ -149,7 +150,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     onClose();
   }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks]);
-
+  
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask && !showSubTasks) {
         handleStop(true);
@@ -481,5 +482,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
-
-    
