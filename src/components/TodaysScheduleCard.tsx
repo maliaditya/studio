@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -412,7 +412,7 @@ export function TodaysScheduleCard({
   if (!isAgendaDocked) {
     return (
       <div
-        className="fixed z-50 w-full max-w-xs"
+        className="fixed z-50 w-full max-w-sm"
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
