@@ -128,7 +128,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onDelete={() => handleDeletePoint(point.id)}
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
                                 onOpenContentView={(e) => handleOpenContentView(point, e)}
-                                onConvertToCard={() => createResourceWithHierarchy(resource, 'card')}
+                                onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
                             />
                         ))}
                     </ul>

@@ -171,7 +171,7 @@ interface AuthContextType {
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
-  createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, type: Resource['type']) => ExerciseDefinition | Resource | undefined;
+  createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type']) => ExerciseDefinition | Resource | undefined;
 
   
   // Resource Popups (Original system, kept for resources page)
@@ -188,7 +188,7 @@ interface AuthContextType {
   
   // General Popups (New System)
   generalPopups: Map<string, PopupState>;
-  openGeneralPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
+  openGeneralPopup: (resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeGeneralPopup: (resourceId: string) => void;
   handleUpdateResource: (resource: Resource) => void;
 
@@ -707,7 +707,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     }
     const estDuration = activityDurations[activity.id];
-    let minutes = estDuration ? parseInt(estDuration.replace('h', '*60+').replace('m', ''), 10) : 45;
+    let minutes = estDuration ? parseInt(estDuration.replace(/[a-zA-Z\s]/g, '')) || 0 : 45;
     if (isNaN(minutes) || minutes <= 0) minutes = 45;
 
     setFocusDuration(minutes);
@@ -1453,7 +1453,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let logSource: DatedWorkout[];
 
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const SLOW_CAPACITY_MINUTES = 240;
+    const SLOT_CAPACITY_MINUTES = 240;
 
     const currentSlotActivities = schedule[todayKey]?.[slotName] || [];
     const currentSlotDuration = (Array.isArray(currentSlotActivities) ? currentSlotActivities : [])
@@ -1469,7 +1469,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return sum + activityDuration;
         }, 0);
     
-    if (currentSlotDuration + duration > SLOW_CAPACITY_MINUTES) {
+    if (currentSlotDuration + duration > SLOT_CAPACITY_MINUTES) {
         toast({
             title: "Slot Full",
             description: `Cannot add task. This would exceed the 4-hour limit for the '${slotName}' slot.`,
@@ -1700,12 +1700,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
       const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
-      workoutLog = { id: dateKey, date: dateKey, exercises };
-      setAllWorkoutLogs(prev => [...prev, workoutLog!]);
-      // We need to use a timeout to let state update before we proceed, or pass the updater function
-      // A better way is to make sure the log is created before this function is called, but this is a failsafe
-      setTimeout(() => swapWorkoutExercise(date, oldExerciseId, newExerciseDefinition), 50);
-      return;
+      const newLog = { id: dateKey, date: dateKey, exercises };
+      setAllWorkoutLogs(prev => [...prev, newLog]);
+      workoutLog = newLog;
     }
   
     const exerciseIndex = workoutLog.exercises.findIndex(ex => ex.id === oldExerciseId);
@@ -2230,11 +2227,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setRecentItems]);
 
-  const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, type: Resource['type']): ExerciseDefinition | Resource | undefined => {
+  const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
     let path: string[];
     let parentName: string;
+    let newResourceName = type === 'card' ? 'New Resource Card' : 'New Resource Link';
 
-    if ('category' in parent) { // It's an ExerciseDefinition
+    if (pointToConvert) {
+      newResourceName = pointToConvert.text;
+    }
+
+    if ('category' in parent) {
         const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
         if (!microSkill) {
           toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
@@ -2247,9 +2249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const domain = skillDomains.find(d => d.id === coreSkill.domainId);
         if (!domain) return undefined;
         path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
-        parentName = parent.name;
-    } else { // It's a Resource
-        parentName = parent.name;
+    } else {
         const folderPath: string[] = [];
         let currentFolderId: string | null = parent.folderId;
         while(currentFolderId) {
@@ -2284,7 +2284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     const newResource: Resource = {
       id: `res_card_${Date.now()}`,
-      name: 'New Resource Card',
+      name: newResourceName,
       folderId: parentFolderId!,
       type: type,
       createdAt: new Date().toISOString(),
@@ -2293,32 +2293,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setResources(prev => [...prev, newResource]);
   
-    // Logic to update the parent (ExerciseDefinition or Resource) with the new resource link
     let updatedParent: ExerciseDefinition | Resource | undefined;
-    if ('category' in parent) {
-      const parentIsUpskill = upskillDefinitions.some(d => d.id === parent.id);
-      const setParentDefinitions = parentIsUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
-      setParentDefinitions(prev => {
-        const newDefs = prev.map(def => {
-          if (def.id === parent.id) {
-            updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
-            return updatedParent;
-          } 
-          return def;
-        });
-        return newDefs;
-      });
-    } else {
-      setResources(prev => {
-        const newDefs = prev.map(def => {
-          if (def.id === parent.id) {
-            updatedParent = { ...def, points: [...(def.points || []), { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }] };
-            return updatedParent as Resource;
-          }
-          return def;
-        });
-        return newDefs;
-      });
+    const parentIsUpskill = upskillDefinitions.some(d => d.id === parent.id);
+    const parentIsDeepWork = deepWorkDefinitions.some(d => d.id === parent.id);
+  
+    const updateParentDefs = (definitions: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
+        setter(prev => prev.map(def => {
+            if (def.id === parent.id) {
+                updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
+                return updatedParent;
+            } 
+            return def;
+        }));
+    };
+
+    const updateResourceParent = (pointIdToReplace: string) => {
+        setResources(prev => prev.map(def => {
+            if (def.id === parent.id) {
+                const newPoint: ResourcePoint = { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id };
+                const updatedPoints = (def.points || []).map(p => p.id === pointIdToReplace ? newPoint : p);
+                updatedParent = { ...def, points: updatedPoints };
+                return updatedParent as Resource;
+            }
+            return def;
+        }));
+    };
+  
+    if (parentIsUpskill) {
+        updateParentDefs(upskillDefinitions, setUpskillDefinitions);
+    } else if (parentIsDeepWork) {
+        updateParentDefs(deepWorkDefinitions, setDeepWorkDefinitions);
+    } else { // Parent is a Resource
+        if (pointToConvert) {
+            updateResourceParent(pointToConvert.id);
+        } else {
+             setResources(prev => prev.map(def => {
+              if (def.id === parent.id) {
+                updatedParent = { ...def, points: [...(def.points || []), { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }] };
+                return updatedParent as Resource;
+              }
+              return def;
+            }));
+        }
     }
   
     toast({ title: 'Resource Created', description: `A new resource card has been created and linked.` });
@@ -2586,6 +2602,7 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
 
 
 
