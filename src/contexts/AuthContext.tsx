@@ -747,6 +747,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (taskDef) {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
         const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+        // Only mark as complete, don't log time for parent nodes.
         if (isParentNode) {
             updateActivityInSchedule({ completed: true });
             return;
@@ -1418,7 +1419,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activityIndex = activities.findIndex(act => act.id === activityId);
 
         if (activityIndex > -1) {
-            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            const activity = activities[activityIndex];
+            let finalDuration = activity.duration;
+
+            if (isCompleted) {
+                const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+                const mainDef = activity.taskIds?.[0] ? allDefs.find(d => activity.taskIds![0].startsWith(d.id)) : undefined;
+
+                if (mainDef) {
+                    const allLeafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
+                    const loggedIds = new Set([
+                        ...allDeepWorkLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId)),
+                        ...allUpskillLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId))
+                    ]);
+                    
+                    const allChildrenLogged = allLeafNodes.every(node => loggedIds.has(node.id));
+
+                    if (allChildrenLogged) {
+                        let totalLoggedMinutes = 0;
+                        const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
+                        const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
+                        
+                        allLeafNodes.forEach(node => {
+                            logs.forEach(log => {
+                                log.exercises.forEach(ex => {
+                                    if (ex.definitionId === node.id) {
+                                        totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set[durationField as 'reps'|'weight'] || 0), 0);
+                                    }
+                                });
+                            });
+                        });
+                        finalDuration = totalLoggedMinutes;
+                    }
+                }
+            }
+
+            activities[activityIndex] = { ...activity, completed: isCompleted, duration: finalDuration };
             daySchedule[slotName] = activities;
             newSchedule[todayKey] = daySchedule;
         }
@@ -2234,9 +2270,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
       let updated = false;
-      for (const dateKey in newSchedule) {
-        const daySchedule = newSchedule[dateKey];
-        if (daySchedule[targetSlot]) {
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      const daySchedule = newSchedule[todayKey];
+      
+      if (daySchedule && daySchedule[targetSlot]) {
           const activities = (daySchedule[targetSlot] as Activity[]).map(act => {
             if (act.id === targetActivityId) {
               updated = true;
@@ -2248,10 +2285,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             return act;
           });
-          newSchedule[dateKey] = { ...daySchedule, [targetSlot]: activities };
-        }
-        if (updated) break;
+          newSchedule[todayKey] = { ...daySchedule, [targetSlot]: activities };
       }
+      
       if(updated) {
         toast({ title: "Meal Swapped!", description: `Updated your agenda with ${MEAL_NAMES[sourceMeal]} from ${sourceDay}.` });
       }
@@ -2669,6 +2705,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

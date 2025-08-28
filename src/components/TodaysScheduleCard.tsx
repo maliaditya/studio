@@ -179,20 +179,20 @@ export function TodaysScheduleCard({
     }
 
     const parseDurationToHours = (activity: Activity): number => {
-        if (activity.completed && activity.duration) {
-            return activity.duration / 60;
-        }
-        const durationStr = activityDurations[activity.id];
-        if (!durationStr || typeof durationStr !== 'string') return 0;
-        
         let totalMinutes = 0;
-        if (/^\d+$/.test(durationStr.trim())) {
-            totalMinutes = parseInt(durationStr.trim(), 10);
+        if (activity.completed && activity.duration) {
+            totalMinutes = activity.duration;
         } else {
-            const hourMatch = durationStr.match(/(\d+)\s*h/);
-            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-            const minMatch = durationStr.match(/(\d+)\s*m/);
-            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+            const durationStr = activityDurations[activity.id];
+            if (!durationStr || typeof durationStr !== 'string') return 0;
+            if (/^\d+$/.test(durationStr.trim())) {
+                totalMinutes = parseInt(durationStr.trim(), 10);
+            } else {
+                const hourMatch = durationStr.match(/(\d+)\s*h/);
+                if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+                const minMatch = durationStr.match(/(\d+)\s*m/);
+                if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+            }
         }
         return totalMinutes / 60;
     };
