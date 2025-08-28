@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -1057,73 +1056,43 @@ function DeepWorkPageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition) => {
+  const getLoggedMinutes = useCallback((taskIds: Set<string>, logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
+    if (!logs) return 0;
+    return logs.reduce((total, log) => {
+        return total + log.exercises.reduce((dayTotal, ex) => {
+            if (taskIds.has(ex.definitionId)) {
+                return dayTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (set[durationField] || 0), 0);
+            }
+            return dayTotal;
+        }, 0);
+    }, 0);
+  }, []);
+
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
-    const visited = new Set<string>();
-    const actionIds = new Set<string>();
+    const nodeType = getDeepWorkNodeType(definition);
 
-    function recurse(nodeId: string) {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-        const node = deepWorkDefinitions.find(d => d.id === nodeId);
-        if (!node) return;
-        
-        const nodeType = getDeepWorkNodeType(node);
-
-        if (nodeType === 'Action' || nodeType === 'Standalone') {
-            actionIds.add(node.id);
-        } else {
-            (node.linkedDeepWorkIds || []).forEach(childId => recurse(childId));
-        }
+    if (nodeType === 'Intention' || nodeType === 'Objective') {
+        const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+        const leafNodeIds = new Set(leafNodes.map(n => n.id));
+        return getLoggedMinutes(leafNodeIds, allDeepWorkLogs, 'weight');
+    } else { // Action or Standalone
+        return getLoggedMinutes(new Set([definition.id]), allDeepWorkLogs, 'weight');
     }
-    recurse(definition.id);
-
-    let totalMinutes = 0;
-    if (allDeepWorkLogs) {
-        allDeepWorkLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if (actionIds.has(ex.definitionId)) {
-                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                }
-            });
-        });
-    }
-    return totalMinutes;
-  }, [allDeepWorkLogs, deepWorkDefinitions, getDeepWorkNodeType]);
+  }, [allDeepWorkLogs, getDeepWorkNodeType, getDescendantLeafNodes, getLoggedMinutes]);
   
-  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition) => {
+  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
-    const visited = new Set<string>();
-    const visualizationIds = new Set<string>();
+    const nodeType = getUpskillNodeType(definition);
 
-    function recurse(nodeId: string) {
-        if (visited.has(nodeId)) return;
-        visited.add(nodeId);
-        const node = upskillDefinitions.find(d => d.id === nodeId);
-        if (!node) return;
-        
-        const nodeType = getUpskillNodeType(node);
-
-        if (nodeType === 'Visualization' || nodeType === 'Standalone') {
-            visualizationIds.add(node.id);
-        } else {
-            (node.linkedUpskillIds || []).forEach(childId => recurse(childId));
-        }
+    if (nodeType === 'Curiosity' || nodeType === 'Objective') {
+        const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+        const leafNodeIds = new Set(leafNodes.map(n => n.id));
+        return getLoggedMinutes(leafNodeIds, allUpskillLogs, 'reps');
+    } else { // Visualization or Standalone
+        return getLoggedMinutes(new Set([definition.id]), allUpskillLogs, 'reps');
     }
-    recurse(definition.id);
-
-    let totalMinutes = 0;
-    if (allUpskillLogs) {
-        allUpskillLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if (visualizationIds.has(ex.definitionId)) {
-                    totalMinutes += ex.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                }
-            });
-        });
-    }
-    return totalMinutes;
-  }, [allUpskillLogs, upskillDefinitions, getUpskillNodeType]);
+  }, [allUpskillLogs, getUpskillNodeType, getDescendantLeafNodes, getLoggedMinutes]);
 
   const totalLoggedTime = useMemo(() => {
     if (!currentTask) return 0;
@@ -2433,3 +2402,6 @@ export default function DeepWorkPage() {
 
 
 
+
+
+    
