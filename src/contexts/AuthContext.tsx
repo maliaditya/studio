@@ -215,6 +215,7 @@ interface AuthContextType {
   openTodaysDietPopup: (event: React.MouseEvent) => void;
   closeTodaysDietPopup: () => void;
   handleTodaysDietPopupDragEnd: (event: DragEndEvent) => void;
+  swapMealInSchedule: (targetSlot: string, targetActivityId: string, sourceDay: string, sourceMeal: 'meal1' | 'meal2' | 'meal3') => void;
 
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
@@ -715,6 +716,116 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(true);
   }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, toast, markObjectiveActivityAsComplete]);
   
+  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+
+    const updateActivityInSchedule = (updatedActivityProps: Partial<Activity>) => {
+        setSchedule(prev => {
+            const newSchedule = { ...prev };
+            for (const dateKey in newSchedule) {
+                if (newSchedule[dateKey]) {
+                    for (const slotName in newSchedule[dateKey]) {
+                        const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                        if (Array.isArray(activities)) {
+                            const activityIndex = activities.findIndex(a => a.id === activity.id);
+                            if (activityIndex > -1) {
+                                const updatedActivities = [...activities];
+                                updatedActivities[activityIndex] = { ...activities[activityIndex], ...updatedActivityProps };
+                                newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
+                                return newSchedule; 
+                            }
+                        }
+                    }
+                }
+            }
+            return newSchedule;
+        });
+    };
+
+    const taskDef = allDefs.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
+    if (taskDef) {
+        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
+        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+        if (isParentNode) {
+            updateActivityInSchedule({ completed: true });
+            return;
+        }
+    }
+
+    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
+    let definition: ExerciseDefinition | undefined;
+    
+    switch (activity.type) {
+        case 'upskill':
+            logsUpdater = setAllUpskillLogs;
+            definition = upskillDefinitions.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
+            break;
+        case 'deepwork':
+            logsUpdater = setAllDeepWorkLogs;
+            definition = deepWorkDefinitions.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
+            break;
+        default:
+            updateActivityInSchedule({ completed: true, duration });
+            toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
+            return;
+    }
+  
+    const exerciseInstanceId = activity.taskIds?.[0];
+    if (!exerciseInstanceId) {
+        updateActivityInSchedule({ completed: true, duration });
+        return;
+    }
+
+    if (!definition) {
+        definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
+    }
+    
+    if (!definition) {
+        updateActivityInSchedule({ completed: true, duration });
+        return;
+    }
+      
+    if (logsUpdater) {
+        logsUpdater(prevLogs => {
+            const newLogs = [...prevLogs];
+            let logForToday = newLogs.find(log => log.date === todayKey);
+            
+            if (!logForToday) {
+                logForToday = { id: todayKey, date: todayKey, exercises: [] };
+                newLogs.push(logForToday);
+            }
+
+            let exerciseInstance = logForToday.exercises.find(ex => ex.id === exerciseInstanceId);
+            if (!exerciseInstance) {
+                exerciseInstance = {
+                    id: exerciseInstanceId,
+                    definitionId: definition!.id,
+                    name: definition!.name,
+                    category: definition!.category,
+                    loggedSets: [],
+                    targetSets: 1,
+                    targetReps: '25'
+                };
+                logForToday.exercises.push(exerciseInstance);
+            }
+            
+            const newSet: LoggedSet = {
+                id: `${Date.now()}-${Math.random()}`,
+                reps: activity.type === 'upskill' ? duration : 1,
+                weight: duration,
+                timestamp: Date.now(),
+            };
+
+            exerciseInstance.loggedSets.push(newSet);
+            return newLogs;
+        });
+    }
+  
+    updateActivityInSchedule({ completed: true, duration });
+    toast({ title: "Progress Logged", description: `Logged ${duration} minutes for "${definition.name}".` });
+  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
+
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -726,8 +837,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
     const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
-    const logSource = isUpskill ? allUpskillLogs : allDeepWorkLogs;
-
+    
     logsUpdater(prevLogs => {
         const newLogs = [...prevLogs];
         let logForToday = newLogs.find(log => log.date === todayKey);
@@ -753,8 +863,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const newSet: LoggedSet = {
             id: `${Date.now()}-${Math.random()}`,
-            reps: isUpskill ? durationMinutes : 1,
-            weight: durationMinutes,
+            reps: isUpskill ? durationMinutes : 1, // Store duration in reps for upskill, just count for deepwork
+            weight: durationMinutes, // Always store duration in weight
             timestamp: Date.now(),
         };
 
@@ -764,7 +874,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
-  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, allUpskillLogs, allDeepWorkLogs, toast]);
+  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
   
   const getAllUserData = useCallback(() => {
     return {
@@ -1316,105 +1426,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newSchedule;
     });
   };
-  
- const handleLogLearning = useCallback((activity: Activity, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    
-    // Find the activity in the schedule to update it directly
-    const updateActivityInSchedule = (updatedActivityProps: Partial<Activity>) => {
-      setSchedule(prev => {
-        const newSchedule = { ...prev };
-        for (const dateKey in newSchedule) {
-          if (newSchedule[dateKey]) {
-            for (const slotName in newSchedule[dateKey]) {
-              const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-              if (Array.isArray(activities)) {
-                const activityIndex = activities.findIndex(a => a.id === activity.id);
-                if (activityIndex > -1) {
-                  const updatedActivities = [...activities];
-                  updatedActivities[activityIndex] = { ...activities[activityIndex], ...updatedActivityProps };
-                  newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
-                  return newSchedule; // Exit after updating
-                }
-              }
-            }
-          }
-        }
-        return newSchedule;
-      });
-    };
 
-    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
-    let allDefs: ExerciseDefinition[] = [];
-    
-    switch (activity.type) {
-      case 'upskill':
-        logsUpdater = setAllUpskillLogs;
-        allDefs = upskillDefinitions;
-        break;
-      case 'deepwork':
-        logsUpdater = setAllDeepWorkLogs;
-        allDefs = deepWorkDefinitions;
-        break;
-      default:
-        // For simple activities, just mark as complete and set duration
-        updateActivityInSchedule({ completed: true, duration });
-        toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
-        return;
-    }
-  
-    const exerciseInstanceId = activity.taskIds?.[0];
-    if (!exerciseInstanceId) {
-      updateActivityInSchedule({ completed: true, duration });
-      return;
-    }
-  
-    const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
-    if (!definition) {
-      updateActivityInSchedule({ completed: true, duration });
-      return;
-    }
-      
-    if (logsUpdater) {
-      logsUpdater(prevLogs => {
-          const newLogs = [...prevLogs];
-          let logForToday = newLogs.find(log => log.date === todayKey);
-          
-          if (!logForToday) {
-              logForToday = { id: todayKey, date: todayKey, exercises: [] };
-              newLogs.push(logForToday);
-          }
-
-          let exerciseInstance = logForToday.exercises.find(ex => ex.id === exerciseInstanceId);
-          if (!exerciseInstance) {
-              exerciseInstance = {
-                  id: exerciseInstanceId,
-                  definitionId: definition!.id,
-                  name: definition!.name,
-                  category: definition!.category,
-                  loggedSets: [],
-                  targetSets: 1,
-                  targetReps: '25'
-              };
-              logForToday.exercises.push(exerciseInstance);
-          }
-          
-          const newSet: LoggedSet = {
-              id: `${Date.now()}-${Math.random()}`,
-              reps: activity.type === 'upskill' ? duration : 1,
-              weight: duration,
-              timestamp: Date.now(),
-          };
-
-          exerciseInstance.loggedSets.push(newSet);
-          return newLogs;
-      });
-    }
-  
-    updateActivityInSchedule({ completed: true, duration });
-    toast({ title: "Progress Logged", description: `Logged ${duration} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions]);
-  
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
@@ -1763,25 +1775,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const oldResource = prev.find(r => r.id === updatedResource.id);
         const nameHasChanged = oldResource && oldResource.name !== updatedResource.name;
     
-        // If name hasn't changed, just do a simple update
-        if (!nameHasChanged) {
-            return prev.map(res => res.id === updatedResource.id ? updatedResource : res);
-        }
-    
-        // If name has changed, update this resource AND any links pointing to it
         return prev.map(res => {
-            let resToReturn = res;
-            
-            // 1. Update the resource itself
+            // Update the resource itself
             if (res.id === updatedResource.id) {
-                resToReturn = updatedResource;
+                res = updatedResource;
             }
     
-            // 2. Update links in other resources
-            if (resToReturn.points) {
-                resToReturn = {
-                    ...resToReturn,
-                    points: resToReturn.points.map(p => {
+            // Update any links pointing to it if the name changed
+            if (nameHasChanged && res.points) {
+                res = {
+                    ...res,
+                    points: res.points.map(p => {
                         if (p.type === 'card' && p.resourceId === updatedResource.id) {
                             return { ...p, text: updatedResource.name };
                         }
@@ -1790,7 +1794,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 };
             }
     
-            return resToReturn;
+            return res;
         });
     });
   };
@@ -2215,6 +2219,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const swapMealInSchedule = (targetSlot: string, targetActivityId: string, sourceDay: string, sourceMeal: 'meal1' | 'meal2' | 'meal3') => {
+    const dayPlan = dietPlan.find(p => p.day === sourceDay);
+    if (!dayPlan) return;
+  
+    const mealItems = dayPlan[sourceMeal];
+    if (!Array.isArray(mealItems) || mealItems.length === 0) {
+      toast({ title: "No Meal Data", description: "The selected meal is empty in your diet plan." });
+      return;
+    }
+  
+    const mealDetails = mealItems.map(item => `${item.quantity} ${item.content}`).join(', ');
+  
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let updated = false;
+      for (const dateKey in newSchedule) {
+        const daySchedule = newSchedule[dateKey];
+        if (daySchedule[targetSlot]) {
+          const activities = (daySchedule[targetSlot] as Activity[]).map(act => {
+            if (act.id === targetActivityId) {
+              updated = true;
+              return {
+                ...act,
+                details: mealDetails,
+                taskIds: [sourceMeal] // Store which meal it is
+              };
+            }
+            return act;
+          });
+          newSchedule[dateKey] = { ...daySchedule, [targetSlot]: activities };
+        }
+        if (updated) break;
+      }
+      if(updated) {
+        toast({ title: "Meal Swapped!", description: `Updated your agenda with ${MEAL_NAMES[sourceMeal]} from ${sourceDay}.` });
+      }
+      return newSchedule;
+    });
+  };
 
   const createHabitFromThought = (thought: PistonEntry, habitName: string, folderId: string) => {
     const newHabit: Resource = {
@@ -2320,45 +2363,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResources(prev => [...prev, newResource]);
   
     let updatedParent: ExerciseDefinition | Resource | undefined;
-    const parentIsUpskill = upskillDefinitions.some(d => d.id === parent.id);
-    const parentIsDeepWork = deepWorkDefinitions.some(d => d.id === parent.id);
-  
-    if (parentIsUpskill) {
-        setUpskillDefinitions(prev => prev.map(def => {
-            if (def.id === parent.id) {
-                updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
-                return updatedParent;
-            } 
-            return def;
-        }));
-    } else if (parentIsDeepWork) {
-        setDeepWorkDefinitions(prev => prev.map(def => {
-            if (def.id === parent.id) {
-                updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
-                return updatedParent;
-            } 
-            return def;
-        }));
-    } else { // Parent is a Resource
-        if (pointToConvert) {
-             setResources(prev => prev.map(def => {
-                if (def.id === parent.id) {
-                    const newPoint: ResourcePoint = { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id };
-                    const updatedPoints = (def.points || []).map(p => p.id === pointToConvert.id ? newPoint : p);
-                    updatedParent = { ...def, points: updatedPoints };
-                    return updatedParent as Resource;
-                }
-                return def;
-            }));
-        } else {
-             setResources(prev => prev.map(def => {
-              if (def.id === parent.id) {
-                updatedParent = { ...def, points: [...(def.points || []), { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }] };
-                return updatedParent as Resource;
-              }
-              return def;
-            }));
+    
+    const updateParentDefinitions = (
+      setDefs: React.Dispatch<React.SetStateAction<any[]>>,
+      isPointConversion: boolean
+    ) => {
+      setDefs(prev => prev.map(def => {
+        if (def.id === parent.id) {
+          let updatedPoints = def.points || [];
+          if (isPointConversion) {
+            updatedPoints = updatedPoints.map((p: any) =>
+              p.id === pointToConvert!.id
+                ? { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }
+                : p
+            );
+          } else {
+            updatedPoints.push({ id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id });
+          }
+          updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id], points: updatedPoints };
+          return updatedParent;
         }
+        return def;
+      }));
+    };
+
+    if ('category' in parent) {
+      if (upskillDefinitions.some(d => d.id === parent.id)) {
+        updateParentDefinitions(setUpskillDefinitions, false); // can't convert points from task cards
+      } else if (deepWorkDefinitions.some(d => d.id === parent.id)) {
+        updateParentDefinitions(setDeepWorkDefinitions, false);
+      }
+    } else {
+        updateParentDefinitions(setResources, !!pointToConvert);
     }
   
     toast({ title: 'Resource Created', description: `A new resource card has been created and linked.` });
@@ -2507,7 +2543,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     contentViewPopups, openContentViewPopup, closeContentViewPopup, handleContentViewPopupDragEnd,
-    todaysDietPopup, openTodaysDietPopup, closeTodaysDietPopup, handleTodaysDietPopupDragEnd,
+    todaysDietPopup, openTodaysDietPopup, closeTodaysDietPopup, handleTodaysDietPopupDragEnd, swapMealInSchedule,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
@@ -2573,6 +2609,13 @@ const usePrevious = <T,>(value: T) => {
   });
   return ref.current;
 };
+
+const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = {
+  meal1: "Meal 1",
+  meal2: "Meal 2",
+  meal3: "Meal 3",
+  supplements: "Snacks & Supplements",
+}
     
 
     
@@ -2626,6 +2669,8 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
+
 
 
 
