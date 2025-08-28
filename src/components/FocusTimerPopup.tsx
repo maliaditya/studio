@@ -164,9 +164,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const completionTime = Date.now();
     const durationMs = subTaskStartTime ? completionTime - subTaskStartTime : 0;
     const durationMinutes = Math.floor(durationMs / 60000);
-
+    
     if (durationMinutes > 0) {
         logSubTaskTime(activeSubTask.id, durationMinutes);
+    } else {
+        // If duration is 0, it means it was completed instantly. Log at least 1 minute.
+        logSubTaskTime(activeSubTask.id, 1);
     }
     
     const newCompletedSet = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
@@ -180,7 +183,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         handleStop(true);
     }
   }, [activeSubTask, subTaskStartTime, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
-
+  
 
   useEffect(() => {
     if (sessionState === 'idle' && showSubTasks) {
