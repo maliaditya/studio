@@ -360,9 +360,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         <Button size="sm" onClick={handleExtendTimer}>Extend</Button>
                     </div>
                   ) : (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
-                        {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    </Button>
+                    <div className="flex items-center">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
+                          {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={() => handleStop(true)}>
+                          <Check className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
