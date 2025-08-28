@@ -982,7 +982,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const today = new Date();
     const todayDateKey = format(today, 'yyyy-MM-dd');
-    const yesterday = addDays(today, -1);
+    const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
 
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
@@ -1759,9 +1759,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleUpdateResource = (updatedResource: Resource) => {
-    setResources(prev =>
-      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
-    );
+    setResources(prev => {
+        const oldResource = prev.find(r => r.id === updatedResource.id);
+        const nameHasChanged = oldResource && oldResource.name !== updatedResource.name;
+    
+        // If name hasn't changed, just do a simple update
+        if (!nameHasChanged) {
+            return prev.map(res => res.id === updatedResource.id ? updatedResource : res);
+        }
+    
+        // If name has changed, update this resource AND any links pointing to it
+        return prev.map(res => {
+            let resToReturn = res;
+            
+            // 1. Update the resource itself
+            if (res.id === updatedResource.id) {
+                resToReturn = updatedResource;
+            }
+    
+            // 2. Update links in other resources
+            if (resToReturn.points) {
+                resToReturn = {
+                    ...resToReturn,
+                    points: resToReturn.points.map(p => {
+                        if (p.type === 'card' && p.resourceId === updatedResource.id) {
+                            return { ...p, text: updatedResource.name };
+                        }
+                        return p;
+                    })
+                };
+            }
+    
+            return resToReturn;
+        });
+    });
   };
   
   const handleClosePopup = useCallback((resourceId: string) => {
@@ -2203,7 +2234,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         let found = false;
         for (const dateKey in newSchedule) {
             for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[];
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
                 if (Array.isArray(activities)) {
                     const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
                     if (activityIndex > -1) {
@@ -2229,18 +2260,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
     let path: string[];
-    let parentName: string;
-    let newResourceName = type === 'card' ? 'New Resource Card' : 'New Resource Link';
-
-    if (pointToConvert) {
-      newResourceName = pointToConvert.text;
-    }
-
-    if ('category' in parent) {
+    let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
+    
+    if ('category' in parent) { // Parent is an ExerciseDefinition
         const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
         if (!microSkill) {
-          toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
-          return undefined;
+            toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
+            return undefined;
         }
         const microSkillInfo = microSkill[1];
         const { coreSkillName, skillAreaName } = microSkillInfo;
@@ -2249,7 +2275,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const domain = skillDomains.find(d => d.id === coreSkill.domainId);
         if (!domain) return undefined;
         path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
-    } else {
+    } else { // Parent is a Resource
         const folderPath: string[] = [];
         let currentFolderId: string | null = parent.folderId;
         while(currentFolderId) {
@@ -2297,35 +2323,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const parentIsUpskill = upskillDefinitions.some(d => d.id === parent.id);
     const parentIsDeepWork = deepWorkDefinitions.some(d => d.id === parent.id);
   
-    const updateParentDefs = (definitions: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
-        setter(prev => prev.map(def => {
+    if (parentIsUpskill) {
+        setUpskillDefinitions(prev => prev.map(def => {
             if (def.id === parent.id) {
                 updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
                 return updatedParent;
             } 
             return def;
         }));
-    };
-
-    const updateResourceParent = (pointIdToReplace: string) => {
-        setResources(prev => prev.map(def => {
+    } else if (parentIsDeepWork) {
+        setDeepWorkDefinitions(prev => prev.map(def => {
             if (def.id === parent.id) {
-                const newPoint: ResourcePoint = { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id };
-                const updatedPoints = (def.points || []).map(p => p.id === pointIdToReplace ? newPoint : p);
-                updatedParent = { ...def, points: updatedPoints };
-                return updatedParent as Resource;
-            }
+                updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id] };
+                return updatedParent;
+            } 
             return def;
         }));
-    };
-  
-    if (parentIsUpskill) {
-        updateParentDefs(upskillDefinitions, setUpskillDefinitions);
-    } else if (parentIsDeepWork) {
-        updateParentDefs(deepWorkDefinitions, setDeepWorkDefinitions);
     } else { // Parent is a Resource
         if (pointToConvert) {
-            updateResourceParent(pointToConvert.id);
+             setResources(prev => prev.map(def => {
+                if (def.id === parent.id) {
+                    const newPoint: ResourcePoint = { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id };
+                    const updatedPoints = (def.points || []).map(p => p.id === pointToConvert.id ? newPoint : p);
+                    updatedParent = { ...def, points: updatedPoints };
+                    return updatedParent as Resource;
+                }
+                return def;
+            }));
         } else {
              setResources(prev => prev.map(def => {
               if (def.id === parent.id) {
@@ -2602,6 +2626,7 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
 
 
 
