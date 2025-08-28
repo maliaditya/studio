@@ -124,12 +124,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
       if (completed) {
         if (showSubTasks && activeSubTask) {
-          const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
-          const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-          if (elapsedMinutes > 0) {
-            logSubTaskTime(activeSubTask.id, elapsedMinutes);
-          }
-          setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
+            const elapsedSeconds = totalSeconds - secondsLeft;
+            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+            if (elapsedMinutes > 0) {
+                logSubTaskTime(activeSubTask.id, elapsedMinutes);
+            }
+            setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
         } else {
             const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
             const elapsedMinutes = Math.floor(elapsedSeconds / 60);
@@ -139,7 +139,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, activeSubTask, logSubTaskTime]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, activeSubTask, logSubTaskTime, totalSeconds, secondsLeft]);
 
 
   const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
@@ -163,7 +163,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
     setPromptForCompletion(false);
     
-    const durationMinutes = Math.floor(totalSeconds / 60);
+    const elapsedSeconds = totalSeconds - secondsLeft;
+    const durationMinutes = Math.floor(elapsedSeconds / 60);
     if (durationMinutes > 0) {
         logSubTaskTime(activeSubTask.id, durationMinutes);
     }
@@ -180,7 +181,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         // All sub-tasks for this objective are now complete
         handleStop(true);
     }
-  }, [activeSubTask, totalSeconds, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
+  }, [activeSubTask, totalSeconds, secondsLeft, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
 
   useEffect(() => {
     if (sessionState === 'idle' && showSubTasks) {
@@ -387,7 +388,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                           {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={() => handleStop(true)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={() => showSubTasks ? handleSubTaskComplete() : handleStop(true)}>
                           <Check className="h-4 w-4" />
                       </Button>
                     </div>
