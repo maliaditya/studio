@@ -97,7 +97,7 @@ interface AuthContextType {
   handleLogLearning: (activity: Activity, duration: number) => void;
   logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
-  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string) => void;
+  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => void;
   updateActivity: (updatedActivity: Activity) => void;
 
   // Focus Timer
@@ -1447,11 +1447,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string) => {
+  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => {
     let definition: ExerciseDefinition | undefined;
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
     let logSource: DatedWorkout[];
 
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const SLOW_CAPACITY_MINUTES = 240;
+
+    const currentSlotActivities = schedule[todayKey]?.[slotName] || [];
+    const currentSlotDuration = (Array.isArray(currentSlotActivities) ? currentSlotActivities : [])
+        .filter(act => !act.completed)
+        .reduce((sum, act) => {
+            let activityDuration = 0;
+            if (act.type === 'essentials' || act.type === 'interrupt') {
+                activityDuration = act.duration || 0;
+            } else {
+                const estDurationStr = activityDurations[act.id];
+                activityDuration = estDurationStr ? parseInt(estDurationStr.replace(/[a-zA-Z\s]/g, '')) || 0 : 0;
+            }
+            return sum + activityDuration;
+        }, 0);
+    
+    if (currentSlotDuration + duration > SLOW_CAPACITY_MINUTES) {
+        toast({
+            title: "Slot Full",
+            description: `Cannot add task. This would exceed the 4-hour limit for the '${slotName}' slot.`,
+            variant: "destructive"
+        });
+        return;
+    }
+    
     switch (activityType) {
         case 'upskill':
             definition = upskillDefinitions.find(d => d.id === definitionId);
@@ -1478,7 +1504,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
     let todaysLog = logSource.find(log => log.date === todayKey);
     let exerciseInstance: WorkoutExercise | undefined;
 
@@ -1524,12 +1549,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newSchedule = { ...prev };
         const daySchedule = { ...(newSchedule[todayKey] || {}) };
         const activitiesInSlot = Array.isArray(daySchedule[slotName]) ? daySchedule[slotName] as Activity[] : [];
-
-        if (activitiesInSlot.length >= 2) {
-            toast({ title: "Slot Full", description: "Cannot add more than two activities per slot.", variant: "destructive" });
-            return prev;
-        }
-
         daySchedule[slotName] = [...activitiesInSlot, newActivity as Activity];
         newSchedule[todayKey] = daySchedule;
         return newSchedule;
@@ -2567,6 +2586,7 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
 
 
 

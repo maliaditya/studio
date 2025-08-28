@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -1273,7 +1274,8 @@ function DeepWorkPageContent() {
   };
 
   const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
-    scheduleTaskFromMindMap(definition.id, definition.category === "Content Bundle" ? 'branding' : (deepWorkDefinitions.some(d => d.id === definition.id) ? 'deepwork' : 'upskill'), slot);
+    const estimatedDuration = calculateTotalEstimate(definition);
+    scheduleTaskFromMindMap(definition.id, definition.category === "Content Bundle" ? 'branding' : (deepWorkDefinitions.some(d => d.id === definition.id) ? 'deepwork' : 'upskill'), slot, estimatedDuration);
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
@@ -2045,7 +2047,7 @@ function DeepWorkPageContent() {
                                             isComplete={isComplete}
                                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                             calculatedEstimate={calculateTotalEstimate(def)}
-                                            handleAddTaskToSession={scheduleTaskFromMindMap} 
+                                            handleAddTaskToSession={scheduleTaskFromMindMap}
                                             handleCardClick={handleCardClick}
                                             handleDeleteSubtopic={handleDeleteFocusArea}
                                             handleUnlinkItem={handleUnlinkItem}
@@ -2383,7 +2385,7 @@ function DeepWorkPageContent() {
                             isComplete={permanentlyLoggedTaskIds.has(activeDragItem.id)}
                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                             calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
-                            handleAddTaskToSession={scheduleTaskFromMindMap} 
+                            handleAddTaskToSession={scheduleTaskFromMindMap}
                             handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
                             handleUnlinkItem={handleUnlinkItem}
@@ -2423,6 +2425,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
