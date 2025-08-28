@@ -1279,7 +1279,7 @@ function ResourcesPageContent() {
     const parentResource = resources.find(r => r.points?.some(p => p.id === pointToConvert.id));
     if (!parentResource) return;
 
-    createResourceWithHierarchy(parentResource, 'card');
+    createResourceWithHierarchy(parentResource, pointToConvert, 'card');
   };
 
   const handleModelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1827,6 +1827,20 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         e.target.style.height = `${e.target.scrollHeight}px`;
     }
     
+     if (point.type === 'card' && point.resourceId) {
+        return (
+            <li className="flex items-start gap-3 group/item">
+                <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
+                <button onClick={onOpenNestedPopup} className="text-left font-medium text-primary hover:underline flex-grow">
+                    {point.text}
+                </button>
+                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
+                    <Trash2 className="h-3 w-3"/>
+                </Button>
+            </li>
+        )
+    }
+
     return (
         <li className="flex items-start gap-3 group/item w-full">
             <div className="pt-0.5" {...dragHandle?.attributes} {...dragHandle?.listeners}>
@@ -1867,7 +1881,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                         </span>
                     </div>
                 ) : (
-                    <p className="whitespace-pre-wrap text-muted-foreground">{point.text}</p>
+                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
             </div>
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
@@ -1890,6 +1904,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
