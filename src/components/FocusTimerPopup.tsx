@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -52,6 +52,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const [editingDurationTaskId, setEditingDurationTaskId] = useState<string | null>(null);
   const [subTaskDurationInput, setSubTaskDurationInput] = useState('');
+  
+  const [isSubTasksVisible, setIsSubTasksVisible] = useState(true);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -281,8 +283,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
-        <Card ref={popupRef} className={cn("shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm", showSubTasks ? "w-[600px]" : "w-[300px]")}>
-            <CardContent className={cn("p-4 grid gap-4", showSubTasks ? "grid-cols-2" : "grid-cols-1")}>
+        <Card ref={popupRef} className={cn(
+            "shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm transition-[width]",
+            showSubTasks && isSubTasksVisible ? "w-[600px]" : "w-[300px]"
+        )}>
+            <CardContent className={cn(
+                "p-4 grid gap-4",
+                showSubTasks && isSubTasksVisible ? "grid-cols-2" : "grid-cols-1"
+            )}>
             <div className="col-span-1 space-y-2">
               <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
@@ -290,6 +298,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   <p className="text-sm font-medium">Focus period...</p>
                   </div>
                   <div className="flex items-center">
+                    {showSubTasks && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsSubTasksVisible(v => !v)}>
+                            <Menu className="h-4 w-4" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleStop(false)}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -381,7 +394,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               )}
             </div>
             
-            {showSubTasks && (
+            {showSubTasks && isSubTasksVisible && (
             <div className="col-span-1 border-l pl-4">
               <h4 className="text-sm font-semibold mb-2">Pending Sub-tasks</h4>
               <ScrollArea className="h-48 mb-2">
