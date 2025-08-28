@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -278,6 +279,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
   };
 
+  const getLoggedMinutesForTask = useCallback((taskId: string) => {
+    let totalMinutes = 0;
+    const isUpskill = upskillDefinitions.some(def => def.id === taskId);
+    const logs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
+    const durationField = isUpskill ? 'reps' : 'weight';
+
+    (logs || []).forEach(log => {
+      (log.exercises || []).forEach(ex => {
+        if (ex.definitionId === taskId) {
+          totalMinutes += ex.loggedSets.reduce((sum, set) => sum + (set[durationField as 'reps'|'weight'] || 0), 0);
+        }
+      });
+    });
+    return totalMinutes;
+  }, [allDeepWorkLogs, allUpskillLogs, upskillDefinitions]);
+
   const elapsedSeconds = totalSeconds - secondsLeft;
   
   const minutes = Math.floor(secondsLeft / 60);
@@ -388,7 +405,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                           {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={() => showSubTasks ? handleSubTaskComplete() : handleStop(true)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={() => handleSubTaskComplete()}>
                           <Check className="h-4 w-4" />
                       </Button>
                     </div>
@@ -453,7 +470,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{permanentlyLoggedTaskIds.has(task.id) ? `${(deepWorkDefinitions.find(d => d.id === task.id)?.estimatedDuration || 0)}m logged` : 'Just completed'}</span>
+                            <span className="text-xs text-muted-foreground">{getLoggedMinutesForTask(task.id)}m logged</span>
                        </div>
                     ))}
                     {completedSubTaskComponents.length === 0 && (
