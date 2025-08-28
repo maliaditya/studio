@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -100,34 +101,6 @@ export function TodaysWorkoutModal({
     }
   };
 
-  const ensureWorkoutLogExists = (date: Date): DatedWorkout => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    let workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
-  
-    if (!workoutLog) {
-      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
-      workoutLog = { id: dateKey, date: dateKey, exercises };
-      
-      setAllWorkoutLogs(prev => {
-        // Prevent adding duplicate logs
-        if (prev.some(log => log.id === dateKey)) {
-          return prev;
-        }
-        return [...prev, workoutLog!];
-      });
-    }
-    return workoutLog;
-  };
-
-  const handleSwapExerciseWrapper = (oldExerciseId: string, newDef: ExerciseDefinition) => {
-    ensureWorkoutLogExists(dateForWorkout);
-    // Allow state to update before calling the swap function
-    setTimeout(() => {
-      swapWorkoutExercise(dateForWorkout, oldExerciseId, newDef);
-    }, 0);
-  };
-
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
@@ -157,7 +130,7 @@ export function TodaysWorkoutModal({
                           onDeleteSet={(...args) => deleteWorkoutSet(dateForWorkout, ...args)} 
                           onUpdateSet={(...args) => updateWorkoutSet(dateForWorkout, ...args)} 
                           onRemoveExercise={(...args) => removeExerciseFromWorkout(dateForWorkout, ...args)}
-                          onSwapExercise={(newDef) => handleSwapExerciseWrapper(exercise.id, newDef)}
+                          onSwapExercise={(newDef) => swapWorkoutExercise(dateForWorkout, exercise.id, newDef)}
                           swappableExercises={swappableExercises}
                       />
                     )
@@ -188,3 +161,4 @@ export function TodaysWorkoutModal({
     </Dialog>
   );
 }
+

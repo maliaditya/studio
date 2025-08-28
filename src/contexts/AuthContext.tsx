@@ -1010,6 +1010,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const activitiesToCarry = incompleteActivities.filter(activity => {
           if(activity.completed) return false;
+          if(activity.isRoutine) return true; // Always carry over routine tasks
           if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
           if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
           return currentSettings.carryForward;
@@ -1018,21 +1019,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (activitiesToCarry.length > 0) {
         newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
             activitiesToCarry.map(activity => {
-                let newDetails = '';
+                let newDetails = activity.details;
 
-                switch (activity.type) {
-                  case 'workout': {
-                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                    newDetails = description.split(' for ')[1] || "Workout";
-                    break;
-                  }
-                  case 'upskill': newDetails = 'Learning Session'; break;
-                  case 'deepwork': newDetails = 'Deep Work Session'; break;
-                  case 'planning': newDetails = 'Planning Session'; break;
-                  case 'tracking': newDetails = 'Tracking Session'; break;
-                  case 'branding': newDetails = 'Branding Session'; break;
-                  case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-                  default: newDetails = activity.details;
+                if (!activity.isRoutine) { // Only update details for non-routine tasks
+                    switch (activity.type) {
+                      case 'workout': {
+                        const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                        newDetails = description.split(' for ')[1] || "Workout";
+                        break;
+                      }
+                      case 'upskill': newDetails = 'Learning Session'; break;
+                      case 'deepwork': newDetails = 'Deep Work Session'; break;
+                      case 'planning': newDetails = 'Planning Session'; break;
+                      case 'tracking': newDetails = 'Tracking Session'; break;
+                      case 'branding': newDetails = 'Branding Session'; break;
+                      case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                    }
                 }
 
                 return {
@@ -1040,7 +1042,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   id: `${activity.type}-${Date.now()}-${Math.random()}`,
                   completed: false,
                   details: newDetails,
-                  taskIds: [],
+                  taskIds: activity.isRoutine ? activity.taskIds : [], // Reset taskIds for non-routine
                 };
             })
         );
@@ -1674,21 +1676,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const swapWorkoutExercise = (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => {
     const dateKey = format(date, 'yyyy-MM-dd');
-    const workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
-
+    let workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
+  
+    // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
-      toast({ title: "Error", description: "Could not find workout log for the selected date.", variant: "destructive" });
+      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+      workoutLog = { id: dateKey, date: dateKey, exercises };
+      setAllWorkoutLogs(prev => [...prev, workoutLog!]);
+      // We need to use a timeout to let state update before we proceed, or pass the updater function
+      // A better way is to make sure the log is created before this function is called, but this is a failsafe
+      setTimeout(() => swapWorkoutExercise(date, oldExerciseId, newExerciseDefinition), 50);
       return;
     }
-
+  
     const exerciseIndex = workoutLog.exercises.findIndex(ex => ex.id === oldExerciseId);
     if (exerciseIndex === -1) {
       toast({ title: "Error", description: "Could not find the exercise to replace.", variant: "destructive" });
       return;
     }
-
+  
     const oldExerciseName = workoutLog.exercises[exerciseIndex].name;
-
+  
     const newWorkoutExercise: WorkoutExercise = {
       id: `${newExerciseDefinition.id}-${Date.now()}_${Math.random()}`,
       definitionId: newExerciseDefinition.id,
@@ -1698,14 +1706,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       targetSets: 3,
       targetReps: "8-12",
     };
-
+  
     const updatedExercises = [...workoutLog.exercises];
     updatedExercises[exerciseIndex] = newWorkoutExercise;
-
+  
     const updatedWorkout = { ...workoutLog, exercises: updatedExercises };
-
+  
     setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? updatedWorkout : log));
-
+  
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
   
@@ -2559,4 +2567,6 @@ const usePrevious = <T,>(value: T) => {
     
 
     
+
+
 
