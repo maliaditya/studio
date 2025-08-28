@@ -1,5 +1,6 @@
 
 
+
       
 
 "use client";
@@ -213,7 +214,8 @@ function MyPlatePageContent() {
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
         if (Array.isArray(activities) && activities.length > 0) {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
-                if(activity.completed) return false;
+                if (activity.isRoutine) return true; // Always carry over routine tasks
+                if(activity.completed) return false; // Don't carry over completed non-routine tasks
                 if(activity.type === 'essentials') return settings.carryForwardEssentials;
                 if(activity.type === 'nutrition') return settings.carryForwardNutrition;
                 return settings.carryForward;
@@ -225,7 +227,7 @@ function MyPlatePageContent() {
                     ...activitiesToCarry.map(activity => ({
                         ...activity,
                         id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false,
+                        completed: false, // Reset completion status for the new day
                     }))
                 );
                 carriedOver = true;
@@ -235,7 +237,7 @@ function MyPlatePageContent() {
 
     if (carriedOver) {
         setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
-        toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+        toast({ title: "Tasks Carried Over", description: "Yesterday's tasks have been moved to today." });
     }
     setCarryOverComplete(true); 
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate, carryOverComplete]);
@@ -1193,6 +1195,7 @@ export default function MyPlatePage() {
 
       
     
+
 
 
 

@@ -178,6 +178,7 @@ export interface Activity {
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
   focusSessionInitialDuration?: number; // The originally intended duration
   duration?: number; // For interruptions
+  isRoutine?: boolean; // New field for daily routine tasks
 };
 
 export interface Interrupt {

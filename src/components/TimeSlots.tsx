@@ -25,16 +25,16 @@ const slots = [
 ];
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
-  workout: <Dumbbell className="h-5 w-5 text-primary" />,
-  upskill: <BookOpenCheck className="h-5 w-5 text-primary" />,
-  deepwork: <Briefcase className="h-5 w-5 text-primary" />,
-  planning: <ClipboardList className="h-5 w-5 text-primary" />,
-  tracking: <ClipboardCheck className="h-5 w-5 text-primary" />,
-  branding: <Share2 className="h-5 w-5 text-primary" />,
-  'lead-generation': <Magnet className="h-5 w-5 text-primary" />,
+  workout: <Dumbbell className="h-5 w-5" />,
+  upskill: <BookOpenCheck className="h-5 w-5" />,
+  deepwork: <Briefcase className="h-5 w-5" />,
+  planning: <ClipboardList className="h-5 w-5" />,
+  tracking: <ClipboardCheck className="h-5 w-5" />,
+  branding: <Share2 className="h-5 w-5" />,
+  'lead-generation': <Magnet className="h-5 w-5" />,
   interrupt: <AlertCircle className="h-5 w-5 text-destructive" />,
-  essentials: <CheckSquare className="h-5 w-5 text-primary" />,
-  nutrition: <Utensils className="h-5 w-5 text-primary" />,
+  essentials: <CheckSquare className="h-5 w-5" />,
+  nutrition: <Utensils className="h-5 w-5" />,
 };
 
 interface TimeSlotsProps {
@@ -75,8 +75,29 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const activityDurations = useAuth().activityDurations;
+  const { activityDurations, setSchedule } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
+
+  const handleToggleRoutine = (slotName: string, activityId: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+            const day = newSchedule[dateKey];
+            if (day[slotName] && Array.isArray(day[slotName])) {
+                const activities = day[slotName] as Activity[];
+                const activityIndex = activities.findIndex(a => a.id === activityId);
+                if (activityIndex > -1) {
+                    const updatedActivities = [...activities];
+                    updatedActivities[activityIndex] = { ...updatedActivities[activityIndex], isRoutine: !updatedActivities[activityIndex].isRoutine };
+                    newSchedule[dateKey] = { ...day, [slotName]: updatedActivities };
+                    // We update it everywhere, but for now let's just do one.
+                    // This logic might need to be refined if tasks appear on multiple days and we want to sync their routine status.
+                }
+            }
+        }
+        return newSchedule;
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -127,7 +148,15 @@ export function TimeSlots({
                           className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
                           onClick={(e) => onActivityClick(slot.name, activity, e)}
                         >
-                          <div className="pt-0.5">{activityIcons[activity.type]}</div>
+                          <button
+                            onClick={(e) => {
+                                e.stopPropagation(); // Prevent the main div's onClick from firing
+                                handleToggleRoutine(slot.name, activity.id);
+                            }}
+                            className={cn("pt-0.5", activity.isRoutine ? "text-green-500" : "text-primary")}
+                          >
+                            {activityIcons[activity.type]}
+                          </button>
                           <div className="flex-grow">
                             <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
                               {activity.details}
