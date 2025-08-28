@@ -462,6 +462,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    if (!subTaskId || durationMinutes <= 0) return;
+
+    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
+    const updater = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+
+    updater(prevDefs => 
+        prevDefs.map(def => 
+            def.id === subTaskId 
+                ? { ...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes }
+                : def
+        )
+    );
+
+    const definition = (isUpskill ? upskillDefinitions : deepWorkDefinitions).find(d => d.id === subTaskId);
+    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${definition?.name}".` });
+  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
@@ -747,135 +765,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (taskDef) {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
         const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-        // Only mark as complete, don't log time for parent nodes.
         if (isParentNode) {
             updateActivityInSchedule({ completed: true });
             return;
         }
     }
 
-    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | null = null;
-    let definition: ExerciseDefinition | undefined;
-    
-    switch (activity.type) {
-        case 'upskill':
-            logsUpdater = setAllUpskillLogs;
-            definition = upskillDefinitions.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
-            break;
-        case 'deepwork':
-            logsUpdater = setAllDeepWorkLogs;
-            definition = deepWorkDefinitions.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
-            break;
-        default:
-            updateActivityInSchedule({ completed: true, duration });
-            toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
-            return;
+    if (activity.type !== 'upskill' && activity.type !== 'deepwork') {
+        updateActivityInSchedule({ completed: true, duration });
+        toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
+        return;
     }
-  
+      
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
         updateActivityInSchedule({ completed: true, duration });
         return;
     }
 
-    if (!definition) {
-        definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
-    }
-    
+    const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
     if (!definition) {
         updateActivityInSchedule({ completed: true, duration });
         return;
     }
-      
-    if (logsUpdater) {
-        logsUpdater(prevLogs => {
-            const newLogs = [...prevLogs];
-            let logForToday = newLogs.find(log => log.date === todayKey);
-            
-            if (!logForToday) {
-                logForToday = { id: todayKey, date: todayKey, exercises: [] };
-                newLogs.push(logForToday);
-            }
 
-            let exerciseInstance = logForToday.exercises.find(ex => ex.id === exerciseInstanceId);
-            if (!exerciseInstance) {
-                exerciseInstance = {
-                    id: exerciseInstanceId,
-                    definitionId: definition!.id,
-                    name: definition!.name,
-                    category: definition!.category,
-                    loggedSets: [],
-                    targetSets: 1,
-                    targetReps: '25'
-                };
-                logForToday.exercises.push(exerciseInstance);
-            }
-            
-            const newSet: LoggedSet = {
-                id: `${Date.now()}-${Math.random()}`,
-                reps: activity.type === 'upskill' ? duration : 1,
-                weight: duration,
-                timestamp: Date.now(),
-            };
-
-            exerciseInstance.loggedSets.push(newSet);
-            return newLogs;
-        });
-    }
-  
+    logSubTaskTime(definition.id, duration);
     updateActivityInSchedule({ completed: true, duration });
-    toast({ title: "Progress Logged", description: `Logged ${duration} minutes for "${definition.name}".` });
-  }, [setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
-
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const subTaskDef = allDefs.find(def => def.id === subTaskId);
-    if (!subTaskDef) {
-        toast({ title: "Error", description: "Could not find sub-task definition.", variant: "destructive" });
-        return;
-    }
-
-    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
-    const logsUpdater = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
     
-    logsUpdater(prevLogs => {
-        const newLogs = [...prevLogs];
-        let logForToday = newLogs.find(log => log.date === todayKey);
-        
-        if (!logForToday) {
-            logForToday = { id: todayKey, date: todayKey, exercises: [] };
-            newLogs.push(logForToday);
-        }
-
-        let exerciseInstance = logForToday.exercises.find(ex => ex.definitionId === subTaskId);
-        if (!exerciseInstance) {
-            exerciseInstance = {
-                id: `${subTaskDef.id}-${Date.now()}`,
-                definitionId: subTaskDef.id,
-                name: subTaskDef.name,
-                category: subTaskDef.category,
-                loggedSets: [],
-                targetSets: 1,
-                targetReps: '1',
-            };
-            logForToday.exercises.push(exerciseInstance);
-        }
-
-        const newSet: LoggedSet = {
-            id: `${Date.now()}-${Math.random()}`,
-            reps: isUpskill ? durationMinutes : 1, // Store duration in reps for upskill, just count for deepwork
-            weight: durationMinutes, // Always store duration in weight
-            timestamp: Date.now(),
-        };
-
-        exerciseInstance.loggedSets.push(newSet);
-        
-        return newLogs;
-    });
-
-    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${subTaskDef.name}".` });
-  }, [deepWorkDefinitions, upskillDefinitions, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
+  }, [deepWorkDefinitions, upskillDefinitions, logSubTaskTime, toast, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
   
   const getAllUserData = useCallback(() => {
     return {
@@ -1437,17 +1354,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                     if (allChildrenLogged) {
                         let totalLoggedMinutes = 0;
-                        const logs = activity.type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-                        const durationField = activity.type === 'deepwork' ? 'weight' : 'reps';
-                        
                         allLeafNodes.forEach(node => {
-                            logs.forEach(log => {
-                                log.exercises.forEach(ex => {
-                                    if (ex.definitionId === node.id) {
-                                        totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set[durationField as 'reps'|'weight'] || 0), 0);
-                                    }
-                                });
-                            });
+                            totalLoggedMinutes += node.loggedDuration || 0;
                         });
                         finalDuration = totalLoggedMinutes;
                     }
@@ -2705,6 +2613,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

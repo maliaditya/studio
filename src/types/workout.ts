@@ -57,6 +57,7 @@ export interface ExerciseDefinition {
   link?: string;
   iconUrl?: string;
   estimatedDuration?: number; // Total minutes
+  loggedDuration?: number; // Total minutes logged for this specific task
   decompositionData?: DecompositionRow[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;

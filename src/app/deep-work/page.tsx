@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -1056,43 +1057,29 @@ function DeepWorkPageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const getLoggedMinutes = useCallback((taskIds: Set<string>, logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-    if (!logs) return 0;
-    return logs.reduce((total, log) => {
-        return total + log.exercises.reduce((dayTotal, ex) => {
-            if (taskIds.has(ex.definitionId)) {
-                return dayTotal + ex.loggedSets.reduce((setTotal, set) => setTotal + (set[durationField] || 0), 0);
-            }
-            return dayTotal;
-        }, 0);
-    }, 0);
-  }, []);
-
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
     const nodeType = getDeepWorkNodeType(definition);
 
     if (nodeType === 'Intention' || nodeType === 'Objective') {
-        const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
-        const leafNodeIds = new Set(leafNodes.map(n => n.id));
-        return getLoggedMinutes(leafNodeIds, allDeepWorkLogs, 'weight');
-    } else { // Action or Standalone
-        return getLoggedMinutes(new Set([definition.id]), allDeepWorkLogs, 'weight');
+      const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+      return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
-  }, [allDeepWorkLogs, getDeepWorkNodeType, getDescendantLeafNodes, getLoggedMinutes]);
-  
+    
+    return definition.loggedDuration || 0;
+  }, [getDeepWorkNodeType, getDescendantLeafNodes]);
+
   const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
     const nodeType = getUpskillNodeType(definition);
 
     if (nodeType === 'Curiosity' || nodeType === 'Objective') {
-        const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
-        const leafNodeIds = new Set(leafNodes.map(n => n.id));
-        return getLoggedMinutes(leafNodeIds, allUpskillLogs, 'reps');
-    } else { // Visualization or Standalone
-        return getLoggedMinutes(new Set([definition.id]), allUpskillLogs, 'reps');
+      const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+      return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
-  }, [allUpskillLogs, getUpskillNodeType, getDescendantLeafNodes, getLoggedMinutes]);
+    
+    return definition.loggedDuration || 0;
+  }, [getUpskillNodeType, getDescendantLeafNodes]);
 
   const totalLoggedTime = useMemo(() => {
     if (!currentTask) return 0;
@@ -1160,6 +1147,7 @@ function DeepWorkPageContent() {
         category: selectedMicroSkill.name as ExerciseCategory,
         description: newFocusAreaData.description.trim(),
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
+        loggedDuration: 0,
         link: newFocusAreaData.link.trim(),
         iconUrl: getFaviconUrl(newFocusAreaData.link.trim()),
     };
@@ -1443,6 +1431,7 @@ function DeepWorkPageContent() {
             link: newLinkedItemLink.trim(),
             iconUrl: getFaviconUrl(newLinkedItemLink.trim()),
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
+            loggedDuration: 0,
         };
         setUpskillDefinitions(prev => [...prev, newUpskillDef]);
         
@@ -1475,6 +1464,7 @@ function DeepWorkPageContent() {
             category: microSkillName as ExerciseCategory,
             description: newLinkedItemDescription.trim(),
             estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
+            loggedDuration: 0,
         };
         setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
         updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
