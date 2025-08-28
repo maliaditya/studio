@@ -123,14 +123,24 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       updateActivity(updatedActivity);
 
       if (completed) {
-        const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
-        const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-        onLogTime(updatedActivity, elapsedMinutes);
+        if (showSubTasks && activeSubTask) {
+          const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
+          const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+          if (elapsedMinutes > 0) {
+            logSubTaskTime(activeSubTask.id, elapsedMinutes);
+          }
+          setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
+        } else {
+            const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
+            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+            onLogTime(updatedActivity, elapsedMinutes);
+        }
         handleToggleComplete(activity.slot, activity.id, true);
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, activeSubTask, logSubTaskTime]);
+
 
   const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
     const durationMins = subTask.estimatedDuration || 25;
