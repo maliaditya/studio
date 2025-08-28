@@ -51,10 +51,11 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-function AddToSessionPopover({ definition, onSelectSlot, disabled = false }: { 
+function AddToSessionPopover({ definition, onSelectSlot, disabled = false, currentSlot }: { 
     definition: ExerciseDefinition; 
     onSelectSlot: (slotName: string) => void; 
     disabled?: boolean;
+    currentSlot: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -72,7 +73,10 @@ function AddToSessionPopover({ definition, onSelectSlot, disabled = false }: {
             <Button
               key={slotName}
               variant="ghost"
-              className="w-full justify-start h-8"
+              className={cn(
+                "w-full justify-start h-8",
+                slotName === currentSlot && "bg-primary/10 text-primary"
+              )}
               onClick={() => {
                 onSelectSlot(slotName as string);
                 setIsOpen(false);
@@ -147,6 +151,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   projectsInDomain: Project[];
   handleCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
   activeProjectIds: Set<string>;
+  currentSlot: string;
 }>(({ 
   upskillDef, 
   getUpskillNodeType,
@@ -167,6 +172,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   projectsInDomain,
   handleCreateAndLinkChild,
   activeProjectIds,
+  currentSlot,
 }, ref) => {
   const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -255,9 +261,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   const linkedProjects = (upskillDef.linkedProjectIds || [])
     .map(pid => projectsInDomain.find(p => p.id === pid))
     .filter((p): p is Project => !!p);
-  const isActionable = nodeType === 'Visualization' || nodeType === 'Standalone' || nodeType === 'Objective';
-  
-  const finalIsComplete = isActionable ? permanentlyLoggedTaskIds.has(upskillDef.id) : isObjectiveComplete;
+  const finalIsComplete = nodeType === 'Curiosity' || nodeType === 'Objective' ? isObjectiveComplete : isComplete;
 
   return (
     <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
@@ -273,6 +277,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
                       definition={upskillDef} 
                       onSelectSlot={(slot) => handleAddTaskToSession(upskillDef.id, 'upskill', slot)} 
                       disabled={!isAddToSessionEnabled}
+                      currentSlot={currentSlot}
                     />
                   </div>
                 </TooltipTrigger>

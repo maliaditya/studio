@@ -159,10 +159,11 @@ const DraggableSubtaskItem: React.FC<{
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-function AddToSessionPopover({ definition, onSelectSlot, disabled = false }: { 
+function AddToSessionPopover({ definition, onSelectSlot, disabled = false, currentSlot }: { 
     definition: ExerciseDefinition; 
     onSelectSlot: (slotName: string) => void; 
     disabled?: boolean;
+    currentSlot: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -180,7 +181,10 @@ function AddToSessionPopover({ definition, onSelectSlot, disabled = false }: {
             <Button
               key={slotName}
               variant="ghost"
-              className="w-full justify-start h-8"
+              className={cn(
+                "w-full justify-start h-8",
+                slotName === currentSlot && "bg-primary/10 text-primary"
+              )}
               onClick={() => {
                 onSelectSlot(slotName as string);
                 setIsOpen(false);
@@ -216,6 +220,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
     activeProjectIds: Set<string>;
+    currentSlot: string;
 }>(({
     deepworkDef,
     getDeepWorkNodeType,
@@ -237,6 +242,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal,
     handleCreateAndLinkChild,
     activeProjectIds,
+    currentSlot,
 }, ref) => {
     const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
 
@@ -336,6 +342,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                                         definition={deepworkDef} 
                                         onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} 
                                         disabled={!isAddToSessionEnabled}
+                                        currentSlot={currentSlot}
                                     />
                                 </div>
                             </TooltipTrigger>
@@ -580,6 +587,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleOpenManageLinksModal: (type: 'resource', parent: ExerciseDefinition) => void;
     handleCreateResource: (parentTask: ExerciseDefinition) => void;
     activeProjectIds: Set<string>;
+    currentSlot: string;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -613,6 +621,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleOpenManageLinksModal,
     handleCreateResource,
     activeProjectIds,
+    currentSlot,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
@@ -781,6 +790,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                             activeProjectIds={activeProjectIds}
+                            currentSlot={currentSlot}
                         />
                     );
                 })}
@@ -814,6 +824,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             projectsInDomain={projectsInDomainForChild}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                             activeProjectIds={activeProjectIds}
+                            currentSlot={currentSlot}
                         />
                     );
                 })}
@@ -893,6 +904,7 @@ function DeepWorkPageContent() {
     permanentlyLoggedTaskIds,
     getDescendantLeafNodes,
     activeProjectIds,
+    currentSlot,
   } = useAuth();
   const router = useRouter();
   
@@ -1991,6 +2003,7 @@ function DeepWorkPageContent() {
                                 handleOpenManageLinksModal={handleOpenManageLinksModal}
                                 handleCreateResource={handleCreateResource}
                                 activeProjectIds={activeProjectIds}
+                                currentSlot={currentSlot}
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -2017,6 +2030,7 @@ function DeepWorkPageContent() {
                                         handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
                                         activeProjectIds={activeProjectIds}
+                                        currentSlot={currentSlot}
                                     />
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
@@ -2045,6 +2059,7 @@ function DeepWorkPageContent() {
                                             projectsInDomain={projects}
                                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                                             activeProjectIds={activeProjectIds}
+                                            currentSlot={currentSlot}
                                         />
                                     );
                                 })}
@@ -2358,6 +2373,7 @@ function DeepWorkPageContent() {
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                             activeProjectIds={activeProjectIds}
+                            currentSlot={currentSlot}
                         />
                     )}
                     {activeId.startsWith('card-upskill-') && (
@@ -2381,6 +2397,7 @@ function DeepWorkPageContent() {
                             projectsInDomain={[]}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                             activeProjectIds={activeProjectIds}
+                            currentSlot={currentSlot}
                         />
                     )}
                     {activeId.startsWith('subtask-') && (
@@ -2406,6 +2423,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
