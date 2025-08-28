@@ -1,8 +1,5 @@
 
 
-
-      
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -104,6 +101,11 @@ function MyPlatePageContent() {
     currentSlot,
     activityDurations,
     weightLogs,
+    logWorkoutSet,
+    updateWorkoutSet,
+    deleteWorkoutSet,
+    removeExerciseFromWorkout,
+    swapWorkoutExercise,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -184,27 +186,30 @@ function MyPlatePageContent() {
 
   // Carry forward tasks logic
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !selectedDate || carryOverComplete) return;
+    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
+
+    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
+    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
+    const todayDateKey = format(selectedDate, 'yyyy-MM-dd');
+    if (lastCarryForwardDate === todayDateKey) return; // Already ran for today
 
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     
-    const today = selectedDate;
-    const todayDateKey = format(today, 'yyyy-MM-dd');
-    const yesterday = addDays(today, -1);
+    const yesterday = addDays(selectedDate, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     
     const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
     if (hasTodaysActivities) {
-        setCarryOverComplete(true);
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
         return;
     }
 
     const yesterdaysSchedule = schedule[yesterdayKey];
     if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
-        setCarryOverComplete(true);
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
         return;
     }
 
@@ -239,8 +244,8 @@ function MyPlatePageContent() {
         setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
         toast({ title: "Tasks Carried Over", description: "Yesterday's tasks have been moved to today." });
     }
-    setCarryOverComplete(true); 
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate, carryOverComplete]);
+    localStorage.setItem(lastCarryForwardKey, todayDateKey);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate]);
   
     const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
@@ -1033,9 +1038,13 @@ function MyPlatePageContent() {
               isOpen={isTodaysWorkoutModalOpen}
               onOpenChange={setIsTodaysWorkoutModalOpen}
               activityToLog={workoutActivityToLog}
-              todaysExercises={todaysExercises}
-              muscleGroupsForDay={todaysMuscleGroups}
+              dateForWorkout={selectedDate}
               onActivityComplete={handleToggleComplete}
+              logWorkoutSet={logWorkoutSet}
+              updateWorkoutSet={updateWorkoutSet}
+              deleteWorkoutSet={deleteWorkoutSet}
+              removeExerciseFromWorkout={removeExerciseFromWorkout}
+              swapWorkoutExercise={swapWorkoutExercise}
           />
         )}
 
@@ -1192,13 +1201,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-      
-    
-
-
-
-
-
-
-

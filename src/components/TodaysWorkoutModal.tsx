@@ -11,49 +11,64 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { WorkoutExercise, Activity, ExerciseDefinition } from '@/types/workout';
+import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet } from '@/types/workout';
 import { Dumbbell, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutExerciseCard } from './WorkoutExerciseCard';
 import { useToast } from '@/hooks/use-toast';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 interface TodaysWorkoutModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   activityToLog: Activity | null;
-  todaysExercises: WorkoutExercise[];
-  muscleGroupsForDay: string[];
+  dateForWorkout: Date;
   onActivityComplete: (slotName: string, activityId: string) => void;
+  logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
+  updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
+  deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
+  removeExerciseFromWorkout: (date: Date, exerciseId: string) => void;
+  swapWorkoutExercise: (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => void;
 }
 
 export function TodaysWorkoutModal({
   isOpen,
   onOpenChange,
   activityToLog,
-  todaysExercises,
-  muscleGroupsForDay,
+  dateForWorkout,
   onActivityComplete,
+  logWorkoutSet,
+  updateWorkoutSet,
+  deleteWorkoutSet,
+  removeExerciseFromWorkout,
+  swapWorkoutExercise,
 }: TodaysWorkoutModalProps) {
-  const { 
-    allWorkoutLogs, 
-    logWorkoutSet, 
-    updateWorkoutSet, 
-    deleteWorkoutSet,
-    removeExerciseFromWorkout,
-    swapWorkoutExercise,
-    exerciseDefinitions
-  } = useAuth();
+  const { allWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans } = useAuth();
   const { toast } = useToast();
-
-  const today = useMemo(() => new Date(), [isOpen]);
 
   const currentWorkoutLog = useMemo(() => {
     if (!isOpen) return null;
-    const dateKey = format(today, 'yyyy-MM-dd');
+    const dateKey = format(dateForWorkout, 'yyyy-MM-dd');
     return allWorkoutLogs.find(log => log.date === dateKey);
-  }, [allWorkoutLogs, isOpen, today]);
+  }, [allWorkoutLogs, isOpen, dateForWorkout]);
+  
+  const { exercises: todaysExercises, muscleGroupsForDay } = useMemo(() => {
+      if (!isOpen) return { exercises: [], muscleGroupsForDay: []};
+      
+      const log = currentWorkoutLog;
+      if (log && log.exercises.length > 0) {
+          const muscleGroups = Array.from(new Set(log.exercises.map(ex => ex.category)));
+          return { exercises: log.exercises, muscleGroupsForDay: muscleGroups };
+      }
+
+      // If no log for today, generate the workout plan
+      const { exercises, description } = getExercisesForDay(dateForWorkout, workoutMode, workoutPlans, exerciseDefinitions);
+      const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
+      return { exercises, muscleGroupsForDay: muscleGroups };
+      
+  }, [isOpen, dateForWorkout, currentWorkoutLog, workoutMode, workoutPlans, exerciseDefinitions]);
 
   const exercisesInLog = currentWorkoutLog?.exercises || todaysExercises;
 
@@ -90,7 +105,7 @@ export function TodaysWorkoutModal({
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>
-            Log Workout: {Array.isArray(muscleGroupsForDay) ? muscleGroupsForDay.join(' & ') : 'Rest Day'}
+            Log Workout: {Array.isArray(muscleGroupsForDay) && muscleGroupsForDay.length > 0 ? muscleGroupsForDay.join(' & ') : 'Rest Day'}
           </DialogTitle>
           <DialogDescription>
             Log your sets for each exercise. You can swap exercises if needed.
@@ -110,11 +125,11 @@ export function TodaysWorkoutModal({
                       <WorkoutExerciseCard 
                           key={exercise.id}
                           exercise={exercise}
-                          onLogSet={(...args) => logWorkoutSet(today, ...args)} 
-                          onDeleteSet={(...args) => deleteWorkoutSet(today, ...args)} 
-                          onUpdateSet={(...args) => updateWorkoutSet(today, ...args)} 
-                          onRemoveExercise={(...args) => removeExerciseFromWorkout(today, ...args)}
-                          onSwapExercise={(newDef) => swapWorkoutExercise(today, exercise.id, newDef)}
+                          onLogSet={(...args) => logWorkoutSet(dateForWorkout, ...args)} 
+                          onDeleteSet={(...args) => deleteWorkoutSet(dateForWorkout, ...args)} 
+                          onUpdateSet={(...args) => updateWorkoutSet(dateForWorkout, ...args)} 
+                          onRemoveExercise={(...args) => removeExerciseFromWorkout(dateForWorkout, ...args)}
+                          onSwapExercise={(newDef) => swapWorkoutExercise(dateForWorkout, exercise.id, newDef)}
                           swappableExercises={swappableExercises}
                       />
                     )
