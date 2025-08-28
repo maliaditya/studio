@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet } from '@/types/workout';
+import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet, DatedWorkout } from '@/types/workout';
 import { Dumbbell, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
@@ -25,7 +25,7 @@ interface TodaysWorkoutModalProps {
   onOpenChange: (isOpen: boolean) => void;
   activityToLog: Activity | null;
   dateForWorkout: Date;
-  onActivityComplete: (slotName: string, activityId: string) => void;
+  onActivityComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
   deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
@@ -45,7 +45,7 @@ export function TodaysWorkoutModal({
   removeExerciseFromWorkout,
   swapWorkoutExercise,
 }: TodaysWorkoutModalProps) {
-  const { allWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans } = useAuth();
+  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans } = useAuth();
   const { toast } = useToast();
 
   const currentWorkoutLog = useMemo(() => {
@@ -89,7 +89,7 @@ export function TodaysWorkoutModal({
     if (!activityToLog) return;
     
     if (isWorkoutComplete) {
-      onActivityComplete(activityToLog.slot, activityToLog.id);
+      onActivityComplete(activityToLog.slot, activityToLog.id, true);
       onOpenChange(false);
     } else {
       toast({
@@ -99,6 +99,34 @@ export function TodaysWorkoutModal({
       });
     }
   };
+
+  const ensureWorkoutLogExists = (date: Date): DatedWorkout => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    let workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
+  
+    if (!workoutLog) {
+      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+      workoutLog = { id: dateKey, date: dateKey, exercises };
+      
+      setAllWorkoutLogs(prev => {
+        // Prevent adding duplicate logs
+        if (prev.some(log => log.id === dateKey)) {
+          return prev;
+        }
+        return [...prev, workoutLog!];
+      });
+    }
+    return workoutLog;
+  };
+
+  const handleSwapExerciseWrapper = (oldExerciseId: string, newDef: ExerciseDefinition) => {
+    ensureWorkoutLogExists(dateForWorkout);
+    // Allow state to update before calling the swap function
+    setTimeout(() => {
+      swapWorkoutExercise(dateForWorkout, oldExerciseId, newDef);
+    }, 0);
+  };
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -129,7 +157,7 @@ export function TodaysWorkoutModal({
                           onDeleteSet={(...args) => deleteWorkoutSet(dateForWorkout, ...args)} 
                           onUpdateSet={(...args) => updateWorkoutSet(dateForWorkout, ...args)} 
                           onRemoveExercise={(...args) => removeExerciseFromWorkout(dateForWorkout, ...args)}
-                          onSwapExercise={(newDef) => swapWorkoutExercise(dateForWorkout, exercise.id, newDef)}
+                          onSwapExercise={(newDef) => handleSwapExerciseWrapper(exercise.id, newDef)}
                           swappableExercises={swappableExercises}
                       />
                     )
