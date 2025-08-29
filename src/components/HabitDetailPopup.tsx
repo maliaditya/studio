@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -14,7 +13,6 @@ import { ScrollArea } from './ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRule } from '@/types/workout';
-import { EditableResponse } from './EditableFields';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
@@ -245,9 +243,9 @@ export function HabitDetailPopup({ popupState, onClose }: {
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, patterns, habitCards, resources } = useAuth();
+    const { setResources, mechanismCards, patterns, resources, openGeneralPopup } = useAuth();
     const { habitId, x, y } = popupState;
-    const habit = habitCards.find(h => h.id === habitId);
+    const habit = resources.find(r => r.id === habitId);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
@@ -276,7 +274,9 @@ export function HabitDetailPopup({ popupState, onClose }: {
     
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
-    
+
+    const linkedHabits: Resource[] = []; // This functionality was removed as it was faulty.
+
     const handleNextHabit = () => {
         setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
     };
@@ -395,7 +395,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                       </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
                                        <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
@@ -453,9 +453,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
         );
     };
 
-    const linkedHabits = []; // This was removed as it was faulty
-
-
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
@@ -467,9 +464,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <CardDescription>Trigger: When I {habit.trigger?.action || '...'}</CardDescription>
                             </div>
                             <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule({ rule }); }}>
-                                    <Workflow className="h-4 w-4" />
-                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -480,18 +474,20 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
                             {/* Negative Path */}
                             <div className="space-y-2">
-                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism: {negativeMechanism?.name || 'Unlinked'}</h4>
+                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">Internal Effect:</span> {negativeMechanism?.response?.visualize || '...'}</p>
-                                    <p><span className="font-medium">Blocks:</span> {negativeMechanism?.reward || '...'}</p>
+                                    <p><span className="font-medium text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}</span></p>
+                                    <p><span className="font-medium text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{negativeMechanism?.response?.visualize || '...'}</span></p>
+                                    <p><span className="font-medium text-muted-foreground">Blocks:</span> <span className="text-foreground">{negativeMechanism?.reward || '...'}</span></p>
                                 </div>
                             </div>
                             {/* Positive Path */}
                             <div className="space-y-2">
-                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism: {positiveMechanism?.name || 'Unlinked'}</h4>
+                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">New Response:</span> {positiveMechanism?.newResponse?.action || '...'}</p>
-                                    <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
+                                    <p><span className="font-medium text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{positiveMechanism?.name || 'Unlinked'}</span></p>
+                                    <p><span className="font-medium text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{positiveMechanism?.response?.visualize || '...'}</span></p>
+                                    <p><span className="font-medium text-muted-foreground">Reward:</span> <span className="text-foreground">{positiveMechanism?.reward || '...'}</span></p>
                                 </div>
                             </div>
                         </div>
