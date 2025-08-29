@@ -57,9 +57,7 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
     const [newStopperText, setNewStopperText] = useState('');
     const [newStrengthText, setNewStrengthText] = useState('');
     
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `habit-detail-popup-${habitId}`,
-    });
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habitId}` });
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -123,7 +121,7 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
     const pattern = patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habit.id));
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
+        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={`habit-${habitId}`}>
             <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-4 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
@@ -174,14 +172,22 @@ const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewS
 }) => {
     return (
         <div>
-            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2 border rounded-md p-2")}>
+            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
               <div className="space-y-2">
                   {(habit.stoppers || []).map(stopper => (
-                      <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left flex items-center justify-between">
+                      <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left">
                           <p>{stopper.text}</p>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStopper(stopper.id)}>
-                              <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
+                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); /* handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); */ }}>
+                                  <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); /* handleStopperStatusChange(e, habit.id, 'unmanageable'); */ }}>
+                                  <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                              </Button>
+                               <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                          </div>
                       </div>
                   ))}
               </div>
@@ -191,7 +197,7 @@ const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewS
                     value={newStopperText}
                     onChange={(e) => setNewStopperText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
-                    placeholder="What's the urge?"
+                    placeholder="What's stopping you?"
                     className="h-8 text-xs"
                 />
                 <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
@@ -209,7 +215,7 @@ const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStre
 }) => {
     return (
         <div>
-            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2 border rounded-md p-2")}>
+            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
               <div className="space-y-2">
                   {(habit.strengths || []).map(strength => (
                       <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
@@ -226,7 +232,7 @@ const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStre
                     value={newStrengthText}
                     onChange={(e) => setNewStrengthText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
-                    placeholder="What's the truth?"
+                    placeholder="What's a reinforcing truth?"
                     className="h-8 text-xs"
                 />
                 <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
