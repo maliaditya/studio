@@ -1063,6 +1063,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       case 'branding': newDetails = 'Branding Session'; break;
                       case 'lead-generation': newDetails = 'Lead Generation Session'; break;
                     }
+                } else if (activity.type === 'workout') { // ALSO update details for ROUTINE workouts
+                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                    newDetails = description.split(' for ')[1] || "Workout";
                 }
 
                 return {
@@ -2613,6 +2616,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
