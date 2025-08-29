@@ -73,14 +73,6 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
         setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
     };
 
-    const handleStopperStatusChange = (e: React.PointerEvent<HTMLButtonElement>, stopperId: string, status: Stopper['status']) => {
-        if (!habit) return;
-        const updatedStoppers = (habit.stoppers || []).map(s => 
-            s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
-        );
-        handleUpdateResource({ ...habit, stoppers: updatedStoppers });
-    };
-
     const handleAddStopper = () => {
         if (!newStopperText.trim() || !habit) return;
         const newStopper: Stopper = {
@@ -175,17 +167,11 @@ const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewS
               <div className="space-y-2">
                   {(habit.stoppers || []).map(stopper => (
                       <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left">
-                          <p>{stopper.text}</p>
-                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); /* handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); */ }}>
-                                  <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); /* handleStopperStatusChange(e, habit.id, 'unmanageable'); */ }}>
-                                  <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                              </Button>
-                               <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => handleDeleteStopper(stopper.id)}>
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
+                          <div className="flex items-center justify-between">
+                            <p>{stopper.text}</p>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
                           </div>
                       </div>
                   ))}
