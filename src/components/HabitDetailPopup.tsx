@@ -16,38 +16,12 @@ import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState } from '
 import { EditableField, EditableResponse } from './EditableFields';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 
 interface HabitDetailPopupProps {
   popupState: HabitDetailPopupState;
   onClose: () => void;
 }
-
-const MechanismDetailView = ({ mechanism }: { mechanism: Resource | null }) => {
-    if (!mechanism) {
-        return <p className="text-xs text-muted-foreground text-center py-4">No mechanism linked.</p>;
-    }
-
-    return (
-        <div className="space-y-3 text-sm">
-            <div>
-                <p className="font-semibold text-muted-foreground text-xs">Internal Effect</p>
-                <p>{mechanism.response?.visualize || '-'}</p>
-            </div>
-             {mechanism.mechanismFramework === 'positive' ? (
-                <div>
-                    <p className="font-semibold text-muted-foreground text-xs">Reward</p>
-                    <p>{mechanism.reward || '-'}</p>
-                </div>
-            ) : (
-                 <div>
-                    <p className="font-semibold text-muted-foreground text-xs">Blocks</p>
-                    <p>{mechanism.reward || '-'}</p>
-                </div>
-            )}
-        </div>
-    );
-};
-
 
 export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps) {
     const { habitId, x, y } = popupState;
@@ -113,40 +87,41 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={`habit-${habitId}`}>
-            <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-4 relative cursor-grab" {...listeners}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Workflow className="h-5 w-5 text-primary"/>
-                            {habit.name}
+                           {habit.name}
                         </CardTitle>
                         <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
                     </div>
-                     {pattern && <CardDescription>Pattern: {pattern.name}</CardDescription>}
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                     <div className="space-y-4">
-                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={habit} onUpdate={handleUpdateResource} />
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-semibold text-sm text-red-500">Old Response</h4>
-                                <MechanismDetailView mechanism={negativeMechanism} />
-                            </div>
-                             <div className="space-y-2">
-                                <h4 className="font-semibold text-sm text-green-500">New Response</h4>
-                                <MechanismDetailView mechanism={positiveMechanism} />
-                            </div>
+                        <div>
+                            <p className="text-sm font-semibold text-red-500">Negative Mechanism:</p>
+                            <p className="text-sm text-muted-foreground">
+                                <span className="font-bold text-foreground">{habit.trigger?.action || '...'}:</span> {negativeMechanism?.response?.visualize || '...'}
+                            </p>
                         </div>
-                         <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <h4 className="font-semibold text-sm text-red-500 mb-2">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</h4>
-                                <ResistanceSection habit={habit} handleDeleteStopper={handleDeleteStopper} newStopperText={newStopperText} setNewStopperText={setNewStopperText} handleAddStopper={handleAddStopper} />
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-sm text-green-500 mb-2">Truth</h4>
-                                <TruthSection habit={habit} handleDeleteStrength={handleDeleteStrength} newStrengthText={newStrengthText} setNewStrengthText={setNewStrengthText} handleAddStrength={handleAddStrength} />
-                            </div>
-                         </div>
+                        <div>
+                            <p className="text-sm font-semibold text-green-500">Positive Mechanism:</p>
+                            <p className="text-sm text-muted-foreground">
+                                <span className="font-bold text-foreground">{positiveMechanism?.newResponse?.action || '...'}:</span> {`Only when ${positiveMechanism?.newResponse?.visualize || '...'}, this happens.`}
+                            </p>
+                        </div>
+                        <Tabs defaultValue="truth" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
+                                <TabsTrigger value="truth">Truth</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="resistance" className="mt-2">
+                                <ResistanceSection habit={habit} handleDeleteStopper={handleDeleteStopper} newStopperText={newStopperText} setNewStopperText={setNewStopperText} handleAddStopper={handleAddStopper} isNegative={pattern?.type === 'Negative'}/>
+                            </TabsContent>
+                            <TabsContent value="truth" className="mt-2">
+                                <TruthSection habit={habit} handleDeleteStrength={handleDeleteStrength} newStrengthText={newStrengthText} setNewStrengthText={setNewStrengthText} handleAddStrength={handleAddStrength} isNegative={pattern?.type === 'Negative'}/>
+                            </TabsContent>
+                        </Tabs>
                     </div>
                 </CardContent>
             </Card>
@@ -154,25 +129,24 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
     );
 }
 
-const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewStopperText, handleAddStopper }: { 
+const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewStopperText, handleAddStopper, isNegative }: { 
     habit: Resource, 
     handleDeleteStopper: (stopperId: string) => void,
     newStopperText: string,
     setNewStopperText: (text: string) => void,
     handleAddStopper: () => void,
+    isNegative?: boolean
 }) => {
     return (
         <div>
-            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
+            <ScrollArea className="h-28 pr-2">
               <div className="space-y-2">
                   {(habit.stoppers || []).map(stopper => (
-                      <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left">
-                          <div className="flex items-center justify-between">
-                            <p>{stopper.text}</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStopper(stopper.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                          </div>
+                      <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left flex items-center justify-between">
+                          <p>{stopper.text}</p>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                       </div>
                   ))}
               </div>
@@ -182,7 +156,7 @@ const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewS
                     value={newStopperText}
                     onChange={(e) => setNewStopperText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
-                    placeholder="What's stopping you?"
+                    placeholder={isNegative ? "What's the urge?" : "What's stopping you?"}
                     className="h-8 text-xs"
                 />
                 <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
@@ -191,16 +165,17 @@ const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewS
     );
 };
 
-const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStrengthText, handleAddStrength }: { 
+const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStrengthText, handleAddStrength, isNegative }: { 
     habit: Resource, 
     handleDeleteStrength: (strengthId: string) => void,
     newStrengthText: string,
     setNewStrengthText: (text: string) => void,
     handleAddStrength: () => void,
+    isNegative?: boolean
 }) => {
     return (
         <div>
-            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
+            <ScrollArea className="h-28 pr-2">
               <div className="space-y-2">
                   {(habit.strengths || []).map(strength => (
                       <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
@@ -217,7 +192,7 @@ const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStre
                     value={newStrengthText}
                     onChange={(e) => setNewStrengthText(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
-                    placeholder="What's a reinforcing truth?"
+                    placeholder={isNegative ? "What's the truth?" : "What's a reinforcing truth?"}
                     className="h-8 text-xs"
                 />
                 <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
