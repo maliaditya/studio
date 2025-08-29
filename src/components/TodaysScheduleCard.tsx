@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -66,9 +67,8 @@ function AgendaWidgetItem({
       return;
     }
     
-    if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
-        const habitId = activity.taskIds[0];
-        onOpenHabitPopup(habitId, event);
+    if (linkedHabit) {
+        onOpenHabitPopup(linkedHabit.id, event);
         return;
     }
   };
@@ -83,7 +83,7 @@ function AgendaWidgetItem({
             }
         </button>
         <div 
-          className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
+          className={cn("flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
           onClick={handleTitleClick}
         >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
@@ -210,12 +210,12 @@ export function TodaysScheduleCard({
         } else {
             const durationStr = activityDurations[activity.id];
             if (!durationStr || typeof durationStr !== 'string') return 0;
-            if (/^\d+$/.test(durationStr.trim())) {
+            if (/^\\d+$/.test(durationStr.trim())) {
                 totalMinutes = parseInt(durationStr.trim(), 10);
             } else {
-                const hourMatch = durationStr.match(/(\d+)\s*h/);
+                const hourMatch = durationStr.match(/(\\d+)\\s*h/);
                 if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-                const minMatch = durationStr.match(/(\d+)\s*m/);
+                const minMatch = durationStr.match(/(\\d+)\\s*m/);
                 if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
             }
         }
