@@ -1048,7 +1048,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             activitiesToCarry.map(activity => {
                 let newDetails = activity.details;
 
-                // Regenerate details for workout tasks regardless of routine status
+                // Always regenerate workout details for today
                 if (activity.type === 'workout') {
                     const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
                     newDetails = description.split(' for ')[1] || "Workout";
@@ -1068,6 +1068,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   id: `${activity.type}-${Date.now()}-${Math.random()}`,
                   completed: false,
                   details: newDetails,
+                  // Keep taskIds for routine tasks, clear for non-routine to allow re-selection
                   taskIds: activity.isRoutine ? activity.taskIds : [],
                 };
             })
@@ -2611,6 +2612,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
