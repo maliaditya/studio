@@ -99,31 +99,24 @@ const DraggableSubtaskItem: React.FC<{
     type: 'upskill' | 'resource';
     onClick: () => void;
   }> = ({ childId, parentId, childName, isLogged, type, onClick }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `subtask-${childId}-from-${parentId}`,
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+        id: `subtask-${type}-${childId}-from-${parentId}`,
+        data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName, parentId: parentId },
     });
-  
-    const style = transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-        zIndex: 100,
-        backgroundColor: 'hsl(var(--card))',
-        padding: '2px 4px',
-        borderRadius: '4px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    } : undefined;
   
     return (
         <div 
             ref={setNodeRef} 
-            style={style} 
+            {...listeners}
+            {...attributes}
             className={cn(
-                "text-xs text-muted-foreground truncate transition-transform", 
+                "text-xs text-muted-foreground truncate flex items-center gap-1 cursor-grab active:cursor-grabbing",
                 isLogged && "line-through text-muted-foreground/70",
-                isDragging && "opacity-50 scale-90"
-            )} 
+                isDragging && "opacity-0"
+            )}
             title={childName}
         >
-          <span {...listeners} {...attributes} className="cursor-grab pr-1"> - </span>
+          <span>-</span>
           <span onClick={onClick} className="cursor-pointer hover:text-foreground">
              {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
           </span>
@@ -335,11 +328,11 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
             )}
         </CardHeader>
         <CardContent className="min-h-[50px]">
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
                 {(upskillDef.linkedUpskillIds || []).map(childId => {
                     const childDef = upskillDefinitions.find(d => d.id === childId);
                     if (!childDef) return null;
-                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={finalIsComplete} type="upskill" onClick={() => handleCardClick(childDef)} />;
+                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isComplete} type="upskill" onClick={() => handleCardClick(childDef)} />;
                 })}
                  {(upskillDef.linkedResourceIds || []).map(childId => {
                     const childDef = resources.find(d => d.id === childId);
@@ -350,8 +343,9 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
         </CardContent>
         <CardFooter className="pt-3 flex items-center justify-end">
             <div className="flex items-center gap-1 flex-shrink-0">
+                {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(upskillDef.id, 'upskill')}>Add Visualization</Button>}
                 {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
-                {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(estDuration)}</Badge>}
+                {estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(estDuration)}</Badge>}
                 {loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}
             </div>
         </CardFooter>
