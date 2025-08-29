@@ -81,6 +81,7 @@ function MyPlatePageContent() {
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
+    workoutPlanRotation,
     upskillDefinitions, topicGoals, deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
     projects,
@@ -105,7 +106,6 @@ function MyPlatePageContent() {
     deleteWorkoutSet,
     removeExerciseFromWorkout,
     swapWorkoutExercise,
-    resources,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
