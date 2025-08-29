@@ -1029,28 +1029,28 @@ function DeepWorkPageContent() {
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
     const visited = new Set<string>();
-  
+    
+    const definitions = [...deepWorkDefinitions, ...upskillDefinitions];
+
     function recurse(d: ExerciseDefinition) {
-      if (visited.has(d.id)) return;
-      visited.add(d.id);
+        if (visited.has(d.id)) return;
+        visited.add(d.id);
   
-      const hasDeepWorkChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0;
-      const hasUpskillChildren = (d.linkedUpskillIds?.length ?? 0) > 0;
+        const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
   
-      if (hasDeepWorkChildren) {
-        (d.linkedDeepWorkIds || []).forEach(childId => {
-          const childDef = deepWorkDefinitions.find(c => c.id === childId);
-          if (childDef) recurse(childDef);
-        });
-      } else if (hasUpskillChildren) {
-         (d.linkedUpskillIds || []).forEach(childId => {
-          const childDef = upskillDefinitions.find(d => d.id === childId);
-          if (childDef) recurse(childDef);
-        });
-      }
-      else {
-        total += d.estimatedDuration || 0;
-      }
+        if (hasChildren) {
+            (d.linkedDeepWorkIds || []).forEach(childId => {
+                const childDef = definitions.find(c => c.id === childId);
+                if (childDef) recurse(childDef);
+            });
+            (d.linkedUpskillIds || []).forEach(childId => {
+                const childDef = definitions.find(d => d.id === childId);
+                if (childDef) recurse(childDef);
+            });
+        }
+        else {
+            total += d.estimatedDuration || 0;
+        }
     }
   
     recurse(def);
@@ -1679,20 +1679,62 @@ function DeepWorkPageContent() {
   }
 
   const handleCardClick = (def: ExerciseDefinition) => {
-    const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
-    setLibraryView(type);
-    
-    const nodeType = type === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
+    const findRootParent = (startNode: ExerciseDefinition): { type: 'deepwork' | 'upskill', root: ExerciseDefinition } => {
+        let current: ExerciseDefinition | undefined = startNode;
+        let pathType: 'deepwork' | 'upskill' | null = null;
+        const allDefs = new Map([...deepWorkDefinitions.map(d => [d.id, d]), ...upskillDefinitions.map(u => [u.id, u])]);
 
-    if (nodeType === 'Intention' || nodeType === 'Curiosity') {
-        addToRecents({ ...def, type });
+        while (current) {
+            let foundParent: ExerciseDefinition | undefined;
+            // Search in deep work definitions
+            for (const parent of deepWorkDefinitions) {
+                if ((parent.linkedDeepWorkIds || []).includes(current!.id) || (parent.linkedUpskillIds || []).includes(current!.id)) {
+                    foundParent = parent;
+                    pathType = 'deepwork';
+                    break;
+                }
+            }
+            if (!foundParent) {
+                // Search in upskill definitions if not found in deep work
+                for (const parent of upskillDefinitions) {
+                    if ((parent.linkedDeepWorkIds || []).includes(current!.id) || (parent.linkedUpskillIds || []).includes(current!.id)) {
+                        foundParent = parent;
+                        pathType = 'upskill';
+                        break;
+                    }
+                }
+            }
+
+            if (foundParent) {
+                current = foundParent;
+            } else {
+                // No parent found, current is the root
+                break;
+            }
+        }
+        
+        const type = upskillDefinitions.some(d => d.id === (current?.id || startNode.id)) ? 'upskill' : 'deepwork';
+        return { type, root: current || startNode };
+    };
+
+    const { type: rootType, root: rootNode } = findRootParent(def);
+    const nodeType = rootType === 'deepwork' ? getDeepWorkNodeType(rootNode) : getUpskillNodeType(rootNode);
+
+    if (nodeType === 'Curiosity') {
+        setLibraryView('upskill');
+    } else {
+        setLibraryView('deepwork');
     }
-
+    
+    if (nodeType === 'Intention' || nodeType === 'Curiosity') {
+        addToRecents({ ...def, type: rootType });
+    }
+    
     const existingIndex = navigationStack.findIndex(item => item.id === def.id);
     if (existingIndex !== -1) {
         setNavigationStack(prev => prev.slice(0, existingIndex + 1));
     } else {
-        setNavigationStack(prev => [...prev, { ...def, type }]);
+        setNavigationStack(prev => [...prev, { ...def, type: rootType }]);
     }
   };
 
@@ -2396,4 +2438,5 @@ export default function DeepWorkPage() {
 
 
     
+
 
