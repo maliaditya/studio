@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -251,7 +250,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
-    const [activeTab, setActiveTab] = useState<'urge' | 'truth'>('truth');
+    const [activeTab, setActiveTab] = useState<'resistance' | 'truth'>('truth');
     const [newTextInput, setNewTextInput] = useState('');
 
     const style: React.CSSProperties = {
@@ -269,12 +268,11 @@ export function HabitDetailPopup({ popupState, onClose }: {
     if (!habit) return null;
     
     const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-    const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
     
     const handleAddEntry = () => {
         if (!newTextInput.trim()) return;
 
-        if (activeTab === 'urge') {
+        if (activeTab === 'resistance') {
             const newStopper: Stopper = {
                 id: `stopper_${Date.now()}`,
                 text: newTextInput.trim(),
@@ -302,7 +300,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     };
     
     const handleDeleteEntry = (entryId: string) => {
-        if (activeTab === 'urge') {
+        if (activeTab === 'resistance') {
             setResources(prev => prev.map(r => {
                 if (r.id === habit.id) {
                     return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== entryId) };
@@ -319,8 +317,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
         }
     };
     
-    const listItems = activeTab === 'urge' ? (habit.stoppers || []) : (habit.strengths || []);
-
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
@@ -337,31 +333,17 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <p className="text-xs text-muted-foreground">Trigger: When I {habit.trigger.action}</p>
                             )}
                         </div>
-                        <div>
-                            <p className="text-red-500 font-semibold">Negative Mechanism:</p>
-                            <p className="text-muted-foreground">
-                                <span className="font-bold text-foreground">{negativeMechanism?.name || 'Unlinked'}:</span>
-                                &nbsp;{`It causes ${negativeMechanism?.response?.visualize || '...'} internally.`}
-                            </p>
-                        </div>
-                         <div>
-                            <p className="text-green-500 font-semibold">Positive Mechanism:</p>
-                            <p className="text-muted-foreground">
-                                <span className="font-bold text-foreground">{positiveMechanism?.name || 'Unlinked'}:</span>
-                                &nbsp;{`Only when ${positiveMechanism?.newResponse?.visualize || '...'}, ${positiveMechanism?.newResponse?.action || '...'} happens.`}
-                            </p>
-                        </div>
                         <div className="pt-2 mt-2">
-                        <Tabs defaultValue="truth" className="w-full">
+                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
                             <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="resistance">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
+                                <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
                                 <TabsTrigger value="truth">Truth</TabsTrigger>
                             </TabsList>
                             <TabsContent value="resistance" className="mt-2">
-                                <ResistanceSection habit={habit} isNegative={pattern?.type === 'Negative'}/>
+                                <ResistanceSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
                             </TabsContent>
                             <TabsContent value="truth" className="mt-2">
-                                <TruthSection habit={habit} isNegative={pattern?.type === 'Negative'}/>
+                                <TruthSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
                             </TabsContent>
                         </Tabs>
                         </div>
@@ -416,15 +398,14 @@ const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative:
               <div className="space-y-2">
                   {(habit.stoppers || []).map(stopper => (
                       <div key={stopper.id} className={cn("text-xs p-2 rounded-md bg-background group w-full text-left", !!stopper.linkedResourceId && "cursor-pointer hover:bg-muted/50")}
-                          onClick={(e) => { if (stopper.linkedResourceId && cardRef.current) openGeneralPopup(stopper.linkedResourceId, e); }}
                       >
                           <div className="flex items-start justify-between">
                                 <p className="flex-grow pr-2">{stopper.text}</p>
                                 <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, habit.id, stopper.id, 'manageable')}>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, stopper.id, 'manageable')}>
                                         <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, habit.id, 'unmanageable')}>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, stopper.id, 'unmanageable')}>
                                         <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(stopper.id)}>
@@ -500,5 +481,3 @@ const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: bool
         </div>
     );
 };
-
-    
