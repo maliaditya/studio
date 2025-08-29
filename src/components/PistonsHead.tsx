@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow, PlusCircle, Library, Database, ArrowRight } from 'lucide-react';
+import { BrainCircuit, ChevronLeft, Target, Shield, Edit, X, History, Plus, Save, Star, Mic, MessageSquare, Lightbulb, ThumbsUp, Flame, Compass, Sun, GitBranch, Anchor, Trash2, Calendar as CalendarIcon, HeartPulse, Search, Workflow, PlusCircle, Library, Database, ArrowRight, View } from 'lucide-react';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -22,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { EquationEditor } from '@/app/purpose/page';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -231,66 +233,15 @@ const QuickAccessView = () => {
 const RuleEquationsView = () => {
     const { pillarEquations, setPillarEquations, metaRules } = useAuth();
     const [isAddEquationOpen, setIsAddEquationOpen] = useState(false);
-    const [selectedPillar, setSelectedPillar] = useState('');
-    const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
-    const [outcome, setOutcome] = useState('');
-
-    const handleSaveEquation = () => {
-        if (!selectedPillar || selectedRuleIds.length === 0 || !outcome.trim()) {
-            alert('Please select a pillar, at least one rule, and provide an outcome.');
-            return;
-        }
-        const newEquation: HabitEquation = {
-            id: `eq_${Date.now()}`,
-            metaRuleIds: selectedRuleIds,
-            outcome: outcome.trim(),
-        };
-        setPillarEquations(prev => ({
-            ...prev,
-            [selectedPillar]: [...(prev[selectedPillar] || []), newEquation]
-        }));
-        setIsAddEquationOpen(false);
-        setSelectedPillar('');
-        setSelectedRuleIds([]);
-        setOutcome('');
-    };
+    const [viewEquationState, setViewEquationState] = useState<{ isOpen: boolean; equation?: HabitEquation; pillar?: string }>({ isOpen: false });
 
     return (
         <CardContent className="p-4">
             <div className="flex justify-between items-center mb-2">
                 <h3 className="font-semibold">Rule Equations</h3>
-                <Dialog open={isAddEquationOpen} onOpenChange={setIsAddEquationOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader><DialogTitle>Create New Rule Equation</DialogTitle></DialogHeader>
-                        <div className="py-4 space-y-4">
-                            <Select value={selectedPillar} onValueChange={setSelectedPillar}>
-                                <SelectTrigger><SelectValue placeholder="Select Pillar..." /></SelectTrigger>
-                                <SelectContent>
-                                    {['Mind', 'Body', 'Heart', 'Spirit'].map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                {metaRules.map(rule => (
-                                    <div key={rule.id} className="flex items-center space-x-2 p-1">
-                                        <Checkbox 
-                                            id={`rule-${rule.id}`} 
-                                            checked={selectedRuleIds.includes(rule.id)}
-                                            onCheckedChange={() => setSelectedRuleIds(prev => prev.includes(rule.id) ? prev.filter(id => id !== rule.id) : [...prev, rule.id])}
-                                        />
-                                        <Label htmlFor={`rule-${rule.id}`} className="font-normal w-full cursor-pointer">{rule.text}</Label>
-                                    </div>
-                                ))}
-                            </ScrollArea>
-                            <Input value={outcome} onChange={e => setOutcome(e.target.value)} placeholder="Expected Outcome..." />
-                        </div>
-                        <DialogFooter>
-                            <Button onClick={handleSaveEquation}>Save Equation</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewEquationState({ isOpen: true })}>
+                    <PlusCircle className="h-4 w-4 text-green-500"/>
+                </Button>
             </div>
             <ScrollArea className="h-80 pr-2">
                 <div className="space-y-4">
@@ -299,7 +250,7 @@ const RuleEquationsView = () => {
                             <h4 className="font-medium text-sm mb-1">{pillar}</h4>
                             <div className="space-y-2">
                                 {equations.map(eq => (
-                                    <Card key={eq.id} className="bg-muted/30 p-3">
+                                    <Card key={eq.id} className="bg-muted/30 p-3 group relative">
                                         <ul className="list-disc list-inside text-xs space-y-1">
                                             {(eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)?.text).filter(Boolean).map(text => <li key={text}>{text}</li>)}
                                         </ul>
@@ -307,6 +258,11 @@ const RuleEquationsView = () => {
                                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                             <span>{eq.outcome}</span>
                                         </p>
+                                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewEquationState({ isOpen: true, equation: eq, pillar })}>
+                                                <View className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </Card>
                                 ))}
                             </div>
@@ -314,6 +270,16 @@ const RuleEquationsView = () => {
                     ))}
                 </div>
             </ScrollArea>
+            
+            <EquationEditor
+                isOpen={viewEquationState.isOpen}
+                onOpenChange={(open) => setViewEquationState({ ...viewEquationState, isOpen: open })}
+                pillarName={viewEquationState.pillar || ''}
+                equation={viewEquationState.equation}
+                onSave={() => {}} // No-op for now, as editing logic is in Purpose page.
+                metaRules={metaRules}
+                viewOnly={true}
+            />
         </CardContent>
     );
 };
