@@ -1020,6 +1020,7 @@ function MyPlatePageContent() {
               </div>
             </div>
             <TimeSlots 
+              date={selectedDate}
               schedule={selectedDaySchedule}
               currentSlot={currentSlot}
               remainingTime={remainingTime}

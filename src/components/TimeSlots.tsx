@@ -1,5 +1,6 @@
 
 
+      
 "use client";
 
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -38,6 +40,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 };
 
 interface TimeSlotsProps {
+  date: Date;
   schedule: DailySchedule;
   currentSlot: string;
   remainingTime: string;
@@ -66,6 +69,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
 
 export function TimeSlots({
+  date,
   schedule,
   currentSlot,
   remainingTime,
@@ -75,7 +79,7 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule } = useAuth();
+  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
@@ -141,45 +145,52 @@ export function TimeSlots({
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem]">
               <div className="flex-grow space-y-2 mb-2">
                 {activities && activities.length > 0 ? (
-                  activities.map((activity) => (
-                    <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div
-                          className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
-                          onClick={(e) => onActivityClick(slot.name, activity, e)}
-                        >
-                          <button
-                            onClick={(e) => {
-                                e.stopPropagation(); // Prevent the main div's onClick from firing
-                                handleToggleRoutine(slot.name, activity.id);
-                            }}
-                            className={cn("pt-0.5", activity.isRoutine ? "text-green-500" : "text-primary")}
+                  activities.map((activity) => {
+                    let displayDetails = activity.details;
+                    if (activity.type === 'workout') {
+                      const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+                      displayDetails = description.split(' for ')[1] || "Workout";
+                    }
+                    return (
+                      <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div
+                            className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
+                            onClick={(e) => onActivityClick(slot.name, activity, e)}
                           >
-                            {activityIcons[activity.type]}
-                          </button>
-                          <div className="flex-grow">
-                            <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
-                              {activity.details}
-                            </p>
-                            <p className="text-xs text-muted-foreground capitalize">
-                              {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}
-                               {activity.duration ? ` (${activity.duration}m)`: ''}
-                            </p>
+                            <button
+                              onClick={(e) => {
+                                  e.stopPropagation(); // Prevent the main div's onClick from firing
+                                  handleToggleRoutine(slot.name, activity.id);
+                              }}
+                              className={cn("pt-0.5", activity.isRoutine ? "text-green-500" : "text-primary")}
+                            >
+                              {activityIcons[activity.type]}
+                            </button>
+                            <div className="flex-grow">
+                              <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
+                                {displayDetails}
+                              </p>
+                              <p className="text-xs text-muted-foreground capitalize">
+                                {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}
+                                 {activity.duration ? ` (${activity.duration}m)`: ''}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center flex-shrink-0">
+                            <Checkbox
+                              id={`cb-${activity.id}`}
+                              checked={!!activity.completed}
+                              onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
+                            />
+                            <Button variant="ghost" size="icon" onClick={() => onRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center flex-shrink-0">
-                          <Checkbox
-                            id={`cb-${activity.id}`}
-                            checked={!!activity.completed}
-                            onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
-                          />
-                          <Button variant="ghost" size="icon" onClick={() => onRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
                       </div>
-                    </div>
-                  ))
+                    )
+                  })
                 ) : (
                   <div className="flex-grow flex items-center justify-center h-full">
                     {currentSlot === slot.name ? (
