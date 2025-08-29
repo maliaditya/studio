@@ -1062,24 +1062,25 @@ function DeepWorkPageContent() {
     const nodeType = getDeepWorkNodeType(definition);
 
     if (nodeType === 'Intention' || nodeType === 'Objective') {
-      const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
-      return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
+        const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+        return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
     
     return definition.loggedDuration || 0;
-  }, [getDeepWorkNodeType, getDescendantLeafNodes]);
+}, [getDeepWorkNodeType, getDescendantLeafNodes]);
 
-  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
+const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
     const nodeType = getUpskillNodeType(definition);
 
     if (nodeType === 'Curiosity' || nodeType === 'Objective') {
-      const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
-      return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
+        const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+        return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
     
     return definition.loggedDuration || 0;
-  }, [getUpskillNodeType, getDescendantLeafNodes]);
+}, [getUpskillNodeType, getDescendantLeafNodes]);
+
 
   const totalLoggedTime = useMemo(() => {
     if (!currentTask) return 0;
@@ -1681,40 +1682,42 @@ function DeepWorkPageContent() {
   const handleCardClick = (def: ExerciseDefinition) => {
     const findRootParent = (startNode: ExerciseDefinition): { type: 'deepwork' | 'upskill', root: ExerciseDefinition } => {
         let current: ExerciseDefinition | undefined = startNode;
-        let pathType: 'deepwork' | 'upskill' | null = null;
         const allDefs = new Map([...deepWorkDefinitions.map(d => [d.id, d]), ...upskillDefinitions.map(u => [u.id, u])]);
+        
+        let pathType: 'deepwork' | 'upskill' = upskillDefinitions.some(d => d.id === startNode.id) ? 'upskill' : 'deepwork';
 
         while (current) {
             let foundParent: ExerciseDefinition | undefined;
-            // Search in deep work definitions
-            for (const parent of deepWorkDefinitions) {
-                if ((parent.linkedDeepWorkIds || []).includes(current!.id) || (parent.linkedUpskillIds || []).includes(current!.id)) {
-                    foundParent = parent;
-                    pathType = 'deepwork';
-                    break;
-                }
-            }
-            if (!foundParent) {
-                // Search in upskill definitions if not found in deep work
-                for (const parent of upskillDefinitions) {
-                    if ((parent.linkedDeepWorkIds || []).includes(current!.id) || (parent.linkedUpskillIds || []).includes(current!.id)) {
-                        foundParent = parent;
-                        pathType = 'upskill';
-                        break;
-                    }
-                }
+            
+            const deepWorkParent = deepWorkDefinitions.find(parent => 
+                (parent.linkedDeepWorkIds || []).includes(current!.id) || (parent.linkedUpskillIds || []).includes(current!.id)
+            );
+            
+            const upskillParent = upskillDefinitions.find(parent => 
+                (parent.linkedUpskillIds || []).includes(current!.id)
+            );
+
+            // Prioritize the direct lineage type. An upskill node can be a child of a deep work node.
+            // If the current node is upskill, its parent is likely upskill unless it's a top-level link.
+            if (pathType === 'upskill' && upskillParent) {
+                foundParent = upskillParent;
+            } else if (deepWorkParent) {
+                foundParent = deepWorkParent;
+                pathType = 'deepwork';
+            } else if (upskillParent) {
+                foundParent = upskillParent;
+                pathType = 'upskill';
             }
 
             if (foundParent) {
                 current = foundParent;
             } else {
-                // No parent found, current is the root
                 break;
             }
         }
         
-        const type = upskillDefinitions.some(d => d.id === (current?.id || startNode.id)) ? 'upskill' : 'deepwork';
-        return { type, root: current || startNode };
+        const finalType = upskillDefinitions.some(d => d.id === (current?.id || startNode.id)) ? 'upskill' : 'deepwork';
+        return { type: finalType, root: current || startNode };
     };
 
     const { type: rootType, root: rootNode } = findRootParent(def);
@@ -2438,5 +2441,6 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
