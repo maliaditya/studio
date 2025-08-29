@@ -1680,6 +1680,7 @@ function DeepWorkPageContent() {
 
   const handleCardClick = (def: ExerciseDefinition) => {
     const type = deepWorkDefinitions.some(d => d.id === def.id) ? 'deepwork' : 'upskill';
+    setLibraryView(type);
     
     const nodeType = type === 'deepwork' ? getDeepWorkNodeType(def) : getUpskillNodeType(def);
 
@@ -2395,3 +2396,4 @@ export default function DeepWorkPage() {
 
 
     
+
