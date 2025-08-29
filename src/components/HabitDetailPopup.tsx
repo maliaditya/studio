@@ -22,6 +22,34 @@ interface HabitDetailPopupProps {
   onClose: () => void;
 }
 
+const MechanismDetailView = ({ mechanism }: { mechanism: Resource | null }) => {
+    if (!mechanism) {
+        return <p className="text-xs text-muted-foreground text-center py-4">No mechanism linked.</p>;
+    }
+
+    return (
+        <div className="space-y-3 text-sm">
+            <h5 className="font-semibold text-foreground">{mechanism.name}</h5>
+            <p><span className="font-semibold text-muted-foreground">Action:</span> {mechanism.trigger?.action}</p>
+            <p><span className="font-semibold text-muted-foreground">Internal Effect:</span> {mechanism.response?.visualize}</p>
+            {mechanism.mechanismFramework === 'positive' ? (
+                <>
+                    <p><span className="font-semibold text-muted-foreground">Benefit:</span> {mechanism.benefit}</p>
+                    <p><span className="font-semibold text-muted-foreground">Reward:</span> {mechanism.reward}</p>
+                </>
+            ) : (
+                <>
+                    <p><span className="font-semibold text-muted-foreground">Cost:</span> {mechanism.reward}</p>
+                    <p><span className="font-semibold text-muted-foreground">Blocks:</span> {mechanism.benefit}</p>
+                </>
+            )}
+            <p><span className="font-semibold text-muted-foreground">Condition/Opposite:</span> {mechanism.newResponse?.visualize}, {mechanism.newResponse?.action}</p>
+            <p><span className="font-semibold text-muted-foreground">Law:</span> {mechanism.law?.premise} → {mechanism.law?.outcome}</p>
+        </div>
+    );
+};
+
+
 export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps) {
     const { habitId, x, y } = popupState;
     const { resources, setResources, mechanismCards, openGeneralPopup, patterns } = useAuth();
@@ -88,6 +116,9 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
     };
     
     if (!habit) return null;
+
+    const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+    const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
     
     const pattern = patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habit.id));
 
@@ -110,17 +141,17 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-red-500">Old Response</h4>
-                                <EditableResponse field="response" label="" resource={habit} onUpdate={handleUpdateResource} onOpenNestedPopup={(id, e) => openGeneralPopup(id, e)} />
+                                <MechanismDetailView mechanism={negativeMechanism} />
                             </div>
                              <div className="space-y-2">
                                 <h4 className="font-semibold text-sm text-green-500">New Response</h4>
-                                <EditableResponse field="newResponse" label="" resource={habit} onUpdate={handleUpdateResource} onOpenNestedPopup={(id, e) => openGeneralPopup(id, e)} />
+                                <MechanismDetailView mechanism={positiveMechanism} />
                             </div>
                         </div>
                          <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <h4 className="font-semibold text-sm text-red-500 mb-2">Resistance</h4>
-                                <ResistanceSection habit={habit} handleStopperStatusChange={handleStopperStatusChange} handleDeleteStopper={handleDeleteStopper} newStopperText={newStopperText} setNewStopperText={setNewStopperText} handleAddStopper={handleAddStopper} />
+                                <h4 className="font-semibold text-sm text-red-500 mb-2">{pattern?.type === 'Negative' ? 'Urge' : 'Resistance'}</h4>
+                                <ResistanceSection habit={habit} handleDeleteStopper={handleDeleteStopper} newStopperText={newStopperText} setNewStopperText={setNewStopperText} handleAddStopper={handleAddStopper} />
                             </div>
                             <div>
                                 <h4 className="font-semibold text-sm text-green-500 mb-2">Truth</h4>
@@ -134,47 +165,40 @@ export function HabitDetailPopup({ popupState, onClose }: HabitDetailPopupProps)
     );
 }
 
-const ResistanceSection = ({ habit, handleStopperStatusChange, handleDeleteStopper, newStopperText, setNewStopperText, handleAddStopper }: { 
+const ResistanceSection = ({ habit, handleDeleteStopper, newStopperText, setNewStopperText, handleAddStopper }: { 
     habit: Resource, 
-    handleStopperStatusChange: (e: React.PointerEvent<HTMLButtonElement>, stopperId: string, status: 'manageable' | 'unmanageable') => void,
     handleDeleteStopper: (stopperId: string) => void,
     newStopperText: string,
     setNewStopperText: (text: string) => void,
     handleAddStopper: () => void,
-}) => (
-    <div>
-        <ScrollArea className="h-40 pr-2 border rounded-md p-2">
-            <div className="space-y-2">
-                {(habit.stoppers || []).map(stopper => (
-                    <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left flex items-center justify-between">
-                        <p>{stopper.text}</p>
-                        <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'manageable'); }}>
-                                <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
-                                <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => handleDeleteStopper(stopper.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                            </Button>
-                        </div>
-                    </div>
-                ))}
+}) => {
+    return (
+        <div>
+            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2 border rounded-md p-2")}>
+              <div className="space-y-2">
+                  {(habit.stoppers || []).map(stopper => (
+                      <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left flex items-center justify-between">
+                          <p>{stopper.text}</p>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                      </div>
+                  ))}
+              </div>
+            </ScrollArea>
+            <div className="mt-2 flex gap-2">
+                <Input
+                    value={newStopperText}
+                    onChange={(e) => setNewStopperText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
+                    placeholder="What's the urge?"
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
             </div>
-        </ScrollArea>
-        <div className="mt-2 flex gap-2">
-            <Input
-                value={newStopperText}
-                onChange={(e) => setNewStopperText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
-                placeholder="What's the urge?"
-                className="h-8 text-xs"
-            />
-            <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
         </div>
-    </div>
-);
+    );
+};
 
 const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStrengthText, handleAddStrength }: { 
     habit: Resource, 
@@ -182,29 +206,31 @@ const TruthSection = ({ habit, handleDeleteStrength, newStrengthText, setNewStre
     newStrengthText: string,
     setNewStrengthText: (text: string) => void,
     handleAddStrength: () => void,
-}) => (
-    <div>
-        <ScrollArea className="h-40 pr-2 border rounded-md p-2">
-            <div className="space-y-2">
-                {(habit.strengths || []).map(strength => (
-                    <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
-                        <p className="flex-grow pr-2">{strength.text}</p>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(strength.id)}>
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                    </div>
-                ))}
+}) => {
+    return (
+        <div>
+            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2 border rounded-md p-2")}>
+              <div className="space-y-2">
+                  {(habit.strengths || []).map(strength => (
+                      <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
+                          <p className="flex-grow pr-2">{strength.text}</p>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(strength.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                      </div>
+                  ))}
+              </div>
+            </ScrollArea>
+            <div className="mt-2 flex gap-2">
+                <Input
+                    value={newStrengthText}
+                    onChange={(e) => setNewStrengthText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
+                    placeholder="What's the truth?"
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
             </div>
-        </ScrollArea>
-        <div className="mt-2 flex gap-2">
-            <Input
-                value={newStrengthText}
-                onChange={(e) => setNewStrengthText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
-                placeholder="What's the truth?"
-                className="h-8 text-xs"
-            />
-            <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
         </div>
-    </div>
-);
+    );
+};
