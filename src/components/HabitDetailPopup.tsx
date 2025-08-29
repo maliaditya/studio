@@ -16,149 +16,11 @@ import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRul
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { Separator } from './ui/separator';
-import { format, parseISO } from 'date-fns';
-
-interface LogicDiagramPopupState {
-    rule: MetaRule;
-}
-
-interface ManageResistancePopupState {
-    habitId: string;
-    stopper: Stopper;
-    x: number;
-    y: number;
-}
-
-
-const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
-        {children}
-    </div>
-);
-
-const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPopupState; onClose: () => void; }) => {
-    const { rule } = popupState;
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `logic-diagram-${rule.id}` });
-    const { habitCards, mechanismCards, patterns } = useAuth();
-    
-    const pattern = patterns.find(p => p.id === rule.patternId);
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px), 0)` : 'translate(-50%, -50%)',
-        zIndex: 110,
-    };
-
-    const linkedHabit = useMemo(() => {
-        if (!pattern) return null;
-        const habitPhrase = pattern.phrases.find(p => p.category === 'Habit Cards');
-        if (!habitPhrase) return null;
-        return habitCards.find(h => h.id === habitPhrase.mechanismCardId);
-    }, [pattern, habitCards]);
-
-    if (!linkedHabit) {
-        return (
-            <div ref={setNodeRef} style={style} {...attributes}>
-                <Card className="w-[400px] shadow-2xl border-2 border-primary/30 bg-card">
-                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-4 text-center text-muted-foreground">
-                        No Habit Card is linked to this pattern. A logic diagram cannot be generated.
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-    
-    const negativeMechanism = mechanismCards.find(m => m.id === linkedHabit.response?.resourceId);
-    const positiveMechanism = mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId);
-    const stoppers = linkedHabit.stoppers || [];
-    
-    const negativeCosts = [
-        negativeMechanism?.reward ? `Blocks: ${negativeMechanism.reward}` : null,
-        negativeMechanism?.benefit ? `Costs me: ${negativeMechanism.benefit}` : null
-    ].filter(Boolean);
-
-    const positiveBenefits = [
-        positiveMechanism?.benefit ? `Enables: ${positiveMechanism.benefit}` : null,
-        positiveMechanism?.reward ? `Gives me: ${positiveMechanism.reward}` : null
-    ].filter(Boolean);
-
-
-    return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-auto max-w-[90vw] shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic for: "{rule.text}"</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                    <div className="flex flex-col items-center space-y-2">
-                        <FlowNode>Trigger: When I {linkedHabit.trigger?.action || '...'}</FlowNode>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        <FlowNode className="font-bold bg-primary/10">{rule.text}</FlowNode>
-                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                        
-                        <div className="flex w-full justify-around items-start gap-4">
-                            {/* Negative Path */}
-                            <div className="flex flex-col items-center space-y-2 w-1/2">
-                                <Badge variant="destructive">Old Path</Badge>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="bg-red-100/50 border-red-500/50 w-full">Response: {linkedHabit.response?.visualize || '...'}</FlowNode>
-                                {stoppers.length > 0 && (
-                                    <>
-                                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                        <FlowNode className="border-yellow-500/50 bg-yellow-100/30 w-full">
-                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Resistance</p>
-                                            <ul className="list-disc list-inside text-left mt-1">
-                                                {stoppers.map(s => <li key={s.id}>{s.text}</li>)}
-                                            </ul>
-                                        </FlowNode>
-                                    </>
-                                )}
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="w-full bg-red-100/20">
-                                    <p className="font-semibold">Costs & Consequences</p>
-                                    <ul className="list-disc list-inside text-left mt-1">
-                                        {negativeCosts.length > 0 ? negativeCosts.map((c, i) => <li key={i}>{c}</li>) : <li>Not specified</li>}
-                                    </ul>
-                                </FlowNode>
-                            </div>
-
-                             {/* Positive Path */}
-                            <div className="flex flex-col items-center space-y-2 w-1/2">
-                                <Badge variant="secondary" className="bg-green-600 text-white">New Path</Badge>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="bg-green-100/50 border-green-500/50 w-full">New Response: {linkedHabit.newResponse?.action || '...'}</FlowNode>
-                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
-                                <FlowNode className="w-full bg-green-100/20">
-                                     <p className="font-semibold">Benefits & Rewards</p>
-                                     <ul className="list-disc list-inside text-left mt-1">
-                                        {positiveBenefits.length > 0 ? positiveBenefits.map((b, i) => <li key={i}>{b}</li>) : <li>Not specified</li>}
-                                    </ul>
-                                </FlowNode>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    );
-};
 
 const ManageResistancePopup = ({ habit, popupState, onClose }: {
     habit: Resource;
-    popupState: ManageResistancePopupState;
+    popupState: { stopper: Stopper; x: number; y: number; };
     onClose: () => void;
 }) => {
     const { setResources, resources: allResources } = useAuth();
@@ -194,47 +56,47 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     };
 
     return (
-            <div ref={setNodeRef} style={style} {...attributes}>
-                <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                    <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-center">
-                            <CardTitle className="text-base">Manage Resistance</CardTitle>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
-                        </div>
-                        <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                        <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
-                        <div>
-                            <Label htmlFor="management-strategy">How will you manage this?</Label>
-                            <Textarea 
-                                id="management-strategy" 
-                                value={managementStrategy}
-                                onChange={(e) => setManagementStrategy(e.target.value)}
-                                placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                            <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                                <SelectTrigger id="linked-resource">
-                                    <SelectValue placeholder="Select a resource..." />
-                                </SelectTrigger>
-                                <SelectContent side="right" align="start" sideOffset={5}>
-                                    <SelectItem value="none">-- None --</SelectItem>
-                                    {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                        <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="p-3 flex justify-end gap-2">
-                        <Button variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                    </CardFooter>
-                </Card>
-            </div>
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base">Manage Resistance</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
+                    </div>
+                    <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
+                    <div>
+                        <Label htmlFor="management-strategy">How will you manage this?</Label>
+                        <Textarea 
+                            id="management-strategy" 
+                            value={managementStrategy}
+                            onChange={(e) => setManagementStrategy(e.target.value)}
+                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                        <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                            <SelectTrigger id="linked-resource">
+                                <SelectValue placeholder="Select a resource..." />
+                            </SelectTrigger>
+                            <SelectContent side="right" align="start" sideOffset={5}>
+                                <SelectItem value="none">-- None --</SelectItem>
+                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+                <CardFooter className="p-3 flex justify-end gap-2">
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                </CardFooter>
+            </Card>
+        </div>
     );
 };
 
@@ -243,16 +105,14 @@ export function HabitDetailPopup({ popupState, onClose }: {
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, patterns, resources, openGeneralPopup } = useAuth();
+    const { setResources, mechanismCards, resources, openGeneralPopup } = useAuth();
     const { habitId, x, y } = popupState;
     const habit = resources.find(r => r.id === habitId);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
-    const [logicDiagramRule, setLogicDiagramRule] = useState<LogicDiagramPopupState | null>(null);
     const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
-    const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -265,26 +125,11 @@ export function HabitDetailPopup({ popupState, onClose }: {
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
-    
-    useEffect(() => {
-        setCurrentHabitIndex(0);
-    }, [habitId]);
 
     if (!habit) return null;
     
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
-
-    const linkedHabits: Resource[] = []; // This functionality was removed as it was faulty.
-
-    const handleNextHabit = () => {
-        setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
-    };
-
-    const handlePrevHabit = () => {
-        setCurrentHabitIndex((prevIndex) => (prevIndex - 1 + linkedHabits.length) % linkedHabits.length);
-    };
-
 
     const handleAddStopper = (habitId: string, newStopperText: string) => {
         if (!newStopperText.trim()) return;
@@ -456,43 +301,39 @@ export function HabitDetailPopup({ popupState, onClose }: {
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
-                <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
-                    <CardHeader className="p-4 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-start">
-                            <div className="flex-grow pr-10">
-                                <CardTitle className="text-lg">{habit.name}</CardTitle>
-                                <CardDescription>Trigger: When I {habit.trigger?.action || '...'}</CardDescription>
-                            </div>
-                            <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
+                <Card ref={cardRef} className="w-[450px] shadow-2xl border-2 border-primary/30 bg-card">
+                    <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <span className="text-primary"><Zap className="h-5 w-5" /></span>
+                                {habit.name}
+                            </CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
+                                <X className="h-4 w-4" />
+                            </Button>
                         </div>
+                        <CardDescription>
+                            Trigger: When I {habit.trigger?.action || '...'}
+                        </CardDescription>
                     </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-3 text-sm">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
-                            {/* Negative Path */}
-                            <div className="space-y-2">
-                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
-                                <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}</span></p>
-                                    <p><span className="font-medium text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{negativeMechanism?.response?.visualize || '...'}</span></p>
-                                    <p><span className="font-medium text-muted-foreground">Blocks:</span> <span className="text-foreground">{negativeMechanism?.reward || '...'}</span></p>
-                                </div>
-                            </div>
-                            {/* Positive Path */}
-                            <div className="space-y-2">
-                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
-                                <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{positiveMechanism?.name || 'Unlinked'}</span></p>
-                                    <p><span className="font-medium text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{positiveMechanism?.response?.visualize || '...'}</span></p>
-                                    <p><span className="font-medium text-muted-foreground">Reward:</span> <span className="text-foreground">{positiveMechanism?.reward || '...'}</span></p>
-                                </div>
+                    <CardContent className="p-3 pt-0 text-sm space-y-4">
+                        <div className="p-3 rounded-md bg-muted/30">
+                            <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
+                            <div className="text-xs space-y-1 mt-1">
+                                <p><span className="text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}</span></p>
+                                <p><span className="text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{negativeMechanism?.response?.visualize || '...'}</span></p>
+                                <p><span className="text-muted-foreground">Blocks:</span> <span className="text-foreground">{negativeMechanism?.reward || '...'}</span></p>
                             </div>
                         </div>
-
-                        <div className="pt-2 mt-2">
+                        <div className="p-3 rounded-md bg-muted/30">
+                            <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
+                            <div className="text-xs space-y-1 mt-1">
+                                <p><span className="text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{positiveMechanism?.name || 'Unlinked'}</span></p>
+                                <p><span className="text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{positiveMechanism?.response?.visualize || '...'}</span></p>
+                                <p><span className="text-muted-foreground">Reward:</span> <span className="text-foreground">{positiveMechanism?.benefit || '...'}</span></p>
+                            </div>
+                        </div>
+                        <div className="pt-2">
                             <Tabs defaultValue="truth" className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
@@ -509,12 +350,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
                     </CardContent>
                 </Card>
             </div>
-            {logicDiagramRule && (
-                <LogicDiagramPopup 
-                    popupState={logicDiagramRule} 
-                    onClose={() => setLogicDiagramRule(null)} 
-                />
-            )}
              {manageResistancePopupState && (
                 <ManageResistancePopup
                     habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
