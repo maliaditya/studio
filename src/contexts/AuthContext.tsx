@@ -1008,7 +1008,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     if (!currentSettings.carryForward) return;
 
-    const today = new Date();
+    const today = startOfToday();
     const todayDateKey = format(today, 'yyyy-MM-dd');
     const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
@@ -1037,7 +1037,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
       
       const activitiesToCarry = incompleteActivities.filter(activity => {
-          if(activity.completed) return false;
           if(activity.isRoutine) return true; // Always carry over routine tasks
           if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
           if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
@@ -1049,13 +1048,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             activitiesToCarry.map(activity => {
                 let newDetails = activity.details;
 
-                if (!activity.isRoutine) { // Only update details for non-routine tasks
+                // Regenerate details for workout tasks regardless of routine status
+                if (activity.type === 'workout') {
+                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                    newDetails = description.split(' for ')[1] || "Workout";
+                } else if (!activity.isRoutine) { // For non-routine, non-workout tasks, reset details
                     switch (activity.type) {
-                      case 'workout': {
-                        const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                        newDetails = description.split(' for ')[1] || "Workout";
-                        break;
-                      }
                       case 'upskill': newDetails = 'Learning Session'; break;
                       case 'deepwork': newDetails = 'Deep Work Session'; break;
                       case 'planning': newDetails = 'Planning Session'; break;
@@ -1063,9 +1061,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       case 'branding': newDetails = 'Branding Session'; break;
                       case 'lead-generation': newDetails = 'Lead Generation Session'; break;
                     }
-                } else if (activity.type === 'workout') { // ALSO update details for ROUTINE workouts
-                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                    newDetails = description.split(' for ')[1] || "Workout";
                 }
 
                 return {
@@ -1073,7 +1068,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   id: `${activity.type}-${Date.now()}-${Math.random()}`,
                   completed: false,
                   details: newDetails,
-                  taskIds: activity.isRoutine ? activity.taskIds : [], // Reset taskIds for non-routine
+                  taskIds: activity.isRoutine ? activity.taskIds : [],
                 };
             })
         );
@@ -2616,6 +2611,8 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
+
 
 
 
