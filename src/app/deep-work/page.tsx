@@ -1593,35 +1593,44 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
     setActiveId(null);
     const { active, over } = event;
 
-    if (!over || active.id === over.id) {
+    if (!over || active.id === over.id || !over.data.current) {
         return;
     }
 
     const { itemType: activeSubtaskType, subtaskId } = active.data.current || {};
-    const { id: targetId, itemType: targetCardType, definition: targetCardDefinition } = over.data.current || {};
+    const { id: targetCardId, itemType: targetCardType } = over.data.current;
 
-    if (!subtaskId || !targetId || !targetCardType || over.data.current?.type !== 'card') {
+    if (!activeSubtaskType || !subtaskId || !targetCardId || !targetCardType) {
         return;
     }
-    
-    const setOldParentDefs = (updater: (prev: ExerciseDefinition[]) => ExerciseDefinition[]) => {
-        setDeepWorkDefinitions(updater);
-        setUpskillDefinitions(updater);
-    };
 
-    setOldParentDefs((prev: ExerciseDefinition[]) => prev.map(def => ({
-        ...def,
-        linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== subtaskId),
-        linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== subtaskId),
-        linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== subtaskId),
-    })));
+    // Unlink from old parent
+    const oldParentId = active.data.current?.parentId;
+    if (oldParentId) {
+        const isOldParentDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
+        const setOldParentDefs = isOldParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
 
-    const setNewParentDefs = targetCardType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
+        setOldParentDefs((prev: ExerciseDefinition[]) => prev.map(def => {
+            if (def.id === oldParentId) {
+                return {
+                    ...def,
+                    linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== subtaskId),
+                    linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== subtaskId),
+                    linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== subtaskId),
+                };
+            }
+            return def;
+        }));
+    }
+
+    // Link to new parent
+    const isNewParentDeepWork = targetCardType === 'deepwork';
+    const setNewParentDefs = isNewParentDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
     const newLinkKey = activeSubtaskType === 'deepwork' ? 'linkedDeepWorkIds' :
                        activeSubtaskType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
 
     setNewParentDefs((prev: ExerciseDefinition[]) => prev.map(def => {
-        if (def.id === targetId) {
+        if (def.id === targetCardId) {
             const currentLinks = def[newLinkKey as keyof ExerciseDefinition] as string[] || [];
             if (!currentLinks.includes(subtaskId)) {
                 return { ...def, [newLinkKey]: [...currentLinks, subtaskId] };
@@ -1631,7 +1640,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
     }));
 
     toast({ title: "Task Re-linked!", description: `Item moved to a new parent.` });
-};
+  };
+
 
   const handleToggleReadyForBranding = (defId: string) => {
     setDeepWorkDefinitions(prev => prev.map(def =>
@@ -1694,26 +1704,19 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
         while (current) {
             let foundParent: ExerciseDefinition | undefined;
             
-            // Prioritize parent of the same type first
-            if(pathType === 'upskill') {
-                foundParent = upskillDefinitions.find(parent => (parent.linkedUpskillIds || []).includes(current!.id));
-            } else { // deepwork
-                foundParent = deepWorkDefinitions.find(parent => (parent.linkedDeepWorkIds || []).includes(current!.id));
-            }
+            const parentId = Array.from(allDefs.values()).find(parent => 
+                (parent.linkedDeepWorkIds || []).includes(current!.id) || 
+                (parent.linkedUpskillIds || []).includes(current!.id)
+            )?.id;
             
-            // If no parent of same type, check for cross-link
-            if (!foundParent) {
-                if(pathType === 'deepwork') { // current is deepwork, check for upskill parent
-                     foundParent = upskillDefinitions.find(parent => (parent.linkedDeepWorkIds || []).includes(current!.id));
-                     if(foundParent) pathType = 'upskill';
-                } else { // current is upskill, check for deepwork parent
-                    foundParent = deepWorkDefinitions.find(parent => (parent.linkedUpskillIds || []).includes(current!.id));
-                    if(foundParent) pathType = 'deepwork';
+            if (parentId) {
+                foundParent = allDefs.get(parentId);
+                if (foundParent) {
+                    current = foundParent;
+                    pathType = upskillDefinitions.some(d => d.id === current?.id) ? 'upskill' : 'deepwork';
+                } else {
+                    break;
                 }
-            }
-            
-            if (foundParent) {
-                current = foundParent;
             } else {
                 break;
             }
@@ -2440,6 +2443,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
