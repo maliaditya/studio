@@ -85,24 +85,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [focusedObjective, allDefinitions]);
   
-  const allCompletedSubTaskIds = useMemo(() => new Set([
-      ...Array.from(permanentlyLoggedTaskIds), 
-      ...Array.from(sessionCompletedSubTaskIds)
-  ]), [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds]);
+  const isSubTaskComplete = useCallback((task: ExerciseDefinition) => {
+    return permanentlyLoggedTaskIds.has(task.id) || 
+           sessionCompletedSubTaskIds.has(task.id) ||
+           (task.loggedDuration || 0) > 0;
+  }, [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds]);
 
   const activeSubTask = useMemo(() => {
-    return subTasks.find(task => !allCompletedSubTaskIds.has(task.id)) || null;
-  }, [subTasks, allCompletedSubTaskIds]);
+    return subTasks.find(task => !isSubTaskComplete(task)) || null;
+  }, [subTasks, isSubTaskComplete]);
   
   const pendingSubTasks = useMemo(() => {
     return subTasks.filter(task => 
-      !allCompletedSubTaskIds.has(task.id) && task.id !== activeSubTask?.id
+      !isSubTaskComplete(task) && task.id !== activeSubTask?.id
     );
-  }, [subTasks, activeSubTask?.id, allCompletedSubTaskIds]);
+  }, [subTasks, activeSubTask?.id, isSubTaskComplete]);
 
   const completedSubTaskComponents = useMemo(() => {
-    return subTasks.filter(task => allCompletedSubTaskIds.has(task.id));
-  }, [subTasks, allCompletedSubTaskIds]);
+    return subTasks.filter(task => isSubTaskComplete(task));
+  }, [subTasks, isSubTaskComplete]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
@@ -179,7 +180,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const newCompletedSet = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
     setSessionCompletedSubTaskIds(newCompletedSet);
     
-    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id));
+    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id) && (st.loggedDuration || 0) === 0);
 
     if (nextTask) {
         handleStartSubTask(nextTask);
