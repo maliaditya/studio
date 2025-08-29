@@ -303,13 +303,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!focusedObjective) return;
     const isUpskill = upskillDefinitions.some(d => d.id === focusedObjective.id);
     if (isUpskill) {
-        setSelectedUpskillTask(focusedObjective);
-        router.push('/upskill');
+      setSelectedUpskillTask(focusedObjective);
     } else {
-        setSelectedDeepWorkTask(focusedObjective);
-        router.push('/deep-work');
+      setSelectedDeepWorkTask(focusedObjective);
     }
-    onClose();
+    router.push('/deep-work');
   };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
