@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -26,14 +25,14 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
 import { Checkbox } from '@/components/ui/checkbox';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -106,6 +105,7 @@ function MyPlatePageContent() {
     deleteWorkoutSet,
     removeExerciseFromWorkout,
     swapWorkoutExercise,
+    resources,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -132,6 +132,8 @@ function MyPlatePageContent() {
   const [essentialsModalState, setEssentialsModalState] = useState<{isOpen: boolean, slotName: string | null, activity: Activity | null}>({ isOpen: false, slotName: null, activity: null });
   const [essentialDetails, setEssentialDetails] = useState('');
   const [essentialDuration, setEssentialDuration] = useState('');
+  const [essentialLinkedHabitId, setEssentialLinkedHabitId] = useState<string | null>(null);
+
   
   // Meal selection modal
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
@@ -150,6 +152,10 @@ function MyPlatePageContent() {
   // New state to track if carry-over has run
   const [carryOverComplete, setCarryOverComplete] = useState(false);
   
+  const habitResources = useMemo(() => {
+    return resources.filter(r => r.type === 'habit');
+  }, [resources]);
+
   useEffect(() => {
     // Correctly initialize date on client-side to prevent hydration mismatch
     setSelectedDate(new Date());
@@ -229,11 +235,32 @@ function MyPlatePageContent() {
             if (activitiesToCarry.length > 0) {
                 if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
                 (newTodaySchedule[slotName] as Activity[]).push(
-                    ...activitiesToCarry.map(activity => ({
-                        ...activity,
-                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false, // Reset completion status for the new day
-                    }))
+                    ...activitiesToCarry.map(activity => {
+                        let newDetails = activity.details;
+                        // Always regenerate workout details for today, regardless of routine status
+                        if (activity.type === 'workout') {
+                            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                            newDetails = description.split(' for ')[1] || "Workout";
+                        } else if (!activity.isRoutine) { // For other non-routine tasks, reset details to generic
+                            switch (activity.type) {
+                                case 'upskill': newDetails = 'Learning Session'; break;
+                                case 'deepwork': newDetails = 'Deep Work Session'; break;
+                                case 'planning': newDetails = 'Planning Session'; break;
+                                case 'tracking': newDetails = 'Tracking Session'; break;
+                                case 'branding': newDetails = 'Branding Session'; break;
+                                case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                            }
+                        }
+                
+                        return {
+                            ...activity,
+                            id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                            completed: false, // Reset completion status for the new day
+                            details: newDetails,
+                            // Keep taskIds for routine tasks, clear for non-routine to allow re-selection
+                            taskIds: activity.isRoutine ? activity.taskIds : [],
+                        };
+                    })
                 );
                 carriedOver = true;
             }
@@ -245,7 +272,7 @@ function MyPlatePageContent() {
         toast({ title: "Tasks Carried Over", description: "Yesterday's tasks have been moved to today." });
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
     const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
@@ -261,6 +288,7 @@ function MyPlatePageContent() {
     if (type === 'essentials') {
         setEssentialDetails('');
         setEssentialDuration('');
+        setEssentialLinkedHabitId(null);
         setEssentialsModalState({ isOpen: true, slotName, activity: null });
         return;
     }
@@ -388,7 +416,7 @@ function MyPlatePageContent() {
                 if (Array.isArray(daySchedule[slotName])) {
                     (daySchedule[slotName] as Activity[]) = (daySchedule[slotName] as Activity[]).map(act => 
                         act.id === activity.id 
-                            ? { ...act, details: essentialDetails, duration: durationMinutes }
+                            ? { ...act, details: essentialDetails, duration: durationMinutes, taskIds: essentialLinkedHabitId ? [essentialLinkedHabitId] : [] }
                             : act
                     );
                     newSchedule[selectedDateKey] = daySchedule;
@@ -404,7 +432,7 @@ function MyPlatePageContent() {
             type: 'essentials',
             details: essentialDetails,
             completed: false,
-            taskIds: [],
+            taskIds: essentialLinkedHabitId ? [essentialLinkedHabitId] : [],
             duration: durationMinutes,
             slot: slotName,
         };
@@ -421,6 +449,7 @@ function MyPlatePageContent() {
 
     setEssentialDetails('');
     setEssentialDuration('');
+    setEssentialLinkedHabitId(null);
     setEssentialsModalState({ isOpen: false, slotName: null, activity: null });
   };
 
@@ -530,6 +559,7 @@ function MyPlatePageContent() {
     } else if (activity.type === 'essentials') {
         setEssentialDetails(activity.details);
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
+        setEssentialLinkedHabitId(activity.taskIds?.[0] || null);
         setEssentialsModalState({ isOpen: true, slotName, activity });
     } else if (activity.type === 'nutrition') {
       openTodaysDietPopup(event);
@@ -1157,7 +1187,7 @@ function MyPlatePageContent() {
             </DialogContent>
         </Dialog>
         
-         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>
+         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => { if(!isOpen) setEssentialsModalState({ isOpen: false, slotName: null, activity: null }); }}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{essentialsModalState.activity ? 'Edit' : 'Log a'} Daily Essential</DialogTitle>
@@ -1171,6 +1201,23 @@ function MyPlatePageContent() {
                     <div className="space-y-1">
                         <Label htmlFor="essential-duration">Est. Duration (minutes)</Label>
                         <Input id="essential-duration" type="number" value={essentialDuration} onChange={(e) => setEssentialDuration(e.target.value)} placeholder="e.g., 15" />
+                    </div>
+                    <div className="space-y-1">
+                        <Label htmlFor="essential-habit">Link Habit (Optional)</Label>
+                        <Select
+                            value={essentialLinkedHabitId || ''}
+                            onValueChange={(value) => setEssentialLinkedHabitId(value === 'none' ? null : value)}
+                        >
+                            <SelectTrigger id="essential-habit">
+                                <SelectValue placeholder="Select a habit..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">-- None --</SelectItem>
+                                {habitResources.map(habit => (
+                                    <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
                 <DialogFooter>
@@ -1202,3 +1249,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
