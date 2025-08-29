@@ -1,5 +1,5 @@
 
-
+      
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -60,7 +60,7 @@ function AgendaWidgetItem({
         const taskDef = taskDefId ? allDefs.find(d => d.id === taskDefId) : null;
         
         if (taskDef) {
-            router.push(`/${activity.type}`);
+            router.push(`/deep-work`);
             setTimeout(() => { // Allow router to navigate before setting state
                 if (activity.type === 'deepwork') {
                     setSelectedDeepWorkTask(taskDef);
@@ -448,3 +448,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
