@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ interface AgendaWidgetItemProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
-  onClick: (activity: Activity, event: React.MouseEvent) => void;
+  handleAgendaItemClick: (activity: Activity, event: React.MouseEvent) => void;
 }
 
 function AgendaWidgetItem({ 
@@ -43,16 +43,29 @@ function AgendaWidgetItem({
     onToggleComplete, 
     onStartLeadGenLog, 
     onOpenTaskContext,
-    onClick,
+    handleAgendaItemClick
 }: AgendaWidgetItemProps) {
-  const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
-  const router = useRouter();
+  const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
+  const [isHabitPopoverOpen, setIsHabitPopoverOpen] = useState(false);
 
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
     const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
     displayDetails = description.split(' for ')[1] || "Workout";
   }
+
+  const handleLinkHabit = (habitId: string) => {
+    const updatedActivity = { ...activity, habitEquationIds: [habitId] };
+    updateActivity(updatedActivity);
+    setIsHabitPopoverOpen(false);
+  };
+  
+  const linkedHabit = useMemo(() => {
+    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+      return habitCards.find(h => h.id === activity.habitEquationIds![0]);
+    }
+    return null;
+  }, [activity.habitEquationIds, habitCards]);
 
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
@@ -65,15 +78,51 @@ function AgendaWidgetItem({
         </button>
         <div 
           className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
-          onClick={(e) => onClick(activity, e)}
+          onClick={(e) => handleAgendaItemClick(activity, e)}
         >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
             {displayDetails}
           </p>
+          {linkedHabit && (
+            <p className="text-xs text-primary font-medium truncate">
+                Habit: {linkedHabit.name}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
+        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'essentials' && (
+             <Popover open={isHabitPopoverOpen} onOpenChange={setIsHabitPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                        <LinkIcon className="h-4 w-4" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-60 p-0">
+                    <div className="p-2 space-y-1">
+                        <h4 className="font-medium text-sm px-2">Link Habit</h4>
+                        <ScrollArea className="h-40">
+                            {habitCards.map(habit => (
+                                <Button
+                                    key={habit.id}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full justify-start text-xs"
+                                    onClick={() => handleLinkHabit(habit.id)}
+                                >
+                                    {habit.name}
+                                </Button>
+                            ))}
+                        </ScrollArea>
+                    </div>
+                </PopoverContent>
+            </Popover>
+        )}
         {!activity.completed && activity.type !== 'interrupt' ? (
             <Button
                 variant="ghost"
@@ -412,7 +461,7 @@ export function TodaysScheduleCard({
                         onToggleComplete={onToggleComplete}
                         onStartLeadGenLog={onStartLeadGenLog}
                         onOpenTaskContext={onOpenTaskContext}
-                        onClick={handleAgendaItemClick}
+                        handleAgendaItemClick={handleAgendaItemClick}
                     />
                     ))}
                 </ul>
