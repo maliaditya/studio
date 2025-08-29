@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -313,6 +314,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const strokeDashoffset = totalSeconds > 0 ? CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE) : CIRCUMFERENCE;
+  
+  const allSubTasksCompleted = showSubTasks && !activeSubTask;
+  let nowFocusingText: string;
+
+  if (allSubTasksCompleted) {
+    nowFocusingText = "All sub-tasks completed!";
+  } else if (activeSubTask) {
+    nowFocusingText = activeSubTask.name;
+  } else {
+    nowFocusingText = activity.details;
+  }
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -382,7 +394,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
-                    <p className="text-sm font-semibold truncate" title={activeSubTask?.name || activity.details}>{activeSubTask?.name || activity.details}</p>
+                    <p className="text-sm font-semibold truncate" title={nowFocusingText}>{nowFocusingText}</p>
                     {showSubTasks && activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
                         <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
                             <Timer className="h-4 w-4" />
@@ -410,7 +422,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                           {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={handleSubTaskComplete}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={handleSubTaskComplete} disabled={allSubTasksCompleted}>
                           <Check className="h-4 w-4" />
                       </Button>
                     </div>
