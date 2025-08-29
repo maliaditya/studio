@@ -106,6 +106,7 @@ function MyPlatePageContent() {
     deleteWorkoutSet,
     removeExerciseFromWorkout,
     swapWorkoutExercise,
+    resources,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
