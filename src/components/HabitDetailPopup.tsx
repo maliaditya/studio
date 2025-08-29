@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch } from 'lucide-react';
+import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -13,7 +13,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRule } from '@/types/workout';
-import { EditableField, EditableResponse } from './EditableFields';
+import { EditableResponse } from './EditableFields';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
@@ -276,27 +276,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
     
-    const categorizedPhrasesForHabit = useMemo(() => {
-        if (!pattern || !habit) return {};
-
-        const relevantMechanismIds = new Set([
-            habit.response?.resourceId,
-            habit.newResponse?.resourceId
-        ].filter(Boolean));
-
-        return pattern.phrases.reduce((acc, phrase) => {
-            if (phrase.category === 'Habit Cards' || !relevantMechanismIds.has(phrase.mechanismCardId)) {
-                return acc;
-            }
-            if (!acc[phrase.category]) {
-                acc[phrase.category] = [];
-            }
-            acc[phrase.category].push(phrase.text);
-            return acc;
-        }, {} as Record<string, string[]>);
-    }, [pattern, habit]);
-
-
     const handleNextHabit = () => {
         setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
     };
@@ -474,17 +453,18 @@ export function HabitDetailPopup({ popupState, onClose }: {
     };
 
     const linkedHabits = useMemo(() => {
+        const pattern = patterns.find(p => p.phrases.some(ph => ph.mechanismCardId === habitId));
         if (!pattern) return [];
         const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
         return habitPhrases.map(phrase => {
             return habitCards.find(h => h.id === phrase.mechanismCardId);
         }).filter((h): h is Resource => !!h);
-    }, [pattern, habitCards]);
+    }, [patterns, habitCards, habitId]);
 
 
     return (
         <>
-            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={rule.id}>
+            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
                 <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
                     <CardHeader className="p-4 relative cursor-grab" {...listeners}>
                         <div className="flex justify-between items-start">
@@ -493,9 +473,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <CardDescription>Trigger: When I {habit.trigger?.action || '...'}</CardDescription>
                             </div>
                             <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule({ rule }); }}>
-                                    <Workflow className="h-4 w-4" />
-                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -518,7 +495,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
                                     <p><span className="font-medium">Name:</span> {positiveMechanism?.name || 'Unlinked'}</p>
-                                    <p><span className="font-medium">Internal Effect:</span> {positiveMechanism?.newResponse?.visualize || '...'}</p>
+                                    <p><span className="font-medium">New Response:</span> {positiveMechanism?.newResponse?.action || '...'}</p>
                                     <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
                                 </div>
                             </div>
