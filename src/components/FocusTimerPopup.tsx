@@ -13,6 +13,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface FocusTimerPopupProps {
@@ -37,6 +38,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setSelectedUpskillTask,
   } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
@@ -152,10 +154,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             }
         }
         handleToggleComplete(activity.slot, activity.id, true);
+        toast({ title: "Objective Complete!", description: `All tasks for "${focusedObjective?.name}" are done.` });
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name]);
   
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask && !showSubTasks) {
@@ -174,7 +177,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (durationMinutes > 0) {
         logSubTaskTime(activeSubTask.id, durationMinutes);
     } else {
-        // If duration is 0, it means it was completed instantly. Log at least 1 minute.
         logSubTaskTime(activeSubTask.id, 1);
     }
     
