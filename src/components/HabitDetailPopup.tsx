@@ -269,7 +269,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     
     useEffect(() => {
         setCurrentHabitIndex(0);
-    }, [ruleId]);
+    }, [habitId]);
 
     if (!habit) return null;
     
@@ -297,7 +297,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">Response:</span> {habit.response?.text || '...'}</p>
+                                    <p><span className="font-medium">Response:</span> {negativeMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">Internal Effect:</span> {negativeMechanism?.response?.visualize || '...'}</p>
                                     <p><span className="font-medium">Blocks:</span> {negativeMechanism?.reward || '...'}</p>
                                 </div>
@@ -306,7 +306,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">New Response:</span> {habit.newResponse?.action || '...'}</p>
+                                    <p><span className="font-medium">New Response:</span> {positiveMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">Internal Effect:</span> {positiveMechanism?.newResponse?.visualize || '...'}</p>
                                     <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
                                 </div>
@@ -314,7 +314,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         </div>
 
                         <div className="pt-2 mt-2">
-                            <Tabs defaultValue="resistance" className="w-full">
+                            <Tabs defaultValue="truth" className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
                                     <TabsTrigger value="truth">Truth</TabsTrigger>
@@ -398,25 +398,44 @@ const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative:
         <div ref={cardRef}>
             <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
               <div className="space-y-2">
-                  {(habit.stoppers || []).map(stopper => (
-                      <div key={stopper.id} className={cn("text-xs p-2 rounded-md bg-background group w-full text-left", !!stopper.linkedResourceId && "cursor-pointer hover:bg-muted/50")}
-                      >
-                          <div className="flex items-start justify-between">
-                                <p className="flex-grow pr-2">{stopper.text}</p>
-                                <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, stopper.id, 'manageable')}>
-                                        <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
-                                        <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                    </Button>
-                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(stopper.id)}>
-                                          <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                </div>
+                  {(habit.stoppers || []).map(stopper => {
+                      const isClickable = !!stopper.linkedResourceId;
+                      return (
+                        <div
+                            key={stopper.id}
+                            className={cn(
+                                "text-xs p-2 rounded-md bg-background group w-full text-left",
+                                isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
+                            )}
+                            onClick={(e) => {
+                                if (isClickable && cardRef.current) {
+                                    e.stopPropagation();
+                                    openGeneralPopup(stopper.linkedResourceId!, e, {habitId: habit.id, x: 0, y: 0, level:0}, cardRef.current.getBoundingClientRect());
+                                }
+                            }}
+                        >
+                              <div className="flex-grow pr-2">
+                                <p>{stopper.text}</p>
+                                {stopper.managementStrategy && (
+                                  <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                    Strategy: {stopper.managementStrategy}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, habit.id, stopper.id, 'manageable')}>
+                                      <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
+                                      <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                  </Button>
+                                   <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                              </div>
                           </div>
-                      </div>
-                  ))}
+                      )
+                  })}
               </div>
             </ScrollArea>
             <div className="mt-2 flex gap-2">
@@ -463,7 +482,7 @@ const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: bool
                   {(habit.strengths || []).map(strength => (
                       <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
                           <p className="flex-grow pr-2">{strength.text}</p>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(strength.id)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                       </div>
