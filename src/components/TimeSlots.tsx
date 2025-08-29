@@ -15,7 +15,7 @@ import {
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getExercisesForDay } from '@/lib/workoutUtils';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { useState, useMemo } from 'react';
 import { ScrollArea } from './ui/scroll-area';
 
