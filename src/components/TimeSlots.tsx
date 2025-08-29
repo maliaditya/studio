@@ -12,7 +12,7 @@ import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
   Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon
 } from 'lucide-react';
-import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
+import type { ActivityType, Activity, DailySchedule, FullSchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator } from './ui/dropdown-menu';
@@ -104,38 +104,45 @@ export function TimeSlots({
   };
 
   const handleLinkHabit = (sourceActivity: Activity, habitId: string) => {
-    // If it's an essentials task, link it locally
     if (sourceActivity.type === 'essentials') {
       const updatedActivity = { ...sourceActivity, habitEquationIds: [habitId] };
       updateActivity(updatedActivity);
       return;
     }
 
-    // For all other types, apply the link globally to all tasks of the same type for the day
-    const dateKey = Object.keys(schedule).find(key => 
-        Object.values(schedule[key] as DailySchedule).flat().some((act: Activity) => act && act.id === sourceActivity.id)
+    const dateKey = Object.keys(schedule).find(key =>
+      Object.values(schedule[key] as DailySchedule)
+        .flat()
+        .some((act: Activity) => act && act.id === sourceActivity.id)
     );
-    
+
     if (!dateKey) return;
 
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
-      const daySchedule = { ...(newSchedule[dateKey] || {}) };
-
-      for (const slotName in daySchedule) {
-        if (Array.isArray(daySchedule[slotName])) {
-            daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act => {
-                if (act.type === sourceActivity.type) {
-                    return { ...act, habitEquationIds: [habitId] };
-                }
-                return act;
-            });
+      const dayScheduleToUpdate = { ...(newSchedule[dateKey] || {}) };
+      
+      let updated = false;
+      for (const slotName in dayScheduleToUpdate) {
+        if (Array.isArray(dayScheduleToUpdate[slotName])) {
+          dayScheduleToUpdate[slotName] = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
+            if (act.type === sourceActivity.type) {
+              updated = true;
+              return { ...act, habitEquationIds: [habitId] };
+            }
+            return act;
+          });
         }
       }
-      newSchedule[dateKey] = daySchedule;
+      
+      if (updated) {
+        newSchedule[dateKey] = dayScheduleToUpdate;
+      }
+      
       return newSchedule;
     });
   };
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -143,7 +150,7 @@ export function TimeSlots({
         const activities = (schedule[slot.name] as Activity[]) || [];
         const currentSlotDuration = activities.reduce((sum, act) => {
             let duration = 0;
-            if(act.type === 'essentials') {
+            if(act.type === 'essentials' || act.type === 'interrupt') {
                 duration = act.duration || 0;
             } else {
                 duration = parseDurationToMinutes(activityDurations[act.id]);
@@ -338,3 +345,4 @@ export function TimeSlots({
     </div>
   );
 }
+
