@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -243,15 +244,16 @@ export function HabitDetailPopup({ popupState, onClose }: {
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards } = useAuth();
+    const { setResources, mechanismCards, patterns } = useAuth();
     const { habitId, x, y } = popupState;
     const habit = useAuth().habitCards.find(h => h.id === habitId);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
-    const [activeTab, setActiveTab] = useState<'resistance' | 'truth'>('truth');
-    const [newTextInput, setNewTextInput] = useState('');
+    const [logicDiagramRule, setLogicDiagramRule] = useState<LogicDiagramPopupState | null>(null);
+    const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
+    const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -265,91 +267,82 @@ export function HabitDetailPopup({ popupState, onClose }: {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
+    useEffect(() => {
+        setCurrentHabitIndex(0);
+    }, [ruleId]);
+
     if (!habit) return null;
     
     const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-    
-    const handleAddEntry = () => {
-        if (!newTextInput.trim()) return;
+    const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
 
-        if (activeTab === 'resistance') {
-            const newStopper: Stopper = {
-                id: `stopper_${Date.now()}`,
-                text: newTextInput.trim(),
-                status: 'none',
-            };
-             setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
-                    return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
-                }
-                return r;
-            }));
-        } else {
-            const newStrength: Strength = {
-                id: `strength_${Date.now()}`,
-                text: newTextInput.trim(),
-            };
-            setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
-                    return { ...r, strengths: [...(r.strengths || []), newStrength] };
-                }
-                return r;
-            }));
-        }
-        setNewTextInput('');
-    };
-    
-    const handleDeleteEntry = (entryId: string) => {
-        if (activeTab === 'resistance') {
-            setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
-                    return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== entryId) };
-                }
-                return r;
-            }));
-        } else {
-            setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
-                    return { ...r, strengths: (r.strengths || []).filter(s => s.id !== entryId) };
-                }
-                return r;
-            }));
-        }
-    };
-    
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
-                <Card ref={cardRef} className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
                     <CardHeader className="p-4 pb-2 relative cursor-grab" {...listeners}>
                         <div className="absolute top-2 right-2">
                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
                         </div>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 space-y-3 text-sm">
                         <div className="text-center space-y-1">
                             <p className="text-lg font-bold text-foreground">{habit.name}</p>
                             {habit.trigger?.action && (
                                 <p className="text-xs text-muted-foreground">Trigger: When I {habit.trigger.action}</p>
                             )}
                         </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-2 space-y-3 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                            {/* Negative Path */}
+                            <div className="space-y-2">
+                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
+                                <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
+                                    <p><span className="font-medium">Response:</span> {habit.response?.text || '...'}</p>
+                                    <p><span className="font-medium">Internal Effect:</span> {negativeMechanism?.response?.visualize || '...'}</p>
+                                    <p><span className="font-medium">Blocks:</span> {negativeMechanism?.reward || '...'}</p>
+                                </div>
+                            </div>
+                            {/* Positive Path */}
+                            <div className="space-y-2">
+                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
+                                <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
+                                    <p><span className="font-medium">New Response:</span> {habit.newResponse?.action || '...'}</p>
+                                    <p><span className="font-medium">Internal Effect:</span> {positiveMechanism?.newResponse?.visualize || '...'}</p>
+                                    <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="pt-2 mt-2">
-                        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
-                                <TabsTrigger value="truth">Truth</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="resistance" className="mt-2">
-                                <ResistanceSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
-                            </TabsContent>
-                            <TabsContent value="truth" className="mt-2">
-                                <TruthSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
-                            </TabsContent>
-                        </Tabs>
+                            <Tabs defaultValue="resistance" className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
+                                    <TabsTrigger value="truth">Truth</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="resistance" className="mt-2">
+                                    <ResistanceSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
+                                </TabsContent>
+                                <TabsContent value="truth" className="mt-2">
+                                    <TruthSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
+                                </TabsContent>
+                            </Tabs>
                         </div>
                     </CardContent>
                 </Card>
             </div>
+            {logicDiagramRule && (
+                <LogicDiagramPopup 
+                    popupState={logicDiagramRule} 
+                    onClose={() => setLogicDiagramRule(null)} 
+                />
+            )}
+             {manageResistancePopupState && (
+                <ManageResistancePopup
+                    habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
+                    popupState={manageResistancePopupState}
+                    onClose={() => setManageResistancePopupState(null)}
+                />
+            )}
         </>
     );
 };
@@ -381,15 +374,24 @@ const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative:
 
     const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                const updatedStoppers = (r.stoppers || []).map(s => 
-                    s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
-                );
-                return { ...r, stoppers: updatedStoppers };
-            }
-            return r;
-        }));
+        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
+
+        if (status === 'manageable' && stopper) {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            // This needs to call a function from the parent to open the new popup.
+            // For now, logging. A context or prop-drilled function is needed here.
+            console.log("Open manage resistance popup for:", stopper.text);
+        } else {
+            setResources(prev => prev.map(r => {
+                if (r.id === habit.id) {
+                    const updatedStoppers = (r.stoppers || []).map(s => 
+                        s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
+                    );
+                    return { ...r, stoppers: updatedStoppers };
+                }
+                return r;
+            }));
+        }
     };
 
     return (
@@ -405,12 +407,12 @@ const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative:
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, stopper.id, 'manageable')}>
                                         <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, stopper.id, 'unmanageable')}>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
                                         <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                     </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(stopper.id)}>
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                    </Button>
+                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(stopper.id)}>
+                                          <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
                                 </div>
                           </div>
                       </div>
