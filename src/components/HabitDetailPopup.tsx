@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight } from 'lucide-react';
+import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight, Zap } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { Separator } from './ui/separator';
+import { Textarea } from './ui/textarea';
 
 const ManageResistancePopup = ({ habit, popupState, onClose }: {
     habit: Resource;
@@ -112,7 +113,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
-    const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
+    const [manageResistancePopupState, setManageResistancePopupState] = useState<{ stopper: Stopper; x: number; y: number; } | null>(null);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -186,7 +187,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
         if (status === 'manageable' && stopper) {
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setManageResistancePopupState({
-                habitId,
                 stopper,
                 x: rect.right + 10,
                 y: rect.top
@@ -298,10 +298,11 @@ export function HabitDetailPopup({ popupState, onClose }: {
         );
     };
 
+
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
-                <Card ref={cardRef} className="w-[450px] shadow-2xl border-2 border-primary/30 bg-card">
+                <Card ref={cardRef} className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                         <div className="flex justify-between items-center">
                             <CardTitle className="text-base flex items-center gap-2">
@@ -319,7 +320,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                     <CardContent className="p-3 pt-0 text-sm space-y-4">
                         <div className="p-3 rounded-md bg-muted/30">
                             <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
-                            <div className="text-xs space-y-1 mt-1">
+                             <div className="text-xs space-y-1 mt-1">
                                 <p><span className="text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}</span></p>
                                 <p><span className="text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{negativeMechanism?.response?.visualize || '...'}</span></p>
                                 <p><span className="text-muted-foreground">Blocks:</span> <span className="text-foreground">{negativeMechanism?.reward || '...'}</span></p>
@@ -327,13 +328,13 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         </div>
                         <div className="p-3 rounded-md bg-muted/30">
                             <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
-                            <div className="text-xs space-y-1 mt-1">
+                             <div className="text-xs space-y-1 mt-1">
                                 <p><span className="text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{positiveMechanism?.name || 'Unlinked'}</span></p>
                                 <p><span className="text-muted-foreground">Internal Effect:</span> <span className="text-foreground">{positiveMechanism?.response?.visualize || '...'}</span></p>
                                 <p><span className="text-muted-foreground">Reward:</span> <span className="text-foreground">{positiveMechanism?.benefit || '...'}</span></p>
                             </div>
                         </div>
-                        <div className="pt-2">
+                         <div className="pt-2">
                             <Tabs defaultValue="truth" className="w-full">
                                 <TabsList className="grid w-full grid-cols-2">
                                     <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
