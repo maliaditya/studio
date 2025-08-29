@@ -133,7 +133,8 @@ const DraggableSubtaskItem: React.FC<{
   childName: string;
   isLogged: boolean;
   type: 'deepwork' | 'upskill' | 'resource';
-}> = ({ childId, parentId, childName, isLogged, type }) => {
+  onClick?: () => void;
+}> = ({ childId, parentId, childName, isLogged, type, onClick }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `subtask-${type}-${childId}-from-${parentId}`,
     data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName, parentId: parentId },
@@ -152,7 +153,14 @@ const DraggableSubtaskItem: React.FC<{
       title={childName}
     >
       <span>-</span>
-      <span>{childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}</span>
+      <span
+        onClick={onClick}
+        className={cn(
+          onClick && "cursor-pointer hover:text-foreground"
+        )}
+      >
+        {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
+      </span>
     </div>
   );
 };
@@ -1059,25 +1067,33 @@ function DeepWorkPageContent() {
   
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
+    
+    // Check if the task itself is a parent or a leaf
     const nodeType = getDeepWorkNodeType(definition);
 
+    // If it's a parent node, calculate sum of its descendants' logs
     if (nodeType === 'Intention' || nodeType === 'Objective') {
         const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
         return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
     
+    // If it's a leaf node ('Action' or 'Standalone'), return its own log
     return definition.loggedDuration || 0;
 }, [getDeepWorkNodeType, getDescendantLeafNodes]);
 
 const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
+    
+    // Check if the task itself is a parent or a leaf
     const nodeType = getUpskillNodeType(definition);
 
+    // If it's a parent node, calculate sum of its descendants' logs
     if (nodeType === 'Curiosity' || nodeType === 'Objective') {
         const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
         return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
     
+    // If it's a leaf node ('Visualization' or 'Standalone'), return its own log
     return definition.loggedDuration || 0;
 }, [getUpskillNodeType, getDescendantLeafNodes]);
 
@@ -1581,33 +1597,26 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
         return;
     }
 
-    const { subtaskId, itemType: activeSubtaskType, parentId: oldParentId } = active.data.current || {};
-    const { id: targetId, itemType: targetCardType } = over.data.current || {};
+    const { itemType: activeSubtaskType, subtaskId } = active.data.current || {};
+    const { id: targetId, itemType: targetCardType, definition: targetCardDefinition } = over.data.current || {};
 
     if (!subtaskId || !targetId || !targetCardType || over.data.current?.type !== 'card') {
         return;
     }
-
-    // Unlink from the old parent
-    if (oldParentId) {
-        const oldParentIsDeepWork = deepWorkDefinitions.some(d => d.id === oldParentId);
-        const setOldParentDefs = oldParentIsDeepWork ? setDeepWorkDefinitions : setUpskillDefinitions;
-
-        setOldParentDefs((prev: ExerciseDefinition[]) => prev.map(def => {
-            if (def.id === oldParentId) {
-                const newDef = { ...def };
-                if (activeSubtaskType === 'deepwork') newDef.linkedDeepWorkIds = (def.linkedDeepWorkIds || []).filter(id => id !== subtaskId);
-                if (activeSubtaskType === 'upskill') newDef.linkedUpskillIds = (def.linkedUpskillIds || []).filter(id => id !== subtaskId);
-                if (activeSubtaskType === 'resource') newDef.linkedResourceIds = (def.linkedResourceIds || []).filter(id => id !== subtaskId);
-                return newDef;
-            }
-            return def;
-        }));
-    }
-
-    // Link to the new parent
-    const setNewParentDefs = targetCardType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
     
+    const setOldParentDefs = (updater: (prev: ExerciseDefinition[]) => ExerciseDefinition[]) => {
+        setDeepWorkDefinitions(updater);
+        setUpskillDefinitions(updater);
+    };
+
+    setOldParentDefs((prev: ExerciseDefinition[]) => prev.map(def => ({
+        ...def,
+        linkedDeepWorkIds: (def.linkedDeepWorkIds || []).filter(id => id !== subtaskId),
+        linkedUpskillIds: (def.linkedUpskillIds || []).filter(id => id !== subtaskId),
+        linkedResourceIds: (def.linkedResourceIds || []).filter(id => id !== subtaskId),
+    })));
+
+    const setNewParentDefs = targetCardType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
     const newLinkKey = activeSubtaskType === 'deepwork' ? 'linkedDeepWorkIds' :
                        activeSubtaskType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
 
@@ -2431,6 +2440,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
