@@ -113,14 +113,14 @@ export function TimeSlots({
 
     // For all other types, apply the link globally to all tasks of the same type for the day
     const dateKey = Object.keys(schedule).find(key => 
-      Object.values(schedule[key]).flat().some((act: any) => act && act.id === sourceActivity.id)
+        Object.values(schedule[key] as DailySchedule).flat().some((act: Activity) => act && act.id === sourceActivity.id)
     );
     
     if (!dateKey) return;
 
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
-      const daySchedule = { ...newSchedule[dateKey] };
+      const daySchedule = { ...(newSchedule[dateKey] || {}) };
 
       for (const slotName in daySchedule) {
         if (Array.isArray(daySchedule[slotName])) {
@@ -140,7 +140,7 @@ export function TimeSlots({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
-        const activities = schedule[slot.name] || [];
+        const activities = (schedule[slot.name] as Activity[]) || [];
         const currentSlotDuration = activities.reduce((sum, act) => {
             let duration = 0;
             if(act.type === 'essentials') {
@@ -227,7 +227,7 @@ export function TimeSlots({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  {activity.type !== 'interrupt' && (
+                                  {activity.type !== 'interrupt' && activity.type !== 'essentials' && (
                                     <DropdownMenuSub>
                                       <DropdownMenuSubTrigger>
                                         <LinkIcon className="mr-2 h-4 w-4" />
