@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -11,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfToday, isAfter } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -541,24 +542,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             let suffix = '';
             
             if (activity.completed) {
-              if (activity.duration) { // Check for explicit logged duration first
-                totalMinutes = activity.duration;
-                suffix = ' logged';
-              } else {
-                  let logs, durationField;
-                  if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                  else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                  
-                  if (logs && durationField) {
-                      const loggedDuration = (logs.find(log => log.date === dateKey)
-                        ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                        .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                      if (loggedDuration > 0) {
-                          totalMinutes = loggedDuration;
-                          suffix = ' logged';
-                      }
-                  }
-              }
+                const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+                const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
+                
+                if (mainDef && ((mainDef.linkedDeepWorkIds?.length ?? 0) > 0 || (mainDef.linkedUpskillIds?.length ?? 0) > 0)) {
+                     const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
+                     totalMinutes = leafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
+                     suffix = ' logged';
+                } else if (activity.duration) {
+                    totalMinutes = activity.duration;
+                    suffix = ' logged';
+                } else {
+                    let logs, durationField;
+                    if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                    else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                    
+                    if (logs && durationField) {
+                        const loggedDuration = (logs.find(log => log.date === dateKey)
+                          ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                        if (loggedDuration > 0) {
+                            totalMinutes = loggedDuration;
+                            suffix = ' logged';
+                        }
+                    }
+                }
             } else {
               // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
@@ -716,23 +724,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-    
+
     if (def) {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
         const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
         
         if (isParentNode) {
             const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-            const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
+            const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
 
             if (allChildrenCompleted) {
-                toast({ title: "Objective Complete", description: "All sub-tasks for this objective have already been logged." });
+                toast({ title: "Objective Complete", description: `All sub-tasks for "${def.name}" are already logged.` });
                 markObjectiveActivityAsComplete(def.id);
                 return;
             }
-            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
+            
+            const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration || 0 > 0));
             if (firstPendingNode) {
                 handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
+            } else {
+                 handleStartFocusSession(activity, 25); // Fallback
             }
             return;
         }
@@ -744,7 +755,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusDuration(minutes);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, toast, markObjectiveActivityAsComplete]);
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, toast, markObjectiveActivityAsComplete]);
   
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1347,24 +1358,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activityIndex = activities.findIndex(act => act.id === activityId);
 
         if (activityIndex > -1) {
-            const activity = activities[activityIndex];
-            let finalDuration = activity.duration;
-
-            if (isCompleted) {
-                const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-                const mainDef = activity.taskIds?.[0] ? allDefs.find(d => activity.taskIds![0].startsWith(d.id)) : undefined;
-
-                if (mainDef) {
-                    const allLeafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
-                    let totalLoggedMinutes = 0;
-                    allLeafNodes.forEach(node => {
-                        totalLoggedMinutes += node.loggedDuration || 0;
-                    });
-                    finalDuration = totalLoggedMinutes;
-                }
-            }
-
-            activities[activityIndex] = { ...activity, completed: isCompleted, duration: finalDuration };
+            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
             daySchedule[slotName] = activities;
             newSchedule[todayKey] = daySchedule;
         }
