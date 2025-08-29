@@ -29,22 +29,21 @@ const MechanismDetailView = ({ mechanism }: { mechanism: Resource | null }) => {
 
     return (
         <div className="space-y-3 text-sm">
-            <h5 className="font-semibold text-foreground">{mechanism.name}</h5>
-            <p><span className="font-semibold text-muted-foreground">Action:</span> {mechanism.trigger?.action}</p>
-            <p><span className="font-semibold text-muted-foreground">Internal Effect:</span> {mechanism.response?.visualize}</p>
-            {mechanism.mechanismFramework === 'positive' ? (
-                <>
-                    <p><span className="font-semibold text-muted-foreground">Benefit:</span> {mechanism.benefit}</p>
-                    <p><span className="font-semibold text-muted-foreground">Reward:</span> {mechanism.reward}</p>
-                </>
+            <div>
+                <p className="font-semibold text-muted-foreground text-xs">Internal Effect</p>
+                <p>{mechanism.response?.visualize || '-'}</p>
+            </div>
+             {mechanism.mechanismFramework === 'positive' ? (
+                <div>
+                    <p className="font-semibold text-muted-foreground text-xs">Reward</p>
+                    <p>{mechanism.reward || '-'}</p>
+                </div>
             ) : (
-                <>
-                    <p><span className="font-semibold text-muted-foreground">Cost:</span> {mechanism.reward}</p>
-                    <p><span className="font-semibold text-muted-foreground">Blocks:</span> {mechanism.benefit}</p>
-                </>
+                 <div>
+                    <p className="font-semibold text-muted-foreground text-xs">Blocks</p>
+                    <p>{mechanism.reward || '-'}</p>
+                </div>
             )}
-            <p><span className="font-semibold text-muted-foreground">Condition/Opposite:</span> {mechanism.newResponse?.visualize}, {mechanism.newResponse?.action}</p>
-            <p><span className="font-semibold text-muted-foreground">Law:</span> {mechanism.law?.premise} → {mechanism.law?.outcome}</p>
         </div>
     );
 };
