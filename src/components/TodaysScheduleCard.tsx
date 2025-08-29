@@ -16,6 +16,7 @@ import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
+import { useRouter } from 'next/navigation';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -38,36 +39,57 @@ function AgendaWidgetItem({
     onStartLeadGenLog, 
     onOpenTaskContext,
 }: AgendaWidgetItemProps) {
-  const { onOpenFocusModal } = useAuth();
-  const [openPopover, setOpenPopover] = useState(false);
-  const [durationInput, setDurationInput] = useState('');
-
-  const canLogProgress = (activity.type === 'upskill' || activity.type === 'deepwork') && (activity.taskIds?.length ?? 0) > 0;
+  const { onOpenFocusModal, deepWorkDefinitions, upskillDefinitions, setSelectedDeepWorkTask, setSelectedUpskillTask, addToRecents } = useAuth();
+  const router = useRouter();
 
   const handleItemClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    
     if (activity.completed) {
       onToggleComplete(activity.slot, activity.id, false); // Allow un-checking
-    } else if (activity.type === 'workout') {
+      return;
+    }
+    
+    if (activity.type === 'workout') {
         onStartWorkoutLog(activity);
     } else if (activity.type === 'lead-generation') {
         onStartLeadGenLog(activity);
-    } else if (activity.type !== 'interrupt') {
-      onOpenFocusModal(activity);
+    } else if (activity.type === 'deepwork' || activity.type === 'upskill') {
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+        const taskDefId = activity.taskIds?.[0]?.split('-')[0];
+        const taskDef = taskDefId ? allDefs.find(d => d.id === taskDefId) : null;
+        
+        if (taskDef) {
+            router.push(`/${activity.type}`);
+            setTimeout(() => { // Allow router to navigate before setting state
+                if (activity.type === 'deepwork') {
+                    setSelectedDeepWorkTask(taskDef);
+                    addToRecents({ ...taskDef, type: 'deepwork' });
+                } else {
+                    setSelectedUpskillTask(taskDef);
+                    addToRecents({ ...taskDef, type: 'upskill' });
+                }
+            }, 100);
+        } else {
+            // Fallback to focus modal if no definition found
+            onOpenFocusModal(activity);
+        }
     }
   };
 
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
-      <div 
-        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
-        onClick={handleItemClick}
-      >
-        {activity.completed 
-          ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-          : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-        }
-        <div className="flex-grow min-w-0">
+      <div className="flex items-start gap-3 min-w-0 flex-grow">
+        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
+            {activity.completed 
+              ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+              : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            }
+        </button>
+        <div 
+          className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
+          onClick={handleItemClick}
+        >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={activity.details}>
             {activity.details}
           </p>
