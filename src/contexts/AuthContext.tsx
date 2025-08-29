@@ -106,7 +106,7 @@ interface AuthContextType {
   setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   focusActivity: Activity | null;
   focusDuration: number;
-  onOpenFocusModal: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
   activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number; } | null>>;
@@ -700,9 +700,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const updatedActivity = { ...activities[activityIndex], completed: true };
               (newSchedule[dateKey][slotName] as Activity[])[activityIndex] = updatedActivity;
               activityUpdated = true;
-              const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === definitionId);
-              toast({ title: "Objective Complete!", description: `Objective "${def?.name || 'Task'}" has been marked as complete.` });
-              break;
+              break; 
             }
           }
         }
@@ -710,9 +708,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return newSchedule;
     });
-  }, [setSchedule, toast, deepWorkDefinitions, upskillDefinitions]);
+  }, [setSchedule]);
 
-  const onOpenFocusModal = useCallback((activity: Activity) => {
+  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
@@ -726,18 +724,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
 
             if (allChildrenCompleted) {
-                toast({ title: "Objective Complete", description: `All sub-tasks for "${def.name}" are already logged.` });
                 markObjectiveActivityAsComplete(def.id);
-                return;
+                return false;
             }
             
-            const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration || 0 > 0));
+            const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration && node.loggedDuration > 0));
             if (firstPendingNode) {
                 handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
             } else {
                  handleStartFocusSession(activity, 25); // Fallback
             }
-            return;
+            return true;
         }
     }
     
@@ -748,7 +745,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusDuration(minutes);
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, toast, markObjectiveActivityAsComplete]);
+    return true;
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, markObjectiveActivityAsComplete]);
   
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     setActiveFocusSession({
@@ -2662,4 +2660,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 

@@ -19,6 +19,7 @@ import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { useToast } from '@/hooks/use-toast';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -30,7 +31,7 @@ interface AgendaWidgetItemProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onOpenFocusModal: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
 }
@@ -47,6 +48,7 @@ function AgendaWidgetItem({
     onOpenHabitPopup,
 }: AgendaWidgetItemProps) {
   const { workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
+  const { toast } = useToast();
   
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
@@ -70,6 +72,17 @@ function AgendaWidgetItem({
     if (linkedHabit) {
         onOpenHabitPopup(linkedHabit.id, event);
         return;
+    }
+  };
+
+  const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const shouldOpenModal = onOpenFocusModal(activity);
+    if (!shouldOpenModal) {
+      toast({
+        title: "Objective Already Complete",
+        description: `All sub-tasks for "${activity.details}" are already logged.`,
+      });
     }
   };
   
@@ -103,7 +116,7 @@ function AgendaWidgetItem({
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => { e.stopPropagation(); onOpenFocusModal(activity); }}
+                onClick={handleFocusClick}
             >
                 <Timer className="h-4 w-4" />
             </Button>
@@ -135,7 +148,7 @@ interface TodaysScheduleCardProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  onOpenFocusModal: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
