@@ -81,7 +81,7 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity, schedule: fullSchedule } = useAuth();
+  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
@@ -103,48 +103,32 @@ export function TimeSlots({
     });
   };
 
-  const handleLinkHabit = (sourceActivity: Activity, habitId: string) => {
-    const dateKey = Object.keys(fullSchedule).find(key => 
-        Object.values(fullSchedule[key] as DailySchedule).flat().some(act => act && act.id === sourceActivity.id)
-    );
-
-    if (!dateKey) return;
-
-    setSchedule(prevSchedule => {
-        const newSchedule = { ...prevSchedule };
-        const dayScheduleToUpdate = { ...(newSchedule[dateKey] || {}) };
-        
-        // If it's an essentials task, link only to itself
-        if (sourceActivity.type === 'essentials') {
-            for (const slotName in dayScheduleToUpdate) {
-                if (Array.isArray(dayScheduleToUpdate[slotName])) {
-                    (dayScheduleToUpdate[slotName] as Activity[]) = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
-                        if (act.id === sourceActivity.id) {
-                            return { ...act, habitEquationIds: [habitId] };
-                        }
-                        return act;
-                    });
-                }
-            }
-        } else {
-            // Otherwise, link to all tasks of the same type for that day
-            for (const slotName in dayScheduleToUpdate) {
-                if (Array.isArray(dayScheduleToUpdate[slotName])) {
-                    (dayScheduleToUpdate[slotName] as Activity[]) = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
-                        if (act.type === sourceActivity.type) {
-                            return { ...act, habitEquationIds: [habitId] };
-                        }
-                        return act;
-                    });
+  const handleLinkHabit = (activityId: string, habitId: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+            const day = newSchedule[dateKey];
+            for(const slotName in day) {
+                if (Array.isArray(day[slotName])) {
+                    const activities = day[slotName] as Activity[];
+                    const activityIndex = activities.findIndex(a => a.id === activityId);
+                    if (activityIndex > -1) {
+                        const updatedActivities = [...activities];
+                        const currentHabits = updatedActivities[activityIndex].habitEquationIds || [];
+                        const isLinked = currentHabits.includes(habitId);
+                        updatedActivities[activityIndex] = {
+                            ...updatedActivities[activityIndex],
+                            habitEquationIds: isLinked ? currentHabits.filter(id => id !== habitId) : [...currentHabits, habitId]
+                        };
+                        newSchedule[dateKey] = { ...day, [slotName]: updatedActivities };
+                        return newSchedule; // Exit after finding and updating
+                    }
                 }
             }
         }
-        
-        newSchedule[dateKey] = dayScheduleToUpdate;
         return newSchedule;
     });
   };
-
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -194,7 +178,8 @@ export function TimeSlots({
                       const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
                       displayDetails = description.split(' for ')[1] || "Workout";
                     }
-                     const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
+
+                    const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
 
                     return (
                       <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
@@ -218,9 +203,13 @@ export function TimeSlots({
                               </p>
                               <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
                                 <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
-                                 {activity.duration ? <span className="font-mono">({activity.duration}m)</span>: ''}
-                                {linkedHabit && <span className="text-primary font-medium truncate italic" title={linkedHabit.name}>({linkedHabit.name})</span>}
+                                {activityDurations[activity.id] && <span className="font-mono">({activityDurations[activity.id]})</span>}
                               </div>
+                              {linkedHabit && (
+                                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                                  Habit: {linkedHabit.name}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center flex-shrink-0">
@@ -246,7 +235,7 @@ export function TimeSlots({
                                          <DropdownMenuSubContent>
                                           <ScrollArea className="h-48">
                                             {habitCards.map(habit => (
-                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity, habit.id)}>
+                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id)}>
                                                     {habit.name}
                                                 </DropdownMenuItem>
                                             ))}
@@ -347,4 +336,3 @@ export function TimeSlots({
     </div>
   );
 }
-
