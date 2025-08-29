@@ -103,9 +103,38 @@ export function TimeSlots({
     });
   };
 
-  const handleLinkHabit = (activity: Activity, habitId: string) => {
-    const updatedActivity = { ...activity, habitEquationIds: [habitId] };
-    updateActivity(updatedActivity);
+  const handleLinkHabit = (sourceActivity: Activity, habitId: string) => {
+    // If it's an essentials task, link it locally
+    if (sourceActivity.type === 'essentials') {
+      const updatedActivity = { ...sourceActivity, habitEquationIds: [habitId] };
+      updateActivity(updatedActivity);
+      return;
+    }
+
+    // For all other types, apply the link globally to all tasks of the same type for the day
+    const dateKey = Object.keys(schedule).find(key => 
+      Object.values(schedule[key]).flat().some((act: any) => act && act.id === sourceActivity.id)
+    );
+    
+    if (!dateKey) return;
+
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      const daySchedule = { ...newSchedule[dateKey] };
+
+      for (const slotName in daySchedule) {
+        if (Array.isArray(daySchedule[slotName])) {
+            daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act => {
+                if (act.type === sourceActivity.type) {
+                    return { ...act, habitEquationIds: [habitId] };
+                }
+                return act;
+            });
+        }
+      }
+      newSchedule[dateKey] = daySchedule;
+      return newSchedule;
+    });
   };
 
   return (
@@ -191,40 +220,40 @@ export function TimeSlots({
                               checked={!!activity.completed}
                               onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
                             />
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {activity.type !== 'essentials' && activity.type !== 'interrupt' && (
-                                  <DropdownMenuSub>
-                                    <DropdownMenuSubTrigger>
-                                      <LinkIcon className="mr-2 h-4 w-4" />
-                                      <span>Link Habit</span>
-                                    </DropdownMenuSubTrigger>
-                                    <DropdownMenuPortal>
-                                       <DropdownMenuSubContent>
-                                        <ScrollArea className="h-48">
-                                          {habitCards.map(habit => (
-                                              <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity, habit.id)}>
-                                                  {habit.name}
-                                              </DropdownMenuItem>
-                                          ))}
-                                          {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
-                                        </ScrollArea>
-                                      </DropdownMenuSubContent>
-                                    </DropdownMenuPortal>
-                                  </DropdownMenuSub>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => onRemoveActivity(slot.name, activity.id)} className="text-destructive">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  <span>Delete</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                                    <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {activity.type !== 'interrupt' && (
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger>
+                                        <LinkIcon className="mr-2 h-4 w-4" />
+                                        <span>Link Habit</span>
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuPortal>
+                                         <DropdownMenuSubContent>
+                                          <ScrollArea className="h-48">
+                                            {habitCards.map(habit => (
+                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity, habit.id)}>
+                                                    {habit.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                            {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
+                                          </ScrollArea>
+                                        </DropdownMenuSubContent>
+                                      </DropdownMenuPortal>
+                                    </DropdownMenuSub>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => onRemoveActivity(slot.name, activity.id)} className="text-destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                           </div>
                         </div>
                       </div>
