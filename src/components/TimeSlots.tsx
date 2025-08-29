@@ -81,7 +81,7 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
+  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity, schedule: fullSchedule } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
@@ -104,42 +104,44 @@ export function TimeSlots({
   };
 
   const handleLinkHabit = (sourceActivity: Activity, habitId: string) => {
-    if (sourceActivity.type === 'essentials') {
-      const updatedActivity = { ...sourceActivity, habitEquationIds: [habitId] };
-      updateActivity(updatedActivity);
-      return;
-    }
-
-    const dateKey = Object.keys(schedule).find(key =>
-      Object.values(schedule[key] as DailySchedule)
-        .flat()
-        .some((act: Activity) => act && act.id === sourceActivity.id)
+    const dateKey = Object.keys(fullSchedule).find(key => 
+        Object.values(fullSchedule[key] as DailySchedule).flat().some(act => act && act.id === sourceActivity.id)
     );
 
     if (!dateKey) return;
 
     setSchedule(prevSchedule => {
-      const newSchedule = { ...prevSchedule };
-      const dayScheduleToUpdate = { ...(newSchedule[dateKey] || {}) };
-      
-      let updated = false;
-      for (const slotName in dayScheduleToUpdate) {
-        if (Array.isArray(dayScheduleToUpdate[slotName])) {
-          dayScheduleToUpdate[slotName] = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
-            if (act.type === sourceActivity.type) {
-              updated = true;
-              return { ...act, habitEquationIds: [habitId] };
+        const newSchedule = { ...prevSchedule };
+        const dayScheduleToUpdate = { ...(newSchedule[dateKey] || {}) };
+        
+        // If it's an essentials task, link only to itself
+        if (sourceActivity.type === 'essentials') {
+            for (const slotName in dayScheduleToUpdate) {
+                if (Array.isArray(dayScheduleToUpdate[slotName])) {
+                    (dayScheduleToUpdate[slotName] as Activity[]) = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
+                        if (act.id === sourceActivity.id) {
+                            return { ...act, habitEquationIds: [habitId] };
+                        }
+                        return act;
+                    });
+                }
             }
-            return act;
-          });
+        } else {
+            // Otherwise, link to all tasks of the same type for that day
+            for (const slotName in dayScheduleToUpdate) {
+                if (Array.isArray(dayScheduleToUpdate[slotName])) {
+                    (dayScheduleToUpdate[slotName] as Activity[]) = (dayScheduleToUpdate[slotName] as Activity[]).map(act => {
+                        if (act.type === sourceActivity.type) {
+                            return { ...act, habitEquationIds: [habitId] };
+                        }
+                        return act;
+                    });
+                }
+            }
         }
-      }
-      
-      if (updated) {
+        
         newSchedule[dateKey] = dayScheduleToUpdate;
-      }
-      
-      return newSchedule;
+        return newSchedule;
     });
   };
 
@@ -234,7 +236,7 @@ export function TimeSlots({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  {activity.type !== 'interrupt' && activity.type !== 'essentials' && (
+                                  {activity.type !== 'interrupt' && (
                                     <DropdownMenuSub>
                                       <DropdownMenuSubTrigger>
                                         <LinkIcon className="mr-2 h-4 w-4" />
