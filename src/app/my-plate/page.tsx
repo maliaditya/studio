@@ -534,18 +534,6 @@ function MyPlatePageContent() {
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (!activity || activity.completed || !selectedDate) return;
   
-    if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
-        const habitId = activity.taskIds[0];
-        const pattern = patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habitId));
-        if (pattern) {
-          const rule = metaRules.find(r => r.patternId === pattern.id);
-          if (rule) {
-            openRuleDetailPopup(rule.id, event);
-            return;
-          }
-        }
-    }
-  
     if (activity.type === 'workout') {
       const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
       setTodaysExercises(exercises);
