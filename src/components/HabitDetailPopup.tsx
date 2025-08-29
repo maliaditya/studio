@@ -273,31 +273,242 @@ export function HabitDetailPopup({ popupState, onClose }: {
 
     if (!habit) return null;
     
-    const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-    const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+    const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
+    const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
+    
+    const categorizedPhrasesForHabit = useMemo(() => {
+        if (!pattern || !habit) return {};
+
+        const relevantMechanismIds = new Set([
+            habit.response?.resourceId,
+            habit.newResponse?.resourceId
+        ].filter(Boolean));
+
+        return pattern.phrases.reduce((acc, phrase) => {
+            if (phrase.category === 'Habit Cards' || !relevantMechanismIds.has(phrase.mechanismCardId)) {
+                return acc;
+            }
+            if (!acc[phrase.category]) {
+                acc[phrase.category] = [];
+            }
+            acc[phrase.category].push(phrase.text);
+            return acc;
+        }, {} as Record<string, string[]>);
+    }, [pattern, habit]);
+
+
+    const handleNextHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
+    };
+
+    const handlePrevHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex - 1 + linkedHabits.length) % linkedHabits.length);
+    };
+
+
+    const handleAddStopper = (habitId: string, newStopperText: string) => {
+        if (!newStopperText.trim()) return;
+        const newStopper: Stopper = {
+            id: `stopper_${Date.now()}`,
+            text: newStopperText.trim(),
+            status: 'none',
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
+            }
+            return r;
+        }));
+    };
+    
+    const handleAddStrength = (habitId: string, newStrengthText: string) => {
+        if (!newStrengthText.trim()) return;
+        const newStrength: Strength = {
+            id: `strength_${Date.now()}`,
+            text: newStrengthText.trim(),
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, strengths: [...(r.strengths || []), newStrength] };
+            }
+            return r;
+        }));
+    };
+
+    const handleDeleteStopper = (habitId: string, stopperId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
+            }
+            return r;
+        }));
+    };
+    
+    const handleDeleteStrength = (habitId: string, strengthId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habitId) {
+                return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
+            }
+            return r;
+        }));
+    };
+
+    const handleStopperStatusChange = (e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
+        e.stopPropagation();
+        const habit = resources.find(r => r.id === habitId);
+        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
+
+        if (status === 'manageable' && stopper) {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            setManageResistancePopupState({
+                habitId,
+                stopper,
+                x: rect.right + 10,
+                y: rect.top
+            });
+        } else {
+            setResources(prev => prev.map(r => {
+                if (r.id === habitId) {
+                    const updatedStoppers = (r.stoppers || []).map(s => 
+                        s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
+                    );
+                    return { ...r, stoppers: updatedStoppers };
+                }
+                return r;
+            }));
+        }
+    };
+    
+    const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
+        const [newStopperText, setNewStopperText] = useState('');
+        const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
+      
+        return (
+            <div>
+                <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
+                  <div className="space-y-2">
+                      {(habit.stoppers || []).map(stopper => {
+                          const isClickable = !!stopper.linkedResourceId;
+                          return (
+                            <div
+                                key={stopper.id}
+                                className={cn(
+                                    "text-xs p-2 rounded-md bg-background group w-full text-left",
+                                    isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
+                                )}
+                                onClick={(e) => {
+                                    if (isClickable && cardRef.current) {
+                                        e.stopPropagation();
+                                        openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
+                                    }
+                                }}
+                            >
+                                  <div className="flex-grow pr-2">
+                                    <p>{stopper.text}</p>
+                                    {stopper.managementStrategy && (
+                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                        Strategy: {stopper.managementStrategy}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
+                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                      </Button>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
+                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                      </Button>
+                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
+                                          <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
+                                  </div>
+                              </div>
+                          )
+                      })}
+                  </div>
+                </ScrollArea>
+                <div className="mt-2 flex gap-2">
+                    <Input
+                        value={newStopperText}
+                        onChange={(e) => setNewStopperText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); } }}
+                        placeholder={placeholder}
+                        className="h-8 text-xs"
+                    />
+                    <Button size="sm" onClick={() => { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); }} className="h-8">Add</Button>
+                </div>
+            </div>
+        );
+      };
+
+    const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
+        const [newStrengthText, setNewStrengthText] = useState('');
+        const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
+      
+        return (
+            <div>
+                <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
+                  <div className="space-y-2">
+                      {(habit.strengths || []).map(strength => (
+                          <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
+                              <p className="flex-grow pr-2">{strength.text}</p>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                          </div>
+                      ))}
+                  </div>
+                </ScrollArea>
+                <div className="mt-2 flex gap-2">
+                    <Input
+                        value={newStrengthText}
+                        onChange={(e) => setNewStrengthText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); } }}
+                        placeholder={placeholder}
+                        className="h-8 text-xs"
+                    />
+                    <Button size="sm" onClick={() => { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); }} className="h-8">Add</Button>
+                </div>
+            </div>
+        );
+    };
+
+    const linkedHabits = useMemo(() => {
+        if (!pattern) return [];
+        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
+        return habitPhrases.map(phrase => {
+            return habitCards.find(h => h.id === phrase.mechanismCardId);
+        }).filter((h): h is Resource => !!h);
+    }, [pattern, habitCards]);
+
 
     return (
         <>
-            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
+            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={rule.id}>
                 <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card">
-                    <CardHeader className="p-4 pb-2 relative cursor-grab" {...listeners}>
-                        <div className="absolute top-2 right-2">
-                           <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
-                        </div>
-                        <div className="text-center space-y-1">
-                            <p className="text-lg font-bold text-foreground">{habit.name}</p>
-                            {habit.trigger?.action && (
-                                <p className="text-xs text-muted-foreground">Trigger: When I {habit.trigger.action}</p>
-                            )}
+                    <CardHeader className="p-4 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-start">
+                            <div className="flex-grow pr-10">
+                                <CardTitle className="text-lg">{habit.name}</CardTitle>
+                                <CardDescription>Trigger: When I {habit.trigger?.action || '...'}</CardDescription>
+                            </div>
+                            <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule({ rule }); }}>
+                                    <Workflow className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-4 pt-2 space-y-3 text-sm">
+                    <CardContent className="p-4 pt-0 space-y-3 text-sm">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
                             {/* Negative Path */}
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">Response:</span> {negativeMechanism?.name || 'Unlinked'}</p>
+                                    <p><span className="font-medium">Name:</span> {negativeMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">Internal Effect:</span> {negativeMechanism?.response?.visualize || '...'}</p>
                                     <p><span className="font-medium">Blocks:</span> {negativeMechanism?.reward || '...'}</p>
                                 </div>
@@ -306,7 +517,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                             <div className="space-y-2">
                                 <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">New Response:</span> {positiveMechanism?.name || 'Unlinked'}</p>
+                                    <p><span className="font-medium">Name:</span> {positiveMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">Internal Effect:</span> {positiveMechanism?.newResponse?.visualize || '...'}</p>
                                     <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
                                 </div>
@@ -344,161 +555,5 @@ export function HabitDetailPopup({ popupState, onClose }: {
                 />
             )}
         </>
-    );
-};
-
-const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-    const { setResources, openGeneralPopup } = useAuth();
-    const [newStopperText, setNewStopperText] = useState('');
-    const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
-    const cardRef = useRef<HTMLDivElement>(null);
-  
-    const handleAddStopper = () => {
-        if (!newStopperText.trim()) return;
-        const newStopper: Stopper = {
-            id: `stopper_${Date.now()}`,
-            text: newStopperText.trim(),
-            status: 'none',
-        };
-        setResources(prev => prev.map(r => 
-            r.id === habit.id ? { ...r, stoppers: [...(r.stoppers || []), newStopper] } : r
-        ));
-        setNewStopperText('');
-    };
-
-    const handleDeleteStopper = (stopperId: string) => {
-        setResources(prev => prev.map(r => 
-            r.id === habit.id ? { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) } : r
-        ));
-    };
-
-    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
-        e.stopPropagation();
-        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
-
-        if (status === 'manageable' && stopper) {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            // This needs to call a function from the parent to open the new popup.
-            // For now, logging. A context or prop-drilled function is needed here.
-            console.log("Open manage resistance popup for:", stopper.text);
-        } else {
-            setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
-                    const updatedStoppers = (r.stoppers || []).map(s => 
-                        s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
-                    );
-                    return { ...r, stoppers: updatedStoppers };
-                }
-                return r;
-            }));
-        }
-    };
-
-    return (
-        <div ref={cardRef}>
-            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
-              <div className="space-y-2">
-                  {(habit.stoppers || []).map(stopper => {
-                      const isClickable = !!stopper.linkedResourceId;
-                      return (
-                        <div
-                            key={stopper.id}
-                            className={cn(
-                                "text-xs p-2 rounded-md bg-background group w-full text-left",
-                                isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
-                            )}
-                            onClick={(e) => {
-                                if (isClickable && cardRef.current) {
-                                    e.stopPropagation();
-                                    openGeneralPopup(stopper.linkedResourceId!, e, {habitId: habit.id, x: 0, y: 0, level:0}, cardRef.current.getBoundingClientRect());
-                                }
-                            }}
-                        >
-                              <div className="flex-grow pr-2">
-                                <p>{stopper.text}</p>
-                                {stopper.managementStrategy && (
-                                  <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
-                                    Strategy: {stopper.managementStrategy}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleStopperStatusChange(e, habit.id, stopper.id, 'manageable')}>
-                                      <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
-                                      <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                  </Button>
-                                   <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
-                                      <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                              </div>
-                          </div>
-                      )
-                  })}
-              </div>
-            </ScrollArea>
-            <div className="mt-2 flex gap-2">
-                <Input
-                    value={newStopperText}
-                    onChange={(e) => setNewStopperText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
-                    placeholder={placeholder}
-                    className="h-8 text-xs"
-                />
-                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
-            </div>
-        </div>
-    );
-};
-
-const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-    const { setResources } = useAuth();
-    const [newStrengthText, setNewStrengthText] = useState('');
-    const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
-  
-    const handleAddStrength = () => {
-        if (!newStrengthText.trim()) return;
-        const newStrength: Strength = {
-            id: `strength_${Date.now()}`,
-            text: newStrengthText.trim(),
-        };
-        setResources(prev => prev.map(r => 
-            r.id === habit.id ? { ...r, strengths: [...(r.strengths || []), newStrength] } : r
-        ));
-        setNewStrengthText('');
-    };
-
-    const handleDeleteStrength = (strengthId: string) => {
-        setResources(prev => prev.map(r => 
-            r.id === habit.id ? { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) } : r
-        ));
-    };
-
-    return (
-        <div>
-            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
-              <div className="space-y-2">
-                  {(habit.strengths || []).map(strength => (
-                      <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
-                          <p className="flex-grow pr-2">{strength.text}</p>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                      </div>
-                  ))}
-              </div>
-            </ScrollArea>
-            <div className="mt-2 flex gap-2">
-                <Input
-                    value={newStrengthText}
-                    onChange={(e) => setNewStrengthText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
-                    placeholder={placeholder}
-                    className="h-8 text-xs"
-                />
-                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
-            </div>
-        </div>
     );
 };
