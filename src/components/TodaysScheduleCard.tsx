@@ -29,6 +29,7 @@ interface AgendaWidgetItemProps {
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
 }
@@ -37,14 +38,14 @@ function AgendaWidgetItem({
     activity, 
     duration, 
     date,
-    onLogLearning, 
     onStartWorkoutLog, 
     onToggleComplete, 
     onStartLeadGenLog, 
+    onOpenFocusModal, 
     onOpenTaskContext,
     onOpenHabitPopup,
 }: AgendaWidgetItemProps) {
-  const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
   
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
@@ -59,10 +60,10 @@ function AgendaWidgetItem({
     return null;
   }, [activity.habitEquationIds, habitCards]);
 
-  const handleAgendaItemClick = (event: React.MouseEvent) => {
+  const handleTitleClick = (event: React.MouseEvent) => {
     if (activity.completed) {
-        onToggleComplete(activity.slot, activity.id, false);
-        return;
+      onToggleComplete(activity.slot, activity.id, false);
+      return;
     }
     
     if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
@@ -70,7 +71,6 @@ function AgendaWidgetItem({
         onOpenHabitPopup(habitId, event);
         return;
     }
-    onOpenFocusModal(activity);
   };
   
   const itemContent = (
@@ -84,7 +84,7 @@ function AgendaWidgetItem({
         </button>
         <div 
           className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
-          onClick={handleAgendaItemClick}
+          onClick={handleTitleClick}
         >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
             {displayDetails}
@@ -417,10 +417,11 @@ export function TodaysScheduleCard({
                         activity={activity}
                         duration={activityDurations[activity.id]}
                         date={date}
-                        onLogLearning={onLogLearning}
+                        onLogLearning={() => {}}
                         onStartWorkoutLog={onStartWorkoutLog}
                         onToggleComplete={onToggleComplete}
                         onStartLeadGenLog={onStartLeadGenLog}
+                        onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
                     />
@@ -452,4 +453,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
