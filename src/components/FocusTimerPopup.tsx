@@ -11,6 +11,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
+import { useRouter } from 'next/navigation';
 
 
 interface FocusTimerPopupProps {
@@ -31,7 +32,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setIsAudioPlaying,
       updateTaskDuration,
       permanentlyLoggedTaskIds,
+      setSelectedDeepWorkTask,
+      setSelectedUpskillTask,
   } = useAuth();
+  const router = useRouter();
   const [totalSeconds, setTotalSeconds] = useState(duration * 60);
   const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
@@ -294,6 +298,19 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     });
     return totalMinutes;
   }, [allDeepWorkLogs, allUpskillLogs, upskillDefinitions]);
+  
+  const handleObjectiveClick = () => {
+    if (!focusedObjective) return;
+    const isUpskill = upskillDefinitions.some(d => d.id === focusedObjective.id);
+    if (isUpskill) {
+        setSelectedUpskillTask(focusedObjective);
+        router.push('/upskill');
+    } else {
+        setSelectedDeepWorkTask(focusedObjective);
+        router.push('/deep-work');
+    }
+    onClose();
+  };
 
   const elapsedSeconds = totalSeconds - secondsLeft;
   
@@ -415,9 +432,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               {showSubTasks && (
                 <div className="mt-2 pt-2 border-t border-border/20 text-center">
                     <p className="text-xs text-muted-foreground">Objective</p>
-                    <p className="text-sm font-semibold truncate" title={focusedObjective?.name}>
+                    <button 
+                        className="text-sm font-semibold truncate hover:underline" 
+                        title={focusedObjective?.name}
+                        onClick={handleObjectiveClick}
+                    >
                         {focusedObjective?.name || '...'}
-                    </p>
+                    </button>
                 </div>
               )}
             </div>
