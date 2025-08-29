@@ -522,6 +522,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
 
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    
+    const leafNodes: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        
+        const node = definitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const children = node[linkKey] || [];
+        if (children.length === 0) {
+            leafNodes.push(node);
+        } else {
+            children.forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
@@ -607,7 +637,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
@@ -654,46 +684,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     processLogs(allUpskillLogs);
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
-  
-  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
-    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-    
-    const leafNodes: ExerciseDefinition[] = [];
-    const queue: string[] = [startNodeId];
-    const visited = new Set<string>();
 
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        
-        const node = definitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const children = node[linkKey] || [];
-        if (children.length === 0) {
-            leafNodes.push(node);
-        } else {
-            children.forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    return leafNodes;
-  }, [deepWorkDefinitions, upskillDefinitions]);
-
-  const handleStartFocusSession = (activity: Activity, duration: number) => {
-    setActiveFocusSession({
-        activity,
-        duration: duration,
-        secondsLeft: duration * 60,
-    });
-    setFocusSessionModalOpen(false);
-  };
-  
   const markObjectiveActivityAsComplete = useCallback((definitionId: string) => {
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
@@ -709,7 +700,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               const updatedActivity = { ...activities[activityIndex], completed: true };
               (newSchedule[dateKey][slotName] as Activity[])[activityIndex] = updatedActivity;
               activityUpdated = true;
-              toast({ title: "Objective Complete!", description: `Objective "${updatedActivity.details}" has been marked as complete.` });
+              const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === definitionId);
+              toast({ title: "Objective Complete!", description: `Objective "${def?.name || 'Task'}" has been marked as complete.` });
               break;
             }
           }
@@ -718,13 +710,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return newSchedule;
     });
-  }, [setSchedule, toast]);
+  }, [setSchedule, toast, deepWorkDefinitions, upskillDefinitions]);
 
   const onOpenFocusModal = useCallback((activity: Activity) => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-
+    
     if (def) {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
         const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
@@ -748,6 +740,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
         }
     }
+    
     const estDuration = activityDurations[activity.id];
     let minutes = estDuration ? parseInt(estDuration.replace(/[a-zA-Z\s]/g, '')) || 0 : 45;
     if (isNaN(minutes) || minutes <= 0) minutes = 45;
@@ -756,6 +749,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
   }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, toast, markObjectiveActivityAsComplete]);
+  
+  const handleStartFocusSession = (activity: Activity, duration: number) => {
+    setActiveFocusSession({
+        activity,
+        duration: duration,
+        secondsLeft: duration * 60,
+    });
+    setFocusSessionModalOpen(false);
+  };
   
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2660,3 +2662,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
