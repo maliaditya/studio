@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -199,7 +198,7 @@ interface AuthContextType {
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
 
-  // Habit Detail Popup (New)
+  // Habit Detail Popup
   habitDetailPopup: HabitDetailPopupState | null;
   openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
   closeHabitDetailPopup: () => void;
@@ -724,13 +723,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (isParentNode) {
             const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
+            const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
 
+            if (allChildrenCompleted) {
+                toast({ title: "Objective Complete", description: "All sub-tasks for this objective have already been logged." });
+                markObjectiveActivityAsComplete(def.id);
+                return;
+            }
+            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
             if (firstPendingNode) {
                 handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
-            } else {
-                toast({ title: "Objective Complete", description: "All sub-tasks for this objective have been logged." });
-                markObjectiveActivityAsComplete(def.id);
             }
             return;
         }
@@ -1354,20 +1356,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
                 if (mainDef) {
                     const allLeafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
-                    const loggedIds = new Set([
-                        ...allDeepWorkLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId)),
-                        ...allUpskillLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId))
-                    ]);
-                    
-                    const allChildrenLogged = allLeafNodes.every(node => loggedIds.has(node.id));
-
-                    if (allChildrenLogged) {
-                        let totalLoggedMinutes = 0;
-                        allLeafNodes.forEach(node => {
-                            totalLoggedMinutes += node.loggedDuration || 0;
-                        });
-                        finalDuration = totalLoggedMinutes;
-                    }
+                    let totalLoggedMinutes = 0;
+                    allLeafNodes.forEach(node => {
+                        totalLoggedMinutes += node.loggedDuration || 0;
+                    });
+                    finalDuration = totalLoggedMinutes;
                 }
             }
 
@@ -2670,3 +2663,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
