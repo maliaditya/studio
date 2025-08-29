@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -244,9 +245,9 @@ export function HabitDetailPopup({ popupState, onClose }: {
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, patterns } = useAuth();
+    const { setResources, mechanismCards, patterns, habitCards, resources } = useAuth();
     const { habitId, x, y } = popupState;
-    const habit = useAuth().habitCards.find(h => h.id === habitId);
+    const habit = habitCards.find(h => h.id === habitId);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
@@ -394,7 +395,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
                                           <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                       </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, stopper.id, 'unmanageable'); }}>
                                           <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                       </Button>
                                        <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
@@ -452,14 +453,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
         );
     };
 
-    const linkedHabits = useMemo(() => {
-        const pattern = patterns.find(p => p.phrases.some(ph => ph.mechanismCardId === habitId));
-        if (!pattern) return [];
-        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
-        return habitPhrases.map(phrase => {
-            return habitCards.find(h => h.id === phrase.mechanismCardId);
-        }).filter((h): h is Resource => !!h);
-    }, [patterns, habitCards, habitId]);
+    const linkedHabits = []; // This was removed as it was faulty
 
 
     return (
@@ -473,6 +467,9 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <CardDescription>Trigger: When I {habit.trigger?.action || '...'}</CardDescription>
                             </div>
                             <div className="flex items-center flex-shrink-0 absolute top-2 right-2">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); setLogicDiagramRule({ rule }); }}>
+                                    <Workflow className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}>
                                     <X className="h-4 w-4" />
                                 </Button>
@@ -483,18 +480,16 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
                             {/* Negative Path */}
                             <div className="space-y-2">
-                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
+                                <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism: {negativeMechanism?.name || 'Unlinked'}</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">Name:</span> {negativeMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">Internal Effect:</span> {negativeMechanism?.response?.visualize || '...'}</p>
                                     <p><span className="font-medium">Blocks:</span> {negativeMechanism?.reward || '...'}</p>
                                 </div>
                             </div>
                             {/* Positive Path */}
                             <div className="space-y-2">
-                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism</h4>
+                                <h4 className="font-semibold text-green-600 dark:text-green-400">Positive Mechanism: {positiveMechanism?.name || 'Unlinked'}</h4>
                                 <div className="text-xs space-y-1 p-2 bg-muted/50 rounded-md">
-                                    <p><span className="font-medium">Name:</span> {positiveMechanism?.name || 'Unlinked'}</p>
                                     <p><span className="font-medium">New Response:</span> {positiveMechanism?.newResponse?.action || '...'}</p>
                                     <p><span className="font-medium">Reward:</span> {positiveMechanism?.reward || '...'}</p>
                                 </div>
