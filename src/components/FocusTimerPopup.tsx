@@ -284,20 +284,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
   const getLoggedMinutesForTask = useCallback((taskId: string) => {
-    let totalMinutes = 0;
-    const isUpskill = upskillDefinitions.some(def => def.id === taskId);
-    const logs = isUpskill ? allUpskillLogs : allDeepWorkLogs;
-    const durationField = isUpskill ? 'reps' : 'weight';
-
-    (logs || []).forEach(log => {
-      (log.exercises || []).forEach(ex => {
-        if (ex.definitionId === taskId) {
-          totalMinutes += ex.loggedSets.reduce((sum, set) => sum + (set[durationField as 'reps'|'weight'] || 0), 0);
-        }
-      });
-    });
-    return totalMinutes;
-  }, [allDeepWorkLogs, allUpskillLogs, upskillDefinitions]);
+    const definition = allDefinitions.get(taskId);
+    return definition?.loggedDuration || 0;
+  }, [allDefinitions]);
   
   const handleObjectiveClick = () => {
     if (!focusedObjective) return;
