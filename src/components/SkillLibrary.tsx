@@ -34,6 +34,7 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 
 
 interface TaskItemProps {
@@ -406,10 +407,12 @@ export function SkillLibrary({
            {renderHeader()}
         </CardHeader>
         <CardContent>
-            <div className="flex gap-1 mb-4 p-1 bg-muted rounded-md">
-                <Button variant={libraryView === 'deepwork' ? 'secondary' : 'ghost'} className="flex-1" onClick={() => setLibraryView('deepwork')}>Deep Work</Button>
-                <Button variant={libraryView === 'upskill' ? 'secondary' : 'ghost'} className="flex-1" onClick={() => setLibraryView('upskill')}>Upskill</Button>
-            </div>
+             <Tabs value={libraryView} onValueChange={(value) => setLibraryView(value as 'deepwork' | 'upskill')} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
+                    <TabsTrigger value="upskill">Upskill</TabsTrigger>
+                </TabsList>
+            </Tabs>
            <AnimatePresence mode="wait">
              <motion.div
                key={(selectedDomainId || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '') + libraryView}
@@ -417,8 +420,9 @@ export function SkillLibrary({
                animate={{ opacity: 1, x: 0 }}
                exit={{ opacity: 0, x: 20 }}
                transition={{ duration: 0.2 }}
+               className="mt-4"
              >
-                <ScrollArea className="pr-2">
+                <ScrollArea className="h-96 pr-2">
                    {renderContent()}
                 </ScrollArea>
              </motion.div>
