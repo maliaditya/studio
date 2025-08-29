@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -30,6 +31,7 @@ interface AgendaWidgetItemProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onClick: (activity: Activity, event: React.MouseEvent) => void;
 }
 
 function AgendaWidgetItem({ 
@@ -41,44 +43,10 @@ function AgendaWidgetItem({
     onToggleComplete, 
     onStartLeadGenLog, 
     onOpenTaskContext,
+    onClick,
 }: AgendaWidgetItemProps) {
-  const { onOpenFocusModal, deepWorkDefinitions, upskillDefinitions, setSelectedDeepWorkTask, setSelectedUpskillTask, addToRecents, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
+  const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
   const router = useRouter();
-
-  const handleItemClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (activity.completed) {
-      onToggleComplete(activity.slot, activity.id, false); // Allow un-checking
-      return;
-    }
-    
-    if (activity.type === 'workout') {
-        onStartWorkoutLog(activity);
-    } else if (activity.type === 'lead-generation') {
-        onStartLeadGenLog(activity);
-    } else if (activity.type === 'deepwork' || activity.type === 'upskill') {
-        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const taskDefId = activity.taskIds?.[0]?.split('-')[0];
-        const taskDef = taskDefId ? allDefs.find(d => d.id === taskDefId) : null;
-        
-        if (taskDef) {
-            router.push(`/deep-work`);
-            setTimeout(() => { // Allow router to navigate before setting state
-                if (activity.type === 'deepwork') {
-                    setSelectedDeepWorkTask(taskDef);
-                    addToRecents({ ...taskDef, type: 'deepwork' });
-                } else {
-                    setSelectedUpskillTask(taskDef);
-                    addToRecents({ ...taskDef, type: 'upskill' });
-                }
-            }, 100);
-        } else {
-            // Fallback to focus modal if no definition found
-            onOpenFocusModal(activity);
-        }
-    }
-  };
 
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
@@ -97,7 +65,7 @@ function AgendaWidgetItem({
         </button>
         <div 
           className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
-          onClick={handleItemClick}
+          onClick={(e) => onClick(activity, e)}
         >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
             {displayDetails}
@@ -162,7 +130,7 @@ export function TodaysScheduleCard({
   onOpenTaskContext,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
@@ -321,6 +289,26 @@ export function TodaysScheduleCard({
     };
   }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
   
+  const handleAgendaItemClick = (activity: Activity, event: React.MouseEvent) => {
+    if (activity.completed) {
+        onToggleComplete(activity.slot, activity.id, false);
+        return;
+    }
+    
+    if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
+        const habitId = activity.taskIds[0];
+        const pattern = patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habitId));
+        if (pattern) {
+          const rule = metaRules.find(r => r.patternId === pattern.id);
+          if (rule) {
+            openRuleDetailPopup(rule.id, event);
+            return;
+          }
+        }
+    }
+    onOpenFocusModal(activity);
+  };
+  
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -427,8 +415,8 @@ export function TodaysScheduleCard({
                         onStartWorkoutLog={onStartWorkoutLog}
                         onToggleComplete={onToggleComplete}
                         onStartLeadGenLog={onStartLeadGenLog}
-                        onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={onOpenTaskContext}
+                        onClick={handleAgendaItemClick}
                     />
                     ))}
                 </ul>
@@ -458,5 +446,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
-    
