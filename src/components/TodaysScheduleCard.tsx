@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -32,7 +31,6 @@ interface AgendaWidgetItemProps {
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-  handleAgendaItemClick: (activity: Activity, event: React.MouseEvent) => void;
 }
 
 function AgendaWidgetItem({ 
@@ -45,23 +43,15 @@ function AgendaWidgetItem({
     onStartLeadGenLog, 
     onOpenTaskContext,
     onOpenHabitPopup,
-    handleAgendaItemClick
 }: AgendaWidgetItemProps) {
   const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
-  const [isHabitPopoverOpen, setIsHabitPopoverOpen] = useState(false);
-
+  
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
     const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
     displayDetails = description.split(' for ')[1] || "Workout";
   }
 
-  const handleLinkHabit = (habitId: string) => {
-    const updatedActivity = { ...activity, habitEquationIds: [habitId] };
-    updateActivity(updatedActivity);
-    setIsHabitPopoverOpen(false);
-  };
-  
   const linkedHabit = useMemo(() => {
     if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
       return habitCards.find(h => h.id === activity.habitEquationIds![0]);
@@ -69,6 +59,20 @@ function AgendaWidgetItem({
     return null;
   }, [activity.habitEquationIds, habitCards]);
 
+  const handleAgendaItemClick = (event: React.MouseEvent) => {
+    if (activity.completed) {
+        onToggleComplete(activity.slot, activity.id, false);
+        return;
+    }
+    
+    if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
+        const habitId = activity.taskIds[0];
+        onOpenHabitPopup(habitId, event);
+        return;
+    }
+    onOpenFocusModal(activity);
+  };
+  
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
       <div className="flex items-start gap-3 min-w-0 flex-grow">
@@ -80,7 +84,7 @@ function AgendaWidgetItem({
         </button>
         <div 
           className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
-          onClick={(e) => handleAgendaItemClick(activity, e)}
+          onClick={handleAgendaItemClick}
         >
           <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
             {displayDetails}
@@ -94,37 +98,6 @@ function AgendaWidgetItem({
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'essentials' && (
-             <Popover open={isHabitPopoverOpen} onOpenChange={setIsHabitPopoverOpen}>
-                <PopoverTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                        <LinkIcon className="h-4 w-4" />
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-60 p-0">
-                    <div className="p-2 space-y-1">
-                        <h4 className="font-medium text-sm px-2">Link Habit</h4>
-                        <ScrollArea className="h-40">
-                            {habitCards.map(habit => (
-                                <Button
-                                    key={habit.id}
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-full justify-start text-xs"
-                                    onClick={() => handleLinkHabit(habit.id)}
-                                >
-                                    {habit.name}
-                                </Button>
-                            ))}
-                        </ScrollArea>
-                    </div>
-                </PopoverContent>
-            </Popover>
-        )}
         {!activity.completed && activity.type !== 'interrupt' ? (
             <Button
                 variant="ghost"
@@ -186,7 +159,7 @@ export function TodaysScheduleCard({
   const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
-  const [purposeText, setPurposeText] = useState(dailyPurposes[dayKey] || '');
+  const [purposeText, setPurposeText] = useState('');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   const [showCurrentSlotOnly, setShowCurrentSlotOnly] = useState(false);
 
@@ -341,21 +314,7 @@ export function TodaysScheduleCard({
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
-  
-  const handleAgendaItemClick = (activity: Activity, event: React.MouseEvent) => {
-    if (activity.completed) {
-        onToggleComplete(activity.slot, activity.id, false);
-        return;
-    }
-    
-    if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
-        const habitId = activity.taskIds[0];
-        onOpenHabitPopup(habitId, event);
-        return;
-    }
-    onOpenFocusModal(activity);
-  };
-  
+
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -464,7 +423,6 @@ export function TodaysScheduleCard({
                         onStartLeadGenLog={onStartLeadGenLog}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
-                        handleAgendaItemClick={handleAgendaItemClick}
                     />
                     ))}
                 </ul>
@@ -494,3 +452,4 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
