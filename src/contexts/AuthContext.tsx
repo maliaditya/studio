@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -35,6 +35,7 @@ import Image from 'next/image';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
+import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 
 
 interface ResourcePopupProps {
@@ -197,6 +198,12 @@ interface AuthContextType {
   openRuleDetailPopup: (ruleId: string, event: React.MouseEvent) => void;
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
+
+  // Habit Detail Popup (New)
+  habitDetailPopup: HabitDetailPopupState | null;
+  openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
+  closeHabitDetailPopup: () => void;
+  handleHabitDetailPopupDragEnd: (event: DragEndEvent) => void;
 
   // Task Context Popup
   taskContextPopups: Map<string, TaskContextPopupState>;
@@ -399,6 +406,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Meta Rule Popup
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
+
+  // Habit Detail Popup
+  const [habitDetailPopup, setHabitDetailPopup] = useState<HabitDetailPopupState | null>(null);
 
   // Task Context Popup
   const [taskContextPopups, setTaskContextPopups] = useState<Map<string, TaskContextPopupState>>(new Map());
@@ -1654,7 +1664,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
-      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
       const newLog = { id: dateKey, date: dateKey, exercises };
       setAllWorkoutLogs(prev => [...prev, newLog]);
       workoutLog = newLog;
@@ -2036,6 +2046,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const openHabitDetailPopup = (habitId: string, event: React.MouseEvent) => {
+    const popupWidth = 600;
+    const popupHeight = 500;
+    const targetRect = (event.target as HTMLElement).getBoundingClientRect();
+    const screenWidth = window.innerWidth;
+    let x = targetRect.left;
+    let y = targetRect.bottom + 10;
+
+    if (x + popupWidth > screenWidth - 10) {
+        x = screenWidth - popupWidth - 10;
+    }
+    if (y + popupHeight > window.innerHeight - 10) {
+        y = targetRect.top - popupHeight - 10;
+    }
+    setHabitDetailPopup({ habitId, x, y, level: 0 });
+  };
+
+  const closeHabitDetailPopup = () => {
+    setHabitDetailPopup(null);
+  };
+
+  const handleHabitDetailPopupDragEnd = (event: DragEndEvent) => {
+    if (habitDetailPopup && event.active.id === `habit-detail-popup-${habitDetailPopup.habitId}`) {
+        setHabitDetailPopup(prev => prev ? {
+            ...prev,
+            x: prev.x + event.delta.x,
+            y: prev.y + event.delta.y,
+        } : null);
+    }
+  };
+  
   const openTaskContextPopup = (activityId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => {
     setTaskContextPopups(prev => {
         const newPopups = new Map(prev);
@@ -2484,6 +2525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     contentViewPopups, openContentViewPopup, closeContentViewPopup, handleContentViewPopupDragEnd,
     todaysDietPopup, openTodaysDietPopup, closeTodaysDietPopup, handleTodaysDietPopupDragEnd, swapMealInSchedule,
@@ -2612,6 +2654,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

@@ -556,6 +556,14 @@ export interface RuleDetailPopupState {
   y: number;
 }
 
+export interface HabitDetailPopupState {
+  habitId: string;
+  x: number;
+  y: number;
+  level: number;
+}
+
+
 export interface TaskContextPopupState {
   activityId: string;
   x: number;

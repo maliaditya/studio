@@ -113,6 +113,7 @@ interface TodaysScheduleCardProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
 }
 
@@ -128,6 +129,7 @@ export function TodaysScheduleCard({
   onToggleComplete,
   onOpenFocusModal,
   onOpenTaskContext,
+  onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
   const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules } = useAuth();
@@ -297,14 +299,8 @@ export function TodaysScheduleCard({
     
     if (activity.type === 'essentials' && activity.taskIds && activity.taskIds.length > 0) {
         const habitId = activity.taskIds[0];
-        const pattern = patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habitId));
-        if (pattern) {
-          const rule = metaRules.find(r => r.patternId === pattern.id);
-          if (rule) {
-            openRuleDetailPopup(rule.id, event);
-            return;
-          }
-        }
+        onOpenHabitPopup(habitId, event);
+        return;
     }
     onOpenFocusModal(activity);
   };

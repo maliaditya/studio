@@ -21,6 +21,7 @@ import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
+import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -42,6 +43,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     activeFocusSession,
     setActiveFocusSession,
@@ -57,6 +59,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartWorkoutLog,
     handleStartLeadGenLog,
     openTaskContextPopup,
+    openHabitDetailPopup,
     currentSlot,
     focusSessionModalOpen,
     setFocusSessionModalOpen,
@@ -80,6 +83,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       if (!target.closest('[data-popup-id]')) {
         closeAllResourcePopups();
         if (ruleDetailPopup) closeRuleDetailPopup();
+        if (habitDetailPopup) closeHabitDetailPopup();
         if (todaysDietPopup) closeTodaysDietPopup();
         return;
       }
@@ -94,11 +98,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup, closeRuleDetailPopup, todaysDietPopup, closeTodaysDietPopup]);
+  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup, closeRuleDetailPopup, habitDetailPopup, closeHabitDetailPopup, todaysDietPopup, closeTodaysDietPopup]);
   
   const handleDragEnd = (event: DragEndEvent) => {
     handlePopupDragEnd(event);
     handleRulePopupDragEnd(event);
+    handleHabitDetailPopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
   };
@@ -145,6 +150,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
+            onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
         />
       )}
@@ -171,6 +177,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     popupState={ruleDetailPopup}
                     onClose={closeRuleDetailPopup}
                 />
+            )}
+            {habitDetailPopup && (
+              <HabitDetailPopup
+                popupState={habitDetailPopup}
+                onClose={closeHabitDetailPopup}
+              />
             )}
             {Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
