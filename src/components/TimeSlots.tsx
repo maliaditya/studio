@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -11,11 +10,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent } from './ui/dropdown-menu';
+import { useState, useMemo } from 'react';
+import { ScrollArea } from './ui/scroll-area';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -79,7 +81,7 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
+  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
@@ -94,13 +96,16 @@ export function TimeSlots({
                     const updatedActivities = [...activities];
                     updatedActivities[activityIndex] = { ...updatedActivities[activityIndex], isRoutine: !updatedActivities[activityIndex].isRoutine };
                     newSchedule[dateKey] = { ...day, [slotName]: updatedActivities };
-                    // We update it everywhere, but for now let's just do one.
-                    // This logic might need to be refined if tasks appear on multiple days and we want to sync their routine status.
                 }
             }
         }
         return newSchedule;
     });
+  };
+
+  const handleLinkHabit = (activity: Activity, habitId: string) => {
+    const updatedActivity = { ...activity, habitEquationIds: [habitId] };
+    updateActivity(updatedActivity);
   };
 
   return (
@@ -151,8 +156,10 @@ export function TimeSlots({
                       const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
                       displayDetails = description.split(' for ')[1] || "Workout";
                     }
+                     const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
+
                     return (
-                      <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm">
+                      <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
                         <div className="flex items-start justify-between gap-3">
                           <div
                             className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
@@ -160,7 +167,7 @@ export function TimeSlots({
                           >
                             <button
                               onClick={(e) => {
-                                  e.stopPropagation(); // Prevent the main div's onClick from firing
+                                  e.stopPropagation();
                                   handleToggleRoutine(slot.name, activity.id);
                               }}
                               className={cn("pt-0.5", activity.isRoutine ? "text-green-500" : "text-primary")}
@@ -171,10 +178,11 @@ export function TimeSlots({
                               <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
                                 {displayDetails}
                               </p>
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}
-                                 {activity.duration ? ` (${activity.duration}m)`: ''}
-                              </p>
+                              <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
+                                <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
+                                 {activity.duration ? <span className="font-mono">({activity.duration}m)</span>: ''}
+                                {linkedHabit && <span className="text-primary font-medium truncate italic" title={linkedHabit.name}>({linkedHabit.name})</span>}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center flex-shrink-0">
@@ -183,9 +191,40 @@ export function TimeSlots({
                               checked={!!activity.completed}
                               onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
                             />
-                            <Button variant="ghost" size="icon" onClick={() => onRemoveActivity(slot.name, activity.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {activity.type !== 'essentials' && activity.type !== 'interrupt' && (
+                                  <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>
+                                      <LinkIcon className="mr-2 h-4 w-4" />
+                                      <span>Link Habit</span>
+                                    </DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                       <DropdownMenuSubContent>
+                                        <ScrollArea className="h-48">
+                                          {habitCards.map(habit => (
+                                              <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity, habit.id)}>
+                                                  {habit.name}
+                                              </DropdownMenuItem>
+                                          ))}
+                                          {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
+                                        </ScrollArea>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                  </DropdownMenuSub>
+                                )}
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => onRemoveActivity(slot.name, activity.id)} className="text-destructive">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  <span>Delete</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       </div>
