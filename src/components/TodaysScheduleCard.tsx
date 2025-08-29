@@ -17,12 +17,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 interface AgendaWidgetItemProps {
   activity: Activity & { slot: keyof DailySchedule };
   duration: string | undefined;
+  date: Date;
   onLogLearning: (activity: Activity, progress: number, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
@@ -33,13 +35,14 @@ interface AgendaWidgetItemProps {
 function AgendaWidgetItem({ 
     activity, 
     duration, 
+    date,
     onLogLearning, 
     onStartWorkoutLog, 
     onToggleComplete, 
     onStartLeadGenLog, 
     onOpenTaskContext,
 }: AgendaWidgetItemProps) {
-  const { onOpenFocusModal, deepWorkDefinitions, upskillDefinitions, setSelectedDeepWorkTask, setSelectedUpskillTask, addToRecents } = useAuth();
+  const { onOpenFocusModal, deepWorkDefinitions, upskillDefinitions, setSelectedDeepWorkTask, setSelectedUpskillTask, addToRecents, workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
   const router = useRouter();
 
   const handleItemClick = (e: React.MouseEvent) => {
@@ -77,6 +80,12 @@ function AgendaWidgetItem({
     }
   };
 
+  let displayDetails = activity.details;
+  if (activity.type === 'workout') {
+    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+    displayDetails = description.split(' for ')[1] || "Workout";
+  }
+
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
       <div className="flex items-start gap-3 min-w-0 flex-grow">
@@ -90,8 +99,8 @@ function AgendaWidgetItem({
           className={cn("flex-grow min-w-0", !activity.completed && activity.type !== 'interrupt' && "cursor-pointer")}
           onClick={handleItemClick}
         >
-          <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={activity.details}>
-            {activity.details}
+          <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
+            {displayDetails}
           </p>
         </div>
       </div>
@@ -413,6 +422,7 @@ export function TodaysScheduleCard({
                         key={activity.id}
                         activity={activity}
                         duration={activityDurations[activity.id]}
+                        date={date}
                         onLogLearning={onLogLearning}
                         onStartWorkoutLog={onStartWorkoutLog}
                         onToggleComplete={onToggleComplete}
