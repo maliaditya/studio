@@ -3,7 +3,7 @@
       
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
 import {
@@ -31,6 +31,7 @@ interface AgendaWidgetItemProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   handleAgendaItemClick: (activity: Activity, event: React.MouseEvent) => void;
 }
 
@@ -43,6 +44,7 @@ function AgendaWidgetItem({
     onToggleComplete, 
     onStartLeadGenLog, 
     onOpenTaskContext,
+    onOpenHabitPopup,
     handleAgendaItemClick
 }: AgendaWidgetItemProps) {
   const { onOpenFocusModal, workoutMode, workoutPlans, exerciseDefinitions, habitCards, updateActivity } = useAuth();
@@ -461,6 +463,7 @@ export function TodaysScheduleCard({
                         onToggleComplete={onToggleComplete}
                         onStartLeadGenLog={onStartLeadGenLog}
                         onOpenTaskContext={onOpenTaskContext}
+                        onOpenHabitPopup={onOpenHabitPopup}
                         handleAgendaItemClick={handleAgendaItemClick}
                     />
                     ))}
