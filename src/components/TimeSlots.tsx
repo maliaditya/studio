@@ -149,6 +149,7 @@ export function TimeSlots({
         return (
           <Card
             key={slot.name}
+            id={`slot-card-${slot.name.replace(/\s+/g, '-')}`}
             className={cn(
               "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
               currentSlot === slot.name

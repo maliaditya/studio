@@ -13,10 +13,17 @@ interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | null;
   activeProjects: Project[];
   onOpenInterruptModal: () => void;
+  currentSlot: string;
 }
 
-export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterruptModal }: SmartLoggingPromptProps) {
+export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterruptModal, currentSlot }: SmartLoggingPromptProps) {
   const router = useRouter();
+
+  const handleAddTaskClick = () => {
+    const slotCardId = `slot-card-${currentSlot.replace(/\s+/g, '-')}`;
+    const slotElement = document.getElementById(slotCardId);
+    slotElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
 
   const prompts = {
     empty: {
@@ -24,10 +31,7 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
       title: "Your current slot is empty.",
       description: "What's your focus right now? Let's get something scheduled.",
       actions: [
-        { label: "Add Task to Agenda", onClick: () => { 
-            const dashboardElement = document.getElementById('dashboard-main-content');
-            dashboardElement?.scrollIntoView({ behavior: 'smooth' });
-        } },
+        { label: "Add Task to Agenda", onClick: handleAddTaskClick },
         { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
       ]
     },
@@ -36,10 +40,7 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
       title: "You have tasks scheduled.",
       description: "Ready to start a focus session and make progress?",
        actions: [
-        { label: "View Agenda", onClick: () => {
-            const dashboardElement = document.getElementById('dashboard-main-content');
-            dashboardElement?.scrollIntoView({ behavior: 'smooth' });
-        } },
+        { label: "View Agenda", onClick: handleAddTaskClick },
         { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
       ]
     },

@@ -1179,6 +1179,7 @@ function MyPlatePageContent() {
                     promptType={promptType} 
                     onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
                     activeProjects={activeProjectsForPrompt}
+                    currentSlot={currentSlot}
                 />
             )}
             <DashboardStats stats={dashboardStats} />
