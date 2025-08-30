@@ -6,8 +6,8 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw } from 'lucide-react';
-import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition, DatedWorkout } from '@/types/workout';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition, DatedWorkout, Resource } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Checkbox } from './ui/checkbox';
@@ -16,6 +16,9 @@ import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -46,7 +49,7 @@ interface WorkoutExerciseCardProps {
   onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
   onSwapExercise?: (newExerciseDefinition: ExerciseDefinition) => void;
   swappableExercises?: ExerciseDefinition[];
-  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system';
+  pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system' | 'mind-programming';
   deepWorkDefinitions?: ExerciseDefinition[];
 }
 
@@ -68,17 +71,16 @@ export function WorkoutExerciseCard({
   pageType = 'workout',
   deepWorkDefinitions
 }: WorkoutExerciseCardProps) {
+  const { resources, mindProgrammingDefinitions, setMindProgrammingDefinitions } = useAuth();
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
   const [duration, setDuration] = useState('');
   const [progress, setProgress] = useState('');
-
   const [editingSet, setEditingSet] = useState<LoggedSet | null>(null);
   const [editReps, setEditReps] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editDuration, setEditDuration] = useState('');
   const [editProgress, setEditProgress] = useState('');
-  
   const isParent = definition && ((definition.linkedDeepWorkIds?.length ?? 0) > 0 || (definition.linkedUpskillIds?.length ?? 0) > 0 || (definition.linkedResourceIds?.length ?? 0) > 0);
   
   const handleSharingChange = (platform: keyof SharingStatus) => {
@@ -247,6 +249,40 @@ export function WorkoutExerciseCard({
     }
     return `Session ${exercise.loggedSets.length - index}: <strong>${set.weight}</strong> min`;
   }
+
+  const updateDecompositionData = (pointId: string, newText: string) => {
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === exercise.definitionId) {
+            const newDecompData = (def.decompositionData || []).map(point =>
+                point.id === pointId ? { ...point, text: newText } : point
+            );
+            return { ...def, decompositionData: newDecompData };
+        }
+        return def;
+    }));
+  };
+
+  const handleAddStep = () => {
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+      if (def.id === exercise.definitionId) {
+        const newStep = { id: `step_${Date.now()}`, text: 'New Step', type: 'text' as const };
+        return { ...def, decompositionData: [...(def.decompositionData || []), newStep] };
+      }
+      return def;
+    }));
+  };
+  
+  const handleLinkResource = (resourceId: string) => {
+    if (!resourceId) return;
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+      if (def.id === exercise.definitionId) {
+        const updatedLinkedIds = [...(def.linkedResourceIds || []), resourceId];
+        return { ...def, linkedResourceIds: updatedLinkedIds };
+      }
+      return def;
+    }));
+  };
+  
   
   const renderBrandingContent = () => {
       const STAGES = ['Create', 'Optimize', 'Review', 'Final Review'];
@@ -351,20 +387,60 @@ export function WorkoutExerciseCard({
 
   const renderMindProgrammingContent = () => (
     <div className="space-y-3">
-        {definition?.decompositionData?.map(point => {
+        {(definition?.decompositionData || []).map(point => {
             const [mainText, ...subTextParts] = point.text.split(' – ');
             const subText = subTextParts.join(' – ');
             return (
-                <div key={point.id} className="text-sm flex items-start gap-3">
-                    <span className="font-bold text-primary w-24 flex-shrink-0">{mainText}</span>
-                    <Textarea 
+                <div key={point.id} className="text-sm flex items-start gap-3 group">
+                    <span className="font-bold text-primary w-24 flex-shrink-0 pt-1.5">{mainText}</span>
+                    <Textarea
                       defaultValue={subText}
+                      onBlur={(e) => updateDecompositionData(point.id, `${mainText} – ${e.target.value}`)}
                       className="text-sm flex-grow min-h-[2.5rem]"
                       rows={1}
                     />
                 </div>
             )
         })}
+        {(definition?.linkedResourceIds || []).map(resourceId => {
+          const resource = resources.find(r => r.id === resourceId);
+          return resource ? (
+            <div key={resourceId} className="text-sm flex items-center gap-3 p-2 border rounded-md">
+              <LinkIcon className="h-4 w-4 text-primary" />
+              <span className="font-semibold">{resource.name}</span>
+            </div>
+          ) : null;
+        })}
+        <div className="flex gap-2 pt-2 border-t">
+          <Button variant="outline" size="sm" onClick={handleAddStep}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Step
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm">
+                <LinkIcon className="mr-2 h-4 w-4" /> Link Resource
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium leading-none">Link Resource</h4>
+                  <p className="text-sm text-muted-foreground">Select a resource card to link.</p>
+                </div>
+                 <Select onValueChange={handleLinkResource}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select a resource..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {resources.map(res => (
+                            <SelectItem key={res.id} value={res.id}>{res.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                 </Select>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
     </div>
   );
 
