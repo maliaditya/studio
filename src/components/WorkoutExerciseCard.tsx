@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -14,6 +15,7 @@ import { Badge } from './ui/badge';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from './ui/scroll-area';
+import { Textarea } from './ui/textarea';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -347,6 +349,25 @@ export function WorkoutExerciseCard({
     </div>
   );
 
+  const renderMindProgrammingContent = () => (
+    <div className="space-y-3">
+        {definition?.decompositionData?.map(point => {
+            const [mainText, ...subTextParts] = point.text.split(' – ');
+            const subText = subTextParts.join(' – ');
+            return (
+                <div key={point.id} className="text-sm flex items-start gap-3">
+                    <span className="font-bold text-primary w-24 flex-shrink-0">{mainText}</span>
+                    <Textarea 
+                      defaultValue={subText}
+                      className="text-sm flex-grow min-h-[2.5rem]"
+                      rows={1}
+                    />
+                </div>
+            )
+        })}
+    </div>
+  );
+
   const renderDefaultContent = () => (
       <>
         {isParent && pageType === 'deepwork' ? (
@@ -457,6 +478,8 @@ export function WorkoutExerciseCard({
       case 'lead-generation':
       case 'offer-system':
         return renderSimpleLogContent();
+      case 'mind-programming':
+        return renderMindProgrammingContent();
       default:
         return renderDefaultContent();
     }

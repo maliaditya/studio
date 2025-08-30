@@ -55,7 +55,7 @@ import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
-import { INITIAL_PLANS } from '@/lib/constants';
+import { INITIAL_PLANS, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 
@@ -484,17 +484,21 @@ function MindProgrammingPageContent() {
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                           <AnimatePresence>
-                          {currentWorkoutExercises.map(exercise => (
-                              <WorkoutExerciseCard 
-                                key={exercise.id} 
-                                exercise={exercise}
-                                onLogSet={handleLogSet} 
-                                onDeleteSet={handleDeleteSet} 
-                                onUpdateSet={handleUpdateSet} 
-                                onRemoveExercise={handleRemoveExerciseFromWorkout}
-                                onViewProgress={viewingProgressExercise ? () => handleViewProgress(viewingProgressExercise) : undefined}
-                              />
-                          ))}
+                          {currentWorkoutExercises.map(exercise => {
+                              const definition = mindProgrammingDefinitions.find(def => def.id === exercise.definitionId);
+                              return (
+                                <WorkoutExerciseCard 
+                                  key={exercise.id} 
+                                  exercise={exercise}
+                                  definition={definition}
+                                  onLogSet={handleLogSet} 
+                                  onDeleteSet={handleDeleteSet} 
+                                  onUpdateSet={handleUpdateSet} 
+                                  onRemoveExercise={handleRemoveExerciseFromWorkout}
+                                  onViewProgress={viewingProgressExercise ? () => handleViewProgress(viewingProgressExercise) : undefined}
+                                />
+                              )
+                          })}
                           </AnimatePresence>
                         </div>
                       )}
@@ -571,4 +575,5 @@ function MindProgrammingPageContent() {
 export default function Page() {
   return ( <AuthGuard> <MindProgrammingPageContent /> </AuthGuard> );
 }
+
 
