@@ -4,10 +4,10 @@
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Trash2, Edit3, Save, X, ChevronRight, TrendingUp, BrainCircuit, BookCopy } from 'lucide-react';
-import { ExerciseDefinition, WorkoutExercise, ExerciseCategory } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, ExerciseCategory, MindsetCard } from '@/types/workout';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 
