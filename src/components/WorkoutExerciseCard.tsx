@@ -1,8 +1,9 @@
 
+
       
 "use client";
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void }) => {
+const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState(point.text);
   const editorRef = useRef<HTMLDivElement>(null);
@@ -44,8 +45,10 @@ const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }
 
   const handleBlur = () => {
     const newText = editorRef.current?.textContent || '';
-    if (newText.trim() !== point.text.trim()) {
-      onUpdate(point.id, newText.trim());
+    if (newText.trim() === '') {
+        onDelete(point.id);
+    } else if (newText.trim() !== point.text.trim()) {
+        onUpdate(point.id, newText.trim());
     }
     setIsEditing(false);
   };
@@ -54,7 +57,6 @@ const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }
     setIsEditing(true);
     setTimeout(() => {
         editorRef.current?.focus();
-        // Move cursor to the end
         const range = document.createRange();
         const sel = window.getSelection();
         if (editorRef.current && sel) {
@@ -73,6 +75,7 @@ const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }
           contentEditable={true} 
           suppressContentEditableWarning={true}
           onBlur={handleBlur}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBlur(); } }}
           className="text-sm editable-placeholder w-full"
         >
           {currentText}
@@ -84,8 +87,11 @@ const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }
     <div className="text-sm flex items-start gap-3 group" onClick={handleClick}>
         <span 
           className="editable-sentence flex-grow cursor-text"
-          dangerouslySetInnerHTML={{ __html: point.text.replace(/→/g, '<span class="mx-2 text-primary font-bold">→</span>') || "..." }}
+          dangerouslySetInnerHTML={{ __html: point.text || "..." }}
         />
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
+            <Trash2 className="h-3 w-3"/>
+        </Button>
     </div>
   );
 };
@@ -272,7 +278,7 @@ export function WorkoutExerciseCard({
 
   const getProgressText = () => {
     if (isParent) {
-      return `Daily Time: ${dailyTotalMinutes} min`;
+      return null;
     }
     if (pageType === 'upskill' && definitionGoal) {
       const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
@@ -290,7 +296,7 @@ export function WorkoutExerciseCard({
     if (pageType === 'mind-programming') {
       return null;
     }
-    return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
+    return null;
   }
 
   const getLoggedSetText = (set: LoggedSet, index: number) => {
@@ -316,6 +322,27 @@ export function WorkoutExerciseCard({
             const newDecompData = (def.decompositionData || []).map(point =>
                 point.id === pointId ? { ...point, text: newText } : point
             );
+            return { ...def, decompositionData: newDecompData };
+        }
+        return def;
+    }));
+  };
+  
+  const deleteDecompositionData = (pointId: string) => {
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === exercise.definitionId) {
+            const newDecompData = (def.decompositionData || []).filter(point => point.id !== pointId);
+            return { ...def, decompositionData: newDecompData };
+        }
+        return def;
+    }));
+  };
+
+  const handleAddDecompositionStep = () => {
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === exercise.definitionId) {
+            const newStep = { id: `step_${Date.now()}`, text: 'New step...', type: 'text' as const };
+            const newDecompData = [...(def.decompositionData || []), newStep];
             return { ...def, decompositionData: newDecompData };
         }
         return def;
@@ -438,7 +465,7 @@ export function WorkoutExerciseCard({
   const renderMindProgrammingContent = () => (
     <div className="space-y-3">
         {(definition?.decompositionData || []).map(point => (
-            <EditableStep key={point.id} point={point} onUpdate={updateDecompositionData} />
+            <EditableStep key={point.id} point={point} onUpdate={updateDecompositionData} onDelete={deleteDecompositionData}/>
         ))}
         {(definition?.linkedResourceIds || []).map(resourceId => {
           const resource = resources.find(r => r.id === resourceId);
@@ -449,6 +476,28 @@ export function WorkoutExerciseCard({
             </div>
           ) : null;
         })}
+        <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleAddDecompositionStep}>
+                Add Step
+            </Button>
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm">Link Resource</Button>
+                </PopoverTrigger>
+                <PopoverContent>
+                    <Select onValueChange={handleLinkResource}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select a resource..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {resources.map(res => (
+                                <SelectItem key={res.id} value={res.id}>{res.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </PopoverContent>
+            </Popover>
+        </div>
     </div>
   );
 
