@@ -50,12 +50,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
 import { INITIAL_PLANS } from '@/lib/constants';
+import { ScrollArea } from '../ui/scroll-area';
 
 
 const DEFAULT_TARGET_SETS = 3;
