@@ -1,4 +1,5 @@
 
+      
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -33,31 +34,58 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void }) => {
-  const [mainText, ...subTextParts] = point.text.split(' – ');
-  const subText = subTextParts.join(' – ');
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentText, setCurrentText] = useState(point.text);
+  const editorRef = useRef<HTMLDivElement>(null);
 
-  const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
-    const newSubText = e.currentTarget.textContent || '';
+  useEffect(() => {
+    setCurrentText(point.text);
+  }, [point.text]);
 
-    if (newSubText !== subText) {
-      onUpdate(point.id, `${mainText} – ${newSubText}`);
+  const handleBlur = () => {
+    const newText = editorRef.current?.textContent || '';
+    if (newText.trim() !== point.text.trim()) {
+      onUpdate(point.id, newText.trim());
     }
+    setIsEditing(false);
   };
 
-  return (
-    <div className="text-sm flex items-start gap-3 group">
-        <span className="font-bold text-primary w-24 flex-shrink-0 pt-1">{mainText}</span>
-        <div 
-          className="editable-sentence flex-grow"
+  const handleClick = () => {
+    setIsEditing(true);
+    setTimeout(() => {
+        editorRef.current?.focus();
+        // Move cursor to the end
+        const range = document.createRange();
+        const sel = window.getSelection();
+        if (editorRef.current && sel) {
+            range.selectNodeContents(editorRef.current);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    }, 0);
+  };
+  
+  if (isEditing) {
+    return (
+       <div 
+          ref={editorRef}
+          contentEditable={true} 
+          suppressContentEditableWarning={true}
+          onBlur={handleBlur}
+          className="text-sm editable-placeholder w-full"
         >
-          <span 
-            contentEditable={true} 
-            suppressContentEditableWarning={true}
-            className="editable-placeholder"
-            onBlur={handleBlur}
-            dangerouslySetInnerHTML={{ __html: subText || "..." }} 
-          />
-        </div>
+          {currentText}
+       </div>
+    )
+  }
+
+  return (
+    <div className="text-sm flex items-start gap-3 group" onClick={handleClick}>
+        <span 
+          className="editable-sentence flex-grow cursor-text"
+          dangerouslySetInnerHTML={{ __html: point.text.replace(/→/g, '<span class="mx-2 text-primary font-bold">→</span>') || "..." }}
+        />
     </div>
   );
 };
@@ -421,33 +449,6 @@ export function WorkoutExerciseCard({
             </div>
           ) : null;
         })}
-        <div className="flex gap-2 pt-2 border-t">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="sm">
-                <LinkIcon className="mr-2 h-4 w-4" /> Link Resource
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">Link Resource</h4>
-                  <p className="text-sm text-muted-foreground">Select a resource card to link.</p>
-                </div>
-                 <Select onValueChange={handleLinkResource}>
-                    <SelectTrigger>
-                        <SelectValue placeholder="Select a resource..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {resources.map(res => (
-                            <SelectItem key={res.id} value={res.id}>{res.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                 </Select>
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
     </div>
   );
 
@@ -644,3 +645,6 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
+
+
+    
