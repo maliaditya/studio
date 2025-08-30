@@ -772,8 +772,6 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
-  const selectedDaySchedule = schedule[selectedDateKey] || {};
-
   const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
     const dailyLog = logs.find(log => log.date === dateKey);
     if (!dailyLog) return 0;
