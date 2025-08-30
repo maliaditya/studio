@@ -1174,14 +1174,6 @@ function MyPlatePageContent() {
               </Popover>
           </CardHeader>
           <CardContent>
-            {promptType && (
-                <SmartLoggingPrompt 
-                    promptType={promptType} 
-                    onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
-                    activeProjects={activeProjectsForPrompt}
-                    currentSlot={currentSlot}
-                />
-            )}
             <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               <div className="space-y-6 lg:col-span-3">
@@ -1259,195 +1251,204 @@ function MyPlatePageContent() {
         </Card>
         
         <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
+      </div>
 
-        {currentUser && (
-          <TodaysWorkoutModal
-              isOpen={isTodaysWorkoutModalOpen}
-              onOpenChange={setIsTodaysWorkoutModalOpen}
-              activityToLog={workoutActivityToLog}
-              dateForWorkout={selectedDate}
-              onActivityComplete={handleToggleComplete}
-              logWorkoutSet={logWorkoutSet}
-              updateWorkoutSet={updateWorkoutSet}
-              deleteWorkoutSet={deleteWorkoutSet}
-              removeExerciseFromWorkout={removeExerciseFromWorkout}
-              swapWorkoutExercise={swapWorkoutExercise}
+      {promptType && (
+          <SmartLoggingPrompt 
+              promptType={promptType} 
+              onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
+              activeProjects={activeProjectsForPrompt}
+              currentSlot={currentSlot}
           />
-        )}
-        
-        {currentUser && (
-          <TodaysMindsetModal
-            isOpen={isTodaysMindsetModalOpen}
-            onOpenChange={setIsTodaysMindsetModalOpen}
-            activityToLog={mindsetActivityToLog}
+      )}
+      
+      {currentUser && (
+        <TodaysWorkoutModal
+            isOpen={isTodaysWorkoutModalOpen}
+            onOpenChange={setIsTodaysWorkoutModalOpen}
+            activityToLog={workoutActivityToLog}
             dateForWorkout={selectedDate}
             onActivityComplete={handleToggleComplete}
-          />
-        )}
-
-        {currentUser && (
-            <TodaysLeadGenModal
-                isOpen={isLeadGenModalOpen}
-                onOpenChange={setIsLeadGenModalOpen}
-                activityToLog={workoutActivityToLog}
-                onActivityComplete={handleToggleComplete}
-            />
-        )}
-        
-        {currentUser && editingActivity && (
-          <TodaysLearningModal
-              isOpen={isLearningModalOpen}
-              onOpenChange={(isOpen) => {
-                  if (!isOpen) setEditingActivity(null);
-                  setIsLearningModalOpen(isOpen);
-              }}
-              availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
-              initialSelectedIds={editingActivity.activity.taskIds || []}
-              onSave={handleSaveTaskSelection}
-              pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
-              deepWorkDefinitions={deepWorkDefinitions}
-              upskillDefinitions={upskillDefinitions}
-              setDeepWorkDefinitions={setDeepWorkDefinitions}
-              projects={projects}
-              offerizationPlans={offerizationPlans}
-              productizationPlans={productizationPlans}
-          />
-        )}
-
-        <DietPlanModal
-          isOpen={isDietPlanModalOpen}
-          onOpenChange={setIsDietPlanModalOpen}
+            logWorkoutSet={logWorkoutSet}
+            updateWorkoutSet={updateWorkoutSet}
+            deleteWorkoutSet={deleteWorkoutSet}
+            removeExerciseFromWorkout={removeExerciseFromWorkout}
+            swapWorkoutExercise={swapWorkoutExercise}
         />
-
-        <StatsOverviewModal
-          isOpen={isStatsModalOpen}
-          onOpenChange={setIsStatsModalOpen}
-          allWorkoutLogs={allWorkoutLogs}
-          allUpskillLogs={allUpskillLogs}
-          allDeepWorkLogs={allDeepWorkLogs}
-          weightLogs={weightLogs}
-          goalWeight={goalWeight}
-          consistencyData={[]}
-          totalHoursData={[]}
-          todayHoursData={[]}
+      )}
+      
+      {currentUser && (
+        <TodaysMindsetModal
+          isOpen={isTodaysMindsetModalOpen}
+          onOpenChange={setIsTodaysMindsetModalOpen}
+          activityToLog={mindsetActivityToLog}
+          dateForWorkout={selectedDate}
+          onActivityComplete={handleToggleComplete}
         />
+      )}
 
-        <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-            <DialogContent className="max-w-7xl h-[90vh] p-0">
-                <DialogHeader className="p-4 border-b">
-                    <DialogTitle>Strategic Mind Map</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                  <MindMapViewer />
-                </div>
-            </DialogContent>
-        </Dialog>
+      {currentUser && (
+          <TodaysLeadGenModal
+              isOpen={isLeadGenModalOpen}
+              onOpenChange={setIsLeadGenModalOpen}
+              activityToLog={workoutActivityToLog}
+              onActivityComplete={handleToggleComplete}
+          />
+      )}
+      
+      {currentUser && editingActivity && (
+        <TodaysLearningModal
+            isOpen={isLearningModalOpen}
+            onOpenChange={(isOpen) => {
+                if (!isOpen) setEditingActivity(null);
+                setIsLearningModalOpen(isOpen);
+            }}
+            availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
+            initialSelectedIds={editingActivity.activity.taskIds || []}
+            onSave={handleSaveTaskSelection}
+            pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
+            deepWorkDefinitions={deepWorkDefinitions}
+            upskillDefinitions={upskillDefinitions}
+            setDeepWorkDefinitions={setDeepWorkDefinitions}
+            projects={projects}
+            offerizationPlans={offerizationPlans}
+            productizationPlans={productizationPlans}
+        />
+      )}
 
-        <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
-          <DialogContent className="max-w-7xl h-[80vh] flex flex-col p-0">
-            <DialogHeader className="p-4 border-b">
-              <DialogTitle>Task Board</DialogTitle>
-              <DialogDescription>A Kanban-style view of all your tasks for today.</DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                <KanbanPageContent isModal={true} />
-            </div>
+      <DietPlanModal
+        isOpen={isDietPlanModalOpen}
+        onOpenChange={setIsDietPlanModalOpen}
+      />
+
+      <StatsOverviewModal
+        isOpen={isStatsModalOpen}
+        onOpenChange={setIsStatsModalOpen}
+        allWorkoutLogs={allWorkoutLogs}
+        allUpskillLogs={allUpskillLogs}
+        allDeepWorkLogs={allDeepWorkLogs}
+        weightLogs={weightLogs}
+        goalWeight={goalWeight}
+        consistencyData={[]}
+        totalHoursData={[]}
+        todayHoursData={[]}
+      />
+
+      <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+          <DialogContent className="max-w-7xl h-[90vh] p-0">
+              <DialogHeader className="p-4 border-b">
+                  <DialogTitle>Strategic Mind Map</DialogTitle>
+              </DialogHeader>
+              <div className="flex-grow min-h-0">
+                <MindMapViewer />
+              </div>
           </DialogContent>
-        </Dialog>
-        
-        <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Log an Interruption</DialogTitle>
-                    <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="interrupt-details">Description</Label>
-                        <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
-                        <Input 
-                          id="interrupt-duration" 
-                          type="number" 
-                          value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
-                          onChange={(e) => setInterruptDuration(e.target.value)} 
-                          placeholder="e.g., 30"
-                          disabled={applyInterruptToFutureSlots}
-                        />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                        <Checkbox 
-                            id="apply-all-slots" 
-                            checked={applyInterruptToFutureSlots} 
-                            onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
-                        />
-                        <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
-                    <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        
-         <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => { if(!isOpen) setEssentialsModalState({ isOpen: false, slotName: null, activity: null }); }}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{essentialsModalState.activity ? 'Edit' : 'Log a'} Daily Essential</DialogTitle>
-                    <DialogDescription>Add a recurring or essential one-off task.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-1">
-                        <Label htmlFor="essential-details">Description</Label>
-                        <Textarea id="essential-details" value={essentialDetails} onChange={(e) => setEssentialDetails(e.target.value)} placeholder="e.g., Meditate, Journal..." />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="essential-duration">Est. Duration (minutes)</Label>
-                        <Input id="essential-duration" type="number" value={essentialDuration} onChange={(e) => setEssentialDuration(e.target.value)} placeholder="e.g., 15" />
-                    </div>
-                    <div className="space-y-1">
-                        <Label htmlFor="essential-habit">Link Habit (Optional)</Label>
-                        <Select
-                            value={essentialLinkedHabitId || ''}
-                            onValueChange={(value) => setEssentialLinkedHabitId(value === 'none' ? null : value)}
-                        >
-                            <SelectTrigger id="essential-habit">
-                                <SelectValue placeholder="Select a habit..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">-- None --</SelectItem>
-                                {habitResources.map(habit => (
-                                    <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>Cancel</Button>
-                    <Button onClick={handleSaveEssential}>Save Task</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+      </Dialog>
 
-        <Dialog open={isMealModalOpen} onOpenChange={setIsMealModalOpen}>
-            <DialogContent className="sm:max-w-xs">
-                <DialogHeader>
-                    <DialogTitle>Select Meal</DialogTitle>
-                    <DialogDescription>Which meal are you logging?</DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-2 py-4">
-                    <Button variant="outline" onClick={() => handleSelectMeal('meal1')}>Meal 1</Button>
-                    <Button variant="outline" onClick={() => handleSelectMeal('meal2')}>Meal 2</Button>
-                    <Button variant="outline" onClick={() => handleSelectMeal('meal3')}>Meal 3</Button>
-                    <Button variant="outline" onClick={() => handleSelectMeal('supplements')}>Supplements</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-      </div>
+      <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
+        <DialogContent className="max-w-7xl h-[80vh] flex flex-col p-0">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Task Board</DialogTitle>
+            <DialogDescription>A Kanban-style view of all your tasks for today.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-grow min-h-0">
+              <KanbanPageContent isModal={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Log an Interruption</DialogTitle>
+                  <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                  <div className="space-y-1">
+                      <Label htmlFor="interrupt-details">Description</Label>
+                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
+                      <Input 
+                        id="interrupt-duration" 
+                        type="number" 
+                        value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
+                        onChange={(e) => setInterruptDuration(e.target.value)} 
+                        placeholder="e.g., 30"
+                        disabled={applyInterruptToFutureSlots}
+                      />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                      <Checkbox 
+                          id="apply-all-slots" 
+                          checked={applyInterruptToFutureSlots} 
+                          onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
+                      />
+                      <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
+                  <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+      
+       <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => { if(!isOpen) setEssentialsModalState({ isOpen: false, slotName: null, activity: null }); }}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>{essentialsModalState.activity ? 'Edit' : 'Log a'} Daily Essential</DialogTitle>
+                  <DialogDescription>Add a recurring or essential one-off task.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                  <div className="space-y-1">
+                      <Label htmlFor="essential-details">Description</Label>
+                      <Textarea id="essential-details" value={essentialDetails} onChange={(e) => setEssentialDetails(e.target.value)} placeholder="e.g., Meditate, Journal..." />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="essential-duration">Est. Duration (minutes)</Label>
+                      <Input id="essential-duration" type="number" value={essentialDuration} onChange={(e) => setEssentialDuration(e.target.value)} placeholder="e.g., 15" />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="essential-habit">Link Habit (Optional)</Label>
+                      <Select
+                          value={essentialLinkedHabitId || ''}
+                          onValueChange={(value) => setEssentialLinkedHabitId(value === 'none' ? null : value)}
+                      >
+                          <SelectTrigger id="essential-habit">
+                              <SelectValue placeholder="Select a habit..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="none">-- None --</SelectItem>
+                              {habitResources.map(habit => (
+                                  <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                              ))}
+                          </SelectContent>
+                      </Select>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>Cancel</Button>
+                  <Button onClick={handleSaveEssential}>Save Task</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMealModalOpen} onOpenChange={setIsMealModalOpen}>
+          <DialogContent className="sm:max-w-xs">
+              <DialogHeader>
+                  <DialogTitle>Select Meal</DialogTitle>
+                  <DialogDescription>Which meal are you logging?</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2 py-4">
+                  <Button variant="outline" onClick={() => handleSelectMeal('meal1')}>Meal 1</Button>
+                  <Button variant="outline" onClick={() => handleSelectMeal('meal2')}>Meal 2</Button>
+                  <Button variant="outline" onClick={() => handleSelectMeal('meal3')}>Meal 3</Button>
+                  <Button variant="outline" onClick={() => handleSelectMeal('supplements')}>Supplements</Button>
+              </div>
+          </DialogContent>
+      </Dialog>
     </>
   );
 }
