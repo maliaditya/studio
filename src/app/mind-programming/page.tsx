@@ -175,10 +175,18 @@ function MindProgrammingPageContent() {
     if (!newExerciseCategory) {
       toast({ title: "Error", description: "Please select a category.", variant: "destructive" }); return;
     }
+    const defaultPoints = [
+        { id: `p1_${Date.now()}`, text: 'Pause', type: 'text' },
+        { id: `p2_${Date.now()}`, text: 'Focus', type: 'text' },
+        { id: `p3_${Date.now()}`, text: 'Observe', type: 'text' },
+        { id: `p4_${Date.now()}`, text: 'Distance', type: 'text' },
+        { id: `p5_${Date.now()}`, text: 'Return', type: 'text' }
+    ];
     const newDef: ExerciseDefinition = { 
       id: `mp_def_${Date.now()}`, 
       name: newExerciseName.trim(),
-      category: newExerciseCategory || DEFAULT_EXERCISE_CATEGORY
+      category: newExerciseCategory || DEFAULT_EXERCISE_CATEGORY,
+      decompositionData: defaultPoints,
     };
     setMindProgrammingDefinitions(prev => [...prev, newDef]);
     setNewExerciseName('');
@@ -563,3 +571,4 @@ function MindProgrammingPageContent() {
 export default function Page() {
   return ( <AuthGuard> <MindProgrammingPageContent /> </AuthGuard> );
 }
+

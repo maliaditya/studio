@@ -58,7 +58,7 @@ export interface ExerciseDefinition {
   iconUrl?: string;
   estimatedDuration?: number; // Total minutes
   loggedDuration?: number; // Total minutes logged for this specific task
-  decompositionData?: DecompositionRow[];
+  decompositionData?: { id: string; text: string, type: 'text' }[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;
   linkedUpskillIds?: string[];
@@ -584,6 +584,11 @@ export interface TodaysDietPopupState {
 }
 
 export interface PathNode {
+  id: string;
+  text: string;
+}
+
+export interface MindsetPoint {
   id: string;
   text: string;
 }
