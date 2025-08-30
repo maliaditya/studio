@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { MindMapViewer } from '@/components/MindMapViewer';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
+import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
 import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
@@ -77,6 +78,7 @@ function MyPlatePageContent() {
     allUpskillLogs, setAllUpskillLogs,
     allDeepWorkLogs, setAllDeepWorkLogs,
     allWorkoutLogs,
+    allMindProgrammingLogs,
     allLeadGenLogs,
     brandingLogs, setAllBrandingLogs,
     isAgendaDocked, setIsAgendaDocked,
@@ -118,6 +120,7 @@ function MyPlatePageContent() {
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
+  const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
@@ -126,6 +129,7 @@ function MyPlatePageContent() {
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
+  const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
   
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
   const [interruptDetails, setInterruptDetails] = useState('');
@@ -253,6 +257,7 @@ function MyPlatePageContent() {
                                 case 'tracking': newDetails = 'Tracking Session'; break;
                                 case 'branding': newDetails = 'Branding Session'; break;
                                 case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                                case 'mindset': newDetails = 'Mindset Session'; break;
                             }
                         }
                 
@@ -352,6 +357,7 @@ function MyPlatePageContent() {
                     } else {
                         switch (activity.type) {
                             case 'workout': totalMinutes = 90; break;
+                            case 'mindset': totalMinutes = 15; break;
                             case 'upskill':
                             case 'deepwork':
                             case 'branding':
@@ -384,7 +390,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-}, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -428,6 +434,7 @@ function MyPlatePageContent() {
         }
         newActivityDuration = 90;
         break;
+      case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
       case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
       case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
       case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
@@ -634,6 +641,11 @@ function MyPlatePageContent() {
     setWorkoutActivityToLog(activity);
     setIsTodaysWorkoutModalOpen(true);
   };
+
+  const handleStartMindsetLog = (activity: Activity) => {
+    setMindsetActivityToLog(activity);
+    setIsTodaysMindsetModalOpen(true);
+  };
   
   const handleStartLeadGenLog = (activity: Activity) => {
     setWorkoutActivityToLog(activity); // Reusing state for simplicity
@@ -649,6 +661,8 @@ function MyPlatePageContent() {
       setTodaysMuscleGroups(muscleGroups);
       setWorkoutActivityToLog(activity);
       setIsTodaysWorkoutModalOpen(true);
+    } else if (activity.type === 'mindset') {
+        handleStartMindsetLog(activity);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
       const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
       const mainDefId = activity.taskIds?.[0]?.split('-')[0];
@@ -994,6 +1008,7 @@ function MyPlatePageContent() {
         deepwork: 'Deep Work',
         upskill: 'Learning',
         workout: 'Workout',
+        mindset: 'Mindset',
         branding: 'Branding',
         essentials: 'Essentials',
         planning: 'Planning',
@@ -1191,6 +1206,16 @@ function MyPlatePageContent() {
               deleteWorkoutSet={deleteWorkoutSet}
               removeExerciseFromWorkout={removeExerciseFromWorkout}
               swapWorkoutExercise={swapWorkoutExercise}
+          />
+        )}
+        
+        {currentUser && (
+          <TodaysMindsetModal
+            isOpen={isTodaysMindsetModalOpen}
+            onOpenChange={setIsTodaysMindsetModalOpen}
+            activityToLog={mindsetActivityToLog}
+            dateForWorkout={selectedDate}
+            onActivityComplete={handleToggleComplete}
           />
         )}
 

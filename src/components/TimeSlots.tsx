@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -10,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon, Brain
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule, FullSchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +40,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   interrupt: <AlertCircle className="h-5 w-5 text-destructive" />,
   essentials: <CheckSquare className="h-5 w-5" />,
   nutrition: <Utensils className="h-5 w-5" />,
+  mindset: <Brain className="h-5 w-5" />,
 };
 
 interface TimeSlotsProps {
@@ -285,6 +287,10 @@ export function TimeSlots({
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'workout')}>
                         <Dumbbell className="h-4 w-4 mr-2" />
                         Add Workout
+                      </Button>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'mindset')}>
+                        <Brain className="h-4 w-4 mr-2" />
+                        Add Mindset
                       </Button>
                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'upskill')}>
                         <BookOpenCheck className="h-4 w-4 mr-2" />
