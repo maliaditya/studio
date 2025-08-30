@@ -39,7 +39,7 @@ interface WorkoutPlanModalProps {
   definitions: ExerciseDefinition[];
   workoutMode: WorkoutMode;
   initialPlans: AllWorkoutPlans;
-  pageType: 'workout' | 'upskill';
+  pageType: 'workout' | 'mind-programming';
   categories: ExerciseCategory[];
 }
 
@@ -90,7 +90,7 @@ export function WorkoutPlanModal({
         setWorkoutPlans({
             ...workoutPlans,
             [planKey]: {
-                ...workoutPlans[planKey],
+                ...(workoutPlans[planKey] || {}), // Ensure plan object exists
                 [category]: [...(Array.isArray(currentExercises) ? currentExercises : []), exerciseName]
             }
         });
@@ -123,9 +123,9 @@ export function WorkoutPlanModal({
                 </Button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {(Object.keys(workoutPlans[planKey] || {}) as ExerciseCategory[]).map(category => {
+                {categories.map(category => {
                     const exercisesForCategory = workoutPlans[planKey]?.[category];
-                    const addEntityPlaceholder = pageType === 'upskill' ? 'Add a task...' : 'Add an exercise...';
+                    const addEntityPlaceholder = pageType === 'mind-programming' ? 'Add a card...' : 'Add an exercise...';
                     return (
                     <Card key={category} className="overflow-hidden">
                         <CardHeader className="p-3"><CardTitle className="text-lg">{category}</CardTitle></CardHeader>
@@ -202,8 +202,8 @@ export function WorkoutPlanModal({
       );
     };
 
-    const dialogTitle = pageType === 'upskill' ? 'Edit Auto-Populated Learning Plans' : 'Edit Auto-Populated Workout Plans';
-    const dialogDescription = pageType === 'upskill' ? 'Customize the tasks for each weekly learning plan. Changes are saved automatically.' : 'Customize the exercises for each weekly plan. Changes are saved automatically.';
+    const dialogTitle = pageType === 'mind-programming' ? 'Edit Auto-Populated Mindset Plans' : 'Edit Auto-Populated Workout Plans';
+    const dialogDescription = pageType === 'mind-programming' ? 'Customize the cards for each weekly mindset plan. Changes are saved automatically.' : 'Customize the exercises for each weekly plan. Changes are saved automatically.';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -213,7 +213,7 @@ export function WorkoutPlanModal({
           <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
-        {pageType === 'workout' ? renderWorkoutContent() : renderUpskillContent()}
+        {pageType === 'workout' ? renderWorkoutContent() : pageType === 'mind-programming' ? renderWorkoutContent() : null}
 
       </DialogContent>
     </Dialog>
