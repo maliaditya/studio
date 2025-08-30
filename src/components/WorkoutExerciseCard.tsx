@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -35,7 +34,6 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
-  const [isEditing, setIsEditing] = useState(false);
   const [currentText, setCurrentText] = useState(point.text);
   const editorRef = useRef<HTMLDivElement>(null);
 
@@ -50,46 +48,34 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
     } else if (newText.trim() !== point.text.trim()) {
         onUpdate(point.id, newText.trim());
     }
-    setIsEditing(false);
   };
 
   const handleClick = () => {
-    setIsEditing(true);
     setTimeout(() => {
         editorRef.current?.focus();
         const range = document.createRange();
         const sel = window.getSelection();
         if (editorRef.current && sel) {
             range.selectNodeContents(editorRef.current);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
+            range.collapse(false); // Collapses the range to the end point
+            sel.removeAllRanges(); // Removes all ranges from the selection
+            sel.addRange(range); // Adds the new range
         }
     }, 0);
   };
   
-  if (isEditing) {
-    return (
-       <div 
+  return (
+    <div className="text-sm flex items-start gap-2 group w-full" onClick={handleClick}>
+        <div 
           ref={editorRef}
           contentEditable={true} 
           suppressContentEditableWarning={true}
           onBlur={handleBlur}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBlur(); } }}
-          className="text-sm editable-placeholder w-full"
-        >
-          {currentText}
-       </div>
-    )
-  }
-
-  return (
-    <div className="text-sm flex items-start gap-3 group" onClick={handleClick}>
-        <span 
-          className="editable-sentence flex-grow cursor-text"
-          dangerouslySetInnerHTML={{ __html: point.text || "..." }}
+          className="editable-placeholder w-full min-h-[1.5rem]" // Added min-h for empty state
+          dangerouslySetInnerHTML={{ __html: currentText }}
         />
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
             <Trash2 className="h-3 w-3"/>
         </Button>
     </div>
@@ -293,9 +279,6 @@ export function WorkoutExerciseCard({
     if (pageType === 'lead-generation' || pageType === 'offer-system') {
         return `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} actions logged.`
     }
-    if (pageType === 'mind-programming') {
-      return null;
-    }
     return null;
   }
 
@@ -463,7 +446,7 @@ export function WorkoutExerciseCard({
   );
 
   const renderMindProgrammingContent = () => (
-    <div className="space-y-3">
+    <div className="space-y-2">
         {(definition?.decompositionData || []).map(point => (
             <EditableStep key={point.id} point={point} onUpdate={updateDecompositionData} onDelete={deleteDecompositionData}/>
         ))}
@@ -476,10 +459,7 @@ export function WorkoutExerciseCard({
             </div>
           ) : null;
         })}
-        <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleAddDecompositionStep}>
-                Add Step
-            </Button>
+        <div className="flex gap-2 pt-2">
             <Popover>
                 <PopoverTrigger asChild>
                     <Button variant="outline" size="sm">Link Resource</Button>
@@ -683,7 +663,7 @@ export function WorkoutExerciseCard({
           </div>
         </CardHeader>
         <CardContent className="p-3">
-          {progressText && (
+          {progressText && pageType !== 'mind-programming' && (
             <p className="text-xs text-muted-foreground mb-2">
               {progressText}
             </p>
