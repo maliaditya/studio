@@ -50,6 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogClose } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
@@ -66,11 +67,12 @@ function MindProgrammingPageContent() {
   const { 
     currentUser, 
     exportData,
-    // Using workout-related state names but they will store mind-programming data
     allMindProgrammingLogs: allWorkoutLogs, 
     setAllMindProgrammingLogs: setAllWorkoutLogs,
     mindProgrammingDefinitions: exerciseDefinitions, 
     setMindProgrammingDefinitions: setExerciseDefinitions,
+    mindProgrammingCategories,
+    setMindProgrammingCategories,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -90,6 +92,8 @@ function MindProgrammingPageContent() {
 
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   useEffect(() => {
     setIsLoadingPage(false);
@@ -302,6 +306,24 @@ function MindProgrammingPageContent() {
     setIsProgressModalOpen(true);
   };
 
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) {
+        toast({ title: "Error", description: "Category name cannot be empty.", variant: "destructive" });
+        return;
+    }
+    const newCategory = newCategoryName.trim() as ExerciseCategory;
+    if (mindProgrammingCategories.includes(newCategory)) {
+        toast({ title: "Error", description: "This category already exists.", variant: "destructive" });
+        return;
+    }
+    setMindProgrammingCategories(prev => [...prev, newCategory]);
+    setNewCategoryName('');
+  };
+  
+  const handleRemoveCategory = (categoryToRemove: ExerciseCategory) => {
+    setMindProgrammingCategories(prev => prev.filter(c => c !== categoryToRemove));
+  };
+
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -323,6 +345,7 @@ function MindProgrammingPageContent() {
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-lg text-primary">
                     <BookCopy /> Mindset Card Library
                   </CardTitle>
+                   <Button variant="outline" size="sm" onClick={() => setIsCategoryManagerOpen(true)}>Manage Categories</Button>
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
@@ -330,7 +353,7 @@ function MindProgrammingPageContent() {
                     <Input type="text" placeholder="New mindset card name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New mindset card name" className="h-10 text-sm" />
                     <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
                       <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                      <SelectContent>{mindProgrammingCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                     </Select>
                     <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Card </Button>
                   </form>
@@ -347,7 +370,7 @@ function MindProgrammingPageContent() {
                                   <Input value={editingDefinitionName} onChange={(e) => setEditingDefinitionName(e.target.value)} className="h-9" aria-label="Edit name"/>
                                   <Select value={editingDefinitionCategory} onValueChange={(value) => setEditingDefinitionCategory(value as ExerciseCategory)}>
                                     <SelectTrigger className="h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
-                                    <SelectContent>{exerciseCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+                                    <SelectContent>{mindProgrammingCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                                   </Select>
                                   <div className="flex gap-2">
                                     <Button size="sm" onClick={handleSaveEditDefinition} className="flex-grow bg-green-600 hover:bg-green-500 text-white"><Save className="h-4 w-4 mr-1"/>Save</Button>
@@ -434,6 +457,34 @@ function MindProgrammingPageContent() {
           />
         )}
       </div>
+
+      <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Manage Categories</DialogTitle>
+                <DialogDescription>Add or remove categories for your mind programming cards.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <div className="flex gap-2 mb-4">
+                    <Input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="New Category Name"/>
+                    <Button onClick={handleAddCategory}>Add</Button>
+                </div>
+                <ScrollArea className="h-60 border rounded-md p-2">
+                    {mindProgrammingCategories.map(cat => (
+                        <div key={cat} className="flex justify-between items-center p-2 hover:bg-muted/50 rounded-md">
+                            <span>{cat}</span>
+                            <Button variant="ghost" size="icon" onClick={() => handleRemoveCategory(cat as ExerciseCategory)}>
+                                <Trash2 className="h-4 w-4 text-destructive"/>
+                            </Button>
+                        </div>
+                    ))}
+                </ScrollArea>
+            </div>
+            <DialogClose asChild>
+                <Button variant="outline" className="mt-4">Close</Button>
+            </DialogClose>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
         <AlertDialogContent>

@@ -335,11 +335,6 @@ export interface CanvasLayout {
 }
 
 // Mindset Types
-export interface MindsetPoint {
-  id: string;
-  text: string;
-}
-
 export interface MindsetCard {
   id: string;
   title: string;
@@ -592,4 +587,3 @@ export interface PathNode {
   id: string;
   text: string;
 }
-

@@ -1,5 +1,6 @@
 
-import type { ExerciseDefinition, AllWorkoutPlans, MindsetCard } from '@/types/workout';
+
+import type { ExerciseDefinition, AllWorkoutPlans, MindsetCard, ExerciseCategory } from '@/types/workout';
 
 export const DEFAULT_EXERCISE_DEFINITIONS: ExerciseDefinition[] = [
     { id: 'def_1', name: '1-Arm Dumbbell Row', category: 'Back' },
@@ -234,4 +235,9 @@ export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
         { id: 'p3_1', text: 'New step' }
       ]
     }
+];
+
+// Default categories for the Mind Programming page.
+export const exerciseCategories: ExerciseCategory[] = [
+    "Chest", "Triceps", "Shoulders", "Legs", "Back", "Biceps", "Core", "Full Body", "Other"
 ];
