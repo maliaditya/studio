@@ -13,7 +13,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { format, parseISO, getDay, getISOWeek, isMonday, getYear, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan, WorkoutPlan } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan, WorkoutPlan, StrengthTrainingMode } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -77,6 +77,7 @@ function WorkoutPageContent() {
     removeExerciseFromWorkout,
     swapWorkoutExercise,
     workoutMode, setWorkoutMode,
+    strengthTrainingMode, setStrengthTrainingMode,
     workoutPlanRotation, setWorkoutPlanRotation,
     workoutPlans, setWorkoutPlans,
     exerciseDefinitions, setExerciseDefinitions,
@@ -525,6 +526,23 @@ function WorkoutPageContent() {
               <CardContent className="p-4 space-y-4">
                 <div className="space-y-4">
                   <div>
+                    <Label className="text-sm font-medium">Strength Training</Label>
+                    <RadioGroup
+                      value={strengthTrainingMode}
+                      onValueChange={(value) => setStrengthTrainingMode(value as StrengthTrainingMode)}
+                      className="flex flex-wrap gap-x-4 gap-y-2 pt-2"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="resistance" id="r-resistance" />
+                        <Label htmlFor="r-resistance" className="font-normal">Resistance Training</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="calisthenics" id="r-calisthenics" />
+                        <Label htmlFor="r-calisthenics" className="font-normal">Calisthenics</Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                  <div>
                     <Label className="text-sm font-medium">Workout Plan</Label>
                     <RadioGroup
                       value={workoutMode}
@@ -864,3 +882,4 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
+

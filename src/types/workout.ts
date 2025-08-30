@@ -121,6 +121,7 @@ export interface LocalUser {
 }
 
 export type WorkoutMode = 'one-muscle' | 'two-muscle';
+export type StrengthTrainingMode = 'resistance' | 'calisthenics';
 export type Gender = 'male' | 'female';
 
 export type WorkoutPlan = Partial<Record<ExerciseCategory, string[]>>;
@@ -591,3 +592,4 @@ export interface PathNode {
   id: string;
   text: string;
 }
+
