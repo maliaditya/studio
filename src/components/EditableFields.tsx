@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from './ui/input';
 import { Resource, ResourcePoint, PopupState } from '@/types/workout';
@@ -19,25 +19,32 @@ export const EditableField = ({ field, subField, prefix, suffix, resource, onUpd
     onUpdate: (updatedResource: Resource) => void,
     placeholder?: string,
 }) => {
-    const editorRef = useRef<HTMLDivElement>(null);
+    const editorRef = useRef<HTMLSpanElement>(null);
+    let initialValue = '';
+    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
+      initialValue = (resource[field] as any)[subField] || '';
+    } else {
+      initialValue = (resource[field] as string) || '';
+    }
+
+    const [currentValue, setCurrentValue] = useState(initialValue);
+
+    useEffect(() => {
+        // Sync state if the external resource data changes, but not while editing
+        if (editorRef.current !== document.activeElement) {
+            setCurrentValue(initialValue);
+        }
+    }, [initialValue]);
     
     const handleBlur = () => {
         if (!editorRef.current) return;
-        const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
-        const newValue = editableSpan?.textContent || '';
+        const newValue = editorRef.current.textContent || '';
         
-        let currentValue = '';
-        if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
-            currentValue = (resource[field] as any)[subField] || '';
-        } else {
-            currentValue = (resource[field] as string) || '';
-        }
-
-        if (newValue !== currentValue) {
+        if (newValue !== initialValue) {
             let updatedResource = { ...resource };
             if (subField && typeof updatedResource[field] === 'object' && updatedResource[field] !== null) {
                 updatedResource[field] = { ...(updatedResource[field] as object), [subField]: newValue };
-            } else if (subField) { // If subField exists but the field is not an object
+            } else if (subField) { 
                  updatedResource[field] = { [subField]: newValue } as any;
             } else {
                 updatedResource[field] = newValue as any;
@@ -46,25 +53,16 @@ export const EditableField = ({ field, subField, prefix, suffix, resource, onUpd
         }
     };
     
-    let displayValue = '';
-    if (subField && typeof resource[field] === 'object' && resource[field] !== null) {
-      displayValue = (resource[field] as any)[subField] || '';
-    } else {
-      displayValue = (resource[field] as string) || '';
-    }
-
     return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
+        <div className="editable-sentence">
           <span contentEditable={false} className="uneditable-text">{prefix}</span>
           <span 
+            ref={editorRef}
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: displayValue || placeholder }} 
+            onBlur={handleBlur}
+            dangerouslySetInnerHTML={{ __html: currentValue || placeholder }} 
           />
           {suffix && <span contentEditable={false} className="uneditable-text">{suffix}</span>}
         </div>
@@ -82,36 +80,48 @@ export const DoubleEditableField = ({ prefix, infix, suffix, value1, value2, onU
     placeholder1?: string;
     placeholder2?: string;
 }) => {
-    const editorRef = useRef<HTMLDivElement>(null);
+    const [currentValue1, setCurrentValue1] = useState(value1);
+    const [currentValue2, setCurrentValue2] = useState(value2);
+    const ref1 = useRef<HTMLSpanElement>(null);
+    const ref2 = useRef<HTMLSpanElement>(null);
     
-    const handleBlur = () => {
-        if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
-        const newValue1 = editableSpans[0]?.textContent || '';
-        const newValue2 = editableSpans[1]?.textContent || '';
-        if (newValue1 !== value1) onUpdate1(newValue1);
-        if (newValue2 !== value2) onUpdate2(newValue2);
+    useEffect(() => {
+      if (document.activeElement !== ref1.current) setCurrentValue1(value1);
+    }, [value1]);
+    
+    useEffect(() => {
+      if (document.activeElement !== ref2.current) setCurrentValue2(value2);
+    }, [value2]);
+
+    const handleBlur1 = () => {
+        const newValue = ref1.current?.textContent || '';
+        if (newValue !== value1) onUpdate1(newValue);
+    };
+    
+    const handleBlur2 = () => {
+        const newValue = ref2.current?.textContent || '';
+        if (newValue !== value2) onUpdate2(newValue);
     };
 
     return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
+        <div className="editable-sentence">
           <span contentEditable={false} className="uneditable-text">{prefix}</span>
           <span 
+            ref={ref1}
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+            onBlur={handleBlur1}
+            dangerouslySetInnerHTML={{ __html: currentValue1 || placeholder1 }} 
           />
           <span contentEditable={false} className="uneditable-text">{infix}</span>
           <span 
+            ref={ref2}
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+            onBlur={handleBlur2}
+            dangerouslySetInnerHTML={{ __html: currentValue2 || placeholder2 }} 
           />
           <span contentEditable={false} className="uneditable-text">{suffix}</span>
         </div>
@@ -127,36 +137,48 @@ export const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, lab
     placeholder1?: string;
     placeholder2?: string;
 }) => {
-    const editorRef = useRef<HTMLDivElement>(null);
+    const [currentValue1, setCurrentValue1] = useState(value1);
+    const [currentValue2, setCurrentValue2] = useState(value2);
+    const ref1 = useRef<HTMLSpanElement>(null);
+    const ref2 = useRef<HTMLSpanElement>(null);
     
-    const handleBlur = () => {
-        if (!editorRef.current) return;
-        const editableSpans = editorRef.current.querySelectorAll<HTMLSpanElement>('[contenteditable=true]');
-        const newValue1 = editableSpans[0]?.textContent || '';
-        const newValue2 = editableSpans[1]?.textContent || '';
-        if (newValue1 !== value1) onUpdate1(newValue1);
-        if (newValue2 !== value2) onUpdate2(newValue2);
+    useEffect(() => {
+        if (document.activeElement !== ref1.current) setCurrentValue1(value1);
+    }, [value1]);
+    
+    useEffect(() => {
+        if (document.activeElement !== ref2.current) setCurrentValue2(value2);
+    }, [value2]);
+
+    const handleBlur1 = () => {
+        const newValue = ref1.current?.textContent || '';
+        if (newValue !== value1) onUpdate1(newValue);
+    };
+    
+    const handleBlur2 = () => {
+        const newValue = ref2.current?.textContent || '';
+        if (newValue !== value2) onUpdate2(newValue);
     };
 
     return (
-        <div 
-          ref={editorRef}
-          onBlur={handleBlur}
-          className="editable-sentence"
-        >
+        <div className="editable-sentence">
           <span contentEditable={false} className="uneditable-text">That one </span>
           <span 
+            ref={ref1}
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value1 || placeholder1 }} 
+            onBlur={handleBlur1}
+            dangerouslySetInnerHTML={{ __html: currentValue1 || placeholder1 }} 
           />
           <span contentEditable={false} className="uneditable-text">{label}</span>
           <span 
+            ref={ref2}
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
-            dangerouslySetInnerHTML={{ __html: value2 || placeholder2 }} 
+            onBlur={handleBlur2}
+            dangerouslySetInnerHTML={{ __html: currentValue2 || placeholder2 }} 
           />
           <span contentEditable={false} className="uneditable-text">.</span>
         </div>

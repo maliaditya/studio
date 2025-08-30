@@ -47,47 +47,71 @@ interface SeamlessEditorProps {
 }
 
 const SeamlessEditor: React.FC<SeamlessEditorProps> = ({ initialParts, onSave }) => {
-  const editorRef = useRef<HTMLDivElement>(null);
+  const [parts, setParts] = useState(initialParts);
 
+  const handleBlur = (fieldId: string, newText: string) => {
+    const newParts = parts.map(p => 
+      p.fieldId === fieldId ? { ...p, text: newText } : p
+    );
+    setParts(newParts);
+  };
+  
   const handleSaveClick = () => {
-    if (!editorRef.current) return;
-
     const values: Record<string, string> = {};
-    const editableElements = editorRef.current.querySelectorAll<HTMLSpanElement>('.editable-placeholder');
-    
-    editableElements.forEach(el => {
-      const fieldId = el.dataset.fieldId;
-      if (fieldId) {
-        values[fieldId] = el.textContent || '';
+    parts.forEach(part => {
+      if (part.type === 'editable') {
+        values[part.fieldId] = part.text;
       }
     });
-
     onSave(values);
   };
 
   return (
     <div className="space-y-4">
-      {/* 2. The single contenteditable container */}
-      <div
-        ref={editorRef}
-        contentEditable={true}
-        suppressContentEditableWarning={true} // Necessary for React to handle contenteditable children
-        className="editable-sentence"
-      >
-        {initialParts.map(part => (
-          <span
+      <div className="editable-sentence">
+        {parts.map(part => (
+          <EditableSpan
             key={part.fieldId}
-            contentEditable={part.type === 'editable'}
-            suppressContentEditableWarning={true}
-            className={part.type === 'editable' ? 'editable-placeholder' : 'uneditable-text'}
-            data-field-id={part.fieldId} // Use data attribute to identify fields
-          >
-            {part.text}
-          </span>
+            part={part}
+            onBlur={handleBlur}
+          />
         ))}
       </div>
       <Button onClick={handleSaveClick}>Save & Extract Values</Button>
     </div>
+  );
+};
+
+const EditableSpan = ({ part, onBlur }: { part: SentencePart, onBlur: (fieldId: string, newText: string) => void }) => {
+  const [currentText, setCurrentText] = useState(part.text);
+  const spanRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (document.activeElement !== spanRef.current) {
+        setCurrentText(part.text);
+    }
+  }, [part.text]);
+
+  const handleLocalBlur = () => {
+    const newText = spanRef.current?.textContent || '';
+    if (newText !== part.text) {
+        onBlur(part.fieldId, newText);
+    }
+  };
+  
+  if (part.type === 'fixed') {
+    return <span className="uneditable-text">{part.text}</span>;
+  }
+
+  return (
+    <span
+      ref={spanRef}
+      contentEditable={true}
+      suppressContentEditableWarning={true}
+      className="editable-placeholder"
+      onBlur={handleLocalBlur}
+      dangerouslySetInnerHTML={{ __html: currentText }}
+    />
   );
 };
 
