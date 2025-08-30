@@ -129,6 +129,57 @@ export const LEAD_GEN_DEFINITIONS: ExerciseDefinition[] = [
     { id: 'lg_3', name: 'Join 1 forum/group weekly', category: 'Lead Generation', description: 'e.g., IndieHackers, Reddit, Discord, LinkedIn groups.' },
 ];
 
+export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
+    {
+      id: 'card_1',
+      title: "Visualization to Action",
+      icon: 'BrainCircuit',
+      points: [
+        { id: 'p1_1', text: 'New step' }
+      ]
+    },
+    {
+      id: 'card_2',
+      title: "Mental Checkpoint",
+      icon: 'CheckSquare',
+      points: [
+        { id: 'p2_1', text: 'New step' }
+      ]
+    },
+    {
+      id: 'card_3',
+      title: "Devotion Mode",
+      icon: 'Zap',
+      points: [
+        { id: 'p3_1', text: 'New step' }
+      ]
+    }
+];
+
+export const DEFAULT_MIND_PROGRAMMING_DEFINITIONS: ExerciseDefinition[] = [
+  {
+    id: 'mp_def_1',
+    name: 'Helicopter View (Zoom Out)',
+    category: 'Other',
+    decompositionData: [
+      { id: 'step_1', text: 'Pause & Settle – Stop, breathe.', type: 'text' },
+      { id: 'step_2', text: 'Choose Focus – The whole situation, seen from above.', type: 'text' },
+      { id: 'step_3', text: 'Observe – Imagine watching yourself + context like a bird/camera.', type: 'text' },
+      { id: 'step_4', text: 'Create Distance – Realize the problem is smaller in the bigger picture.', type: 'text' },
+      { id: 'step_5', text: 'Rest & Return – Carry that broader perspective back with you.', type: 'text' },
+    ]
+  }
+];
+
+// Default categories for the Mind Programming page.
+export const exerciseCategories: ExerciseCategory[] = [
+    "Chest", "Triceps", "Shoulders", "Legs", "Back", "Biceps", "Core", "Full Body", "Other"
+];
+
+export const defaultMindsetCategories: ExerciseCategory[] = [
+    "Focus", "Clarity", "Motivation", "Resilience", "Other"
+];
+
 export const productTypes = [
   { group: "Digital Products (High Scalability, Low Cost)", items: [
       { name: "Ebooks / Guides", description: "Package your knowledge into a written format for detailed, step-by-step instructions." },
@@ -208,36 +259,4 @@ export const GAP_TYPES = [
         { name: "Integration Gap", description: "Clients struggle with tool overload. You offer systems thinking + integration as a service. Example: “All-in-One” productivity system or stack automation." },
         { name: "Monetization Gap", description: "Many creators have skills but don’t make money. You build funnels, pages, pricing systems for them. Example: Productize your skill service, build client funnels, teach pricing." },
     ]}
-];
-
-export const DEFAULT_MINDSET_CARDS: MindsetCard[] = [
-    {
-      id: 'card_1',
-      title: "Visualization to Action",
-      icon: 'BrainCircuit',
-      points: [
-        { id: 'p1_1', text: 'New step' }
-      ]
-    },
-    {
-      id: 'card_2',
-      title: "Mental Checkpoint",
-      icon: 'CheckSquare',
-      points: [
-        { id: 'p2_1', text: 'New step' }
-      ]
-    },
-    {
-      id: 'card_3',
-      title: "Devotion Mode",
-      icon: 'Zap',
-      points: [
-        { id: 'p3_1', text: 'New step' }
-      ]
-    }
-];
-
-// Default categories for the Mind Programming page.
-export const exerciseCategories: ExerciseCategory[] = [
-    "Chest", "Triceps", "Shoulders", "Legs", "Back", "Biceps", "Core", "Full Body", "Other"
 ];

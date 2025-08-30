@@ -13,7 +13,7 @@ import {
   getCurrentLocalUser,
 } from '@/lib/localAuth';
 import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore } from 'date-fns';
-import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, exerciseCategories as defaultMindsetCategories } from '@/lib/constants';
+import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
@@ -948,7 +948,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTopicGoals(mainData.topicGoals || {});
     setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
     setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
-    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || []);
+    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
     setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
     setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
     setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
@@ -2678,6 +2678,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
