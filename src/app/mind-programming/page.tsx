@@ -56,7 +56,7 @@ import { WeightChartModal } from '@/components/WeightChartModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
 import { INITIAL_PLANS } from '@/lib/constants';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const DEFAULT_TARGET_SETS = 3;
