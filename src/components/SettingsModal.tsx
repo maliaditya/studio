@@ -33,6 +33,7 @@ interface UserSettings {
   autoPushLimit: number;
   carryForwardEssentials: boolean;
   carryForwardNutrition: boolean;
+  smartLogging: boolean;
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
@@ -44,6 +45,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     autoPushLimit: 100,
     carryForwardEssentials: false,
     carryForwardNutrition: false,
+    smartLogging: false,
   });
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -64,13 +66,14 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             autoPushLimit: parsedSettings.autoPushLimit || 100,
             carryForwardEssentials: parsedSettings.carryForwardEssentials || false,
             carryForwardNutrition: parsedSettings.carryForwardNutrition || false,
+            smartLogging: parsedSettings.smartLogging || false,
           });
         } else {
-          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false });
+          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false, smartLogging: false });
         }
       } catch (error) {
         console.error("Failed to load settings from localStorage", error);
-        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false });
+        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false, smartLogging: false });
       }
     }
   }, [isOpen, settingsKey]);
@@ -163,8 +166,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                       {
                         "name": "Patterns",
                         "points": [
-                          { "type": "markdown", "text": "A common workflow is to **block out** the main shape with object-level transforms, then **refine** the shape using component-level edits." },
-                          { "type": "text", "text": "Select an edge loop (Alt + Click) to modify entire sections of a mesh at once." }
+                          { "type": "markdown", "text": "A **Markdown** formatted note with `code` snippets and [links](https://example.com)." }
                         ]
                       }
                     ]
@@ -351,6 +353,16 @@ ${JSON.stringify(finalTemplate, null, 2)}
                 <p className="text-sm text-muted-foreground">
                   Manage general application behavior.
                 </p>
+              </div>
+               <div className="flex items-center space-x-2">
+                <Switch
+                  id="smart-logging"
+                  checked={settings.smartLogging}
+                  onCheckedChange={(checked) => handleSettingChange('smartLogging', checked)}
+                />
+                <Label htmlFor="smart-logging" className="font-normal">
+                  Enable Smart Logging Prompts
+                </Label>
               </div>
               <div className="flex items-center space-x-2">
                 <Switch

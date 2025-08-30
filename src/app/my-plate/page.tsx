@@ -112,6 +112,7 @@ function MyPlatePageContent() {
     patterns,
     openRuleDetailPopup,
     getDescendantLeafNodes,
+    settings,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -209,7 +210,7 @@ function MyPlatePageContent() {
 
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
-    const settings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     
     const yesterday = addDays(selectedDate, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
@@ -235,9 +236,9 @@ function MyPlatePageContent() {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
                 if (activity.isRoutine) return true; // Always carry over routine tasks
                 if(activity.completed) return false; // Don't carry over completed non-routine tasks
-                if(activity.type === 'essentials') return settings.carryForwardEssentials;
-                if(activity.type === 'nutrition') return settings.carryForwardNutrition;
-                return settings.carryForward;
+                if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
+                if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
+                return currentSettings.carryForward;
             });
 
             if (activitiesToCarry.length > 0) {
@@ -429,7 +430,7 @@ function MyPlatePageContent() {
     switch (type) {
       case 'workout': 
         if (selectedDate) {
-            const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+            const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
             details = description.split(' for ')[1] || "Workout";
         }
         newActivityDuration = 90;
@@ -628,14 +629,14 @@ function MyPlatePageContent() {
 
   const getTodaysWorkout = () => {
     if(!selectedDate) return { exercises: [], description: ""};
-    const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+    const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { exercises, muscleGroups };
   };
 
   const handleStartWorkoutLog = (activity: Activity) => {
     if(!selectedDate) return;
-    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
     setTodaysExercises(exercises);
     setTodaysMuscleGroups(muscleGroups);
     setWorkoutActivityToLog(activity);
@@ -656,7 +657,7 @@ function MyPlatePageContent() {
     if (!activity || activity.completed || !selectedDate) return;
   
     if (activity.type === 'workout') {
-      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
+      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
       setTodaysExercises(exercises);
       setTodaysMuscleGroups(muscleGroups);
       setWorkoutActivityToLog(activity);
