@@ -32,41 +32,42 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const [currentText, setCurrentText] = useState(point.text);
+const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setCurrentText(point.text);
+    if (ref.current && ref.current.textContent !== point.text) {
+      ref.current.textContent = point.text;
+    }
   }, [point.text]);
-  
-  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    const newText = e.currentTarget.textContent || '';
+
+  const handleBlur = () => {
+    const newText = ref.current?.textContent || '';
     if (newText.trim() === '') {
-        onDelete(point.id);
+      onDelete(point.id);
     } else if (newText !== point.text) {
-        onUpdate(point.id, newText);
+      onUpdate(point.id, newText);
     }
   };
-  
+
   return (
     <div className="text-sm flex items-start gap-2 group w-full">
-        <div 
-          ref={editorRef}
-          contentEditable={true} 
-          suppressContentEditableWarning={true}
-          onInput={(e) => setCurrentText(e.currentTarget.textContent || '')}
-          onBlur={handleBlur}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-          className="editable-placeholder w-full min-h-[1.5rem]"
-          dangerouslySetInnerHTML={{ __html: currentText }}
-        />
-        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
-            <Trash2 className="h-3 w-3"/>
-        </Button>
+      <div 
+        ref={ref}
+        contentEditable={true} 
+        suppressContentEditableWarning={true}
+        onBlur={handleBlur}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
+        className="editable-placeholder w-full min-h-[1.5rem]"
+        dangerouslySetInnerHTML={{ __html: point.text }}
+      />
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
+        <Trash2 className="h-3 w-3"/>
+      </Button>
     </div>
   );
-};
+});
+EditableStep.displayName = 'EditableStep';
 
 
 interface WorkoutExerciseCardProps {

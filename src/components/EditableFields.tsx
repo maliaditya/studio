@@ -16,26 +16,31 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
     placeholder: string;
     className?: string;
 }) => {
-    const [currentText, setCurrentText] = useState(value);
     const ref = useRef<HTMLSpanElement>(null);
 
+    // This effect ensures that the span's content is updated if the `value` prop
+    // changes from outside (e.g., loading data), but it won't interfere
+    // while the user is actively editing.
     useEffect(() => {
-        // Update local state only if the element is not focused (i.e., not being edited)
-        if (document.activeElement !== ref.current) {
-            setCurrentText(value);
+        if (ref.current && ref.current.textContent !== value) {
+            ref.current.textContent = value || placeholder;
         }
-    }, [value]);
+    }, [value, placeholder]);
 
     const handleBlur = () => {
-        const newValue = ref.current?.textContent || '';
-        if (newValue !== value) {
-            onBlur(newValue);
+        if (ref.current) {
+            const newValue = ref.current.textContent || '';
+            // Only call the update function if the text has actually changed.
+            if (newValue !== value) {
+                onBlur(newValue);
+            }
         }
     };
     
-    // Using dangerouslySetInnerHTML to avoid React re-rendering the content
-    // while typing, which is the cause of the cursor jumping bug.
-    // The key forces a re-render only when the external value changes.
+    // Using a key derived from the initial value ensures that React creates a new
+    // element if the prop changes, resetting its internal state.
+    // We suppress the warning because we are intentionally managing the content
+    // imperatively to avoid the cursor jumping bug.
     return (
         <span
             key={value}
@@ -47,12 +52,7 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
             dangerouslySetInnerHTML={{ __html: value || placeholder }}
         />
     );
-}, (prevProps, nextProps) => {
-    // Only re-render if the value prop changes. This is crucial to prevent
-    // re-renders while the user is typing inside the contentEditable span.
-    return prevProps.value === nextProps.value;
 });
-
 EditableSpan.displayName = 'EditableSpan';
 
 export const EditableField = ({ field, subField, prefix, suffix, resource, onUpdate, placeholder = "..." }: {
