@@ -334,7 +334,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openRuleDetailPopup}
+            onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
         />
       )}
@@ -499,3 +499,4 @@ export default function RootLayout({
     </html>
   );
 }
+
