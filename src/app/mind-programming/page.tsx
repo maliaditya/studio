@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Dumbbell, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -73,6 +73,12 @@ function MindProgrammingPageContent() {
     setMindProgrammingDefinitions: setExerciseDefinitions,
     mindProgrammingCategories,
     setMindProgrammingCategories,
+    mindProgrammingMode: workoutMode,
+    setMindProgrammingMode: setWorkoutMode,
+    mindProgrammingPlans: workoutPlans,
+    setMindProgrammingPlans: setWorkoutPlans,
+    mindProgrammingPlanRotation: workoutPlanRotation,
+    setMindProgrammingPlanRotation: setWorkoutPlanRotation,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -90,6 +96,8 @@ function MindProgrammingPageContent() {
   
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  
   const [showBackupPrompt, setShowBackupPrompt] = useState(false);
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
@@ -324,6 +332,11 @@ function MindProgrammingPageContent() {
     setMindProgrammingCategories(prev => prev.filter(c => c !== categoryToRemove));
   };
 
+  const handleWorkoutModeChange = (newMode: WorkoutMode) => {
+    if (newMode === workoutMode) return;
+    setWorkoutMode(newMode);
+  };
+
   if (isLoadingPage) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
@@ -349,6 +362,36 @@ function MindProgrammingPageContent() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                        <Label className="text-sm font-medium">Mindset Plan</Label>
+                        <RadioGroup
+                        value={workoutMode}
+                        onValueChange={(value) => handleWorkoutModeChange(value as WorkoutMode)}
+                        className="flex flex-wrap gap-x-4 gap-y-2 pt-2"
+                        >
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="two-muscle" id="r1" />
+                            <Label htmlFor="r1" className="font-normal">Plan A / B</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="one-muscle" id="r2" />
+                            <Label htmlFor="r2" className="font-normal">Single Plan</Label>
+                        </div>
+                        </RadioGroup>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="plan-rotation" checked={workoutPlanRotation} onCheckedChange={setWorkoutPlanRotation}/>
+                            <Label htmlFor="plan-rotation">Plan Rotation</Label>
+                        </div>
+                        <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Edit Plans
+                        </Button>
+                    </div>
+                  </div>
+                  <Separator/>
                   <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
                     <Input type="text" placeholder="New mindset card name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New mindset card name" className="h-10 text-sm" />
                     <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
@@ -457,6 +500,18 @@ function MindProgrammingPageContent() {
           />
         )}
       </div>
+
+       <WorkoutPlanModal
+          isOpen={isPlanModalOpen}
+          onOpenChange={setIsPlanModalOpen}
+          workoutMode={workoutMode}
+          workoutPlans={workoutPlans}
+          setWorkoutPlans={setWorkoutPlans}
+          definitions={exerciseDefinitions}
+          initialPlans={INITIAL_PLANS}
+          pageType="mind-programming"
+          categories={mindProgrammingCategories}
+        />
 
       <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
         <DialogContent>
