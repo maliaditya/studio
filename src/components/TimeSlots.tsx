@@ -11,7 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon, Brain
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon, Brain, Wind
 } from 'lucide-react';
 import type { ActivityType, Activity, DailySchedule, FullSchedule } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,6 +38,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
   branding: <Share2 className="h-5 w-5" />,
   'lead-generation': <Magnet className="h-5 w-5" />,
   interrupt: <AlertCircle className="h-5 w-5 text-destructive" />,
+  distraction: <Wind className="h-5 w-5 text-yellow-500" />,
   essentials: <CheckSquare className="h-5 w-5" />,
   nutrition: <Utensils className="h-5 w-5" />,
   mindset: <Brain className="h-5 w-5" />,
@@ -331,6 +332,10 @@ export function TimeSlots({
                       <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name, 'interrupt')}>
                         <AlertCircle className="h-4 w-4 mr-2" />
                         Add Interrupt
+                      </Button>
+                      <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name, 'distraction')}>
+                        <Wind className="h-4 w-4 mr-2" />
+                        Add Distraction
                       </Button>
                     </div>
                   </PopoverContent>

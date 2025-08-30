@@ -2,6 +2,7 @@
 
 "use client";
 
+import React, { useState, useEffect, useMemo } from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -13,11 +14,8 @@ import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
 import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
-import { PistonsHead } from '@/components/PistonsHead';
-import React, { useEffect, useMemo, useRef } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
-import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
@@ -29,6 +27,10 @@ import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
+import { MissedSlotModal } from '@/components/MissedSlotModal';
+import { InterruptModal } from '@/components/InterruptModal';
+import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
+import { PistonsHead } from '@/components/PistonsHead';
 import { format, startOfToday, isAfter, parseISO } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -38,6 +40,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { Project, Activity } from '@/types/workout';
+import { cn } from '@/lib/utils';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const slotEndHours: Record<string, number> = {
@@ -110,7 +114,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState('');
   
-  const [interruptModalState, setInterruptModalState] = React.useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [interruptModalState, setInterruptModalState] = React.useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = React.useState('');
   const [interruptDuration, setInterruptDuration] = React.useState('');
   const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
@@ -228,9 +232,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   }, [promptType, projects, productizationPlans, offerizationPlans]);
 
   const handleSaveInterrupt = () => {
-    const { slotName } = interruptModalState;
-    if (!slotName || !interruptDetails.trim()) {
-        toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
+    const { slotName, activityType } = interruptModalState;
+    if (!slotName || !activityType || !interruptDetails.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide a description and type.', variant: 'destructive' });
         return;
     }
     
@@ -251,8 +255,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             
             slotsToUpdate.forEach(sName => {
                 const newActivity: Activity = {
-                    id: `interrupt-${Date.now()}-${Math.random()}`,
-                    type: 'interrupt',
+                    id: `${activityType}-${Date.now()}-${Math.random()}`,
+                    type: activityType,
                     details: interruptDetails,
                     completed: true,
                     taskIds: [],
@@ -262,11 +266,11 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
                 newDaySchedule[sName] = [...currentActivities, newActivity];
             });
-            toast({ title: 'Interrupt Logged', description: `Interruption added to all future slots.` });
+            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `Added to all future slots.` });
         } else {
             const newActivity: Activity = {
-                id: `interrupt-${Date.now()}`,
-                type: 'interrupt',
+                id: `${activityType}-${Date.now()}`,
+                type: activityType,
                 details: interruptDetails,
                 completed: true,
                 taskIds: [],
@@ -275,7 +279,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             };
             const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
             newDaySchedule[slotName] = [...currentActivities, newActivity];
-            toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
+            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `The ${activityType} has been added to your agenda.` });
         }
 
         return { ...prev, [selectedDateKey]: newDaySchedule };
@@ -284,7 +288,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setInterruptDetails('');
     setInterruptDuration('');
     setApplyInterruptToFutureSlots(false);
-    setInterruptModalState({ isOpen: false, slotName: null });
+    setInterruptModalState({ isOpen: false, slotName: null, activityType: null });
   };
 
 
@@ -330,28 +334,33 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitDetailPopup}
+            onOpenHabitPopup={openRuleDetailPopup}
             currentSlot={currentSlot}
         />
       )}
-      {promptType && (
-          <SmartLoggingPrompt 
-              promptType={promptType} 
-              onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
-              activeProjects={activeProjectsForPrompt}
-              currentSlot={currentSlot}
-          />
-      )}
-      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
+      <SmartLoggingPrompt 
+          promptType={promptType} 
+          onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
+          activeProjects={activeProjectsForPrompt}
+          currentSlot={currentSlot}
+      />
+      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Log an Interruption</DialogTitle>
+                  <DialogTitle>Log an Interruption or Distraction</DialogTitle>
                   <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
                   <div className="space-y-1">
+                      <Label>Type</Label>
+                       <RadioGroup value={interruptModalState.activityType || ""} onValueChange={(value) => setInterruptModalState(prev => ({...prev, activityType: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
+                        </RadioGroup>
+                  </div>
+                  <div className="space-y-1">
                       <Label htmlFor="interrupt-details">Description</Label>
-                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
+                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, browsing social media..." />
                   </div>
                   <div className="space-y-1">
                       <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
@@ -374,8 +383,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                   </div>
               </div>
               <DialogFooter>
-                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
-                  <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null, activityType: null })}>Cancel</Button>
+                  <Button onClick={handleSaveInterrupt}>Save</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
@@ -480,7 +489,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased">
+      <body className={cn("font-body antialiased")}>
         <AuthProvider>
           <AppWrapper>{children}</AppWrapper>
         </AuthProvider>
