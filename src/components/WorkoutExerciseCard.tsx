@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -35,20 +34,17 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
-  const [currentText, setCurrentText] = useState(point.text);
   const editorRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    setCurrentText(point.text);
-  }, [point.text]);
-
-  const handleBlur = () => {
-    if (!editorRef.current) return;
-    const newText = editorRef.current.textContent || '';
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const newText = e.currentTarget.textContent || '';
+    onUpdate(point.id, newText);
+  };
+  
+  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const newText = e.currentTarget.textContent || '';
     if (newText.trim() === '') {
         onDelete(point.id);
-    } else if (newText.trim() !== point.text.trim()) {
-        onUpdate(point.id, newText.trim());
     }
   };
 
@@ -72,10 +68,11 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
           ref={editorRef}
           contentEditable={true} 
           suppressContentEditableWarning={true}
+          onInput={handleInput}
           onBlur={handleBlur}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBlur(); } }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
           className="editable-placeholder w-full min-h-[1.5rem]"
-          dangerouslySetInnerHTML={{ __html: currentText }}
+          dangerouslySetInnerHTML={{ __html: point.text }}
         />
         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
             <Trash2 className="h-3 w-3"/>
@@ -277,7 +274,7 @@ export function WorkoutExerciseCard({
       return `Topic Goal: ${definitionGoal.goalValue} ${definitionGoal.goalType}. This subtopic: ${totalProgress} logged.`;
     }
     if (pageType === 'workout') {
-      return `Target: ${exercise.targetSets} sets of ${exercise.targetReps} reps. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sets.`;
+      return null;
     }
     if (pageType === 'branding') {
         return `Progress: ${exercise.loggedSets.length} / 4 stages complete.`
@@ -677,3 +674,5 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
+
+    
