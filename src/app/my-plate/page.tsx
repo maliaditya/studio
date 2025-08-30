@@ -1095,62 +1095,6 @@ function MyPlatePageContent() {
   
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
-  const promptType = useMemo(() => {
-    if (!settings.smartLogging || !currentSlot) return null;
-
-    const currentSlotActivities = selectedDaySchedule[currentSlot] as Activity[] | undefined;
-
-    if (!currentSlotActivities || currentSlotActivities.length === 0) {
-      return 'empty';
-    }
-
-    const hasIncompleteTasks = currentSlotActivities.some(a => !a.completed);
-    const isFocusSessionActive = !!activeFocusSession;
-
-    if (hasIncompleteTasks && !isFocusSessionActive) {
-      return 'inactive';
-    }
-    
-    if (!hasIncompleteTasks && remainingTime) {
-        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\d\d$/, 'm'));
-        if (remainingMinutes > 15) {
-             return 'completed';
-        }
-    }
-
-    return null;
-  }, [settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
-
-  const activeProjectsForPrompt = useMemo(() => {
-    if (promptType !== 'completed') return [];
-    
-    const activeProjectIds = new Set<string>();
-    const today = startOfToday();
-  
-    (projects || []).forEach(project => {
-      // Check productization plans
-      if (productizationPlans && productizationPlans[project.name]) {
-          activeProjectIds.add(project.id);
-          return;
-      }
-
-      // Check offerization plans
-      const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
-          plan.releases?.some(release => {
-              if (release.name !== project.name) return false;
-              try {
-                  return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-              } catch { return false; }
-          })
-      );
-      if (isOfferedAndActive) {
-          activeProjectIds.add(project.id);
-      }
-    });
-  
-    return (projects || []).filter(p => activeProjectIds.has(p.id));
-  }, [promptType, projects, productizationPlans, offerizationPlans]);
-
   if (!selectedDate) return null;
 
   return (
@@ -1252,15 +1196,6 @@ function MyPlatePageContent() {
         
         <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
       </div>
-
-      {promptType && (
-          <SmartLoggingPrompt 
-              promptType={promptType} 
-              onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
-              activeProjects={activeProjectsForPrompt}
-              currentSlot={currentSlot}
-          />
-      )}
       
       {currentUser && (
         <TodaysWorkoutModal

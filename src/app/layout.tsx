@@ -14,7 +14,7 @@ import { DefaultBackground } from '@/components/DefaultBackground';
 import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
 import { PistonsHead } from '@/components/PistonsHead';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
@@ -28,6 +28,38 @@ import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
+import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
+import { format, startOfToday, isAfter, parseISO } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import type { Project, Activity } from '@/types/workout';
+
+
+const slotEndHours: Record<string, number> = {
+  'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
+};
+
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    
+    // Handle "30" as "30m"
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    
+    return totalMinutes;
+};
 
 // export const metadata: Metadata = {
 //   title: 'LifeOS',
@@ -36,6 +68,7 @@ import { FocusSessionModal } from '@/components/FocusSessionModal';
 // Metadata needs to be in a server component, moving to a new AppWrapper client component
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
+  const { toast } = useToast();
   const { 
     isPistonsHeadOpen, setIsPistonsHeadOpen, 
     openPopups, ResourcePopup, handlePopupDragEnd, 
@@ -54,6 +87,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     isAgendaDocked,
     setIsAgendaDocked,
     schedule,
+    setSchedule,
     activityDurations,
     handleToggleComplete,
     handleStartWorkoutLog,
@@ -67,13 +101,41 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     onOpenFocusModal,
     handleStartFocusSession,
     focusDuration,
+    settings,
+    projects,
+    productizationPlans,
+    offerizationPlans,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
+  const [remainingTime, setRemainingTime] = React.useState('');
+  
+  const [interruptModalState, setInterruptModalState] = React.useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [interruptDetails, setInterruptDetails] = React.useState('');
+  const [interruptDuration, setInterruptDuration] = React.useState('');
+  const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
+
 
   useEffect(() => {
     setIsBrowser(true);
   }, []);
+  
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+        const now = new Date();
+        const slotEndHour = slotEndHours[currentSlot];
+        const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
+        const diff = slotEndTime.getTime() - now.getTime();
+        if (diff > 0) {
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+            setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+        } else { setRemainingTime('00:00:00'); }
+    }, 1000);
+    return () => clearInterval(timerInterval);
+  }, [currentSlot]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -107,6 +169,124 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
   };
+  
+  const selectedDateKey = format(new Date(), 'yyyy-MM-dd');
+  const selectedDaySchedule = schedule[selectedDateKey] || {};
+
+  const promptType = useMemo(() => {
+    if (!settings.smartLogging || !currentSlot) return null;
+
+    const currentSlotActivities = selectedDaySchedule[currentSlot] as Activity[] | undefined;
+
+    if (!currentSlotActivities || currentSlotActivities.length === 0) {
+      return 'empty';
+    }
+
+    const hasIncompleteTasks = currentSlotActivities.some(a => !a.completed);
+    const isFocusSessionActive = !!activeFocusSession;
+
+    if (hasIncompleteTasks && !isFocusSessionActive) {
+      return 'inactive';
+    }
+    
+    if (!hasIncompleteTasks && remainingTime) {
+        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\d\d$/, 'm'));
+        if (remainingMinutes > 15) {
+             return 'completed';
+        }
+    }
+
+    return null;
+  }, [settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
+
+  const activeProjectsForPrompt = useMemo(() => {
+    if (promptType !== 'completed') return [];
+    
+    const activeProjectIds = new Set<string>();
+    const today = startOfToday();
+  
+    (projects || []).forEach(project => {
+      if (productizationPlans && productizationPlans[project.name]) {
+          activeProjectIds.add(project.id);
+          return;
+      }
+
+      const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+          plan.releases?.some(release => {
+              if (release.name !== project.name) return false;
+              try {
+                  return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+              } catch { return false; }
+          })
+      );
+      if (isOfferedAndActive) {
+          activeProjectIds.add(project.id);
+      }
+    });
+  
+    return (projects || []).filter(p => activeProjectIds.has(p.id));
+  }, [promptType, projects, productizationPlans, offerizationPlans]);
+
+  const handleSaveInterrupt = () => {
+    const { slotName } = interruptModalState;
+    if (!slotName || !interruptDetails.trim()) {
+        toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
+        return;
+    }
+    
+    let durationMinutes = parseInt(interruptDuration, 10);
+    if (applyInterruptToFutureSlots) {
+        durationMinutes = 240;
+    } else if (isNaN(durationMinutes) || durationMinutes <= 0) {
+        toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
+        return;
+    }
+
+    setSchedule(prev => {
+        const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
+
+        if (applyInterruptToFutureSlots) {
+            const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
+            const slotsToUpdate = Object.keys(slotEndHours).slice(currentSlotIndex);
+            
+            slotsToUpdate.forEach(sName => {
+                const newActivity: Activity = {
+                    id: `interrupt-${Date.now()}-${Math.random()}`,
+                    type: 'interrupt',
+                    details: interruptDetails,
+                    completed: true,
+                    taskIds: [],
+                    duration: durationMinutes,
+                    slot: sName,
+                };
+                const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
+                newDaySchedule[sName] = [...currentActivities, newActivity];
+            });
+            toast({ title: 'Interrupt Logged', description: `Interruption added to all future slots.` });
+        } else {
+            const newActivity: Activity = {
+                id: `interrupt-${Date.now()}`,
+                type: 'interrupt',
+                details: interruptDetails,
+                completed: true,
+                taskIds: [],
+                duration: durationMinutes,
+                slot: slotName,
+            };
+            const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
+            newDaySchedule[slotName] = [...currentActivities, newActivity];
+            toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
+        }
+
+        return { ...prev, [selectedDateKey]: newDaySchedule };
+    });
+
+    setInterruptDetails('');
+    setInterruptDuration('');
+    setApplyInterruptToFutureSlots(false);
+    setInterruptModalState({ isOpen: false, slotName: null });
+  };
+
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -154,6 +334,51 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             currentSlot={currentSlot}
         />
       )}
+      {promptType && (
+          <SmartLoggingPrompt 
+              promptType={promptType} 
+              onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
+              activeProjects={activeProjectsForPrompt}
+              currentSlot={currentSlot}
+          />
+      )}
+      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Log an Interruption</DialogTitle>
+                  <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                  <div className="space-y-1">
+                      <Label htmlFor="interrupt-details">Description</Label>
+                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
+                  </div>
+                  <div className="space-y-1">
+                      <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
+                      <Input 
+                        id="interrupt-duration" 
+                        type="number" 
+                        value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
+                        onChange={(e) => setInterruptDuration(e.target.value)} 
+                        placeholder="e.g., 30"
+                        disabled={applyInterruptToFutureSlots}
+                      />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                      <Checkbox 
+                          id="apply-all-slots" 
+                          checked={applyInterruptToFutureSlots} 
+                          onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
+                      />
+                      <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
+                  </div>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
+                  <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
