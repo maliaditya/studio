@@ -163,6 +163,12 @@ interface AuthContextType {
   setMindProgrammingDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   mindProgrammingCategories: ExerciseCategory[];
   setMindProgrammingCategories: React.Dispatch<React.SetStateAction<ExerciseCategory[]>>;
+  mindProgrammingMode: WorkoutMode;
+  setMindProgrammingMode: React.Dispatch<React.SetStateAction<WorkoutMode>>;
+  mindProgrammingPlans: AllWorkoutPlans;
+  setMindProgrammingPlans: React.Dispatch<React.SetStateAction<AllWorkoutPlans>>;
+  mindProgrammingPlanRotation: boolean;
+  setMindProgrammingPlanRotation: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Resources
   resourceFolders: ResourceFolder[];
@@ -395,6 +401,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [mindProgrammingDefinitions, setMindProgrammingDefinitions] = useState<ExerciseDefinition[]>([]);
   const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
   const [mindProgrammingCategories, setMindProgrammingCategories] = useState<ExerciseCategory[]>(defaultMindsetCategories);
+  const [mindProgrammingMode, setMindProgrammingMode] = useState<WorkoutMode>('two-muscle');
+  const [mindProgrammingPlans, setMindProgrammingPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
+  const [mindProgrammingPlanRotation, setMindProgrammingPlanRotation] = useState(true);
   
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -767,7 +776,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     setFocusSessionModalOpen(false);
   };
-  
+
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -840,7 +849,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
         pathNodes,
-        mindProgrammingCategories,
+        mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation,
       },
       ui: {
         pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
@@ -851,7 +860,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
   useEffect(() => {
@@ -859,7 +868,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLocalChangeCount(c => c + 1);
     }
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, isLoadingState
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, isLoadingState
   ]);
 
   useEffect(() => {
@@ -941,6 +950,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
     setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || []);
     setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
+    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
+    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
+    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
     setProductizationPlans(mainData.productizationPlans || {});
     setOfferizationPlans(mainData.offerizationPlans || {});
 
@@ -2498,6 +2510,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     copyOffer,
     mindProgrammingDefinitions, setMindProgrammingDefinitions,
     mindProgrammingCategories, setMindProgrammingCategories,
+    mindProgrammingMode, setMindProgrammingMode,
+    mindProgrammingPlans, setMindProgrammingPlans,
+    mindProgrammingPlanRotation, setMindProgrammingPlanRotation,
+    allMindProgrammingLogs, setAllMindProgrammingLogs,
     resourceFolders, setResourceFolders,
     resources, setResources, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
@@ -2662,6 +2678,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
