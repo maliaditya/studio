@@ -32,6 +32,7 @@ import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
 import { Checkbox } from '@/components/ui/checkbox';
+import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource } from '@/types/workout';
@@ -1092,7 +1093,37 @@ function MyPlatePageContent() {
 
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
+  
+  const promptType = useMemo(() => {
+    if (!settings.smartLogging || !currentSlot) return null;
 
+    const currentSlotActivities = selectedDaySchedule[currentSlot] as Activity[] | undefined;
+
+    if (!currentSlotActivities || currentSlotActivities.length === 0) {
+      return 'empty';
+    }
+
+    const hasIncompleteTasks = currentSlotActivities.some(a => !a.completed);
+    const isFocusSessionActive = !!activeFocusSession;
+
+    if (hasIncompleteTasks && !isFocusSessionActive) {
+      return 'inactive';
+    }
+    
+    if (!hasIncompleteTasks && remainingTime) {
+        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\d\d$/, 'm'));
+        if (remainingMinutes > 15) {
+             return 'completed';
+        }
+    }
+
+    return null;
+  }, [settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
+
+  const activeProjectsForPrompt = useMemo(() => {
+    if (promptType !== 'completed') return [];
+    return projects.filter(p => activeProjectIds.has(p.id));
+  }, [promptType, projects, activeProjectIds]);
 
   if (!selectedDate) return null;
 
@@ -1117,6 +1148,13 @@ function MyPlatePageContent() {
               </Popover>
           </CardHeader>
           <CardContent>
+            {promptType && (
+                <SmartLoggingPrompt 
+                    promptType={promptType} 
+                    onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot })} 
+                    activeProjects={activeProjectsForPrompt}
+                />
+            )}
             <DashboardStats stats={dashboardStats} />
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
               <div className="space-y-6 lg:col-span-3">
