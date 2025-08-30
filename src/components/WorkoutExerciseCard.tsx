@@ -1,12 +1,11 @@
 
-      
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw, Link as LinkIcon } from 'lucide-react';
+import { PlusCircle, Trash2, CheckSquare, Edit2, Save, X, Youtube, TrendingUp, Check, Linkedin, RefreshCw, Link as LinkIcon, Unlink } from 'lucide-react';
 import { WorkoutExercise, LoggedSet, TopicGoal, SharingStatus, ExerciseDefinition, DatedWorkout, Resource } from '@/types/workout';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -38,16 +37,10 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
 
   const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
     const newText = e.currentTarget.textContent || '';
+    // Call onUpdate directly as the user types
     onUpdate(point.id, newText);
   };
   
-  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
-    const newText = e.currentTarget.textContent || '';
-    if (newText.trim() === '') {
-        onDelete(point.id);
-    }
-  };
-
   const handleClick = () => {
     setTimeout(() => {
         editorRef.current?.focus();
@@ -69,7 +62,11 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
           contentEditable={true} 
           suppressContentEditableWarning={true}
           onInput={handleInput}
-          onBlur={handleBlur}
+          onBlur={(e) => {
+            if (e.currentTarget.textContent?.trim() === '') {
+                onDelete(point.id);
+            }
+          }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
           className="editable-placeholder w-full min-h-[1.5rem]"
           dangerouslySetInnerHTML={{ __html: point.text }}
@@ -101,6 +98,7 @@ interface WorkoutExerciseCardProps {
   pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system' | 'mind-programming';
   deepWorkDefinitions?: ExerciseDefinition[];
   onCreateAndLinkResource?: (definition: ExerciseDefinition) => void;
+  onUnlinkResource?: (definitionId: string, resourceId: string) => void;
 }
 
 export function WorkoutExerciseCard({
@@ -122,6 +120,7 @@ export function WorkoutExerciseCard({
   pageType = 'workout',
   deepWorkDefinitions,
   onCreateAndLinkResource,
+  onUnlinkResource,
 }: WorkoutExerciseCardProps) {
   const { resources, mindProgrammingDefinitions, setMindProgrammingDefinitions } = useAuth();
   const [reps, setReps] = useState('');
@@ -264,26 +263,6 @@ export function WorkoutExerciseCard({
       
       return totalMinutes;
   }, [isParent, selectedDate, definition, allDeepWorkLogs, allUpskillLogs]);
-
-  const getProgressText = () => {
-    if (isParent) {
-      return null;
-    }
-    if (pageType === 'upskill' && definitionGoal) {
-      const totalProgress = exercise.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-      return `Topic Goal: ${definitionGoal.goalValue} ${definitionGoal.goalType}. This subtopic: ${totalProgress} logged.`;
-    }
-    if (pageType === 'workout') {
-      return null;
-    }
-    if (pageType === 'branding') {
-        return `Progress: ${exercise.loggedSets.length} / 4 stages complete.`
-    }
-    if (pageType === 'lead-generation' || pageType === 'offer-system') {
-        return `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} actions logged.`
-    }
-    return null;
-  }
 
   const getLoggedSetText = (set: LoggedSet, index: number) => {
     if (pageType === 'workout') {
@@ -445,15 +424,21 @@ export function WorkoutExerciseCard({
         {(definition?.linkedResourceIds || []).map(resourceId => {
           const resource = resources.find(r => r.id === resourceId);
           return resource ? (
-            <Button
-                key={resourceId}
+            <div key={resourceId} className="flex items-center justify-between group p-1 rounded-md hover:bg-muted/50">
+              <Button
                 variant="outline"
-                className="text-sm justify-start w-full h-auto"
+                className="text-sm justify-start w-full h-auto flex-grow"
                 onClick={(e) => onOpenPopup?.(resource.id, e)}
-            >
-              <LinkIcon className="h-4 w-4 mr-2 text-primary" />
-              <span className="font-semibold text-left">{resource.name}</span>
-            </Button>
+              >
+                <LinkIcon className="h-4 w-4 mr-2 text-primary" />
+                <span className="font-semibold text-left">{resource.name}</span>
+              </Button>
+              {onUnlinkResource && (
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={() => onUnlinkResource(definition!.id, resourceId)}>
+                  <Unlink className="h-4 w-4"/>
+                </Button>
+              )}
+            </div>
           ) : null;
         })}
         <div className="flex gap-2 pt-2">
@@ -598,8 +583,8 @@ export function WorkoutExerciseCard({
     }
   }
 
-  const progressText = getProgressText();
-
+  const progressText = pageType === 'mind-programming' ? null : `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} sets`;
+  
   return (
     <motion.div
       layout
@@ -663,7 +648,7 @@ export function WorkoutExerciseCard({
           </div>
         </CardHeader>
         <CardContent className="p-3">
-          {progressText && pageType !== 'mind-programming' && (
+          {progressText && (
             <p className="text-xs text-muted-foreground mb-2">
               {progressText}
             </p>

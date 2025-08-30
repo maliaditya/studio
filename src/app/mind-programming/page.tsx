@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo } from 'react';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils, Link as LinkIcon } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils, Link as LinkIcon, Unlink } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -371,6 +370,17 @@ function MindProgrammingPageContent() {
     setLinkingResourceTo(null);
     setSelectedResourceId('');
   };
+  
+  const handleUnlinkResource = (definitionId: string, resourceId: string) => {
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === definitionId) {
+            const updatedLinkedIds = (def.linkedResourceIds || []).filter(id => id !== resourceId);
+            return { ...def, linkedResourceIds: updatedLinkedIds };
+        }
+        return def;
+    }));
+    toast({ title: "Resource Unlinked" });
+  };
 
 
   if (isLoadingPage) {
@@ -526,6 +536,7 @@ function MindProgrammingPageContent() {
                                   onOpenPopup={openGeneralPopup}
                                   pageType="mind-programming"
                                   onCreateAndLinkResource={(def) => createResourceWithHierarchy(def, undefined, 'card')}
+                                  onUnlinkResource={handleUnlinkResource}
                                 />
                               )
                           })}
@@ -630,3 +641,5 @@ function MindProgrammingPageContent() {
 export default function Page() {
   return ( <AuthGuard> <MindProgrammingPageContent /> </AuthGuard> );
 }
+
+    
