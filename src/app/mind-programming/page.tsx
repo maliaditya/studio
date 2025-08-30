@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, ChevronRight, CalendarIcon, GripVertical, TrendingUp, Filter as FilterIcon, Loader2, Info, Youtube, Settings, ChevronDown, ChevronUp, Target, CalendarDays, Plus, Minus, Activity, LineChart as LineChartIcon, BookCopy, Flame, HeartPulse, Utensils, Link as LinkIcon } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -80,6 +80,7 @@ function MindProgrammingPageContent() {
     setMindProgrammingPlans,
     mindProgrammingPlanRotation,
     setMindProgrammingPlanRotation,
+    resources,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -103,6 +104,10 @@ function MindProgrammingPageContent() {
   const [isLibraryExpanded, setIsLibraryExpanded] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [isLinkResourceOpen, setIsLinkResourceOpen] = useState(false);
+  const [linkingResourceTo, setLinkingResourceTo] = useState<ExerciseDefinition | null>(null);
+  const [selectedResourceId, setSelectedResourceId] = useState<string>('');
+
 
   useEffect(() => {
     setIsLoadingPage(false);
@@ -345,6 +350,26 @@ function MindProgrammingPageContent() {
     if (newMode === mindProgrammingMode) return;
     setMindProgrammingMode(newMode);
   };
+  
+  const handleOpenLinkResource = (def: ExerciseDefinition) => {
+    setLinkingResourceTo(def);
+    setIsLinkResourceOpen(true);
+  };
+  
+  const handleSaveResourceLink = () => {
+    if (!linkingResourceTo || !selectedResourceId) return;
+    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === linkingResourceTo.id) {
+            const newLinkedIds = [...(def.linkedResourceIds || []), selectedResourceId];
+            return { ...def, linkedResourceIds: newLinkedIds };
+        }
+        return def;
+    }));
+    setIsLinkResourceOpen(false);
+    setLinkingResourceTo(null);
+    setSelectedResourceId('');
+  };
+
 
   if (isLoadingPage) {
     return (
@@ -436,7 +461,7 @@ function MindProgrammingPageContent() {
                                       <Badge variant="secondary" className="text-xs ml-0 my-0.5">{def.category}</Badge>
                                   </div>
                                   <div className="flex-shrink-0 flex items-center">
-                                    <Button variant="ghost" size="icon" onClick={() => handleViewProgress(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`View progress for ${def.name}`}> <TrendingUp className="h-4 w-4" /> </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenLinkResource(def)} className="h-8 w-8 text-muted-foreground hover:text-blue-500" aria-label={`Link resource for ${def.name}`}> <LinkIcon className="h-4 w-4" /> </Button>
                                     <Button variant="ghost" size="icon" onClick={() => handleStartEditDefinition(def)} className="h-8 w-8 text-muted-foreground hover:text-primary" aria-label={`Edit ${def.name}`}> <Edit3 className="h-4 w-4" /> </Button>
                                     <Button variant="ghost" size="icon" onClick={() => handleDeleteExerciseDefinition(def.id)} className="h-8 w-8 text-muted-foreground hover:text-destructive" aria-label={`Delete ${def.name}`}> <Trash2 className="h-4 w-4" /> </Button>
                                     <Button variant="ghost" size="icon" onClick={() => handleAddExerciseToWorkout(def)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${def.name} to session`}> <ChevronRight className="h-5 w-5" /> </Button>
@@ -496,6 +521,7 @@ function MindProgrammingPageContent() {
                                   onUpdateSet={handleUpdateSet} 
                                   onRemoveExercise={handleRemoveExerciseFromWorkout}
                                   onViewProgress={viewingProgressExercise ? () => handleViewProgress(viewingProgressExercise) : undefined}
+                                  pageType="mind-programming"
                                 />
                               )
                           })}
@@ -553,6 +579,31 @@ function MindProgrammingPageContent() {
             </DialogClose>
         </DialogContent>
       </Dialog>
+      
+      <Dialog open={isLinkResourceOpen} onOpenChange={setIsLinkResourceOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Resource to "{linkingResourceTo?.name}"</DialogTitle>
+            <DialogDescription>Select an existing resource to link to this technique.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select onValueChange={setSelectedResourceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a resource..." />
+              </SelectTrigger>
+              <SelectContent>
+                {resources.map(res => (
+                  <SelectItem key={res.id} value={res.id}>{res.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLinkResourceOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveResourceLink}>Link Resource</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
         <AlertDialogContent>
@@ -575,5 +626,3 @@ function MindProgrammingPageContent() {
 export default function Page() {
   return ( <AuthGuard> <MindProgrammingPageContent /> </AuthGuard> );
 }
-
-
