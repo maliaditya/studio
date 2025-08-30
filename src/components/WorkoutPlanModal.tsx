@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -125,7 +126,7 @@ export function WorkoutPlanModal({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {categories.map(category => {
                     const exercisesForCategory = workoutPlans[planKey]?.[category];
-                    const addEntityPlaceholder = pageType === 'mind-programming' ? 'Add a card...' : 'Add an exercise...';
+                    const addEntityPlaceholder = pageType === 'mind-programming' ? 'Add a technique...' : 'Add an exercise...';
                     return (
                     <Card key={category} className="overflow-hidden">
                         <CardHeader className="p-3"><CardTitle className="text-lg">{category}</CardTitle></CardHeader>
@@ -203,7 +204,7 @@ export function WorkoutPlanModal({
     };
 
     const dialogTitle = pageType === 'mind-programming' ? 'Edit Auto-Populated Mindset Plans' : 'Edit Auto-Populated Workout Plans';
-    const dialogDescription = pageType === 'mind-programming' ? 'Customize the cards for each weekly mindset plan. Changes are saved automatically.' : 'Customize the exercises for each weekly plan. Changes are saved automatically.';
+    const dialogDescription = pageType === 'mind-programming' ? 'Customize the techniques for each weekly mindset plan. Changes are saved automatically.' : 'Customize the exercises for each weekly plan. Changes are saved automatically.';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

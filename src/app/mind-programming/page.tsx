@@ -357,7 +357,7 @@ function MindProgrammingPageContent() {
               <CardHeader>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <CardTitle id="exercise-library-heading" className="flex items-center gap-2 text-lg text-primary">
-                    <BookCopy /> Mindset Card Library
+                    <BookCopy /> Mindset Technique Library
                   </CardTitle>
                    <Button variant="outline" size="sm" onClick={() => setIsCategoryManagerOpen(true)}>Manage Categories</Button>
                 </div>
@@ -394,16 +394,16 @@ function MindProgrammingPageContent() {
                   </div>
                   <Separator/>
                   <form onSubmit={handleAddExerciseDefinition} className="space-y-3">
-                    <Input type="text" placeholder="New mindset card name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New mindset card name" className="h-10 text-sm" />
+                    <Input type="text" placeholder="New mindset technique name" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} aria-label="New mindset technique name" className="h-10 text-sm" />
                     <Select value={newExerciseCategory} onValueChange={(value) => setNewExerciseCategory(value as ExerciseCategory)}>
                       <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
                       <SelectContent>{mindProgrammingCategories.map(cat => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                     </Select>
-                    <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Card </Button>
+                    <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Technique </Button>
                   </form>
                   <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
                     {mindProgrammingDefinitions.length === 0 ? (
-                      <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new card to get started!</p>
+                      <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new technique to get started!</p>
                     ) : (
                       <ul className="space-y-2">
                         <AnimatePresence>
@@ -470,8 +470,8 @@ function MindProgrammingPageContent() {
                       {currentWorkoutExercises.length === 0 ? (
                         <div className="text-center py-10">
                             <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                            <p className="text-muted-foreground">No mindset cards for {format(selectedDate, 'PPP')}.</p>
-                            <p className="text-sm text-muted-foreground/80">Add cards from the library to get started!</p>
+                            <p className="text-muted-foreground">No mindset techniques for {format(selectedDate, 'PPP')}.</p>
+                            <p className="text-sm text-muted-foreground/80">Add techniques from the library to get started!</p>
                         </div>
                       ) : (
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -518,7 +518,7 @@ function MindProgrammingPageContent() {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Manage Categories</DialogTitle>
-                <DialogDescription>Add or remove categories for your mind programming cards.</DialogDescription>
+                <DialogDescription>Add or remove categories for your mind programming techniques.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
                 <div className="flex gap-2 mb-4">
