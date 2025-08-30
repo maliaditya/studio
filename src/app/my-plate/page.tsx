@@ -114,6 +114,7 @@ function MyPlatePageContent() {
     openRuleDetailPopup,
     getDescendantLeafNodes,
     settings,
+    activeFocusSession,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -1094,6 +1095,8 @@ function MyPlatePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
   
+  const selectedDaySchedule = schedule[selectedDateKey] || {};
+
   const promptType = useMemo(() => {
     if (!settings.smartLogging || !currentSlot) return null;
 
@@ -1122,8 +1125,33 @@ function MyPlatePageContent() {
 
   const activeProjectsForPrompt = useMemo(() => {
     if (promptType !== 'completed') return [];
-    return projects.filter(p => activeProjectIds.has(p.id));
-  }, [promptType, projects, activeProjectIds]);
+    
+    const activeProjectIds = new Set<string>();
+    const today = startOfToday();
+  
+    (projects || []).forEach(project => {
+      // Check productization plans
+      if (productizationPlans && productizationPlans[project.name]) {
+          activeProjectIds.add(project.id);
+          return;
+      }
+
+      // Check offerization plans
+      const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+          plan.releases?.some(release => {
+              if (release.name !== project.name) return false;
+              try {
+                  return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+              } catch { return false; }
+          })
+      );
+      if (isOfferedAndActive) {
+          activeProjectIds.add(project.id);
+      }
+    });
+  
+    return (projects || []).filter(p => activeProjectIds.has(p.id));
+  }, [promptType, projects, productizationPlans, offerizationPlans]);
 
   if (!selectedDate) return null;
 
