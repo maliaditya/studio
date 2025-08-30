@@ -34,42 +34,32 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const [currentText, setCurrentText] = useState(point.text);
 
-  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
-    const newText = e.currentTarget.textContent || '';
-    // Call onUpdate directly as the user types
-    onUpdate(point.id, newText);
-  };
+  useEffect(() => {
+    setCurrentText(point.text);
+  }, [point.text]);
   
-  const handleClick = () => {
-    setTimeout(() => {
-        editorRef.current?.focus();
-        const range = document.createRange();
-        const sel = window.getSelection();
-        if (editorRef.current && sel) {
-            range.selectNodeContents(editorRef.current);
-            range.collapse(false);
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-    }, 0);
+  const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const newText = e.currentTarget.textContent || '';
+    if (newText.trim() === '') {
+        onDelete(point.id);
+    } else if (newText !== point.text) {
+        onUpdate(point.id, newText);
+    }
   };
   
   return (
-    <div className="text-sm flex items-start gap-2 group w-full" onClick={handleClick}>
+    <div className="text-sm flex items-start gap-2 group w-full">
         <div 
           ref={editorRef}
           contentEditable={true} 
           suppressContentEditableWarning={true}
-          onInput={handleInput}
-          onBlur={(e) => {
-            if (e.currentTarget.textContent?.trim() === '') {
-                onDelete(point.id);
-            }
-          }}
+          onInput={(e) => setCurrentText(e.currentTarget.textContent || '')}
+          onBlur={handleBlur}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
           className="editable-placeholder w-full min-h-[1.5rem]"
-          dangerouslySetInnerHTML={{ __html: point.text }}
+          dangerouslySetInnerHTML={{ __html: currentText }}
         />
         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
             <Trash2 className="h-3 w-3"/>
@@ -427,11 +417,11 @@ export function WorkoutExerciseCard({
             <div key={resourceId} className="flex items-center justify-between group p-1 rounded-md hover:bg-muted/50">
               <Button
                 variant="outline"
-                className="text-sm justify-start w-full h-auto flex-grow"
+                className="text-sm justify-start w-full h-auto flex-grow min-w-0"
                 onClick={(e) => onOpenPopup?.(resource.id, e)}
               >
-                <LinkIcon className="h-4 w-4 mr-2 text-primary" />
-                <span className="font-semibold text-left">{resource.name}</span>
+                <LinkIcon className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                <span className="font-semibold text-left truncate" title={resource.name}>{resource.name}</span>
               </Button>
               {onUnlinkResource && (
                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={() => onUnlinkResource(definition!.id, resourceId)}>
@@ -659,5 +649,3 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
-
-    
