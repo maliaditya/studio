@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2 } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -84,9 +83,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         onUpdate({ ...resource, points: updatedPoints });
     };
 
-    const handleUpdatePoint = (pointId: string, newText: string) => {
+    const handleUpdatePoint = (pointId: string, updatedPoint: Partial<ResourcePoint>) => {
         const updatedPoints = (resource.points || []).map(p =>
-            p.id === pointId ? { ...p, text: newText } : p
+            p.id === pointId ? { ...p, ...updatedPoint } : p
         );
         onUpdate({ ...resource, points: updatedPoints });
     };
@@ -124,7 +123,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             <EditableResourcePoint 
                                 key={point.id}
                                 point={point}
-                                onUpdate={(newText) => handleUpdatePoint(point.id, newText)}
+                                onUpdate={handleUpdatePoint}
                                 onDelete={() => handleDeletePoint(point.id)}
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
                                 onOpenContentView={(e) => handleOpenContentView(point, e)}
@@ -137,7 +136,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return (
                     <div className="space-y-1">
                         <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
+                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
                         <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
                         <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
                     </div>
@@ -253,7 +252,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 
 const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onConvertToCard }: { 
     point: ResourcePoint, 
-    onUpdate: (text: string) => void, 
+    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
@@ -263,13 +262,36 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
+    const [isFetchingMeta, setIsFetchingMeta] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (editText.trim() === '') {
             onDelete();
+            return;
+        }
+
+        if (point.type === 'link' && editText.trim() !== point.text) {
+            setIsFetchingMeta(true);
+            try {
+                const response = await fetch('/api/get-link-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: editText.trim() }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    onUpdate(point.id, { text: editText.trim(), displayText: result.title || editText.trim() });
+                } else {
+                    onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
+                }
+            } catch (error) {
+                onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
+            } finally {
+                setIsFetchingMeta(false);
+            }
         } else {
-             onUpdate(editText);
+            onUpdate(point.id, { text: editText.trim() });
         }
         setIsEditing(false);
     };
@@ -303,7 +325,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
     }
 
     return (
-        <li className="flex items-start gap-3 group/item">
+        <li className="flex items-start gap-3 group/item w-full">
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
@@ -330,8 +352,13 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
                       )}
                     </div>
                 ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0">
-                        <span className="cursor-pointer text-primary hover:underline" onClick={() => point.text && setFloatingVideoUrl(point.text)}>{point.text}</span>
+                     <div className="flex-grow min-w-0 flex items-center gap-1">
+                        <span 
+                            className="cursor-pointer text-primary hover:underline" 
+                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                        >
+                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
+                        </span>
                     </div>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
@@ -340,7 +367,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
                 {point.type === 'text' && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
-                        <Blocks className="h-3 w-3" />
+                        <Blocks className="h-3 w-3"/>
                     </Button>
                 )}
                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onDelete}>
@@ -350,3 +377,5 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
         </li>
     );
 }
+
+    
