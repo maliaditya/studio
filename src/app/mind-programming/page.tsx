@@ -67,18 +67,18 @@ function MindProgrammingPageContent() {
   const { 
     currentUser, 
     exportData,
-    allMindProgrammingLogs: allWorkoutLogs, 
-    setAllMindProgrammingLogs: setAllWorkoutLogs,
-    mindProgrammingDefinitions: exerciseDefinitions, 
-    setMindProgrammingDefinitions: setExerciseDefinitions,
+    allMindProgrammingLogs, 
+    setAllMindProgrammingLogs,
+    mindProgrammingDefinitions, 
+    setMindProgrammingDefinitions,
     mindProgrammingCategories,
     setMindProgrammingCategories,
-    mindProgrammingMode: workoutMode,
-    setMindProgrammingMode: setWorkoutMode,
-    mindProgrammingPlans: workoutPlans,
-    setMindProgrammingPlans: setWorkoutPlans,
-    mindProgrammingPlanRotation: workoutPlanRotation,
-    setMindProgrammingPlanRotation: setWorkoutPlanRotation,
+    mindProgrammingMode,
+    setMindProgrammingMode,
+    mindProgrammingPlans,
+    setMindProgrammingPlans,
+    mindProgrammingPlanRotation,
+    setMindProgrammingPlanRotation,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -140,8 +140,8 @@ function MindProgrammingPageContent() {
 
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return allWorkoutLogs.find(log => log.id === dateKey);
-  }, [selectedDate, allWorkoutLogs]);
+    return allMindProgrammingLogs.find(log => log.id === dateKey);
+  }, [selectedDate, allMindProgrammingLogs]);
 
   const currentWorkoutExercises = useMemo(() => {
     if (!currentDatedWorkout?.exercises) return [];
@@ -150,10 +150,10 @@ function MindProgrammingPageContent() {
 
   const filteredExerciseDefinitions = useMemo(() => {
     if (selectedCategories.length === 0) {
-      return exerciseDefinitions;
+      return mindProgrammingDefinitions;
     }
-    return exerciseDefinitions.filter(def => selectedCategories.includes(def.category));
-  }, [exerciseDefinitions, selectedCategories]);
+    return mindProgrammingDefinitions.filter(def => selectedCategories.includes(def.category));
+  }, [mindProgrammingDefinitions, selectedCategories]);
 
   const handleCategoryFilterChange = (category: ExerciseCategory) => {
     setSelectedCategories(prev => 
@@ -179,7 +179,7 @@ function MindProgrammingPageContent() {
       name: newExerciseName.trim(),
       category: newExerciseCategory || DEFAULT_EXERCISE_CATEGORY
     };
-    setExerciseDefinitions(prev => [...prev, newDef]);
+    setMindProgrammingDefinitions(prev => [...prev, newDef]);
     setNewExerciseName('');
     setNewExerciseCategory("");
     toast({ title: "Success", description: `"${newDef.name}" added to library.` });
@@ -187,9 +187,9 @@ function MindProgrammingPageContent() {
 
   const handleDeleteExerciseDefinition = (id: string) => {
     if (!currentUser) { toast({ title: "Error", description: "You must be logged in.", variant: "destructive" }); return; }
-    const defToDelete = exerciseDefinitions.find(def => def.id === id);
-    setExerciseDefinitions(prev => prev.filter(def => def.id !== id));
-    setAllWorkoutLogs(prevLogs => 
+    const defToDelete = mindProgrammingDefinitions.find(def => def.id === id);
+    setMindProgrammingDefinitions(prev => prev.filter(def => def.id !== id));
+    setAllMindProgrammingLogs(prevLogs => 
       prevLogs.map(log => ({
         ...log,
         exercises: log.exercises.filter(ex => ex.definitionId !== id)
@@ -208,10 +208,10 @@ function MindProgrammingPageContent() {
     if (!currentUser) { toast({ title: "Error", description: "You must be logged in.", variant: "destructive" }); return; }
     if (editingDefinition && editingDefinitionName.trim() !== '' && editingDefinitionCategory) {
       const updatedDef = { ...editingDefinition, name: editingDefinitionName.trim(), category: editingDefinitionCategory };
-      setExerciseDefinitions(prev => 
+      setMindProgrammingDefinitions(prev => 
         prev.map(def => def.id === editingDefinition.id ? updatedDef : def)
       );
-      setAllWorkoutLogs(prevLogs => 
+      setAllMindProgrammingLogs(prevLogs => 
         prevLogs.map(log => ({
           ...log,
           exercises: log.exercises.map(ex => 
@@ -236,47 +236,47 @@ function MindProgrammingPageContent() {
       loggedSets: [], targetSets: DEFAULT_TARGET_SETS, targetReps: DEFAULT_TARGET_REPS,
     };
 
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allMindProgrammingLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       if (existingWorkout.exercises.some(ex => ex.definitionId === definition.id)) {
         toast({ title: "Info", description: `"${definition.name}" is already in this session.`, variant: "default" }); return;
       }
-      setAllWorkoutLogs(prev => prev.map(log => log.id === dateKey ? {...log, exercises: [...log.exercises, newWorkoutExercise]} : log));
+      setAllMindProgrammingLogs(prev => prev.map(log => log.id === dateKey ? {...log, exercises: [...log.exercises, newWorkoutExercise]} : log));
     } else {
-      setAllWorkoutLogs(prev => [...prev, { id: dateKey, date: dateKey, exercises: [newWorkoutExercise] }]);
+      setAllMindProgrammingLogs(prev => [...prev, { id: dateKey, date: dateKey, exercises: [newWorkoutExercise] }]);
     }
     toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
   };
   
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allMindProgrammingLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const updatedExercises = existingWorkout.exercises.filter(ex => ex.id !== exerciseId);
       if (updatedExercises.length === 0) { 
-        setAllWorkoutLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+        setAllMindProgrammingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       } else {
-        setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? {...log, exercises: updatedExercises} : log));
+        setAllMindProgrammingLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? {...log, exercises: updatedExercises} : log));
       }
     }
   };
   
   const handleLogSet = (exerciseId: string, reps: number, weight: number) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingWorkout = allWorkoutLogs.find(log => log.id === dateKey);
+    const existingWorkout = allMindProgrammingLogs.find(log => log.id === dateKey);
     if (existingWorkout) {
       const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps, weight, timestamp: Date.now() };
       const updatedExercises = existingWorkout.exercises.map(ex => 
         ex.id === exerciseId ? { ...ex, loggedSets: [...ex.loggedSets, newSet] } : ex
       );
-      setAllWorkoutLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? {...log, exercises: updatedExercises} : log));
+      setAllMindProgrammingLogs(prevLogs => prevLogs.map(log => log.id === dateKey ? {...log, exercises: updatedExercises} : log));
       toast({ title: "Set Logged!", description: "Your progress has been saved."});
     }
   };
 
   const handleDeleteSet = (exerciseId: string, setId: string) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    setAllWorkoutLogs(prevLogs => prevLogs.map(log => {
+    setAllMindProgrammingLogs(prevLogs => prevLogs.map(log => {
       if (log.id === dateKey) {
         return {
           ...log,
@@ -291,7 +291,7 @@ function MindProgrammingPageContent() {
 
   const handleUpdateSet = (exerciseId: string, setId: string, reps: number, weight: number) => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    setAllWorkoutLogs(prevLogs => prevLogs.map(log => {
+    setAllMindProgrammingLogs(prevLogs => prevLogs.map(log => {
       if (log.id === dateKey) {
         return {
           ...log,
@@ -333,8 +333,8 @@ function MindProgrammingPageContent() {
   };
 
   const handleWorkoutModeChange = (newMode: WorkoutMode) => {
-    if (newMode === workoutMode) return;
-    setWorkoutMode(newMode);
+    if (newMode === mindProgrammingMode) return;
+    setMindProgrammingMode(newMode);
   };
 
   if (isLoadingPage) {
@@ -366,7 +366,7 @@ function MindProgrammingPageContent() {
                     <div>
                         <Label className="text-sm font-medium">Mindset Plan</Label>
                         <RadioGroup
-                        value={workoutMode}
+                        value={mindProgrammingMode}
                         onValueChange={(value) => handleWorkoutModeChange(value as WorkoutMode)}
                         className="flex flex-wrap gap-x-4 gap-y-2 pt-2"
                         >
@@ -382,7 +382,7 @@ function MindProgrammingPageContent() {
                     </div>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <Switch id="plan-rotation" checked={workoutPlanRotation} onCheckedChange={setWorkoutPlanRotation}/>
+                            <Switch id="plan-rotation" checked={mindProgrammingPlanRotation} onCheckedChange={setMindProgrammingPlanRotation}/>
                             <Label htmlFor="plan-rotation">Plan Rotation</Label>
                         </div>
                         <Button variant="outline" size="sm" className="h-8" onClick={() => setIsPlanModalOpen(true)}>
@@ -401,12 +401,12 @@ function MindProgrammingPageContent() {
                     <Button type="submit" size="sm" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-xs xl:text-sm xl:h-10 xl:px-4"> <PlusCircle className="mr-2 h-5 w-5" /> Add Card </Button>
                   </form>
                   <div className="max-h-[calc(100vh-38rem)] overflow-y-auto pr-1">
-                    {exerciseDefinitions.length === 0 ? (
+                    {mindProgrammingDefinitions.length === 0 ? (
                       <p className="text-muted-foreground text-sm text-center py-4">Library empty. Add a new card to get started!</p>
                     ) : (
                       <ul className="space-y-2">
                         <AnimatePresence>
-                          {exerciseDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
+                          {mindProgrammingDefinitions.sort((a,b) => a.name.localeCompare(b.name)).map(def => (
                             <motion.li key={def.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
                               {editingDefinition?.id === def.id ? (
                                 <div className="space-y-2">
@@ -496,7 +496,7 @@ function MindProgrammingPageContent() {
         </div>
         {viewingProgressExercise && (
           <ExerciseProgressModal isOpen={isProgressModalOpen} onOpenChange={setIsProgressModalOpen}
-            exercise={viewingProgressExercise} allWorkoutLogs={allWorkoutLogs} pageType="workout"
+            exercise={viewingProgressExercise} allWorkoutLogs={allMindProgrammingLogs} pageType="workout"
           />
         )}
       </div>
@@ -504,10 +504,10 @@ function MindProgrammingPageContent() {
        <WorkoutPlanModal
           isOpen={isPlanModalOpen}
           onOpenChange={setIsPlanModalOpen}
-          workoutMode={workoutMode}
-          workoutPlans={workoutPlans}
-          setWorkoutPlans={setWorkoutPlans}
-          definitions={exerciseDefinitions}
+          workoutMode={mindProgrammingMode}
+          workoutPlans={mindProgrammingPlans}
+          setWorkoutPlans={setMindProgrammingPlans}
+          definitions={mindProgrammingDefinitions}
           initialPlans={INITIAL_PLANS}
           pageType="mind-programming"
           categories={mindProgrammingCategories}
