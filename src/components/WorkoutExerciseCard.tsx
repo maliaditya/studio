@@ -1,8 +1,6 @@
-
-
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,7 +13,6 @@ import { Badge } from './ui/badge';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from './ui/scroll-area';
-import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
@@ -33,6 +30,41 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
         <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
     </svg>
 );
+
+const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void }) => {
+  const [mainText, ...subTextParts] = point.text.split(' – ');
+  const subText = subTextParts.join(' – ');
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const handleBlur = () => {
+    if (!editorRef.current) return;
+    const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
+    const newSubText = editableSpan?.textContent || '';
+
+    if (newSubText !== subText) {
+      onUpdate(point.id, `${mainText} – ${newSubText}`);
+    }
+  };
+
+  return (
+    <div className="text-sm flex items-start gap-3 group">
+        <span className="font-bold text-primary w-24 flex-shrink-0 pt-1">{mainText}</span>
+        <div 
+          ref={editorRef}
+          onBlur={handleBlur}
+          className="editable-sentence flex-grow"
+        >
+          <span 
+            contentEditable={true} 
+            suppressContentEditableWarning={true}
+            className="editable-placeholder"
+            dangerouslySetInnerHTML={{ __html: subText || "..." }} 
+          />
+        </div>
+    </div>
+  );
+};
+
 
 interface WorkoutExerciseCardProps {
   exercise: WorkoutExercise;
@@ -261,16 +293,6 @@ export function WorkoutExerciseCard({
         return def;
     }));
   };
-
-  const handleAddStep = () => {
-    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
-      if (def.id === exercise.definitionId) {
-        const newStep = { id: `step_${Date.now()}`, text: 'New Step', type: 'text' as const };
-        return { ...def, decompositionData: [...(def.decompositionData || []), newStep] };
-      }
-      return def;
-    }));
-  };
   
   const handleLinkResource = (resourceId: string) => {
     if (!resourceId) return;
@@ -387,21 +409,9 @@ export function WorkoutExerciseCard({
 
   const renderMindProgrammingContent = () => (
     <div className="space-y-3">
-        {(definition?.decompositionData || []).map(point => {
-            const [mainText, ...subTextParts] = point.text.split(' – ');
-            const subText = subTextParts.join(' – ');
-            return (
-                <div key={point.id} className="text-sm flex items-start gap-3 group">
-                    <span className="font-bold text-primary w-24 flex-shrink-0 pt-1.5">{mainText}</span>
-                    <Textarea
-                      defaultValue={subText}
-                      onBlur={(e) => updateDecompositionData(point.id, `${mainText} – ${e.target.value}`)}
-                      className="text-sm flex-grow min-h-[2.5rem]"
-                      rows={1}
-                    />
-                </div>
-            )
-        })}
+        {(definition?.decompositionData || []).map(point => (
+            <EditableStep key={point.id} point={point} onUpdate={updateDecompositionData} />
+        ))}
         {(definition?.linkedResourceIds || []).map(resourceId => {
           const resource = resources.find(r => r.id === resourceId);
           return resource ? (
@@ -412,9 +422,6 @@ export function WorkoutExerciseCard({
           ) : null;
         })}
         <div className="flex gap-2 pt-2 border-t">
-          <Button variant="outline" size="sm" onClick={handleAddStep}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Step
-          </Button>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" size="sm">
