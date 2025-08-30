@@ -59,9 +59,9 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
         const sel = window.getSelection();
         if (editorRef.current && sel) {
             range.selectNodeContents(editorRef.current);
-            range.collapse(false); // Collapses the range to the end point
-            sel.removeAllRanges(); // Removes all ranges from the selection
-            sel.addRange(range); // Adds the new range
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
         }
     }, 0);
   };
@@ -103,6 +103,7 @@ interface WorkoutExerciseCardProps {
   swappableExercises?: ExerciseDefinition[];
   pageType?: 'workout' | 'upskill' | 'deepwork' | 'branding' | 'lead-generation' | 'offer-system' | 'mind-programming';
   deepWorkDefinitions?: ExerciseDefinition[];
+  onCreateAndLinkResource?: (definition: ExerciseDefinition) => void;
 }
 
 export function WorkoutExerciseCard({
@@ -122,7 +123,8 @@ export function WorkoutExerciseCard({
   onSwapExercise,
   swappableExercises,
   pageType = 'workout',
-  deepWorkDefinitions
+  deepWorkDefinitions,
+  onCreateAndLinkResource,
 }: WorkoutExerciseCardProps) {
   const { resources, mindProgrammingDefinitions, setMindProgrammingDefinitions } = useAuth();
   const [reps, setReps] = useState('');
@@ -326,9 +328,9 @@ export function WorkoutExerciseCard({
   };
   
   const handleLinkResource = (resourceId: string) => {
-    if (!resourceId) return;
+    if (!resourceId || !definition) return;
     setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
-      if (def.id === exercise.definitionId) {
+      if (def.id === definition.id) {
         const updatedLinkedIds = [...(def.linkedResourceIds || []), resourceId];
         return { ...def, linkedResourceIds: updatedLinkedIds };
       }
@@ -475,6 +477,9 @@ export function WorkoutExerciseCard({
                     </Select>
                 </PopoverContent>
             </Popover>
+            {onCreateAndLinkResource && definition && (
+              <Button variant="outline" size="sm" onClick={() => onCreateAndLinkResource(definition)}>Create Resource</Button>
+            )}
         </div>
     </div>
   );
@@ -672,4 +677,3 @@ export function WorkoutExerciseCard({
     </motion.div>
   );
 }
-

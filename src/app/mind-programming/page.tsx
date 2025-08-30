@@ -82,6 +82,7 @@ function MindProgrammingPageContent() {
     setMindProgrammingPlanRotation,
     resources,
     openGeneralPopup,
+    createResourceWithHierarchy,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -524,6 +525,7 @@ function MindProgrammingPageContent() {
                                   onViewProgress={viewingProgressExercise ? () => handleViewProgress(viewingProgressExercise) : undefined}
                                   onOpenPopup={openGeneralPopup}
                                   pageType="mind-programming"
+                                  onCreateAndLinkResource={(def) => createResourceWithHierarchy(def, undefined, 'card')}
                                 />
                               )
                           })}
