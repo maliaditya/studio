@@ -35,12 +35,9 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void }) => {
   const [mainText, ...subTextParts] = point.text.split(' – ');
   const subText = subTextParts.join(' – ');
-  const editorRef = useRef<HTMLDivElement>(null);
 
-  const handleBlur = () => {
-    if (!editorRef.current) return;
-    const editableSpan = editorRef.current.querySelector<HTMLSpanElement>('[contenteditable=true]');
-    const newSubText = editableSpan?.textContent || '';
+  const handleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+    const newSubText = e.currentTarget.textContent || '';
 
     if (newSubText !== subText) {
       onUpdate(point.id, `${mainText} – ${newSubText}`);
@@ -51,14 +48,13 @@ const EditableStep = ({ point, onUpdate }: { point: { id: string; text: string }
     <div className="text-sm flex items-start gap-3 group">
         <span className="font-bold text-primary w-24 flex-shrink-0 pt-1">{mainText}</span>
         <div 
-          ref={editorRef}
-          onBlur={handleBlur}
           className="editable-sentence flex-grow"
         >
           <span 
             contentEditable={true} 
             suppressContentEditableWarning={true}
             className="editable-placeholder"
+            onBlur={handleBlur}
             dangerouslySetInnerHTML={{ __html: subText || "..." }} 
           />
         </div>
