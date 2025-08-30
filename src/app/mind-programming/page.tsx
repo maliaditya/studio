@@ -81,6 +81,7 @@ function MindProgrammingPageContent() {
     mindProgrammingPlanRotation,
     setMindProgrammingPlanRotation,
     resources,
+    openGeneralPopup,
   } = useAuth();
 
   const [newExerciseName, setNewExerciseName] = useState('');
@@ -521,6 +522,7 @@ function MindProgrammingPageContent() {
                                   onUpdateSet={handleUpdateSet} 
                                   onRemoveExercise={handleRemoveExerciseFromWorkout}
                                   onViewProgress={viewingProgressExercise ? () => handleViewProgress(viewingProgressExercise) : undefined}
+                                  onOpenPopup={openGeneralPopup}
                                   pageType="mind-programming"
                                 />
                               )

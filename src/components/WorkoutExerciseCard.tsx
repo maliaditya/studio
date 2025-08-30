@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -42,7 +43,8 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
   }, [point.text]);
 
   const handleBlur = () => {
-    const newText = editorRef.current?.textContent || '';
+    if (!editorRef.current) return;
+    const newText = editorRef.current.textContent || '';
     if (newText.trim() === '') {
         onDelete(point.id);
     } else if (newText.trim() !== point.text.trim()) {
@@ -72,7 +74,7 @@ const EditableStep = ({ point, onUpdate, onDelete }: { point: { id: string; text
           suppressContentEditableWarning={true}
           onBlur={handleBlur}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleBlur(); } }}
-          className="editable-placeholder w-full min-h-[1.5rem]" // Added min-h for empty state
+          className="editable-placeholder w-full min-h-[1.5rem]"
           dangerouslySetInnerHTML={{ __html: currentText }}
         />
         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
@@ -95,6 +97,7 @@ interface WorkoutExerciseCardProps {
   onUpdateSet: (exerciseId: string, setId: string, reps: number, weight: number) => void;
   onRemoveExercise: (exerciseId: string) => void;
   onViewProgress?: () => void;
+  onOpenPopup?: (resourceId: string, event: React.MouseEvent) => void;
   onUpdateSharingStatus?: (definitionId: string, newStatus: SharingStatus) => void;
   onSwapExercise?: (newExerciseDefinition: ExerciseDefinition) => void;
   swappableExercises?: ExerciseDefinition[];
@@ -114,6 +117,7 @@ export function WorkoutExerciseCard({
   onUpdateSet,
   onRemoveExercise,
   onViewProgress,
+  onOpenPopup,
   onUpdateSharingStatus,
   onSwapExercise,
   swappableExercises,
@@ -320,17 +324,6 @@ export function WorkoutExerciseCard({
         return def;
     }));
   };
-
-  const handleAddDecompositionStep = () => {
-    setMindProgrammingDefinitions(prevDefs => prevDefs.map(def => {
-        if (def.id === exercise.definitionId) {
-            const newStep = { id: `step_${Date.now()}`, text: 'New step...', type: 'text' as const };
-            const newDecompData = [...(def.decompositionData || []), newStep];
-            return { ...def, decompositionData: newDecompData };
-        }
-        return def;
-    }));
-  };
   
   const handleLinkResource = (resourceId: string) => {
     if (!resourceId) return;
@@ -453,10 +446,15 @@ export function WorkoutExerciseCard({
         {(definition?.linkedResourceIds || []).map(resourceId => {
           const resource = resources.find(r => r.id === resourceId);
           return resource ? (
-            <div key={resourceId} className="text-sm flex items-center gap-3 p-2 border rounded-md">
-              <LinkIcon className="h-4 w-4 text-primary" />
-              <span className="font-semibold">{resource.name}</span>
-            </div>
+            <Button
+                key={resourceId}
+                variant="outline"
+                className="text-sm justify-start w-full h-auto"
+                onClick={(e) => onOpenPopup?.(resource.id, e)}
+            >
+              <LinkIcon className="h-4 w-4 mr-2 text-primary" />
+              <span className="font-semibold text-left">{resource.name}</span>
+            </Button>
           ) : null;
         })}
         <div className="flex gap-2 pt-2">
@@ -675,5 +673,3 @@ export function WorkoutExerciseCard({
   );
 }
 
-
-    
