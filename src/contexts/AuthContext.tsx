@@ -122,6 +122,8 @@ interface AuthContextType {
   setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  allMindProgrammingLogs: DatedWorkout[];
+  setAllMindProgrammingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
@@ -156,6 +158,9 @@ interface AuthContextType {
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   
   copyOffer: (topic: string, offerId: string) => void;
+
+  mindProgrammingDefinitions: ExerciseDefinition[];
+  setMindProgrammingDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
 
   // Resources
   resourceFolders: ResourceFolder[];
@@ -240,9 +245,7 @@ interface AuthContextType {
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
-  addMindsetCard: (title: string) => void;
-  deleteMindsetCard: (cardId: string) => void;
-
+  
   // Pistons
   isPistonsHeadOpen: boolean;
   setIsPistonsHeadOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -387,6 +390,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
+  const [mindProgrammingDefinitions, setMindProgrammingDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
   
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -439,7 +444,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
 
   // Mindset State
-  const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>(DEFAULT_MINDSET_CARDS);
+  const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>([]);
   
   // Pistons State
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
@@ -826,7 +831,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
         workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans,
+        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs,
         resources, resourceFolders,
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
@@ -842,7 +847,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
   useEffect(() => {
@@ -850,7 +855,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLocalChangeCount(c => c + 1);
     }
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, isLoadingState
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, isLoadingState
   ]);
 
   useEffect(() => {
@@ -920,6 +925,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllWorkoutLogs(mainData.allWorkoutLogs || []);
     setAllBrandingLogs(mainData.brandingLogs || []);
     setAllLeadGenLogs(mainData.allLeadGenLogs || []);
+    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
     setWorkoutMode(mainData.workoutMode || 'two-muscle');
     setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
     setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
@@ -929,6 +935,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTopicGoals(mainData.topicGoals || {});
     setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
     setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
+    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || []);
     setProductizationPlans(mainData.productizationPlans || {});
     setOfferizationPlans(mainData.offerizationPlans || {});
 
@@ -946,7 +953,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResources(mainData.resources || []);
     
     setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
-    setMindsetCards(mainData.mindsetCards || DEFAULT_MINDSET_CARDS);
+    setMindsetCards(mainData.mindsetCards || []);
     setPistons(mainData.pistons || {});
     setSkillDomains(mainData.skillDomains || []);
     setCoreSkills(mainData.coreSkills || []);
@@ -1689,31 +1696,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
   
-  const addMindsetCard = (title: string) => {
-    const newCard: MindsetCard = {
-      id: `card_${Date.now()}`,
-      title: title,
-      icon: 'Brain',
-      points: [
-        { id: `point_${Date.now()}`, text: 'New step' }
-      ]
-    };
-    setMindsetCards(prev => [...prev, newCard]);
-  };
-  
-  const deleteDesire = (desireId: string) => {
-    setDeepWorkDefinitions(prev => prev.filter(def => def.id !== desireId));
-  };
-  
-  const deleteMindsetCard = (cardId: string) => {
-    setMindsetCards(prev => prev.filter(card => card.id !== cardId));
-  };
-
   const openPistonsFor = (initialState: PistonsInitialState) => {
     setPistonsInitialState(initialState);
     setIsPistonsHeadOpen(true);
   };
   
+  const deleteDesire = (desireId: string) => {
+    setDeepWorkDefinitions(prev => prev.filter(def => def.id !== desireId));
+  };
+
   const handleUpdateResource = (updatedResource: Resource) => {
     setResources(prev => {
         const oldResource = prev.find(r => r.id === updatedResource.id);
@@ -2500,6 +2491,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans,
     addFeatureToRelease,
     copyOffer,
+    mindProgrammingDefinitions, setMindProgrammingDefinitions,
+    allMindProgrammingLogs, setAllMindProgrammingLogs,
     resourceFolders, setResourceFolders,
     resources, setResources, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
@@ -2523,7 +2516,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     canvasLayout, setCanvasLayout,
-    mindsetCards, setMindsetCards, addMindsetCard, deleteMindsetCard,
+    mindsetCards, setMindsetCards,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
     pistonsInitialState, openPistonsFor,
@@ -2664,6 +2657,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

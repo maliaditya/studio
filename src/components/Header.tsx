@@ -40,7 +40,7 @@ export function Header() {
     { href: '/path', label: 'Path' },
     { href: '/timesheet', label: 'Timesheet' },
     { href: '/workout-tracker', label: 'Workout' },
-    { href: '/mind-programming', label: 'Mindset' },
+    { href: '/mind-programming', label: 'Mind Programming' },
     { href: '/patterns', label: 'Patterns' },
     { href: '/purpose', label: 'Purpose' },
     { href: '/skill', label: 'Skill' },
