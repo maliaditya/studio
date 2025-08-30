@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useRef } from 'react';
@@ -261,6 +262,9 @@ export function WorkoutExerciseCard({
     }
     if (pageType === 'lead-generation' || pageType === 'offer-system') {
         return `Progress: ${exercise.loggedSets.length} / ${exercise.targetSets} actions logged.`
+    }
+    if (pageType === 'mind-programming') {
+      return null;
     }
     return `Target: ${exercise.targetSets} sessions of ${exercise.targetReps} min. Progress: ${exercise.loggedSets.length}/${exercise.targetSets} sessions.`;
   }
@@ -568,6 +572,8 @@ export function WorkoutExerciseCard({
     }
   }
 
+  const progressText = getProgressText();
+
   return (
     <motion.div
       layout
@@ -631,9 +637,11 @@ export function WorkoutExerciseCard({
           </div>
         </CardHeader>
         <CardContent className="p-3">
-          <p className="text-xs text-muted-foreground mb-2">
-            {getProgressText()}
-          </p>
+          {progressText && (
+            <p className="text-xs text-muted-foreground mb-2">
+              {progressText}
+            </p>
+          )}
           {renderContent()}
         </CardContent>
       </Card>
