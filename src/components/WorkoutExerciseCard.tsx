@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
 
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -33,17 +34,23 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
-  const ref = useRef<HTMLDivElement>(null);
+  const [text, setText] = useState(point.text);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (ref.current && ref.current.textContent !== point.text) {
-      ref.current.textContent = point.text;
-    }
+    setText(point.text);
   }, [point.text]);
+  
+  useEffect(() => {
+    if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [text]);
 
   const handleBlur = () => {
-    const newText = ref.current?.textContent || '';
-    if (newText.trim() === '') {
+    const newText = text.trim();
+    if (newText === '') {
       onDelete(point.id);
     } else if (newText !== point.text) {
       onUpdate(point.id, newText);
@@ -52,14 +59,13 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
 
   return (
     <div className="text-sm flex items-start gap-2 group w-full">
-      <div 
-        ref={ref}
-        contentEditable={true} 
-        suppressContentEditableWarning={true}
+      <Textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
         onBlur={handleBlur}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }}
-        className="editable-placeholder w-full min-h-[1.5rem]"
-        dangerouslySetInnerHTML={{ __html: point.text }}
+        className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1"
+        rows={1}
       />
       <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
         <Trash2 className="h-3 w-3"/>
