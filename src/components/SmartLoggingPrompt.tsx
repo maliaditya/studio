@@ -151,15 +151,22 @@ export function SmartLoggingPrompt({
                                     <div className="mt-2 pt-2 border-t">
                                         <h4 className="font-medium text-xs mb-1">Triggered Habit: <span className="text-foreground font-semibold">{habit.name}</span></h4>
                                         <div className="space-y-2">
-                                            {(habit.stoppers || []).map(stopper => {
-                                                const technique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
-                                                return (
-                                                <div key={stopper.id} className="p-1.5 rounded bg-background text-xs">
-                                                    <p><span className="text-muted-foreground">Urge:</span> {stopper.text}</p>
-                                                    {technique && <p><span className="text-muted-foreground">Technique:</span> <span className="text-primary font-medium">{technique.name}</span></p>}
+                                            {(habit.stoppers || []).length > 0 && (
+                                                <div className="p-1.5 rounded bg-background text-xs">
+                                                    <p className="font-semibold text-red-500">Urge/Resistance</p>
+                                                    <ul className="list-disc list-inside pl-2 space-y-0.5">
+                                                        {(habit.stoppers || []).map(stopper => <li key={stopper.id}>{stopper.text}</li>)}
+                                                    </ul>
                                                 </div>
-                                                )
-                                            })}
+                                            )}
+                                             {(habit.strengths || []).length > 0 && (
+                                                <div className="p-1.5 rounded bg-background text-xs">
+                                                    <p className="font-semibold text-green-600">Truth/Reinforcement</p>
+                                                    <ul className="list-disc list-inside pl-2 space-y-0.5">
+                                                        {(habit.strengths || []).map(strength => <li key={strength.id}>{strength.text}</li>)}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
