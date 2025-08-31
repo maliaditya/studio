@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -16,7 +16,6 @@ import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -276,7 +275,7 @@ export function SmartLoggingPrompt({
                     </div>
                 )}
                  {promptType === 'focus' && focusContext && (
-                     <ScrollArea className="max-h-64 w-full">
+                     <ScrollArea className="w-full">
                         <div className="space-y-4 pr-4">
                             {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                 <div key={habit.id} className="space-y-3">
