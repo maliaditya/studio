@@ -38,7 +38,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       permanentlyLoggedTaskIds,
       setSelectedDeepWorkTask,
       setSelectedUpskillTask,
-      mindProgrammingDefinitions
   } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -65,9 +64,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [subTaskDurationInput, setSubTaskDurationInput] = useState('');
   
   const [isSubTasksVisible, setIsSubTasksVisible] = useState(true);
-
-  // New state for post-session review
-  const [reviewData, setReviewData] = useState<PostSessionReview>({ resistance: '', helpfulTechniqueId: '' });
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -145,11 +141,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setIsAudioPlaying(false);
     
     if (activity) {
-      const updatedActivity: Activity = {
-        ...activity,
-        focusSessionEndTime: Date.now(),
-        postSessionReview: reviewData.resistance || reviewData.helpfulTechniqueId ? reviewData : undefined,
-      };
+      const updatedActivity: Activity = { ...activity, focusSessionEndTime: Date.now() };
       updateActivity(updatedActivity);
 
       if (completed) {
@@ -165,12 +157,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, reviewData]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name]);
   
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask) return;
-
-    setPromptForCompletion(false);
     
     const completionTime = Date.now();
     const durationMs = subTaskStartTime ? completionTime - subTaskStartTime : 0;
@@ -207,14 +197,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     onClose();
   };
 
-  const handleSaveReviewAndStop = () => {
-    if (showSubTasks) {
-      handleStop(true);
-    } else {
-      handleStandaloneTaskComplete();
-    }
-  };
-
   useEffect(() => {
     if (sessionState === 'idle' && showSubTasks) {
         if (activeSubTask) {
@@ -247,7 +229,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (secondsLeft <= 0 && sessionState === 'running') {
       setSessionState('paused');
       setIsAudioPlaying(false);
-      setPromptForCompletion(true);
+      
+      if (showSubTasks) {
+          handleSubTaskComplete();
+      } else {
+          setPromptForCompletion(true);
+      }
     }
 
     if (!skipBreaks && cycleSecondsLeft <= 0 && sessionState === 'running') {
@@ -261,7 +248,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             setIsAudioPlaying(true);
         }
     }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, activeSubTask, handleSubTaskComplete, showSubTasks, BREAK_DURATION, WORK_DURATION, skipBreaks]);
+  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, showSubTasks, handleSubTaskComplete, BREAK_DURATION, WORK_DURATION, skipBreaks]);
 
   const handleExtendTimer = () => {
     const additionalSeconds = extendMinutes * 60;
@@ -508,43 +495,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             </div>
             )}
              {promptForCompletion && (
-                <div className={cn("col-span-1 space-y-4 pt-4 border-t", showSubTasks && isSubTasksVisible && "col-span-2")}>
-                    <CardHeader className="p-0">
-                        <CardTitle className="text-base">Session Complete!</CardTitle>
-                        <p className="text-sm text-muted-foreground">What did you notice?</p>
-                    </CardHeader>
-                    <CardContent className="p-0 space-y-4">
-                        <div className="space-y-1">
-                            <Label htmlFor="resistance-input">What was the resistance/cortisol level?</Label>
-                            <Input
-                                id="resistance-input"
-                                placeholder="e.g., Felt distracted, low energy..."
-                                value={reviewData.resistance}
-                                onChange={(e) => setReviewData(prev => ({ ...prev, resistance: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="technique-select">What technique helped?</Label>
-                            <Select
-                                value={reviewData.helpfulTechniqueId}
-                                onValueChange={(value) => setReviewData(prev => ({ ...prev, helpfulTechniqueId: value }))}
-                            >
-                                <SelectTrigger id="technique-select">
-                                    <SelectValue placeholder="Select a technique..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {mindProgrammingDefinitions.map(def => (
-                                        <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </CardContent>
-                    <CardFooter className="p-0">
-                        <Button onClick={handleSaveReviewAndStop} className="w-full">Save Review & Finish</Button>
-                    </CardFooter>
+                <div className="col-span-1 flex flex-col items-center justify-center gap-2">
+                    <p className="text-lg font-semibold">Time's up!</p>
+                    <p className="text-sm text-center text-muted-foreground">Log your time or extend the session.</p>
+                    <div className="flex items-center gap-2">
+                        <Button onClick={() => setExtendMinutes(5)} size="sm" variant={extendMinutes === 5 ? 'default' : 'outline'}>5m</Button>
+                        <Button onClick={() => setExtendMinutes(15)} size="sm" variant={extendMinutes === 15 ? 'default' : 'outline'}>15m</Button>
+                        <Button onClick={() => setExtendMinutes(25)} size="sm" variant={extendMinutes === 25 ? 'default' : 'outline'}>25m</Button>
+                    </div>
+                    <Button onClick={handleExtendTimer} className="w-full">Extend Session</Button>
                 </div>
-             )}
+            )}
             </CardContent>
         </Card>
         </div>
