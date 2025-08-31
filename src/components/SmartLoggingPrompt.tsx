@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -64,12 +63,20 @@ export function SmartLoggingPrompt({
         ...mindProgrammingDefinitions.map(d => [d.id, d]),
     ]);
 
-    // Find the primary definition for the scheduled activity
-    const taskDefId = activity.taskIds?.[0]?.split('-')[0];
-    const taskDef = taskDefId ? allDefs.get(taskDefId) : null;
+    let equationIds: string[] = [];
+
+    // Find the primary definition(s) for the scheduled activity
+    if (activity.type === 'mindset') {
+        // For a general mindset session, check all mindset techniques for links
+        equationIds = mindProgrammingDefinitions.flatMap(def => def.habitEquationIds || []);
+    } else {
+        const taskDefId = activity.taskIds?.[0]?.split('-')[0];
+        const taskDef = taskDefId ? allDefs.get(taskDefId) : null;
+        
+        // Get equation IDs from either the activity instance or its base definition
+        equationIds = activity.habitEquationIds || taskDef?.habitEquationIds || [];
+    }
     
-    // Get equation IDs from either the activity instance or its base definition
-    const equationIds = activity.habitEquationIds || taskDef?.habitEquationIds || [];
     if (equationIds.length === 0) return null;
     
     const linkedEquations = allEquations.filter(eq => equationIds.includes(eq.id));
