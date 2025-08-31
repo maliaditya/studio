@@ -13,8 +13,7 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Input } from './ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
 
@@ -148,24 +147,21 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
                             <li key={s.id} className="border-t pt-2 group/stopper">
                                 <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
                                 <div className="flex items-center gap-2 mt-1">
-                                    <Popover>
-                                        <PopoverTrigger asChild>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="xs" className="text-xs h-6 px-2">
                                                 <PlusCircle className="h-3.5 w-3.5 mr-1"/>
                                                 {linkedTechnique ? 'Change' : 'Assign'} Technique
                                             </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-56 p-0 z-[150]">
-                                            <Select onValueChange={(techId) => handleLinkTechnique(s.id, techId)}>
-                                                <SelectTrigger><SelectValue placeholder="Select a technique..." /></SelectTrigger>
-                                                <SelectContent>
-                                                    {mindProgrammingDefinitions.map(tech => (
-                                                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </PopoverContent>
-                                    </Popover>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-56 z-[150]">
+                                            {mindProgrammingDefinitions.map(tech => (
+                                                <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
+                                                    {tech.name}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                     {linkedTechnique && (
                                         <Badge variant="secondary" className="font-normal truncate flex-1">
                                             <span className="truncate">{linkedTechnique.name}</span>
