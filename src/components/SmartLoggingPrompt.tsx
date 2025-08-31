@@ -52,28 +52,47 @@ export function SmartLoggingPrompt({
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const focusContext = React.useMemo(() => {
-    if (!activeFocusSession?.activity?.habitEquationIds?.length) {
-      return null;
-    }
+    if (!activeFocusSession?.activity) return null;
   
     const { activity } = activeFocusSession;
-    const equationIds: string[] = activity.habitEquationIds || [];
+    let habitIds: string[] = [];
+
+    // Prioritize habit IDs from the activity itself
+    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+      habitIds = activity.habitEquationIds;
+    } else {
+      // Fallback to check the underlying definition if no habits are linked on the activity instance
+      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
+      const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+      const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+      
+      if (mainDef?.habitEquationIds && mainDef.habitEquationIds.length > 0) {
+          habitIds = mainDef.habitEquationIds;
+      }
+    }
+
+    if (habitIds.length === 0) return null;
     
-    if (equationIds.length === 0) return null;
-    
-    const uniqueEquationIds = [...new Set(equationIds)];
-  
-    const equationDetails = uniqueEquationIds.map(eqId => {
-        const equation = allEquations.find(eq => eq.id === eqId);
-        if (!equation) return null;
-  
-        const linkedRules = metaRules.filter(rule => (equation.metaRuleIds || []).includes(rule.id));
-        const habit = habitCards.find(h => h.id === equation.linkedResourceId);
-        return { equation, rules: linkedRules, habit };
+    const uniqueHabitIds = [...new Set(habitIds)];
+
+    const habitDetails = uniqueHabitIds.map(habitId => {
+        const habit = habitCards.find(h => h.id === habitId);
+        if (!habit) return null;
+        
+        // Find equations that link to THIS habit
+        const linkedEquations = allEquations.filter(eq => eq.linkedResourceId === habit.id);
+        const linkedRuleIds = new Set(linkedEquations.flatMap(eq => eq.metaRuleIds || []));
+        const rules = metaRules.filter(rule => linkedRuleIds.has(rule.id));
+
+        return {
+            habit,
+            rules,
+            equation: linkedEquations[0] // Assuming one equation per habit for now for simplicity
+        };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
-    return equationDetails.length > 0 ? equationDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+    return habitDetails.length > 0 ? habitDetails : null;
+  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
 
 
   const prompts = {
@@ -147,39 +166,36 @@ export function SmartLoggingPrompt({
                  {promptType === 'focus' && focusContext && (
                      <ScrollArea className="max-h-60 w-full">
                         <div className="space-y-3 pr-4">
-                        {focusContext.map(({ equation, rules, habit }) => (
-                            <div key={equation.id} className="p-3 rounded-md bg-muted/50 border text-sm">
-                                <p className="font-semibold flex items-center gap-2"><Workflow className="h-4 w-4"/> Equation: <span className="text-primary">{equation.outcome}</span></p>
-                                <Separator className="my-2"/>
+                        {focusContext.map(({ habit, rules, equation }) => (
+                            <div key={habit.id} className="p-3 rounded-md bg-muted/50 border text-sm">
+                                <p className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span></p>
+                                {equation && (
+                                    <div className="mt-2 pt-2 border-t">
+                                        <p className="font-medium text-xs mb-1">Equation: <span className="text-muted-foreground">{equation.outcome}</span></p>
+                                    </div>
+                                )}
                                 {rules.length > 0 && (
-                                    <div>
+                                    <div className="mt-2 pt-2 border-t">
                                         <h4 className="font-medium text-xs mb-1">Meta-Rules:</h4>
                                         <ul className="space-y-1 list-disc list-inside text-xs">
                                             {rules.map(rule => <li key={rule.id}>{rule.text}</li>)}
                                         </ul>
                                     </div>
                                 )}
-                                {habit && (
+                                {(habit.stoppers && habit.stoppers.length > 0) && (
                                     <div className="mt-2 pt-2 border-t">
-                                        <h4 className="font-medium text-xs mb-1">Triggered Habit: <span className="text-foreground font-semibold">{habit.name}</span></h4>
-                                        <div className="space-y-2">
-                                            {(habit.stoppers || []).length > 0 && (
-                                                <div className="p-1.5 rounded bg-background text-xs">
-                                                    <p className="font-semibold text-red-500">Urge/Resistance</p>
-                                                    <ul className="list-disc list-inside pl-2 space-y-0.5">
-                                                        {(habit.stoppers || []).map(stopper => <li key={stopper.id}>{stopper.text}</li>)}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                             {(habit.strengths || []).length > 0 && (
-                                                <div className="p-1.5 rounded bg-background text-xs">
-                                                    <p className="font-semibold text-green-600">Truth/Reinforcement</p>
-                                                    <ul className="list-disc list-inside pl-2 space-y-0.5">
-                                                        {(habit.strengths || []).map(strength => <li key={strength.id}>{strength.text}</li>)}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
+                                        <h4 className="font-semibold text-xs mb-1 text-red-500">Urges / Resistance</h4>
+                                        <ul className="list-disc list-inside pl-2 space-y-0.5 text-xs">
+                                            {(habit.stoppers || []).map(stopper => <li key={stopper.id}>{stopper.text}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                                {(habit.strengths && habit.strengths.length > 0) && (
+                                    <div className="mt-2 pt-2 border-t">
+                                        <h4 className="font-semibold text-xs mb-1 text-green-600">Truths / Reinforcements</h4>
+                                        <ul className="list-disc list-inside pl-2 space-y-0.5 text-xs">
+                                            {(habit.strengths || []).map(strength => <li key={strength.id}>{strength.text}</li>)}
+                                        </ul>
                                     </div>
                                 )}
                             </div>
