@@ -73,9 +73,6 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
         className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1 p-1"
         rows={1}
       />
-      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
-        <Trash2 className="h-3 w-3"/>
-      </Button>
     </div>
   );
 });
@@ -157,7 +154,31 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                         const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
                         return (
                             <li key={s.id} className="border-t pt-2 group/stopper">
-                                <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
+                                <div className="flex items-center gap-1">
+                                    <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
+                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
+                                      <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                  <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
+                                              </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent className="w-56 z-[150]">
+                                              {mindProgrammingDefinitions.map(tech => (
+                                                  <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
+                                                      {tech.name}
+                                                  </DropdownMenuItem>
+                                              ))}
+                                              <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
+                                                  Unlink
+                                              </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                      </DropdownMenu>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
+                                    </div>
+                                </div>
                                 {linkedTechnique ? (
                                     <div className="mt-1 pl-6">
                                         <Badge 
@@ -169,31 +190,6 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                                         </Badge>
                                     </div>
                                 ) : null}
-                                <div className="flex items-center gap-1 mt-1 pl-5 opacity-0 group-hover/stopper:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, s.id, 'manageable'); }}>
-                                        <ThumbsUp className={cn("h-4 w-4", s.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, s.id, 'unmanageable'); }}>
-                                        <ThumbsDown className={cn("h-4 w-4", s.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                    </Button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-56 z-[150]">
-                                            {mindProgrammingDefinitions.map(tech => (
-                                                <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
-                                                    {tech.name}
-                                                </DropdownMenuItem>
-                                            ))}
-                                            <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
-                                                Unlink
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
                             </li>
                         )
                     })}
@@ -340,7 +336,7 @@ export function SmartLoggingPrompt({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3"
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 h-full"
             >
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="flex-shrink-0">{currentPrompt.icon}</div>
@@ -361,46 +357,48 @@ export function SmartLoggingPrompt({
                             </div>
                         </div>
                     )}
-                    <ScrollArea className="w-full flex-grow min-h-0">
-                      <div className="space-y-4 pr-4">
-                        {promptType === 'focus' && focusContext && (
-                            <>
-                                {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
-                                    <div key={habit.id} className="space-y-3">
-                                        <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
-                                        <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-3">
-                                            {negativeMechanism && (
-                                                <Card className="bg-red-900/10 border-red-500/30">
-                                                    <CardHeader className="p-2">
-                                                        <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
-                                                    </CardHeader>
-                                                    <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                      <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
-                                                      <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
-                                                    </CardContent>
-                                                </Card>
-                                            )}
-                                            {positiveMechanism && (
-                                                 <Card className="bg-green-900/10 border-green-500/30">
-                                                    <CardHeader className="p-2">
-                                                        <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
-                                                    </CardHeader>
-                                                    <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                      <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
-                                                      <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
-                                                      <TruthSection habit={habit} />
-                                                    </CardContent>
-                                                </Card>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </>
-                        )}
-                      </div>
-                    </ScrollArea>
+                    <div className="flex-grow min-h-0">
+                      <ScrollArea className="h-full">
+                        <div className="space-y-4 pr-4">
+                          {promptType === 'focus' && focusContext && (
+                              <>
+                                  {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
+                                      <div key={habit.id} className="space-y-3">
+                                          <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                          <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
+                                          </div>
+                                          <div className="grid grid-cols-1 gap-3">
+                                              {negativeMechanism && (
+                                                  <Card className="bg-red-900/10 border-red-500/30">
+                                                      <CardHeader className="p-2">
+                                                          <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
+                                                      </CardHeader>
+                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                        <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
+                                                        <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
+                                                      </CardContent>
+                                                  </Card>
+                                              )}
+                                              {positiveMechanism && (
+                                                  <Card className="bg-green-900/10 border-green-500/30">
+                                                      <CardHeader className="p-2">
+                                                          <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
+                                                      </CardHeader>
+                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                        <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
+                                                        <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
+                                                        <TruthSection habit={habit} />
+                                                      </CardContent>
+                                                  </Card>
+                                              )}
+                                          </div>
+                                      </div>
+                                  ))}
+                              </>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
                     <div className="flex gap-2 w-full flex-shrink-0">
                         {currentPrompt.actions.map(action => (
                             <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
@@ -415,4 +413,3 @@ export function SmartLoggingPrompt({
     </AnimatePresence>
   );
 }
-
