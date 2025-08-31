@@ -157,9 +157,9 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                                 <div className="flex items-center gap-1">
                                     <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
                                     <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
-                                      <DropdownMenu>
+                                       <DropdownMenu>
                                           <DropdownMenuTrigger asChild>
-                                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                             <Button variant="ghost" size="icon" className="h-6 w-6">
                                                   <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
                                               </Button>
                                           </DropdownMenuTrigger>
@@ -368,18 +368,7 @@ export function SmartLoggingPrompt({
                                           <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
                                           </div>
                                           <div className="grid grid-cols-1 gap-3">
-                                              {negativeMechanism && (
-                                                  <Card className="bg-red-900/10 border-red-500/30">
-                                                      <CardHeader className="p-2">
-                                                          <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
-                                                      </CardHeader>
-                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                        <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
-                                                        <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
-                                                      </CardContent>
-                                                  </Card>
-                                              )}
-                                              {positiveMechanism && (
+                                               {positiveMechanism && (
                                                   <Card className="bg-green-900/10 border-green-500/30">
                                                       <CardHeader className="p-2">
                                                           <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
@@ -388,6 +377,17 @@ export function SmartLoggingPrompt({
                                                         <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
                                                         <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
                                                         <TruthSection habit={habit} />
+                                                      </CardContent>
+                                                  </Card>
+                                              )}
+                                              {negativeMechanism && (
+                                                  <Card className="bg-red-900/10 border-red-500/30">
+                                                      <CardHeader className="p-2">
+                                                          <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
+                                                      </CardHeader>
+                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                        <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
+                                                        <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
                                                       </CardContent>
                                                   </Card>
                                               )}
