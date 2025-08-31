@@ -10,7 +10,7 @@ import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, Trend
 import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState, HabitEquation } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import { Separator } from './ui/separator';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
@@ -239,12 +239,12 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     );
 };
 
-const ResistanceSection = React.memo(({ habit, isNegative, onStopperStatusChange, onDeleteStopper, onAddStopper, onLinkTechnique }: { 
+const ResistanceSection = React.memo(({ habit, isNegative, onAddStopper, onDeleteStopper, onStopperStatusChange, onLinkTechnique }: { 
     habit: Resource, 
     isNegative: boolean,
-    onStopperStatusChange: (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => void,
-    onDeleteStopper: (stopperId: string) => void,
     onAddStopper: (text: string) => void,
+    onDeleteStopper: (stopperId: string) => void,
+    onStopperStatusChange: (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => void,
     onLinkTechnique: (stopperId: string, techniqueId: string | null) => void,
 }) => {
     const { openGeneralPopup, mindProgrammingDefinitions } = useAuth();
@@ -264,10 +264,7 @@ const ResistanceSection = React.memo(({ habit, isNegative, onStopperStatusChange
                       const isClickable = !!stopper.linkedResourceId;
                       const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
                       return (
-                        <div
-                            key={stopper.id}
-                            className="text-xs p-2 rounded-md bg-background group w-full text-left"
-                        >
+                        <div key={stopper.id} className="text-xs p-2 rounded-md bg-background group w-full text-left">
                               <div className="flex items-start justify-between">
                                   <div className="flex-grow pr-2">
                                     <p
@@ -388,11 +385,12 @@ const TruthSection = React.memo(({ habit, isNegative, onAddStrength, onDeleteStr
 });
 TruthSection.displayName = 'TruthSection';
 
+
 export function HabitDetailPopup({ popupState, onClose }: { 
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, resources, openGeneralPopup, mindProgrammingDefinitions } = useAuth();
+    const { setResources, mechanismCards, resources, openGeneralPopup, mindProgrammingDefinitions, patterns } = useAuth();
     const { habitId, x, y } = popupState;
     const habit = resources.find(r => r.id === habitId);
     
@@ -509,6 +507,45 @@ export function HabitDetailPopup({ popupState, onClose }: {
     
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
+
+    const linkedHabits = useMemo(() => {
+        if (!pattern) return [];
+        const habitPhrases = pattern.phrases.filter(p => p.category === 'Habit Cards');
+        return habitPhrases.map(phrase => {
+            return habitCards.find(h => h.id === phrase.mechanismCardId);
+        }).filter((h): h is Resource => !!h);
+    }, [pattern, habitCards]);
+
+    const currentHabit = linkedHabits[currentHabitIndex];
+
+    const categorizedPhrasesForHabit = useMemo(() => {
+        if (!pattern || !currentHabit) return {};
+
+        const relevantMechanismIds = new Set([
+            currentHabit.response?.resourceId,
+            currentHabit.newResponse?.resourceId
+        ].filter(Boolean));
+
+        return pattern.phrases.reduce((acc, phrase) => {
+            if (phrase.category === 'Habit Cards' || !relevantMechanismIds.has(phrase.mechanismCardId)) {
+                return acc;
+            }
+            if (!acc[phrase.category]) {
+                acc[phrase.category] = [];
+            }
+            acc[phrase.category].push(phrase.text);
+            return acc;
+        }, {} as Record<string, string[]>);
+    }, [pattern, currentHabit]);
+
+
+    const handleNextHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex + 1) % linkedHabits.length);
+    };
+
+    const handlePrevHabit = () => {
+        setCurrentHabitIndex((prevIndex) => (prevIndex - 1 + linkedHabits.length) % linkedHabits.length);
+    };
 
     return (
         <>
