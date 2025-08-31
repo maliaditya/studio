@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React from 'react';
@@ -23,6 +24,8 @@ interface SmartLoggingPromptProps {
   habitCards: Resource[];
   pillarEquations: Record<string, HabitEquation[]>;
   metaRules: MetaRule[];
+  deepWorkDefinitions: ExerciseDefinition[];
+  upskillDefinitions: ExerciseDefinition[];
 }
 
 export function SmartLoggingPrompt({ 
@@ -35,7 +38,9 @@ export function SmartLoggingPrompt({
     mindProgrammingDefinitions,
     habitCards,
     pillarEquations,
-    metaRules
+    metaRules,
+    deepWorkDefinitions,
+    upskillDefinitions
 }: SmartLoggingPromptProps) {
   const router = useRouter();
 
@@ -48,10 +53,25 @@ export function SmartLoggingPrompt({
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const focusContext = React.useMemo(() => {
-    if (!activeFocusSession || !activeFocusSession.activity?.habitEquationIds) {
+    if (!activeFocusSession || !activeFocusSession.activity) {
         return null;
     }
-    const linkedEquations = allEquations.filter(eq => activeFocusSession.activity.habitEquationIds.includes(eq.id));
+    
+    const activity = activeFocusSession.activity;
+    let equationIds: string[] = activity.habitEquationIds || [];
+
+    // If the activity doesn't have the IDs, check its definition
+    if (equationIds.length === 0 && activity.taskIds && activity.taskIds.length > 0) {
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+        const taskDef = allDefs.find(d => activity.taskIds[0].startsWith(d.id));
+        if (taskDef && taskDef.habitEquationIds) {
+            equationIds = taskDef.habitEquationIds;
+        }
+    }
+    
+    if (equationIds.length === 0) return null;
+
+    const linkedEquations = allEquations.filter(eq => equationIds.includes(eq.id));
     if (linkedEquations.length === 0) return null;
     
     const equationDetails = linkedEquations.map(eq => {
@@ -61,7 +81,7 @@ export function SmartLoggingPrompt({
     });
     
     return equationDetails;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions]);
 
 
   const prompts = {
