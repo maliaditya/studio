@@ -1,18 +1,19 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight, Zap } from 'lucide-react';
+import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight, Zap, Target } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRule } from '@/types/workout';
+import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRule, ExerciseDefinition } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { Label } from './ui/label';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
@@ -106,7 +107,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, resources, openGeneralPopup } = useAuth();
+    const { setResources, mechanismCards, resources, openGeneralPopup, mindProgrammingDefinitions } = useAuth();
     const { habitId, x, y } = popupState;
     const habit = resources.find(r => r.id === habitId);
     
@@ -204,6 +205,18 @@ export function HabitDetailPopup({ popupState, onClose }: {
         }
     };
     
+    const handleLinkTechniqueToStopper = (stopperId: string, techniqueId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const updatedStoppers = (r.stoppers || []).map(s => 
+                    s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId } : s
+                );
+                return { ...r, stoppers: updatedStoppers };
+            }
+            return r;
+        }));
+    };
+
     const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const [newStopperText, setNewStopperText] = useState('');
         const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
@@ -298,6 +311,55 @@ export function HabitDetailPopup({ popupState, onClose }: {
         );
     };
 
+    const TechniquesSection = ({ habit }: { habit: Resource }) => {
+        const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
+    
+        return (
+            <div>
+                <ScrollArea className={cn((mindProgrammingDefinitions || []).length > 4 && "h-[22.5rem]", "pr-2")}>
+                  <div className="space-y-4">
+                    {mindProgrammingDefinitions.map(technique => {
+                        const assignedStoppers = (habit.stoppers || []).filter(s => s.linkedTechniqueId === technique.id);
+                        return (
+                            <Card key={technique.id} className="bg-background">
+                                <CardHeader className="p-3">
+                                    <CardTitle className="text-sm">{technique.name}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-3 pt-0">
+                                    <div className="space-y-2">
+                                        {assignedStoppers.map(stopper => (
+                                            <div key={stopper.id} className="text-xs p-1.5 rounded-md border bg-muted/50">{stopper.text}</div>
+                                        ))}
+                                    </div>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" size="sm" className="mt-2 text-xs h-7 w-full">
+                                                <PlusCircle className="mr-2 h-3.5 w-3.5" />
+                                                Assign Urge
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent>
+                                            <Select onValueChange={(stopperId) => handleLinkTechniqueToStopper(stopperId, technique.id)}>
+                                                <SelectTrigger><SelectValue placeholder="Select an urge..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {unassignedStoppers.map(s => (
+                                                        <SelectItem key={s.id} value={s.id}>{s.text}</SelectItem>
+                                                    ))}
+                                                    {unassignedStoppers.length === 0 && <SelectItem value="none" disabled>No unassigned urges</SelectItem>}
+                                                </SelectContent>
+                                            </Select>
+                                        </PopoverContent>
+                                    </Popover>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                  </div>
+                </ScrollArea>
+            </div>
+        );
+    };
+
 
     return (
         <>
@@ -336,15 +398,19 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         </div>
                          <div className="pt-2">
                             <Tabs defaultValue="truth" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
+                                <TabsList className="grid w-full grid-cols-3">
                                     <TabsTrigger value="resistance">{negativeMechanism?.mechanismFramework === 'negative' ? 'Urge' : 'Resistance'}</TabsTrigger>
                                     <TabsTrigger value="truth">Truth</TabsTrigger>
+                                    <TabsTrigger value="techniques">Techniques</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="resistance" className="mt-2">
                                     <ResistanceSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
                                 </TabsContent>
                                 <TabsContent value="truth" className="mt-2">
                                     <TruthSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
+                                </TabsContent>
+                                <TabsContent value="techniques" className="mt-2">
+                                    <TechniquesSection habit={habit} />
                                 </TabsContent>
                             </Tabs>
                         </div>

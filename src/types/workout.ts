@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -167,6 +168,7 @@ export interface PauseEvent {
 export interface PostSessionReview {
   resistance: string;
   helpfulTechniqueId: string;
+  cortisolLevel: 'low' | 'medium' | 'high';
 }
 
 export interface Activity {
@@ -520,6 +522,7 @@ export interface Stopper {\
     status: 'none' | 'manageable' | 'unmanageable';\
     managementStrategy?: string;\
     linkedResourceId?: string;\
+    linkedTechniqueId?: string;\
 }
 
 export interface Strength {\
