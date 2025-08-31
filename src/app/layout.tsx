@@ -357,7 +357,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           currentSlot={currentSlot}
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
-          authContext={authContext}
           openMindsetTechniquePopup={openMindsetTechniquePopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
@@ -521,4 +520,5 @@ export default function RootLayout({
     </html>
   );
 }
+
 

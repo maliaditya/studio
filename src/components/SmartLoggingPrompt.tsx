@@ -8,7 +8,7 @@ import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Z
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, AuthContextType } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
