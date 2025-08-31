@@ -157,7 +157,7 @@ export function SmartLoggingPrompt({
                                         {negativeMechanism && (
                                             <Card className="bg-red-900/10 border-red-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative Mechanism</CardTitle>
+                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative: {negativeMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
                                                     {habit.response?.visualize || '...'}
@@ -167,7 +167,7 @@ export function SmartLoggingPrompt({
                                         {positiveMechanism && (
                                              <Card className="bg-green-900/10 border-green-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive Mechanism</CardTitle>
+                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive: {positiveMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
                                                     {habit.newResponse?.action || '...'}
