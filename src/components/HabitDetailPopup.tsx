@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -570,7 +571,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="p-3 pt-0 text-sm space-y-4">
-                        <div className="p-3 rounded-md bg-muted/30">
+                         <div className="p-3 rounded-md bg-muted/30">
                             <h4 className="font-semibold text-red-600 dark:text-red-400">Negative Mechanism</h4>
                              <div className="text-xs space-y-1 mt-1">
                                 <p><span className="text-muted-foreground">Habit Name:</span> <span className="font-semibold text-foreground">{negativeMechanism?.name || 'Unlinked'}</span></p>
