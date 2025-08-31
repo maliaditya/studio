@@ -21,6 +21,7 @@ interface SmartLoggingPromptProps {
   activeFocusSession: { activity: any } | null;
   lastSessionReview: PostSessionReview | null;
   openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
+  openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
 }
 
 export function SmartLoggingPrompt({ 
@@ -31,6 +32,7 @@ export function SmartLoggingPrompt({
     activeFocusSession, 
     lastSessionReview,
     openMindsetTechniquePopup,
+    openHabitDetailPopup,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
   const { 
@@ -43,25 +45,9 @@ export function SmartLoggingPrompt({
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const focusContext = React.useMemo(() => {
-    if (!activeFocusSession?.activity) return null;
-  
-    const { activity } = activeFocusSession;
+    if (!activeFocusSession?.activity?.habitEquationIds) return null;
     
-    // For a generic "Mindset Session", find all techniques with linked habits.
-    if (activity.type === 'mindset') {
-        const mindsetHabitDetails = mindProgrammingDefinitions
-            .map(technique => {
-                const habitId = technique.habitEquationIds?.[0]; // Assuming one for now
-                if (!habitId) return null;
-                const habit = habitCards.find(h => h.id === habitId);
-                return habit ? { habit, rules: [], equation: null, technique } : null;
-            })
-            .filter((item): item is NonNullable<typeof item> => item !== null);
-        return mindsetHabitDetails.length > 0 ? mindsetHabitDetails : null;
-    }
-    
-    const habitIds = activity.habitEquationIds || [];
-
+    const habitIds = activeFocusSession.activity.habitEquationIds;
     if (habitIds.length === 0) return null;
     
     const uniqueHabitIds = [...new Set(habitIds)];
@@ -83,7 +69,7 @@ export function SmartLoggingPrompt({
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, mindProgrammingDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards]);
 
 
   const prompts = {
@@ -159,7 +145,9 @@ export function SmartLoggingPrompt({
                         <div className="space-y-3 pr-4">
                         {focusContext.map(({ habit, rules, equation, technique }) => (
                             <div key={habit.id} className="p-3 rounded-md bg-muted/50 border text-sm">
-                                <p className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span></p>
+                                <button className="font-semibold flex items-center gap-2 hover:underline" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                  <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span>
+                                </button>
                                 {equation && (
                                     <div className="mt-2 pt-2 border-t">
                                         <p className="font-medium text-xs mb-1">Equation: <span className="text-muted-foreground">{equation.outcome}</span></p>

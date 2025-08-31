@@ -85,7 +85,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
+    habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     activeFocusSession,
     setActiveFocusSession,
@@ -346,7 +346,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openRuleDetailPopup}
+            onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
         />
       )}
@@ -358,6 +358,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
           openMindsetTechniquePopup={openMindsetTechniquePopup}
+          openHabitDetailPopup={openHabitDetailPopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -520,6 +521,7 @@ export default function RootLayout({
     </html>
   );
 }
+
 
 
 
