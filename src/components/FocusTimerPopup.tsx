@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -167,11 +168,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, reviewData]);
   
   const handleSubTaskComplete = useCallback(() => {
-    if (!activeSubTask && !showSubTasks) {
-        handleStop(true);
-        return;
-    }
-
     if (!activeSubTask) return;
 
     setPromptForCompletion(false);
@@ -196,10 +192,27 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     } else {
         handleStop(true);
     }
-  }, [activeSubTask, subTaskStartTime, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, showSubTasks]);
+  }, [activeSubTask, subTaskStartTime, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop]);
   
+  const handleStandaloneTaskComplete = () => {
+    const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+    if (elapsedMinutes > 0) {
+      onLogTime(activity, elapsedMinutes);
+    } else {
+      onLogTime(activity, 1);
+    }
+    handleToggleComplete(activity.slot, activity.id, true);
+    toast({ title: "Task Complete!", description: `You've completed "${activity.details}".` });
+    onClose();
+  };
+
   const handleSaveReviewAndStop = () => {
-    handleStop(true);
+    if (showSubTasks) {
+      handleStop(true);
+    } else {
+      handleStandaloneTaskComplete();
+    }
   };
 
   useEffect(() => {
@@ -415,7 +428,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                           {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={handleSubTaskComplete} disabled={allSubTasksCompleted}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={showSubTasks ? handleSubTaskComplete : handleStandaloneTaskComplete}>
                           <Check className="h-4 w-4" />
                       </Button>
                     </div>
