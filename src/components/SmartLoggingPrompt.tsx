@@ -3,11 +3,11 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, Input } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
@@ -23,6 +23,92 @@ interface SmartLoggingPromptProps {
   openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
   openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
 }
+
+const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
+    const { setResources } = useAuth();
+    const [newStopperText, setNewStopperText] = React.useState('');
+    const placeholder = isNegative ? "Log an urge..." : "Log a resistance...";
+
+    const handleAddStopper = () => {
+        if (!newStopperText.trim()) return;
+        const newStopper: Stopper = {
+            id: `stopper_${Date.now()}`,
+            text: newStopperText.trim(),
+            status: 'none',
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
+            }
+            return r;
+        }));
+        setNewStopperText('');
+    };
+    
+    return (
+        <div className="space-y-2">
+            <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
+            {(habit.stoppers || []).length > 0 && (
+                <ul className="text-xs list-disc list-inside space-y-1">
+                    {(habit.stoppers || []).map(s => <li key={s.id}>{s.text}</li>)}
+                </ul>
+            )}
+            <div className="flex gap-2">
+                <Input
+                    value={newStopperText}
+                    onChange={(e) => setNewStopperText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
+                    placeholder={placeholder}
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
+            </div>
+        </div>
+    );
+});
+ResistanceSection.displayName = 'ResistanceSection';
+
+const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
+    const { setResources } = useAuth();
+    const [newStrengthText, setNewStrengthText] = React.useState('');
+
+    const handleAddStrength = () => {
+        if (!newStrengthText.trim()) return;
+        const newStrength: Strength = {
+            id: `strength_${Date.now()}`,
+            text: newStrengthText.trim(),
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                return { ...r, strengths: [...(r.strengths || []), newStrength] };
+            }
+            return r;
+        }));
+        setNewStrengthText('');
+    };
+
+    return (
+        <div className="space-y-2">
+            <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
+            {(habit.strengths || []).length > 0 && (
+                <ul className="text-xs list-disc list-inside space-y-1">
+                    {(habit.strengths || []).map(s => <li key={s.id}>{s.text}</li>)}
+                </ul>
+            )}
+            <div className="flex gap-2">
+                <Input
+                    value={newStrengthText}
+                    onChange={(e) => setNewStrengthText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
+                    placeholder="Log a reinforcing truth..."
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
+            </div>
+        </div>
+    );
+});
+TruthSection.displayName = 'TruthSection';
 
 export function SmartLoggingPrompt({ 
     promptType, 
@@ -40,7 +126,6 @@ export function SmartLoggingPrompt({
     metaRules,
     habitCards,
     mechanismCards,
-    mindProgrammingDefinitions,
   } = useAuth();
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
@@ -57,17 +142,11 @@ export function SmartLoggingPrompt({
         const habit = habitCards.find(h => h.id === habitId);
         if (!habit) return null;
         
-        const equation = allEquations.find(eq => eq.linkedResourceId === habit.id);
-        const rules = metaRules.filter(rule => equation?.metaRuleIds?.includes(rule.id));
-        
         const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
         const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
 
         return {
             habit,
-            rules,
-            equation,
-            technique: null,
             positiveMechanism,
             negativeMechanism,
         };
@@ -75,7 +154,6 @@ export function SmartLoggingPrompt({
     
     return habitDetails.length > 0 ? habitDetails : null;
   }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
-
 
   const prompts = {
     empty: {
@@ -150,27 +228,28 @@ export function SmartLoggingPrompt({
                         <div className="space-y-4 pr-4">
                             {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                 <div key={habit.id} className="space-y-3">
-                                    <button className="font-semibold flex items-center gap-2 hover:underline w-full text-left" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                    <div className="font-semibold flex items-center gap-2">
                                       <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
-                                    </button>
+                                    </div>
                                     <div className="grid grid-cols-1 gap-3">
                                         {negativeMechanism && (
                                             <Card className="bg-red-900/10 border-red-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative: {negativeMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative Mechanism: {negativeMechanism.name}</CardTitle>
                                                 </CardHeader>
-                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
-                                                    {habit.response?.visualize || '...'}
+                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                  <ResistanceSection habit={habit} isNegative={true} />
                                                 </CardContent>
                                             </Card>
                                         )}
                                         {positiveMechanism && (
                                              <Card className="bg-green-900/10 border-green-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive: {positiveMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive Mechanism: {positiveMechanism.name}</CardTitle>
                                                 </CardHeader>
-                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
-                                                    {habit.newResponse?.action || '...'}
+                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                  <ResistanceSection habit={habit} isNegative={false} />
+                                                  <TruthSection habit={habit} />
                                                 </CardContent>
                                             </Card>
                                         )}
@@ -194,4 +273,3 @@ export function SmartLoggingPrompt({
     </AnimatePresence>
   );
 }
-

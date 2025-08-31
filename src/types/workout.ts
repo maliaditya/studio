@@ -254,6 +254,21 @@ export interface ResourcePoint {
   resourceId?: string; // ID of the linked Resource card
   displayText?: string;
 }
+
+export interface Stopper {
+    id: string;
+    text: string;
+    status: 'none' | 'manageable' | 'unmanageable';
+    managementStrategy?: string;
+    linkedResourceId?: string;
+    linkedTechniqueId?: string;
+}
+
+export interface Strength {
+    id: string;
+    text: string;
+}
+
 export interface Resource {
   id: string;
   name: string;
@@ -517,43 +532,6 @@ export interface PistonsInitialState {
 }
 
 export type AutoSuggestionEntry = PistonEntry;
-
-export interface Stopper {
-    id: string;
-    text: string;
-    status: 'none' | 'manageable' | 'unmanageable';
-    managementStrategy?: string;
-    linkedResourceId?: string;
-    linkedTechniqueId?: string;
-}
-
-export interface Strength {
-    id: string;
-    text: string;
-}
-
-// Extending ResourcePoint for more complex links
-export interface ResourcePoint {
-  id: string;
-  text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';
-  url?: string;
-  resourceId?: string; // ID of the linked Resource card
-  displayText?: string;
-}
-
-
-// Extending Popups
-export interface PopupState {
-    resourceId: string;
-    level: number;
-    x: number;
-    y: number;
-    parentId?: string;
-    width?: number;
-    height?: number;
-    z?: number;
-}
 
 export interface RuleDetailPopupState {
   ruleId: string;
