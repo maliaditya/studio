@@ -27,9 +27,11 @@ export function MindsetTechniquePopup({ popupState, onClose }: MindsetTechniqueP
 
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: y,
-    left: x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    top: '50%',
+    left: '50%',
+    transform: transform
+      ? `translate(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px))`
+      : 'translate(-50%, -50%)',
     willChange: 'transform',
     zIndex: 105,
   };
