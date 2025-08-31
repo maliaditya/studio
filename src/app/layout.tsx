@@ -80,7 +80,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     intentionPopups, closeIntentionPopup, 
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
-    ruleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     activeFocusSession,
@@ -98,12 +98,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartWorkoutLog,
     handleStartLeadGenLog,
     openTaskContextPopup,
-    openHabitDetailPopup,
-    currentSlot,
+    onOpenFocusModal,
     focusSessionModalOpen,
     setFocusSessionModalOpen,
     focusActivity,
-    onOpenFocusModal,
     handleStartFocusSession,
     focusDuration,
     settings,
@@ -120,6 +118,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeMindsetTechniquePopup,
     handleMindsetTechniquePopupDragEnd,
     openMindsetTechniquePopup,
+    currentSlot,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
