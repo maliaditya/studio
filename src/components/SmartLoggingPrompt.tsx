@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -289,7 +288,7 @@ export function SmartLoggingPrompt({
                                                     <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative: {negativeMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                  <p><span className="font-semibold text-foreground">Response:</span> {negativeMechanism.response?.visualize}</p>
+                                                  <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
                                                   <ResistanceSection habit={habit} isNegative={true} />
                                                 </CardContent>
                                             </Card>
