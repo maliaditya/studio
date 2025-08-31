@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React from 'react';
@@ -12,6 +11,7 @@ import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, Met
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -39,6 +39,7 @@ export function SmartLoggingPrompt({
     pillarEquations,
     metaRules,
     habitCards,
+    mechanismCards,
     mindProgrammingDefinitions,
   } = useAuth();
 
@@ -56,20 +57,24 @@ export function SmartLoggingPrompt({
         const habit = habitCards.find(h => h.id === habitId);
         if (!habit) return null;
         
-        // Find equations that link to THIS habit
         const equation = allEquations.find(eq => eq.linkedResourceId === habit.id);
         const rules = metaRules.filter(rule => equation?.metaRuleIds?.includes(rule.id));
+        
+        const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+        const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
 
         return {
             habit,
             rules,
             equation,
-            technique: null // No single technique for non-mindset sessions
+            technique: null,
+            positiveMechanism,
+            negativeMechanism,
         };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
 
 
   const prompts = {
@@ -141,59 +146,37 @@ export function SmartLoggingPrompt({
                     </div>
                 )}
                  {promptType === 'focus' && focusContext && (
-                     <ScrollArea className="max-h-60 w-full">
-                        <div className="space-y-3 pr-4">
-                        {focusContext.map(({ habit, rules, equation, technique }) => (
-                            <div key={habit.id} className="p-3 rounded-md bg-muted/50 border text-sm">
-                                <button className="font-semibold flex items-center gap-2 hover:underline" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
-                                  <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span>
-                                </button>
-                                {equation && (
-                                    <div className="mt-2 pt-2 border-t">
-                                        <p className="font-medium text-xs mb-1">Equation: <span className="text-muted-foreground">{equation.outcome}</span></p>
+                     <ScrollArea className="max-h-64 w-full">
+                        <div className="space-y-4 pr-4">
+                            {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
+                                <div key={habit.id} className="space-y-3">
+                                    <button className="font-semibold flex items-center gap-2 hover:underline w-full text-left" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                      <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
+                                    </button>
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {negativeMechanism && (
+                                            <Card className="bg-red-900/10 border-red-500/30">
+                                                <CardHeader className="p-2">
+                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative Mechanism</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
+                                                    Old Response: {habit.response?.visualize || '...'}
+                                                </CardContent>
+                                            </Card>
+                                        )}
+                                        {positiveMechanism && (
+                                             <Card className="bg-green-900/10 border-green-500/30">
+                                                <CardHeader className="p-2">
+                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive Mechanism</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground">
+                                                    New Response: {habit.newResponse?.action || '...'}
+                                                </CardContent>
+                                            </Card>
+                                        )}
                                     </div>
-                                )}
-                                {rules.length > 0 && (
-                                    <div className="mt-2 pt-2 border-t">
-                                        <h4 className="font-medium text-xs mb-1">Meta-Rules:</h4>
-                                        <ul className="space-y-1 list-disc list-inside text-xs">
-                                            {rules.map(rule => <li key={rule.id}>{rule.text}</li>)}
-                                        </ul>
-                                    </div>
-                                )}
-                                {(habit.stoppers && habit.stoppers.length > 0) && (
-                                    <div className="mt-2 pt-2 border-t">
-                                        <h4 className="font-semibold text-xs mb-1 text-red-500">Urges / Resistance</h4>
-                                        <ul className="pl-2 space-y-1 text-xs">
-                                            {(habit.stoppers || []).map(stopper => {
-                                                const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
-                                                return (
-                                                    <li key={stopper.id}>
-                                                        <span className="font-medium">{stopper.text}</span>
-                                                        {linkedTechnique && (
-                                                            <button 
-                                                                className="text-blue-600 dark:text-blue-400 pl-4 block text-left hover:underline"
-                                                                onClick={(e) => openMindsetTechniquePopup(linkedTechnique.id, e)}
-                                                            >
-                                                                ↳ Technique: {linkedTechnique.name}
-                                                            </button>
-                                                        )}
-                                                    </li>
-                                                )
-                                            })}
-                                        </ul>
-                                    </div>
-                                )}
-                                {(habit.strengths && habit.strengths.length > 0) && (
-                                    <div className="mt-2 pt-2 border-t">
-                                        <h4 className="font-semibold text-xs mb-1 text-green-600">Truths / Reinforcements</h4>
-                                        <ul className="list-disc list-inside pl-2 space-y-0.5 text-xs">
-                                            {(habit.strengths || []).map(strength => <li key={strength.id}>{strength.text}</li>)}
-                                        </ul>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                </div>
+                            ))}
                         </div>
                     </ScrollArea>
                 )}
