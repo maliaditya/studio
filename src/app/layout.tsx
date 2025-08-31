@@ -353,7 +353,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitDetailPopup}
+            onOpenHabitPopup={openRuleDetailPopup}
             currentSlot={currentSlot}
         />
       )}

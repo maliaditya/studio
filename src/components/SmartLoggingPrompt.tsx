@@ -26,6 +26,7 @@ interface SmartLoggingPromptProps {
   metaRules: MetaRule[];
   deepWorkDefinitions: ExerciseDefinition[];
   upskillDefinitions: ExerciseDefinition[];
+  openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
 }
 
 export function SmartLoggingPrompt({ 
@@ -41,16 +42,10 @@ export function SmartLoggingPrompt({
     metaRules,
     deepWorkDefinitions,
     upskillDefinitions,
+    openMindsetTechniquePopup,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
-  const { openMindsetTechniquePopup } = useAuth();
 
-  const handleAddTaskClick = () => {
-    const slotCardId = `slot-card-${currentSlot.replace(/\s+/g, '-')}`;
-    const slotElement = document.getElementById(slotCardId);
-    slotElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-  
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const focusContext = React.useMemo(() => {
@@ -106,7 +101,7 @@ export function SmartLoggingPrompt({
       title: "Your current slot is empty.",
       description: "What's your focus right now? Let's get something scheduled.",
       actions: [
-        { label: "Add Task to Agenda", onClick: handleAddTaskClick },
+        { label: "Add Task to Agenda", onClick: () => router.push('/my-plate') },
         { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
       ]
     },
@@ -115,7 +110,7 @@ export function SmartLoggingPrompt({
       title: "You have tasks scheduled.",
       description: "Ready to start a focus session and make progress?",
        actions: [
-        { label: "View Agenda", onClick: handleAddTaskClick },
+        { label: "View Agenda", onClick: () => router.push('/my-plate') },
         { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
       ]
     },
