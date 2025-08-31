@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -74,6 +75,7 @@ export interface ExerciseDefinition {
   };
   sharingStatus?: SharingStatus;
   resourceCards?: { name: string, type: 'Elements' | 'Tools' | 'Patterns', points: { text: string }[] }[];
+  habitEquationIds?: string[];
 }
 
 export interface TopicGoal {
@@ -382,7 +384,7 @@ export interface SkillAcquisitionPlan {
     targetDate: string;
     requiredMoney: number | null;
     requiredHours: number | null;
-    linkedRuleEquationIds: string;
+    linkedRuleEquationIds: string[];
 }
 
 export interface SkillDomain {
@@ -461,13 +463,13 @@ export interface Position {
 export interface PillarCardData {
   id: string;
   principle: string;
-  practiceEquationIds: string;
-  applicationSpecializationIds: string;
+  practiceEquationIds: string[];
+  applicationSpecializationIds: string[];
   outcome: string;
 }
 
 export interface ProjectPlan {
-  linkedRuleEquationIds: string;
+  linkedRuleEquationIds: string[];
   targetDate: string;
   requiredMoney: number | null;
   requiredHours: number | null;
@@ -475,7 +477,7 @@ export interface ProjectPlan {
 
 export interface HabitEquation {
   id: string;
-  metaRuleIds: string;
+  metaRuleIds: string[];
   outcome: string;
   linkedResourceId?: string;
 }
@@ -598,4 +600,10 @@ export interface PathNode {
 export interface MindsetPoint {
   id: string;
   text: string;
+}
+
+export interface MindsetTechniquePopupState {
+  techniqueId: string;
+  x: number;
+  y: number;
 }

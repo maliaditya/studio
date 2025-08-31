@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -42,6 +43,7 @@ export function SmartLoggingPrompt({
     upskillDefinitions,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
+  const { openMindsetTechniquePopup } = useAuth();
 
   const handleAddTaskClick = () => {
     const slotCardId = `slot-card-${currentSlot.replace(/\s+/g, '-')}`;
@@ -56,8 +58,23 @@ export function SmartLoggingPrompt({
   
     const { activity } = activeFocusSession;
     
-    // This is the direct link from the scheduled activity.
-    const habitIds = activity.habitEquationIds || [];
+    // For a generic "Mindset Session", find all techniques with linked habits.
+    if (activity.type === 'mindset') {
+        const mindsetHabitDetails = mindProgrammingDefinitions
+            .map(technique => {
+                const habitId = technique.habitEquationIds?.[0]; // Assuming one for now
+                if (!habitId) return null;
+                const habit = habitCards.find(h => h.id === habitId);
+                return habit ? { habit, rules: [], equation: null, technique } : null;
+            })
+            .filter((item): item is NonNullable<typeof item> => item !== null);
+        return mindsetHabitDetails.length > 0 ? mindsetHabitDetails : null;
+    }
+    
+    // For specific tasks, find the definition and its links.
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const definition = allDefs.find(def => activity.taskIds?.some((tid: string) => tid.startsWith(def.id)));
+    const habitIds = activity.habitEquationIds || definition?.habitEquationIds || [];
 
     if (habitIds.length === 0) return null;
     
@@ -75,11 +92,12 @@ export function SmartLoggingPrompt({
             habit,
             rules,
             equation,
+            technique: null // No single technique for non-mindset sessions
         };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, mindProgrammingDefinitions, deepWorkDefinitions, upskillDefinitions]);
 
 
   const prompts = {
@@ -153,7 +171,7 @@ export function SmartLoggingPrompt({
                  {promptType === 'focus' && focusContext && (
                      <ScrollArea className="max-h-60 w-full">
                         <div className="space-y-3 pr-4">
-                        {focusContext.map(({ habit, rules, equation }) => (
+                        {focusContext.map(({ habit, rules, equation, technique }) => (
                             <div key={habit.id} className="p-3 rounded-md bg-muted/50 border text-sm">
                                 <p className="font-semibold flex items-center gap-2"><Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span></p>
                                 {equation && (
@@ -174,12 +192,17 @@ export function SmartLoggingPrompt({
                                         <h4 className="font-semibold text-xs mb-1 text-red-500">Urges / Resistance</h4>
                                         <ul className="pl-2 space-y-1 text-xs">
                                             {(habit.stoppers || []).map(stopper => {
-                                                const technique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
+                                                const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
                                                 return (
                                                     <li key={stopper.id}>
                                                         <span className="font-medium">{stopper.text}</span>
-                                                        {technique && (
-                                                            <p className="text-blue-600 dark:text-blue-400 pl-4">↳ Technique: {technique.name}</p>
+                                                        {linkedTechnique && (
+                                                            <button 
+                                                                className="text-blue-600 dark:text-blue-400 pl-4 block text-left hover:underline"
+                                                                onClick={(e) => openMindsetTechniquePopup(linkedTechnique.id, e)}
+                                                            >
+                                                                ↳ Technique: {linkedTechnique.name}
+                                                            </button>
                                                         )}
                                                     </li>
                                                 )
