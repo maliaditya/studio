@@ -55,30 +55,9 @@ export function SmartLoggingPrompt({
     if (!activeFocusSession?.activity) return null;
   
     const { activity } = activeFocusSession;
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
-    let habitIds: string[] = [];
-
-    // Prioritize habit IDs from the activity itself
-    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
-      habitIds = activity.habitEquationIds;
-    } else {
-      // Fallback for generic activities like "Mindset Session"
-      if (activity.type === 'mindset') {
-          // Aggregate all habits linked to *any* mindset technique
-          const mindsetHabitIds = new Set<string>();
-          mindProgrammingDefinitions.forEach(def => {
-              (def.habitEquationIds || []).forEach(id => mindsetHabitIds.add(id));
-          });
-          habitIds = Array.from(mindsetHabitIds);
-      } else {
-        // Fallback to check the underlying definition
-        const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-        const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-        if (mainDef?.habitEquationIds && mainDef.habitEquationIds.length > 0) {
-            habitIds = mainDef.habitEquationIds;
-        }
-      }
-    }
+    
+    // This is the direct link from the scheduled activity.
+    const habitIds = activity.habitEquationIds || [];
 
     if (habitIds.length === 0) return null;
     
@@ -89,19 +68,18 @@ export function SmartLoggingPrompt({
         if (!habit) return null;
         
         // Find equations that link to THIS habit
-        const linkedEquations = allEquations.filter(eq => eq.linkedResourceId === habit.id);
-        const linkedRuleIds = new Set(linkedEquations.flatMap(eq => eq.metaRuleIds || []));
-        const rules = metaRules.filter(rule => linkedRuleIds.has(rule.id));
+        const equation = allEquations.find(eq => eq.linkedResourceId === habit.id);
+        const rules = metaRules.filter(rule => equation?.metaRuleIds?.includes(rule.id));
 
         return {
             habit,
             rules,
-            equation: linkedEquations[0] // Assuming one equation per habit for now for simplicity
+            equation,
         };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards]);
 
 
   const prompts = {
@@ -194,8 +172,18 @@ export function SmartLoggingPrompt({
                                 {(habit.stoppers && habit.stoppers.length > 0) && (
                                     <div className="mt-2 pt-2 border-t">
                                         <h4 className="font-semibold text-xs mb-1 text-red-500">Urges / Resistance</h4>
-                                        <ul className="list-disc list-inside pl-2 space-y-0.5 text-xs">
-                                            {(habit.stoppers || []).map(stopper => <li key={stopper.id}>{stopper.text}</li>)}
+                                        <ul className="pl-2 space-y-1 text-xs">
+                                            {(habit.stoppers || []).map(stopper => {
+                                                const technique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
+                                                return (
+                                                    <li key={stopper.id}>
+                                                        <span className="font-medium">{stopper.text}</span>
+                                                        {technique && (
+                                                            <p className="text-blue-600 dark:text-blue-400 pl-4">↳ Technique: {technique.name}</p>
+                                                        )}
+                                                    </li>
+                                                )
+                                            })}
                                         </ul>
                                     </div>
                                 )}
