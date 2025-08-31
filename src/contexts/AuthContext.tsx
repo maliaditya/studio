@@ -404,7 +404,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
-  const [mindProgrammingDefinitions, setMindProgrammingDefinitions] = useState<ExerciseDefinition[]>([]);
+  const [mindProgrammingDefinitions, setMindProgrammingDefinitions] = useState<ExerciseDefinition[]>(DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
   const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
   const [mindProgrammingCategories, setMindProgrammingCategories] = useState<ExerciseCategory[]>(defaultMindsetCategories);
   const [mindProgrammingMode, setMindProgrammingMode] = useState<WorkoutMode>('two-muscle');
@@ -2457,7 +2457,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleDeleteStopper = (habitId: string, stopperId: string) => {
     setResources(prev => prev.map(r => {
         if (r.id === habitId) {
-            return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
+            return { ...r, urges: (r.urges || []).filter(s => s.id !== stopperId), resistances: (r.resistances || []).filter(s => s.id !== stopperId) };
         }
         return r;
     }));
@@ -2763,4 +2763,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 

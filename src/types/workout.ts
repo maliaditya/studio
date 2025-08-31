@@ -584,4 +584,6 @@ export interface MindsetTechniquePopupState {
   techniqueId: string;
   x: number;
   y: number;
+  level: number;
+  z?: number;
 }

@@ -82,7 +82,7 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
 EditableStep.displayName = 'EditableStep';
 
 
-const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
+const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: { habit: Resource, isNegative: boolean, onTechniqueClick: (techniqueId: string, event: React.MouseEvent) => void }) => {
     const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
     const stoppers = isNegative ? (habit.urges || []) : (habit.resistances || []);
 
@@ -163,12 +163,23 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                     {linkedTechnique && (
-                                        <Badge variant="secondary" className="font-normal truncate flex-1">
-                                            <span className="truncate">{linkedTechnique.name}</span>
-                                             <Button variant="ghost" size="icon" className="h-5 w-5 ml-1 -mr-1" onClick={() => handleLinkTechnique(s.id, null)}>
+                                        <div className="relative group/tech-badge">
+                                            <Badge 
+                                                variant="secondary" 
+                                                className="font-normal truncate flex-1 cursor-pointer pr-7" 
+                                                onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
+                                            >
+                                                <span className="truncate">{linkedTechnique.name}</span>
+                                            </Badge>
+                                             <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-5 w-5 ml-1 -mr-1 absolute top-1/2 right-0.5 -translate-y-1/2 opacity-0 group-hover/tech-badge:opacity-100" 
+                                                onClick={(e) => {e.stopPropagation(); handleLinkTechnique(s.id, null)}}
+                                             >
                                                 <X className="h-3 w-3" />
                                             </Button>
-                                        </Badge>
+                                        </div>
                                     )}
                                 </div>
                             </li>
@@ -338,7 +349,7 @@ export function SmartLoggingPrompt({
                             </div>
                         </div>
                     )}
-                    <ScrollArea className="w-full h-full">
+                    <ScrollArea className="w-full flex-grow min-h-0">
                       <div className="space-y-4 pr-4">
                         {promptType === 'focus' && focusContext && (
                             <>
@@ -355,7 +366,7 @@ export function SmartLoggingPrompt({
                                                     </CardHeader>
                                                     <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                       <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
-                                                      <ResistanceSection habit={habit} isNegative={true} />
+                                                      <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
                                                     </CardContent>
                                                 </Card>
                                             )}
@@ -366,7 +377,7 @@ export function SmartLoggingPrompt({
                                                     </CardHeader>
                                                     <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                       <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
-                                                      <ResistanceSection habit={habit} isNegative={false} />
+                                                      <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
                                                       <TruthSection habit={habit} />
                                                     </CardContent>
                                                 </Card>
