@@ -109,6 +109,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     productizationPlans,
     offerizationPlans,
     mindProgrammingDefinitions,
+    habitCards,
+    pillarEquations,
+    metaRules
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -352,6 +355,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
           mindProgrammingDefinitions={mindProgrammingDefinitions}
+          habitCards={habitCards}
+          pillarEquations={pillarEquations}
+          metaRules={metaRules}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -508,4 +514,3 @@ export default function RootLayout({
     </html>
   );
 }
-

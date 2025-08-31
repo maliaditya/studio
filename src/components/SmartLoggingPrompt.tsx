@@ -3,11 +3,14 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource } from '@/types/workout';
+import { ScrollArea } from './ui/scroll-area';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -16,17 +19,50 @@ interface SmartLoggingPromptProps {
   currentSlot: string;
   activeFocusSession: { activity: any } | null;
   lastSessionReview: PostSessionReview | null;
+  mindProgrammingDefinitions: ExerciseDefinition[];
+  habitCards: Resource[];
+  pillarEquations: Record<string, HabitEquation[]>;
+  metaRules: MetaRule[];
 }
 
-export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterruptModal, currentSlot, activeFocusSession, lastSessionReview }: SmartLoggingPromptProps) {
+export function SmartLoggingPrompt({ 
+    promptType, 
+    activeProjects, 
+    onOpenInterruptModal, 
+    currentSlot, 
+    activeFocusSession, 
+    lastSessionReview,
+    mindProgrammingDefinitions,
+    habitCards,
+    pillarEquations,
+    metaRules
+}: SmartLoggingPromptProps) {
   const router = useRouter();
-  const { mindProgrammingDefinitions } = useAuth();
 
   const handleAddTaskClick = () => {
     const slotCardId = `slot-card-${currentSlot.replace(/\s+/g, '-')}`;
     const slotElement = document.getElementById(slotCardId);
     slotElement?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+  
+  const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
+
+  const focusContext = React.useMemo(() => {
+    if (!activeFocusSession || !activeFocusSession.activity?.habitEquationIds) {
+        return null;
+    }
+    const linkedEquations = allEquations.filter(eq => activeFocusSession.activity.habitEquationIds.includes(eq.id));
+    if (linkedEquations.length === 0) return null;
+    
+    const equationDetails = linkedEquations.map(eq => {
+      const linkedRules = metaRules.filter(rule => eq.metaRuleIds.includes(rule.id));
+      const habit = habitCards.find(h => h.id === eq.linkedResourceId);
+      return { equation: eq, rules: linkedRules, habit };
+    });
+    
+    return equationDetails;
+  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+
 
   const prompts = {
     empty: {
@@ -58,10 +94,8 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
     focus: {
         icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
         title: "Focus Session Active",
-        description: lastSessionReview ? "Based on your last session, here's what you noted." : "Stay on task. Use a mindset technique if you feel resistance.",
-        actions: [
-            { label: "End Session Early", onClick: () => {}, variant: "destructive" },
-        ]
+        description: "Your defined systems are running. Stay on task.",
+        actions: []
     }
   };
 
@@ -98,12 +132,41 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
                         </div>
                     </div>
                 )}
-                {promptType === 'focus' && lastSessionReview && (
-                    <div className="p-3 rounded-md bg-muted/50 border text-sm">
-                        <p className="font-semibold">Last Session's Insight:</p>
-                        <p className="mt-1"><span className="font-medium text-muted-foreground">Resistance:</span> {lastSessionReview.resistance}</p>
-                        <p className="mt-1"><span className="font-medium text-muted-foreground">Helpful Technique:</span> {mindProgrammingDefinitions.find(def => def.id === lastSessionReview.helpfulTechniqueId)?.name || 'Unknown'}</p>
-                    </div>
+                {promptType === 'focus' && focusContext && (
+                     <ScrollArea className="max-h-60 w-full">
+                        <div className="space-y-3 pr-4">
+                        {focusContext.map(({ equation, rules, habit }) => (
+                            <div key={equation.id} className="p-3 rounded-md bg-muted/50 border text-sm">
+                                <p className="font-semibold flex items-center gap-2"><Workflow className="h-4 w-4"/> Equation: <span className="text-primary">{equation.outcome}</span></p>
+                                <Separator className="my-2"/>
+                                {rules.length > 0 && (
+                                    <div>
+                                        <h4 className="font-medium text-xs mb-1">Meta-Rules:</h4>
+                                        <ul className="space-y-1 list-disc list-inside text-xs">
+                                            {rules.map(rule => <li key={rule.id}>{rule.text}</li>)}
+                                        </ul>
+                                    </div>
+                                )}
+                                {habit && (
+                                    <div className="mt-2 pt-2 border-t">
+                                        <h4 className="font-medium text-xs mb-1">Triggered Habit: <span className="text-foreground font-semibold">{habit.name}</span></h4>
+                                        <div className="space-y-2">
+                                            {(habit.stoppers || []).map(stopper => {
+                                                const technique = mindProgrammingDefinitions.find(t => t.id === stopper.linkedTechniqueId);
+                                                return (
+                                                <div key={stopper.id} className="p-1.5 rounded bg-background text-xs">
+                                                    <p><span className="text-muted-foreground">Urge:</span> {stopper.text}</p>
+                                                    {technique && <p><span className="text-muted-foreground">Technique:</span> <span className="text-primary font-medium">{technique.name}</span></p>}
+                                                </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        </div>
+                    </ScrollArea>
                 )}
                 <div className="flex gap-2 w-full">
                     {currentPrompt.actions.map(action => (
