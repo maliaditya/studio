@@ -55,19 +55,28 @@ export function SmartLoggingPrompt({
     if (!activeFocusSession?.activity) return null;
   
     const { activity } = activeFocusSession;
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
     let habitIds: string[] = [];
 
     // Prioritize habit IDs from the activity itself
     if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
       habitIds = activity.habitEquationIds;
     } else {
-      // Fallback to check the underlying definition if no habits are linked on the activity instance
-      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
-      const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-      const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-      
-      if (mainDef?.habitEquationIds && mainDef.habitEquationIds.length > 0) {
-          habitIds = mainDef.habitEquationIds;
+      // Fallback for generic activities like "Mindset Session"
+      if (activity.type === 'mindset') {
+          // Aggregate all habits linked to *any* mindset technique
+          const mindsetHabitIds = new Set<string>();
+          mindProgrammingDefinitions.forEach(def => {
+              (def.habitEquationIds || []).forEach(id => mindsetHabitIds.add(id));
+          });
+          habitIds = Array.from(mindsetHabitIds);
+      } else {
+        // Fallback to check the underlying definition
+        const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+        const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+        if (mainDef?.habitEquationIds && mainDef.habitEquationIds.length > 0) {
+            habitIds = mainDef.habitEquationIds;
+        }
       }
     }
 
