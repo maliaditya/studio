@@ -146,12 +146,22 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                         return (
                             <li key={s.id} className="border-t pt-2 group/stopper">
                                 <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
-                                <div className="flex items-center gap-2 mt-1">
+                                {linkedTechnique && (
+                                    <div className="mt-1 pl-6">
+                                        <Badge 
+                                            variant="secondary" 
+                                            className="font-normal truncate cursor-pointer" 
+                                            onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
+                                        >
+                                            <span className="truncate">{linkedTechnique.name}</span>
+                                        </Badge>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-1 mt-1 pl-5 opacity-0 group-hover/stopper:opacity-100 transition-opacity">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="xs" className="text-xs h-6 px-2">
-                                                <PlusCircle className="h-3.5 w-3.5 mr-1"/>
-                                                {linkedTechnique ? 'Change' : 'Assign'} Technique
+                                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-56 z-[150]">
@@ -162,25 +172,6 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                                             ))}
                                         </DropdownMenuContent>
                                     </DropdownMenu>
-                                    {linkedTechnique && (
-                                        <div className="relative group/tech-badge">
-                                            <Badge 
-                                                variant="secondary" 
-                                                className="font-normal truncate flex-1 cursor-pointer pr-7" 
-                                                onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
-                                            >
-                                                <span className="truncate">{linkedTechnique.name}</span>
-                                            </Badge>
-                                             <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-5 w-5 ml-1 -mr-1 absolute top-1/2 right-0.5 -translate-y-1/2 opacity-0 group-hover/tech-badge:opacity-100" 
-                                                onClick={(e) => {e.stopPropagation(); handleLinkTechnique(s.id, null)}}
-                                             >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    )}
                                 </div>
                             </li>
                         )
