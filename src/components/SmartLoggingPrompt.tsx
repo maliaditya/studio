@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2 } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -133,6 +133,18 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
         }));
     };
     
+    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+        e.stopPropagation();
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s);
+                if (isNegative) return { ...r, urges: update(r.urges) };
+                else return { ...r, resistances: update(r.resistances) };
+            }
+            return r;
+        }));
+    };
+    
     return (
         <div className="space-y-2">
             <div className="flex justify-between items-center">
@@ -146,18 +158,24 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                         return (
                             <li key={s.id} className="border-t pt-2 group/stopper">
                                 <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
-                                {linkedTechnique && (
+                                {linkedTechnique ? (
                                     <div className="mt-1 pl-6">
                                         <Badge 
                                             variant="secondary" 
-                                            className="font-normal truncate cursor-pointer" 
+                                            className="font-normal truncate cursor-pointer hover:ring-1 hover:ring-primary"
                                             onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
                                         >
                                             <span className="truncate">{linkedTechnique.name}</span>
                                         </Badge>
                                     </div>
-                                )}
+                                ) : null}
                                 <div className="flex items-center gap-1 mt-1 pl-5 opacity-0 group-hover/stopper:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, s.id, 'manageable'); }}>
+                                        <ThumbsUp className={cn("h-4 w-4", s.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, s.id, 'unmanageable'); }}>
+                                        <ThumbsDown className={cn("h-4 w-4", s.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                    </Button>
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -170,6 +188,9 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                                                     {tech.name}
                                                 </DropdownMenuItem>
                                             ))}
+                                            <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
+                                                Unlink
+                                            </DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
@@ -319,7 +340,7 @@ export function SmartLoggingPrompt({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 max-h-[calc(100vh-7rem)]"
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3"
             >
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="flex-shrink-0">{currentPrompt.icon}</div>
@@ -394,3 +415,4 @@ export function SmartLoggingPrompt({
     </AnimatePresence>
   );
 }
+
