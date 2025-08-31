@@ -318,7 +318,7 @@ export function SmartLoggingPrompt({
     focus: {
         icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
         title: "Focus Session Active",
-        description: "Your defined systems are running. Stay on task.",
+        description: "your actions follow your visualization that image in your brain.",
         actions: []
     }
   };
