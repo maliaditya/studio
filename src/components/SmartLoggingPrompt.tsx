@@ -13,6 +13,10 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Input } from './ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
+import { cn } from '@/lib/utils';
+import { X } from 'lucide-react';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -26,7 +30,7 @@ interface SmartLoggingPromptProps {
 }
 
 const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-    const { setResources } = useAuth();
+    const { setResources, mindProgrammingDefinitions } = useAuth();
     const [newStopperText, setNewStopperText] = React.useState('');
     const placeholder = isNegative ? "Log an urge..." : "Log a resistance...";
 
@@ -45,13 +49,60 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
         }));
         setNewStopperText('');
     };
+
+    const handleLinkTechnique = (stopperId: string, techniqueId: string | null) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const updatedStoppers = (r.stoppers || []).map(s => 
+                    s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId === null ? undefined : techniqueId } : s
+                );
+                return { ...r, stoppers: updatedStoppers };
+            }
+            return r;
+        }));
+    };
     
     return (
         <div className="space-y-2">
             <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
             {(habit.stoppers || []).length > 0 && (
-                <ul className="text-xs list-disc list-inside space-y-1">
-                    {(habit.stoppers || []).map(s => <li key={s.id}>{s.text}</li>)}
+                <ul className="text-xs space-y-1">
+                    {(habit.stoppers || []).map(s => {
+                        const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
+                        return (
+                            <li key={s.id} className="border-t pt-2">
+                                <p>{s.text}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="ghost" size="xs" className="text-xs h-6 px-2">
+                                                <PlusCircle className="h-3.5 w-3.5 mr-1"/>
+                                                {linkedTechnique ? 'Change' : 'Assign'} Technique
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-56 p-0 z-[150]">
+                                            <Select onValueChange={(techId) => handleLinkTechnique(s.id, techId)}>
+                                                <SelectTrigger><SelectValue placeholder="Select a technique..." /></SelectTrigger>
+                                                <SelectContent>
+                                                    {mindProgrammingDefinitions.map(tech => (
+                                                        <SelectItem key={tech.id} value={tech.id}>{tech.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </PopoverContent>
+                                    </Popover>
+                                    {linkedTechnique && (
+                                        <Badge variant="secondary" className="font-normal truncate flex-1">
+                                            <span className="truncate">{linkedTechnique.name}</span>
+                                             <Button variant="ghost" size="icon" className="h-5 w-5 ml-1 -mr-1" onClick={() => handleLinkTechnique(s.id, null)}>
+                                                <X className="h-3 w-3" />
+                                            </Button>
+                                        </Badge>
+                                    )}
+                                </div>
+                            </li>
+                        )
+                    })}
                 </ul>
             )}
             <div className="flex gap-2">
@@ -229,16 +280,17 @@ export function SmartLoggingPrompt({
                         <div className="space-y-4 pr-4">
                             {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                 <div key={habit.id} className="space-y-3">
-                                    <div className="font-semibold flex items-center gap-2">
+                                    <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
                                       <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
                                     </div>
                                     <div className="grid grid-cols-1 gap-3">
                                         {negativeMechanism && (
                                             <Card className="bg-red-900/10 border-red-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative Mechanism: {negativeMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative: {negativeMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                  <p><span className="font-semibold text-foreground">Response:</span> {negativeMechanism.response?.visualize}</p>
                                                   <ResistanceSection habit={habit} isNegative={true} />
                                                 </CardContent>
                                             </Card>
@@ -246,9 +298,10 @@ export function SmartLoggingPrompt({
                                         {positiveMechanism && (
                                              <Card className="bg-green-900/10 border-green-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive Mechanism: {positiveMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive: {positiveMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                  <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
                                                   <ResistanceSection habit={habit} isNegative={false} />
                                                   <TruthSection habit={habit} />
                                                 </CardContent>
