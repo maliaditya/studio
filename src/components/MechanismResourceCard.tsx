@@ -107,10 +107,8 @@ export function MechanismResourceCard({ resource, onUpdate, onDelete, onLinkClic
                 )}
             </CardContent>
             <CardFooter>
-                <p className="text-xs text-muted-foreground">Double-click any text to edit.</p>
+                 <p className="text-xs text-muted-foreground">Double-click any text to edit.</p>
             </CardFooter>
         </Card>
     );
 }
-
-    
