@@ -342,7 +342,7 @@ export function SmartLoggingPrompt({
                             </div>
                         </div>
                     )}
-                    <ScrollArea className="w-full h-full max-h-80">
+                    <ScrollArea className="w-full h-full">
                       <div className="space-y-4 pr-4">
                         {promptType === 'focus' && focusContext && (
                             <>
