@@ -58,15 +58,15 @@ export function SmartLoggingPrompt({
     }
     
     const activity = activeFocusSession.activity;
-    let equationIds: string[] = activity.habitEquationIds || [];
+    
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
+    const taskDef = allDefs.find(d => activity.taskIds?.some((tid: string) => tid.startsWith(d.id)));
 
-    // If the activity doesn't have the IDs, check its definition
-    if (equationIds.length === 0 && activity.taskIds && activity.taskIds.length > 0) {
-        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const taskDef = allDefs.find(d => activity.taskIds[0].startsWith(d.id));
-        if (taskDef && taskDef.habitEquationIds) {
-            equationIds = taskDef.habitEquationIds;
-        }
+    let equationIds: string[] = [];
+    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+        equationIds = activity.habitEquationIds;
+    } else if (taskDef && taskDef.habitEquationIds && taskDef.habitEquationIds.length > 0) {
+        equationIds = taskDef.habitEquationIds;
     }
     
     if (equationIds.length === 0) return null;
@@ -81,7 +81,7 @@ export function SmartLoggingPrompt({
     });
     
     return equationDetails;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
 
 
   const prompts = {

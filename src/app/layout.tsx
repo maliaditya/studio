@@ -111,7 +111,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     mindProgrammingDefinitions,
     habitCards,
     pillarEquations,
-    metaRules
+    metaRules,
+    deepWorkDefinitions,
+    upskillDefinitions
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -358,6 +360,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           habitCards={habitCards}
           pillarEquations={pillarEquations}
           metaRules={metaRules}
+          deepWorkDefinitions={deepWorkDefinitions}
+          upskillDefinitions={upskillDefinitions}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
