@@ -32,6 +32,7 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
     const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
     const [newStopperText, setNewStopperText] = React.useState('');
     const placeholder = isNegative ? "Log an urge..." : "Log a resistance...";
+    const stoppers = isNegative ? (habit.urges || []) : (habit.resistances || []);
 
     const handleAddStopper = () => {
         if (!newStopperText.trim()) return;
@@ -42,20 +43,43 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
         };
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
-                return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
+                if (isNegative) {
+                    return { ...r, urges: [...(r.urges || []), newStopper] };
+                } else {
+                    return { ...r, resistances: [...(r.resistances || []), newStopper] };
+                }
             }
             return r;
         }));
         setNewStopperText('');
     };
 
+    const handleDelete = (stopperId: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                if (isNegative) {
+                    return { ...r, urges: (r.urges || []).filter(s => s.id !== stopperId) };
+                } else {
+                    return { ...r, resistances: (r.resistances || []).filter(s => s.id !== stopperId) };
+                }
+            }
+            return r;
+        }));
+    };
+
     const handleLinkTechnique = (stopperId: string, techniqueId: string | null) => {
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
-                const updatedStoppers = (r.stoppers || []).map(s => 
-                    s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId === null ? undefined : techniqueId } : s
-                );
-                return { ...r, stoppers: updatedStoppers };
+                const updateStoppers = (stoppersList: Stopper[] = []) =>
+                    stoppersList.map(s => 
+                        s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId === null ? undefined : techniqueId } : s
+                    );
+
+                if (isNegative) {
+                    return { ...r, urges: updateStoppers(r.urges) };
+                } else {
+                    return { ...r, resistances: updateStoppers(r.resistances) };
+                }
             }
             return r;
         }));
@@ -64,15 +88,15 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
     return (
         <div className="space-y-2">
             <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
-            {(habit.stoppers || []).length > 0 && (
+            {stoppers.length > 0 && (
                 <ul className="text-xs space-y-1">
-                    {(habit.stoppers || []).map(s => {
+                    {stoppers.map(s => {
                         const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
                         return (
                             <li key={s.id} className="border-t pt-2 group/stopper">
                                 <div className="flex justify-between items-start">
                                     <p>{s.text}</p>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/stopper:opacity-100" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/stopper:opacity-100" onClick={() => handleDelete(s.id)}>
                                         <Trash2 className="h-3 w-3 text-destructive" />
                                     </Button>
                                 </div>
@@ -262,77 +286,77 @@ export function SmartLoggingPrompt({
       {currentPrompt && (
         <div className="fixed bottom-24 right-6 z-50 max-w-sm w-full">
             <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 max-h-[calc(100vh-7rem)]"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 max-h-[calc(100vh-7rem)]"
             >
-            <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="flex-shrink-0">{currentPrompt.icon}</div>
-                <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
-            </div>
-            <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
-            
-            <div className="w-full space-y-3 flex-grow min-h-0">
-                {promptType === 'completed' && activeProjects.length > 0 && (
-                    <div className="w-full">
-                        <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
-                        <div className="flex flex-wrap gap-2">
-                            {activeProjects.map(p => (
-                                <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
-                                    {p.name}
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                 {promptType === 'focus' && focusContext && (
-                     <ScrollArea className="w-full h-full">
-                        <div className="space-y-4 pr-4">
-                            {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
-                                <div key={habit.id} className="space-y-3">
-                                    <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
-                                      <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {negativeMechanism && (
-                                            <Card className="bg-red-900/10 border-red-500/30">
-                                                <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                  <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
-                                                  <ResistanceSection habit={habit} isNegative={true} />
-                                                </CardContent>
-                                            </Card>
-                                        )}
-                                        {positiveMechanism && (
-                                             <Card className="bg-green-900/10 border-green-500/30">
-                                                <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                  <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
-                                                  <ResistanceSection habit={habit} isNegative={false} />
-                                                  <TruthSection habit={habit} />
-                                                </CardContent>
-                                            </Card>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
-                )}
-                <div className="flex gap-2 w-full flex-shrink-0">
-                    {currentPrompt.actions.map(action => (
-                        <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
-                            {action.label}
-                        </Button>
-                    ))}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex-shrink-0">{currentPrompt.icon}</div>
+                    <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
                 </div>
-            </div>
+                <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
+                
+                <div className="w-full space-y-3 flex-grow min-h-0">
+                    {promptType === 'completed' && activeProjects.length > 0 && (
+                        <div className="w-full">
+                            <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {activeProjects.map(p => (
+                                    <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
+                                        {p.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {promptType === 'focus' && focusContext && (
+                        <ScrollArea className="w-full h-full max-h-80">
+                            <div className="space-y-4 pr-4">
+                                {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
+                                    <div key={habit.id} className="space-y-3">
+                                        <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                        <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {negativeMechanism && (
+                                                <Card className="bg-red-900/10 border-red-500/30">
+                                                    <CardHeader className="p-2">
+                                                        <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                      <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
+                                                      <ResistanceSection habit={habit} isNegative={true} />
+                                                    </CardContent>
+                                                </Card>
+                                            )}
+                                            {positiveMechanism && (
+                                                 <Card className="bg-green-900/10 border-green-500/30">
+                                                    <CardHeader className="p-2">
+                                                        <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                      <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
+                                                      <ResistanceSection habit={habit} isNegative={false} />
+                                                      <TruthSection habit={habit} />
+                                                    </CardContent>
+                                                </Card>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    )}
+                    <div className="flex gap-2 w-full flex-shrink-0">
+                        {currentPrompt.actions.map(action => (
+                            <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
+                                {action.label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
             </motion.div>
         </div>
       )}

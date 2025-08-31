@@ -19,7 +19,6 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
-import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -85,7 +84,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
-    habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
+    habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     activeFocusSession,
     setActiveFocusSession,
@@ -346,7 +345,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitDetailPopup}
+            onOpenHabitPopup={openRuleDetailPopup}
             currentSlot={currentSlot}
         />
       )}
@@ -358,7 +357,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
           openMindsetTechniquePopup={openMindsetTechniquePopup}
-          openHabitDetailPopup={openHabitDetailPopup}
+          openHabitDetailPopup={openRuleDetailPopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -427,12 +426,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     popupState={ruleDetailPopup}
                     onClose={closeRuleDetailPopup}
                 />
-            )}
-            {habitDetailPopup && (
-              <HabitDetailPopup
-                popupState={habitDetailPopup}
-                onClose={closeHabitDetailPopup}
-              />
             )}
             {Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
@@ -521,7 +514,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-
-

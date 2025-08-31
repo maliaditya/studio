@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -306,7 +305,8 @@ export interface Resource {
     action?: string;
     visualize?: string;
   };
-  stoppers?: Stopper[];
+  urges?: Stopper[];
+  resistances?: Stopper[];
   strengths?: Strength[];
   
   // For 'mechanism' type
