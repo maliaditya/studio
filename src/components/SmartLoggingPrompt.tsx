@@ -55,35 +55,12 @@ export function SmartLoggingPrompt({
     if (!activeFocusSession?.activity) return null;
 
     const { activity } = activeFocusSession;
-    let equationIds: string[] = [];
+    const equationIds: string[] = activity.habitEquationIds || [];
 
-    if (activity.type === 'mindset') {
-        // For a generic mindset session, find all techniques that have habits linked
-        mindProgrammingDefinitions.forEach(def => {
-            if (def.habitEquationIds) {
-                equationIds.push(...def.habitEquationIds);
-            }
-        });
-    } else {
-        // For specific tasks, find the definition and its linked habits
-        const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
-        const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-        
-        if (mainDef?.habitEquationIds) {
-            equationIds.push(...mainDef.habitEquationIds);
-        }
-    }
-    
-    // Also include any habits directly linked on the activity itself
-    if (activity.habitEquationIds) {
-        equationIds.push(...activity.habitEquationIds);
-    }
+    if (equationIds.length === 0) return null;
     
     const uniqueEquationIds = [...new Set(equationIds)];
 
-    if (uniqueEquationIds.length === 0) return null;
-    
     const equationDetails = uniqueEquationIds.map(eqId => {
         const equation = allEquations.find(eq => eq.id === eqId);
         if (!equation) return null;
@@ -94,7 +71,7 @@ export function SmartLoggingPrompt({
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return equationDetails.length > 0 ? equationDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards]);
 
 
   const prompts = {
