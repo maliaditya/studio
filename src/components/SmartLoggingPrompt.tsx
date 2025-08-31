@@ -20,7 +20,6 @@ interface SmartLoggingPromptProps {
   currentSlot: string;
   activeFocusSession: { activity: any } | null;
   lastSessionReview: PostSessionReview | null;
-  authContext: AuthContextType;
   openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
 }
 
@@ -31,7 +30,6 @@ export function SmartLoggingPrompt({
     currentSlot, 
     activeFocusSession, 
     lastSessionReview,
-    authContext,
     openMindsetTechniquePopup,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
@@ -40,7 +38,7 @@ export function SmartLoggingPrompt({
     metaRules,
     habitCards,
     mindProgrammingDefinitions,
-  } = authContext;
+  } = useAuth();
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
