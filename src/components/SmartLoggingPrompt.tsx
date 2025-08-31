@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -16,6 +16,7 @@ import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
 import { cn } from '@/lib/utils';
+import { Textarea } from './ui/textarea';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -28,17 +29,68 @@ interface SmartLoggingPromptProps {
   openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
 }
 
+const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
+  const [text, setText] = useState(point.text);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setText(point.text);
+    if(point.text === '') {
+        textareaRef.current?.focus();
+    }
+  }, [point.text]);
+  
+  useEffect(() => {
+    if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [text]);
+
+  const handleBlur = () => {
+    const newText = text.trim();
+    if (newText === '') {
+      onDelete(point.id);
+    } else if (newText !== point.text) {
+      onUpdate(point.id, newText);
+    }
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleBlur();
+    }
+  }
+
+  return (
+    <div className="text-sm flex items-start gap-2 group w-full">
+      <Textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1 p-1"
+        rows={1}
+      />
+      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
+        <Trash2 className="h-3 w-3"/>
+      </Button>
+    </div>
+  );
+});
+EditableStep.displayName = 'EditableStep';
+
+
 const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
     const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
-    const [newStopperText, setNewStopperText] = React.useState('');
-    const placeholder = isNegative ? "Log an urge..." : "Log a resistance...";
     const stoppers = isNegative ? (habit.urges || []) : (habit.resistances || []);
 
     const handleAddStopper = () => {
-        if (!newStopperText.trim()) return;
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
-            text: newStopperText.trim(),
+            text: '', // Start with empty text
             status: 'none',
         };
         setResources(prev => prev.map(r => {
@@ -51,17 +103,14 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
             }
             return r;
         }));
-        setNewStopperText('');
     };
-
-    const handleDelete = (stopperId: string) => {
+    
+    const handleUpdateStopper = (stopperId: string, newText: string) => {
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
-                if (isNegative) {
-                    return { ...r, urges: (r.urges || []).filter(s => s.id !== stopperId) };
-                } else {
-                    return { ...r, resistances: (r.resistances || []).filter(s => s.id !== stopperId) };
-                }
+                 const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? {...s, text: newText} : s);
+                 if(isNegative) return {...r, urges: update(r.urges)};
+                 else return {...r, resistances: update(r.resistances)};
             }
             return r;
         }));
@@ -87,19 +136,17 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
     
     return (
         <div className="space-y-2">
-            <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStopper}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+            </div>
             {stoppers.length > 0 && (
                 <ul className="text-xs space-y-1">
                     {stoppers.map(s => {
                         const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
                         return (
                             <li key={s.id} className="border-t pt-2 group/stopper">
-                                <div className="flex justify-between items-start">
-                                    <p>{s.text}</p>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/stopper:opacity-100" onClick={() => handleDelete(s.id)}>
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                    </Button>
-                                </div>
+                                <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
                                 <div className="flex items-center gap-2 mt-1">
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -133,16 +180,6 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
                     })}
                 </ul>
             )}
-            <div className="flex gap-2">
-                <Input
-                    value={newStopperText}
-                    onChange={(e) => setNewStopperText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStopper(); }}
-                    placeholder={placeholder}
-                    className="h-8 text-xs"
-                />
-                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
-            </div>
         </div>
     );
 });
@@ -150,13 +187,11 @@ ResistanceSection.displayName = 'ResistanceSection';
 
 const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
     const { setResources, handleDeleteStrength } = useAuth();
-    const [newStrengthText, setNewStrengthText] = React.useState('');
 
     const handleAddStrength = () => {
-        if (!newStrengthText.trim()) return;
         const newStrength: Strength = {
             id: `strength_${Date.now()}`,
-            text: newStrengthText.trim(),
+            text: '',
         };
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
@@ -164,34 +199,30 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
             }
             return r;
         }));
-        setNewStrengthText('');
+    };
+    
+    const handleUpdateStrength = (strengthId: string, newText: string) => {
+      setResources(prev => prev.map(r => {
+          if (r.id === habit.id) {
+              return {...r, strengths: (r.strengths || []).map(s => s.id === strengthId ? {...s, text: newText} : s)}
+          }
+          return r;
+      }));
     };
 
     return (
         <div className="space-y-2">
-            <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStrength}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+            </div>
             {(habit.strengths || []).length > 0 && (
                 <ul className="text-xs list-disc list-inside space-y-1">
                     {(habit.strengths || []).map(s => (
-                      <li key={s.id} className="group/truth flex items-center justify-between">
-                        <span>{s.text}</span>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/truth:opacity-100" onClick={() => handleDeleteStrength(habit.id, s.id)}>
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      </li>
+                       <EditableStep key={s.id} point={s} onUpdate={(id, text) => handleUpdateStrength(id, text)} onDelete={() => handleDeleteStrength(habit.id, s.id)} />
                     ))}
                 </ul>
             )}
-            <div className="flex gap-2">
-                <Input
-                    value={newStrengthText}
-                    onChange={(e) => setNewStrengthText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddStrength(); }}
-                    placeholder="Log a reinforcing truth..."
-                    className="h-8 text-xs"
-                />
-                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
-            </div>
         </div>
     );
 });
@@ -298,7 +329,7 @@ export function SmartLoggingPrompt({
                 </div>
                 <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
                 
-                <div className="w-full space-y-3 flex-grow min-h-0">
+                <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
                     {promptType === 'completed' && activeProjects.length > 0 && (
                         <div className="w-full">
                             <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
@@ -311,9 +342,10 @@ export function SmartLoggingPrompt({
                             </div>
                         </div>
                     )}
-                    {promptType === 'focus' && focusContext && (
-                        <ScrollArea className="w-full h-full max-h-80">
-                            <div className="space-y-4 pr-4">
+                    <ScrollArea className="w-full h-full max-h-80">
+                      <div className="space-y-4 pr-4">
+                        {promptType === 'focus' && focusContext && (
+                            <>
                                 {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                     <div key={habit.id} className="space-y-3">
                                         <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
@@ -346,9 +378,10 @@ export function SmartLoggingPrompt({
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        </ScrollArea>
-                    )}
+                            </>
+                        )}
+                      </div>
+                    </ScrollArea>
                     <div className="flex gap-2 w-full flex-shrink-0">
                         {currentPrompt.actions.map(action => (
                             <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
