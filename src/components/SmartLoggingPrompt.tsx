@@ -3,21 +3,24 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project } from '@/types/workout';
+import type { Project, PostSessionReview } from '@/types/workout';
 
 interface SmartLoggingPromptProps {
-  promptType: 'empty' | 'inactive' | 'completed' | null;
+  promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
   activeProjects: Project[];
   onOpenInterruptModal: () => void;
   currentSlot: string;
+  activeFocusSession: { activity: any } | null;
+  lastSessionReview: PostSessionReview | null;
 }
 
-export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterruptModal, currentSlot }: SmartLoggingPromptProps) {
+export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterruptModal, currentSlot, activeFocusSession, lastSessionReview }: SmartLoggingPromptProps) {
   const router = useRouter();
+  const { mindProgrammingDefinitions } = useAuth();
 
   const handleAddTaskClick = () => {
     const slotCardId = `slot-card-${currentSlot.replace(/\s+/g, '-')}`;
@@ -52,9 +55,19 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
         { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
       ]
     },
+    focus: {
+        icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
+        title: "Focus Session Active",
+        description: lastSessionReview ? "Based on your last session, here's what you noted." : "Stay on task. Use a mindset technique if you feel resistance.",
+        actions: [
+            { label: "End Session Early", onClick: () => {}, variant: "destructive" },
+        ]
+    }
   };
 
   const currentPrompt = promptType ? prompts[promptType] : null;
+
+  if (!currentPrompt) return null;
 
   return (
     <AnimatePresence>
@@ -83,6 +96,13 @@ export function SmartLoggingPrompt({ promptType, activeProjects, onOpenInterrupt
                                 </Button>
                             ))}
                         </div>
+                    </div>
+                )}
+                {promptType === 'focus' && lastSessionReview && (
+                    <div className="p-3 rounded-md bg-muted/50 border text-sm">
+                        <p className="font-semibold">Last Session's Insight:</p>
+                        <p className="mt-1"><span className="font-medium text-muted-foreground">Resistance:</span> {lastSessionReview.resistance}</p>
+                        <p className="mt-1"><span className="font-medium text-muted-foreground">Helpful Technique:</span> {mindProgrammingDefinitions.find(def => def.id === lastSessionReview.helpfulTechniqueId)?.name || 'Unknown'}</p>
                     </div>
                 )}
                 <div className="flex gap-2 w-full">

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -109,6 +108,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     projects,
     productizationPlans,
     offerizationPlans,
+    mindProgrammingDefinitions,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -177,30 +177,36 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const selectedDateKey = format(new Date(), 'yyyy-MM-dd');
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
-  const promptType = useMemo(() => {
-    if (!settings.smartLogging || !currentSlot) return null;
-
-    const currentSlotActivities = selectedDaySchedule[currentSlot] as Activity[] | undefined;
-
-    if (!currentSlotActivities || currentSlotActivities.length === 0) {
-      return 'empty';
+  const { promptType, lastSessionReview } = useMemo(() => {
+    if (!settings.smartLogging || !currentSlot) return { promptType: null, lastSessionReview: null };
+  
+    if (activeFocusSession) {
+      return { 
+        promptType: 'focus',
+        lastSessionReview: activeFocusSession.activity?.postSessionReview || null,
+      };
     }
-
+  
+    const currentSlotActivities = selectedDaySchedule[currentSlot] as Activity[] | undefined;
+  
+    if (!currentSlotActivities || currentSlotActivities.length === 0) {
+      return { promptType: 'empty', lastSessionReview: null };
+    }
+  
     const hasIncompleteTasks = currentSlotActivities.some(a => !a.completed);
-    const isFocusSessionActive = !!activeFocusSession;
-
-    if (hasIncompleteTasks && !isFocusSessionActive) {
-      return 'inactive';
+  
+    if (hasIncompleteTasks) {
+      return { promptType: 'inactive', lastSessionReview: null };
     }
     
     if (!hasIncompleteTasks && remainingTime) {
-        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\d\d$/, 'm'));
+        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\\d\\d$/, 'm'));
         if (remainingMinutes > 15) {
-             return 'completed';
+             return { promptType: 'completed', lastSessionReview: null };
         }
     }
-
-    return null;
+  
+    return { promptType: null, lastSessionReview: null };
   }, [settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
 
   const activeProjectsForPrompt = useMemo(() => {
@@ -343,6 +349,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
           activeProjects={activeProjectsForPrompt}
           currentSlot={currentSlot}
+          activeFocusSession={activeFocusSession}
+          lastSessionReview={lastSessionReview}
+          mindProgrammingDefinitions={mindProgrammingDefinitions}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>

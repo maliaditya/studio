@@ -1,5 +1,3 @@
-
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -166,6 +164,11 @@ export interface PauseEvent {
   resumeTime: number | null;
 }
 
+export interface PostSessionReview {
+  resistance: string;
+  helpfulTechniqueId: string;
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;
@@ -179,6 +182,7 @@ export interface Activity {
   focusSessionEndTime?: number;
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
   focusSessionInitialDuration?: number; // The originally intended duration
+  postSessionReview?: PostSessionReview;
   duration?: number; // For interruptions
   isRoutine?: boolean; // New field for daily routine tasks
 };
@@ -353,242 +357,242 @@ export interface PistonEntry {
 
 export type PistonState = PistonEntry[];
 
-export type PistonsData = Partial<Record<PistonType, PistonState> & {
-    activity?: string;
-    linkedResourceIds?: Partial<Record<PistonType, string>>;
-    thoughtEntries?: PistonEntry[]; // For negative thoughts
+export type PistonsData = Partial<Record<PistonType, PistonState> & {\
+    activity?: string;\
+    linkedResourceIds?: Partial<Record<PistonType, string>>;\
+    thoughtEntries?: PistonEntry[]; // For negative thoughts\
 }>;
 
-export interface PistonsCategoryData {
-    health?: PistonsData;
-    [topicId: string]: PistonsData | undefined; // For wealth, growth, and desire topics
+export interface PistonsCategoryData {\
+    health?: PistonsData;\
+    [topicId: string]: PistonsData | undefined; // For wealth, growth, and desire topics\
 }
 
 // Skill Page Types
-export type PurposePillar =
-  | 'Mind' | 'Focus' | 'Learning' | 'Creativity'
-  | 'Body' | 'Health' | 'Strength' | 'Energy'
-  | 'Heart' | 'Relationships' | 'Emotional Health'
+export type PurposePillar =\
+  | 'Mind' | 'Focus' | 'Learning' | 'Creativity'\
+  | 'Body' | 'Health' | 'Strength' | 'Energy'\
+  | 'Heart' | 'Relationships' | 'Emotional Health'\
   | 'Spirit' | 'Meaning' | 'Contribution' | 'Legacy';
 
-export interface SkillAcquisitionPlan {
-    specializationId: string;
-    targetDate: string;
-    requiredMoney: number | null;
-    requiredHours: number | null;
-    linkedRuleEquationIds: string[];
+export interface SkillAcquisitionPlan {\
+    specializationId: string;\
+    targetDate: string;\
+    requiredMoney: number | null;\
+    requiredHours: number | null;\
+    linkedRuleEquationIds: string;\
 }
 
-export interface SkillDomain {
-  id: string;
-  name: string;
+export interface SkillDomain {\
+  id: string;\
+  name: string;\
 }
 
-export interface CoreSkill {
-  id: string;
-  domainId: string;
-  name: string;
-  type: 'Foundation' | 'Specialization' | 'Professionalism';
-  skillAreas: SkillArea[];
-  purposePillar?: string;
-  parentId?: string | null;
+export interface CoreSkill {\
+  id: string;\
+  domainId: string;\
+  name: string;\
+  type: 'Foundation' | 'Specialization' | 'Professionalism';\
+  skillAreas: SkillArea[];\
+  purposePillar?: string;\
+  parentId?: string | null;\
 }
 
-export interface SkillArea {
-  id: string;
-  name: string;
-  purpose: string;
-  microSkills: MicroSkill[];
+export interface SkillArea {\
+  id: string;\
+  name: string;\
+  purpose: string;\
+  microSkills: MicroSkill[];\
 }
 
-export interface MicroSkill {
-  id: string;
-  name: string;
+export interface MicroSkill {\
+  id: string;\
+  name: string;\
 }
 
 // Project Skill Linking
-export interface ProjectSkillLink {
-  featureId: string;
-  microSkillId: string;
+export interface ProjectSkillLink {\
+  featureId: string;\
+  microSkillId: string;\
 }
 
-export interface Feature {
-  id: string;
-  name: string;
-  linkedSkills: ProjectSkillLink[];
+export interface Feature {\
+  id: string;\
+  name: string;\
+  linkedSkills: ProjectSkillLink[];\
 }
 
-export interface Project {
-  id: string;
-  name: string;
-  domainId: string;
-  features: Feature[];
-  // Re-purposing these from the old system for product planning
-  productType?: string;
-  gapAnalysis?: GapAnalysis;
-  releases?: Release[];
-  purposePillar?: string;
-  productPlan?: ProjectPlan; // Added for dedicated product planning
+export interface Project {\
+  id: string;\
+  name: string;\
+  domainId: string;\
+  features: Feature[];\
+  // Re-purposing these from the old system for product planning\
+  productType?: string;\
+  gapAnalysis?: GapAnalysis;\
+  releases?: Release[];\
+  purposePillar?: string;\
+  productPlan?: ProjectPlan; // Added for dedicated product planning\
 }
 
 // Professional Experience Types
-export interface Company {
-    id: string;
-    name: string;
+export interface Company {\
+    id: string;\
+    name: string;\
 }
 
-export interface WorkProject {
-    id: string;
-    name: string;
-    description: string;
-    linkedSpecializationId: string; // ID of a CoreSkill with type 'Specialization'
+export interface WorkProject {\
+    id: string;\
+    name: string;\
+    description: string;\
+    linkedSpecializationId: string; // ID of a CoreSkill with type 'Specialization'\
 }
 
-export interface Position {
-    id: string;
-    companyId: string;
-    title: string;
-    projects: WorkProject[];
+export interface Position {\
+    id: string;\
+    companyId: string;\
+    title: string;\
+    projects: WorkProject[];\
 }
 
 // Purpose & Patterns Data
-export interface PillarCardData {
-  id: string;
-  principle: string;
-  practiceEquationIds: string[];
-  applicationSpecializationIds: string[];
-  outcome: string;
+export interface PillarCardData {\
+  id: string;\
+  principle: string;\
+  practiceEquationIds: string;\
+  applicationSpecializationIds: string;\
+  outcome: string;\
 }
 
-export interface ProjectPlan {
-  linkedRuleEquationIds: string[];
-  targetDate: string;
-  requiredMoney: number | null;
-  requiredHours: number | null;
+export interface ProjectPlan {\
+  linkedRuleEquationIds: string;\
+  targetDate: string;\
+  requiredMoney: number | null;\
+  requiredHours: number | null;\
 }
 
-export interface HabitEquation {
-  id: string;
-  metaRuleIds: string[];
-  outcome: string;
-  linkedResourceId?: string;
+export interface HabitEquation {\
+  id: string;\
+  metaRuleIds: string;\
+  outcome: string;\
+  linkedResourceId?: string;\
 }
 
-export interface PurposeData {
-  statement: string;
-  specializationPurposes: Record<string, string>; // Key is CoreSkill ID
-  pillarCards?: PillarCardData[];
+export interface PurposeData {\
+  statement: string;\
+  specializationPurposes: Record<string, string>; // Key is CoreSkill ID\
+  pillarCards?: PillarCardData[];\
 }
 
 // Pattern Recognition Types
-export interface PatternPhrase {
-  category: string;
-  text: string;
-  mechanismCardId: string;
-  mechanismCardName?: string;
-  linkedMechanisms?: string[];
+export interface PatternPhrase {\
+  category: string;\
+  text: string;\
+  mechanismCardId: string;\
+  mechanismCardName?: string;\
+  linkedMechanisms?: string[];\
 }
 
-export interface Pattern {
-  id: string;
-  name: string;
-  type: 'Positive' | 'Negative';
-  phrases: PatternPhrase[];
+export interface Pattern {\
+  id: string;\
+  name: string;\
+  type: 'Positive' | 'Negative';\
+  phrases: PatternPhrase[];\
 }
 
-export interface MetaRule {
-  id: string;
-  text: string;
-  patternId: string;
-  purposePillar?: string;
+export interface MetaRule {\
+  id: string;\
+  text: string;\
+  patternId: string;\
+  purposePillar?: string;\
 }
 
-export interface PistonsInitialState {
-  view: 'quick-access' | 'rule-equations' | 'autosuggestion' | 'starred';
-  context?: any;
+export interface PistonsInitialState {\
+  view: 'quick-access' | 'rule-equations' | 'autosuggestion' | 'starred';\
+  context?: any;\
 }
 
 export type AutoSuggestionEntry = PistonEntry;
 
-export interface Stopper {
-    id: string;
-    text: string;
-    status: 'none' | 'manageable' | 'unmanageable';
-    managementStrategy?: string;
-    linkedResourceId?: string;
+export interface Stopper {\
+    id: string;\
+    text: string;\
+    status: 'none' | 'manageable' | 'unmanageable';\
+    managementStrategy?: string;\
+    linkedResourceId?: string;\
 }
 
-export interface Strength {
-    id: string;
-    text: string;
+export interface Strength {\
+    id: string;\
+    text: string;\
 }
 
 // Extending ResourcePoint for more complex links
-export interface ResourcePoint {
-  id: string;
-  text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';
-  url?: string;
-  resourceId?: string; // ID of the linked Resource card
-  displayText?: string;
+export interface ResourcePoint {\
+  id: string;\
+  text: string;\
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';\
+  url?: string;\
+  resourceId?: string; // ID of the linked Resource card\
+  displayText?: string;\
 }
 
 
 // Extending Popups
-export interface PopupState {
-    resourceId: string;
-    level: number;
-    x: number;
-    y: number;
-    parentId?: string;
-    width?: number;
-    height?: number;
-    z?: number;
+export interface PopupState {\
+    resourceId: string;\
+    level: number;\
+    x: number;\
+    y: number;\
+    parentId?: string;\
+    width?: number;\
+    height?: number;\
+    z?: number;\
 }
 
-export interface RuleDetailPopupState {
-  ruleId: string;
-  x: number;
-  y: number;
+export interface RuleDetailPopupState {\
+  ruleId: string;\
+  x: number;\
+  y: number;\
 }
 
-export interface HabitDetailPopupState {
-  habitId: string;
-  x: number;
-  y: number;
-  level: number;
+export interface HabitDetailPopupState {\
+  habitId: string;\
+  x: number;\
+  y: number;\
+  level: number;\
 }
 
 
-export interface TaskContextPopupState {
-  activityId: string;
-  x: number;
-  y: number;
-  level: number;
-  parentId?: string;
+export interface TaskContextPopupState {\
+  activityId: string;\
+  x: number;\
+  y: number;\
+  level: number;\
+  parentId?: string;\
 }
 
-export interface ContentViewPopupState {
-    id: string;
-    resource: Resource;
-    point: ResourcePoint;
-    x: number;
-    y: number;
+export interface ContentViewPopupState {\
+    id: string;\
+    resource: Resource;\
+    point: ResourcePoint;\
+    x: number;\
+    y: number;\
 }
 
-export interface TodaysDietPopupState {
-  id: string;
-  x: number;
-  y: number;
-  z?: number;
+export interface TodaysDietPopupState {\
+  id: string;\
+  x: number;\
+  y: number;\
+  z?: number;\
 }
 
-export interface PathNode {
-  id: string;
-  text: string;
+export interface PathNode {\
+  id: string;\
+  text: string;\
 }
 
-export interface MindsetPoint {
-  id: string;
-  text: string;
+export interface MindsetPoint {\
+  id: string;\
+  text: string;\
 }
