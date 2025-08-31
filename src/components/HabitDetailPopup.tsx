@@ -5,102 +5,38 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, Workflow, ArrowDown, ThumbsUp, ThumbsDown, Trash2, PlusCircle, Link as LinkIcon, Edit2, PieChart as PieChartIcon, Brain, GitBranch, ArrowLeft, ArrowRight, Zap, Target } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle, Target } from 'lucide-react';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
-import { Input } from './ui/input';
-import { Badge } from './ui/badge';
-import { ScrollArea } from './ui/scroll-area';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
-import { HabitDetailPopupState, Resource, Stopper, Strength, PopupState, MetaRule, ExerciseDefinition } from '@/types/workout';
-import { cn } from '@/lib/utils';
-import { Label } from './ui/label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { Separator } from './ui/separator';
-import { Textarea } from './ui/textarea';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from './ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from './ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
-const ManageResistancePopup = ({ habit, popupState, onClose }: {
-    habit: Resource;
-    popupState: { stopper: Stopper; x: number; y: number; };
-    onClose: () => void;
-}) => {
-    const { setResources, resources: allResources } = useAuth();
-    const { stopper, x, y } = popupState;
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `manage-resistance-${stopper.id}` });
-    
-    const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
-    const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
 
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: y,
-        left: x,
-        zIndex: 75,
-        willChange: 'transform',
-    };
+interface LogicDiagramPopupState {
+    rule: MetaRule;
+}
 
-    if (transform) {
-        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-    }
+interface ManageResistancePopupState {
+    habitId: string;
+    stopper: Stopper;
+    x: number;
+    y: number;
+}
 
-    const handleSaveManagementStrategy = () => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                const updatedStoppers = (r.stoppers || []).map(s =>
-                    s.id === stopper.id ? { ...s, status: 'manageable', managementStrategy: managementStrategy.trim(), linkedResourceId: linkedResourceId || undefined } : s
-                );
-                return { ...r, stoppers: updatedStoppers };
-            }
-            return r;
-        }));
-        onClose();
-    };
 
-    return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                    <div className="flex justify-between items-center">
-                        <CardTitle className="text-base">Manage Resistance</CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
-                    </div>
-                    <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-4 space-y-4">
-                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
-                    <div>
-                        <Label htmlFor="management-strategy">How will you manage this?</Label>
-                        <Textarea 
-                            id="management-strategy" 
-                            value={managementStrategy}
-                            onChange={(e) => setManagementStrategy(e.target.value)}
-                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
-                        />
-                    </div>
-                    <div>
-                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
-                        <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
-                            <SelectTrigger id="linked-resource">
-                                <SelectValue placeholder="Select a resource..." />
-                            </SelectTrigger>
-                            <SelectContent side="right" align="start" sideOffset={5}>
-                                <SelectItem value="none">-- None --</SelectItem>
-                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
-                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-                <CardFooter className="p-3 flex justify-end gap-2">
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
-                </CardFooter>
-            </Card>
-        </div>
-    );
-};
-
+const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+    <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
+        {children}
+    </div>
+);
 
 const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPopupState; onClose: () => void; }) => {
     const { rule } = popupState;
@@ -220,11 +156,88 @@ const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPo
     );
 };
 
-const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
-    <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
-        {children}
-    </div>
-);
+const ManageResistancePopup = ({ habit, popupState, onClose }: {
+    habit: Resource;
+    popupState: ManageResistancePopupState;
+    onClose: () => void;
+}) => {
+    const { setResources, resources: allResources } = useAuth();
+    const { stopper, x, y } = popupState;
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `manage-resistance-${stopper.id}` });
+    
+    const [managementStrategy, setManagementStrategy] = useState(stopper.managementStrategy || '');
+    const [linkedResourceId, setLinkedResourceId] = useState(stopper.linkedResourceId || '');
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: y,
+        left: x,
+        zIndex: 75,
+        willChange: 'transform',
+    };
+
+    if (transform) {
+        style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
+    }
+
+    const handleSaveManagementStrategy = () => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const updatedStoppers = (r.stoppers || []).map(s =>
+                    s.id === stopper.id ? { ...s, status: 'manageable', managementStrategy: managementStrategy.trim(), linkedResourceId: linkedResourceId || undefined } : s
+                );
+                return { ...r, stoppers: updatedStoppers };
+            }
+            return r;
+        }));
+        onClose();
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base">Manage Resistance</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(); }}><X className="h-4 w-4" /></Button>
+                    </div>
+                    <CardDescription>Create a strategy to overcome this obstacle.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                    <p className="font-semibold border p-3 rounded-md bg-muted/50 text-sm">"{stopper.text}"</p>
+                    <div>
+                        <Label htmlFor="management-strategy">How will you manage this?</Label>
+                        <Textarea 
+                            id="management-strategy" 
+                            value={managementStrategy}
+                            onChange={(e) => setManagementStrategy(e.target.value)}
+                            placeholder="e.g., Use the 2-minute rule, put my phone in another room..."
+                        />
+                    </div>
+                    <div>
+                        <Label htmlFor="linked-resource">Link a Resource Card (Optional)</Label>
+                        <Select value={linkedResourceId || 'none'} onValueChange={(value) => setLinkedResourceId(value === 'none' ? '' : value)}>
+                            <SelectTrigger id="linked-resource">
+                                <SelectValue placeholder="Select a resource..." />
+                            </SelectTrigger>
+                            <SelectContent side="right" align="start" sideOffset={5}>
+                                <SelectItem value="none">-- None --</SelectItem>
+                                {allResources.filter(card => card.type === 'habit' || card.type === 'mechanism').map(card => (
+                                    <SelectItem key={card.id} value={card.id}>{card.name} ({card.type})</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+                <CardFooter className="p-3 flex justify-end gap-2">
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSaveManagementStrategy}>Save Strategy</Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
+};
+
 
 const ResistanceSection = React.memo(({ habit, isNegative, onStopperStatusChange, onDeleteStopper, onAddStopper }: { 
     habit: Resource, 
@@ -344,6 +357,57 @@ const TruthSection = React.memo(({ habit, isNegative, onAddStrength, onDeleteStr
 });
 TruthSection.displayName = 'TruthSection';
 
+const TechniquesSection = React.memo(({ habit, onLinkTechnique }: { habit: Resource, onLinkTechnique: (stopperId: string, techniqueId: string) => void }) => {
+    const { mindProgrammingDefinitions } = useAuth();
+    const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
+
+    return (
+        <div>
+            <ScrollArea className={cn((mindProgrammingDefinitions || []).length > 4 && "h-[22.5rem]", "pr-2")}>
+              <div className="space-y-4">
+                {mindProgrammingDefinitions.map(technique => {
+                    const assignedStoppers = (habit.stoppers || []).filter(s => s.linkedTechniqueId === technique.id);
+                    return (
+                        <Card key={technique.id} className="bg-background">
+                            <CardHeader className="p-3">
+                                <CardTitle className="text-sm">{technique.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-3 pt-0">
+                                <div className="space-y-2">
+                                    {assignedStoppers.map(stopper => (
+                                        <div key={stopper.id} className="text-xs p-1.5 rounded-md border bg-muted/50">{stopper.text}</div>
+                                    ))}
+                                </div>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" size="sm" className="mt-2 text-xs h-7 w-full">
+                                            <PlusCircle className="mr-2 h-3.5 w-3.5" />
+                                            Assign Urge
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 z-[150]">
+                                        <Select onValueChange={(stopperId) => onLinkTechnique(stopperId, technique.id)}>
+                                            <SelectTrigger><SelectValue placeholder="Select an urge..." /></SelectTrigger>
+                                            <SelectContent>
+                                                {unassignedStoppers.map(s => (
+                                                    <SelectItem key={s.id} value={s.id}>{s.text}</SelectItem>
+                                                ))}
+                                                {unassignedStoppers.length === 0 && <SelectItem value="none" disabled>No unassigned urges</SelectItem>}
+                                            </SelectContent>
+                                        </Select>
+                                    </PopoverContent>
+                                </Popover>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+              </div>
+            </ScrollArea>
+        </div>
+    );
+});
+TechniquesSection.displayName = 'TechniquesSection';
+
 export function HabitDetailPopup({ popupState, onClose }: { 
     popupState: HabitDetailPopupState;
     onClose: () => void; 
@@ -356,7 +420,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [logicDiagramRule, setLogicDiagramRule] = useState<LogicDiagramPopupState | null>(null);
-    const [manageResistancePopupState, setManageResistancePopupState] = useState<{ habitId: string, stopper: Stopper; x: number; y: number; } | null>(null);
+    const [manageResistancePopupState, setManageResistancePopupState] = useState<ManageResistancePopupState | null>(null);
     const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
 
     const style: React.CSSProperties = {
@@ -466,57 +530,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
 
-    const TechniquesSection = React.memo(({ habit, onLinkTechnique }: { habit: Resource, onLinkTechnique: (stopperId: string, techniqueId: string) => void }) => {
-        const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
-    
-        return (
-            <div>
-                <ScrollArea className={cn((mindProgrammingDefinitions || []).length > 4 && "h-[22.5rem]", "pr-2")}>
-                  <div className="space-y-4">
-                    {mindProgrammingDefinitions.map(technique => {
-                        const assignedStoppers = (habit.stoppers || []).filter(s => s.linkedTechniqueId === technique.id);
-                        return (
-                            <Card key={technique.id} className="bg-background">
-                                <CardHeader className="p-3">
-                                    <CardTitle className="text-sm">{technique.name}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-3 pt-0">
-                                    <div className="space-y-2">
-                                        {assignedStoppers.map(stopper => (
-                                            <div key={stopper.id} className="text-xs p-1.5 rounded-md border bg-muted/50">{stopper.text}</div>
-                                        ))}
-                                    </div>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="mt-2 text-xs h-7 w-full">
-                                                <PlusCircle className="mr-2 h-3.5 w-3.5" />
-                                                Assign Urge
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent>
-                                            <Select onValueChange={(stopperId) => onLinkTechnique(stopperId, technique.id)}>
-                                                <SelectTrigger><SelectValue placeholder="Select an urge..." /></SelectTrigger>
-                                                <SelectContent>
-                                                    {unassignedStoppers.map(s => (
-                                                        <SelectItem key={s.id} value={s.id}>{s.text}</SelectItem>
-                                                    ))}
-                                                    {unassignedStoppers.length === 0 && <SelectItem value="none" disabled>No unassigned urges</SelectItem>}
-                                                </SelectContent>
-                                            </Select>
-                                        </PopoverContent>
-                                    </Popover>
-                                </CardContent>
-                            </Card>
-                        )
-                    })}
-                  </div>
-                </ScrollArea>
-            </div>
-        );
-    });
-    TechniquesSection.displayName = 'TechniquesSection';
-
-
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={habit.id}>
@@ -565,7 +578,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                         isNegative={negativeMechanism?.mechanismFramework === 'negative'}
                                         onAddStopper={(text) => handleAddStopper(habit.id, text)}
                                         onDeleteStopper={(id) => handleDeleteStopper(habit.id, id)}
-                                        onStopperStatusChange={handleStopperStatusChange}
+                                        onStopperStatusChange={(e, id, status) => handleStopperStatusChange(e, habit.id, id, status)}
                                     />
                                 </TabsContent>
                                 <TabsContent value="truth" className="mt-2">
