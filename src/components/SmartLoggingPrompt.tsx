@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -29,7 +29,7 @@ interface SmartLoggingPromptProps {
 }
 
 const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-    const { setResources, mindProgrammingDefinitions } = useAuth();
+    const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
     const [newStopperText, setNewStopperText] = React.useState('');
     const placeholder = isNegative ? "Log an urge..." : "Log a resistance...";
 
@@ -69,8 +69,13 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
                     {(habit.stoppers || []).map(s => {
                         const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
                         return (
-                            <li key={s.id} className="border-t pt-2">
-                                <p>{s.text}</p>
+                            <li key={s.id} className="border-t pt-2 group/stopper">
+                                <div className="flex justify-between items-start">
+                                    <p>{s.text}</p>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/stopper:opacity-100" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                </div>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -120,7 +125,7 @@ const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, 
 ResistanceSection.displayName = 'ResistanceSection';
 
 const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
-    const { setResources } = useAuth();
+    const { setResources, handleDeleteStrength } = useAuth();
     const [newStrengthText, setNewStrengthText] = React.useState('');
 
     const handleAddStrength = () => {
@@ -143,7 +148,14 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
             <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
             {(habit.strengths || []).length > 0 && (
                 <ul className="text-xs list-disc list-inside space-y-1">
-                    {(habit.strengths || []).map(s => <li key={s.id}>{s.text}</li>)}
+                    {(habit.strengths || []).map(s => (
+                      <li key={s.id} className="group/truth flex items-center justify-between">
+                        <span>{s.text}</span>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/truth:opacity-100" onClick={() => handleDeleteStrength(habit.id, s.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </li>
+                    ))}
                 </ul>
             )}
             <div className="flex gap-2">
@@ -275,7 +287,7 @@ export function SmartLoggingPrompt({
                     </div>
                 )}
                  {promptType === 'focus' && focusContext && (
-                     <ScrollArea className="w-full">
+                     <ScrollArea className="w-full max-h-80">
                         <div className="space-y-4 pr-4">
                             {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                 <div key={habit.id} className="space-y-3">

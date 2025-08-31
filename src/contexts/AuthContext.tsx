@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -187,7 +187,8 @@ interface AuthContextType {
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
   createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type']) => ExerciseDefinition | Resource | undefined;
-
+  handleDeleteStopper: (habitId: string, stopperId: string) => void;
+  handleDeleteStrength: (habitId: string, strengthId: string) => void;
   
   // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
@@ -408,7 +409,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [mindProgrammingCategories, setMindProgrammingCategories] = useState<ExerciseCategory[]>(defaultMindsetCategories);
   const [mindProgrammingMode, setMindProgrammingMode] = useState<WorkoutMode>('two-muscle');
   const [mindProgrammingPlans, setMindProgrammingPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
-  const [mindProgrammingPlanRotation, setMindProgrammingPlanRotation] = useState(true);
+  const [mindProgrammingPlanRotation, setMindProgrammingPlanRotation] = useState<boolean>(true);
   
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -1818,8 +1819,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
             level = 0;
             parentId = undefined;
-            x = event.clientX;
-            y = event.clientY;
+            if (hasMarkdown) {
+                x = window.innerWidth / 2 - popupWidth / 2;
+                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
+            } else {
+                x = event.clientX;
+                y = event.clientY;
+            }
         }
         
         newPopups.set(resourceId, { 
@@ -2448,6 +2454,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUpskillDefinitions(unlinkFromDefs);
   };
   
+  const handleDeleteStopper = (habitId: string, stopperId: string) => {
+    setResources(prev => prev.map(r => {
+        if (r.id === habitId) {
+            return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
+        }
+        return r;
+    }));
+  };
+  
+  const handleDeleteStrength = (habitId: string, strengthId: string) => {
+      setResources(prev => prev.map(r => {
+          if (r.id === habitId) {
+              return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
+          }
+          return r;
+      }));
+  };
+  
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
     coreSkills.forEach(coreSkill => {
@@ -2570,6 +2594,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     habitCards, mechanismCards,
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
     createResourceWithHierarchy,
+    handleDeleteStopper, handleDeleteStrength,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,
@@ -2738,3 +2763,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
