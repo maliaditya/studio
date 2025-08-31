@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -103,6 +101,240 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
 };
 
 
+const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPopupState; onClose: () => void; }) => {
+    const { rule } = popupState;
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `logic-diagram-${rule.id}` });
+    const { habitCards, mechanismCards, patterns } = useAuth();
+    
+    const pattern = patterns.find(p => p.id === rule.patternId);
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px), 0)` : 'translate(-50%, -50%)',
+        zIndex: 110,
+    };
+
+    const linkedHabit = useMemo(() => {
+        if (!pattern) return null;
+        const habitPhrase = pattern.phrases.find(p => p.category === 'Habit Cards');
+        if (!habitPhrase) return null;
+        return habitCards.find(h => h.id === habitPhrase.mechanismCardId);
+    }, [pattern, habitCards]);
+
+    if (!linkedHabit) {
+        return (
+            <div ref={setNodeRef} style={style} {...attributes}>
+                <Card className="w-[400px] shadow-2xl border-2 border-primary/30 bg-card">
+                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                        <div className="flex justify-between items-center">
+                            <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic</CardTitle>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4 text-center text-muted-foreground">
+                        No Habit Card is linked to this pattern. A logic diagram cannot be generated.
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+    
+    const negativeMechanism = mechanismCards.find(m => m.id === linkedHabit.response?.resourceId);
+    const positiveMechanism = mechanismCards.find(m => m.id === linkedHabit.newResponse?.resourceId);
+    const stoppers = linkedHabit.stoppers || [];
+    
+    const negativeCosts = [
+        negativeMechanism?.reward ? `Blocks: ${negativeMechanism.reward}` : null,
+        negativeMechanism?.benefit ? `Costs me: ${negativeMechanism.benefit}` : null
+    ].filter(Boolean);
+
+    const positiveBenefits = [
+        positiveMechanism?.benefit ? `Enables: ${positiveMechanism.benefit}` : null,
+        positiveMechanism?.reward ? `Gives me: ${positiveMechanism.reward}` : null
+    ].filter(Boolean);
+
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-auto max-w-[90vw] shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2"><Workflow className="h-4 w-4 text-primary"/>Decision Logic for: "{rule.text}"</CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                    <div className="flex flex-col items-center space-y-2">
+                        <FlowNode>Trigger: When I {linkedHabit.trigger?.action || '...'}</FlowNode>
+                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                        <FlowNode className="font-bold bg-primary/10">{rule.text}</FlowNode>
+                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                        
+                        <div className="flex w-full justify-around items-start gap-4">
+                            {/* Negative Path */}
+                            <div className="flex flex-col items-center space-y-2 w-1/2">
+                                <Badge variant="destructive">Old Path</Badge>
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="bg-red-100/50 border-red-500/50 w-full">Response: {linkedHabit.response?.visualize || '...'}</FlowNode>
+                                {stoppers.length > 0 && (
+                                    <>
+                                        <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                        <FlowNode className="border-yellow-500/50 bg-yellow-100/30 w-full">
+                                            <p className="font-semibold text-yellow-700 dark:text-yellow-300">Resistance</p>
+                                            <ul className="list-disc list-inside text-left mt-1">
+                                                {stoppers.map(s => <li key={s.id}>{s.text}</li>)}
+                                            </ul>
+                                        </FlowNode>
+                                    </>
+                                )}
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="w-full bg-red-100/20">
+                                    <p className="font-semibold">Costs & Consequences</p>
+                                    <ul className="list-disc list-inside text-left mt-1">
+                                        {negativeCosts.length > 0 ? negativeCosts.map((c, i) => <li key={i}>{c}</li>) : <li>Not specified</li>}
+                                    </ul>
+                                </FlowNode>
+                            </div>
+
+                             {/* Positive Path */}
+                            <div className="flex flex-col items-center space-y-2 w-1/2">
+                                <Badge variant="secondary" className="bg-green-600 text-white">New Path</Badge>
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="bg-green-100/50 border-green-500/50 w-full">New Response: {linkedHabit.newResponse?.action || '...'}</FlowNode>
+                                <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                                <FlowNode className="w-full bg-green-100/20">
+                                     <p className="font-semibold">Benefits & Rewards</p>
+                                     <ul className="list-disc list-inside text-left mt-1">
+                                        {positiveBenefits.length > 0 ? positiveBenefits.map((b, i) => <li key={i}>{b}</li>) : <li>Not specified</li>}
+                                    </ul>
+                                </FlowNode>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
+const FlowNode = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+    <div className={cn("bg-card border p-2 rounded-md text-center text-xs shadow", className)}>
+        {children}
+    </div>
+);
+
+const ResistanceSection = React.memo(({ habit, isNegative, newStopperText, setNewStopperText, handleAddStopper, handleDeleteStopper, handleStopperStatusChange }: { 
+    habit: Resource, 
+    isNegative: boolean,
+    newStopperText: string,
+    setNewStopperText: (text: string) => void,
+    handleAddStopper: () => void,
+    handleDeleteStopper: (stopperId: string) => void,
+    handleStopperStatusChange: (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => void
+}) => {
+    const { openGeneralPopup } = useAuth();
+    const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
+  
+    return (
+        <div>
+            <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
+              <div className="space-y-2">
+                  {(habit.stoppers || []).map(stopper => {
+                      const isClickable = !!stopper.linkedResourceId;
+                      return (
+                        <div
+                            key={stopper.id}
+                            className={cn(
+                                "text-xs p-2 rounded-md bg-background group w-full text-left",
+                                isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
+                            )}
+                            onClick={(e) => {
+                                if (isClickable) {
+                                    e.stopPropagation();
+                                    openGeneralPopup(stopper.linkedResourceId!, e);
+                                }
+                            }}
+                        >
+                              <div className="flex-grow pr-2">
+                                <p>{stopper.text}</p>
+                                {stopper.managementStrategy && (
+                                  <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
+                                    Strategy: {stopper.managementStrategy}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, stopper.id, 'manageable'); }}>
+                                      <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
+                                      <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
+                                  </Button>
+                                   <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                              </div>
+                          </div>
+                      )
+                  })}
+              </div>
+            </ScrollArea>
+            <div className="mt-2 flex gap-2">
+                <Input
+                    value={newStopperText}
+                    onChange={(e) => setNewStopperText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(); } }}
+                    placeholder={placeholder}
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
+            </div>
+        </div>
+    );
+});
+ResistanceSection.displayName = 'ResistanceSection';
+
+const TruthSection = React.memo(({ habit, isNegative, newStrengthText, setNewStrengthText, handleAddStrength, handleDeleteStrength }: {
+    habit: Resource,
+    isNegative: boolean,
+    newStrengthText: string,
+    setNewStrengthText: (text: string) => void,
+    handleAddStrength: () => void,
+    handleDeleteStrength: (strengthId: string) => void
+}) => {
+    const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
+  
+    return (
+        <div>
+            <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
+              <div className="space-y-2">
+                  {(habit.strengths || []).map(strength => (
+                      <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
+                          <p className="flex-grow pr-2">{strength.text}</p>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(strength.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                      </div>
+                  ))}
+              </div>
+            </ScrollArea>
+            <div className="mt-2 flex gap-2">
+                <Input
+                    value={newStrengthText}
+                    onChange={(e) => setNewStrengthText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(); } }}
+                    placeholder={placeholder}
+                    className="h-8 text-xs"
+                />
+                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
+            </div>
+        </div>
+    );
+});
+TruthSection.displayName = 'TruthSection';
+
 export function HabitDetailPopup({ popupState, onClose }: { 
     popupState: HabitDetailPopupState;
     onClose: () => void; 
@@ -114,6 +346,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `habit-detail-popup-${habit?.id}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
+    const [logicDiagramRule, setLogicDiagramRule] = useState<LogicDiagramPopupState | null>(null);
     const [manageResistancePopupState, setManageResistancePopupState] = useState<{ stopper: Stopper; x: number; y: number; } | null>(null);
     const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
 
@@ -133,13 +366,12 @@ export function HabitDetailPopup({ popupState, onClose }: {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
-    if (!habit) return null;
+    useEffect(() => {
+        setCurrentHabitIndex(0);
+    }, [habitId]);
     
-    const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
-    const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
-
-    const handleAddStopper = () => {
-        if (!newStopperText.trim()) return;
+    const handleAddStopper = useCallback(() => {
+        if (!newStopperText.trim() || !habit) return;
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
             text: newStopperText.trim(),
@@ -152,10 +384,10 @@ export function HabitDetailPopup({ popupState, onClose }: {
             return r;
         }));
         setNewStopperText('');
-    };
+    }, [newStopperText, habit, setResources]);
     
-    const handleAddStrength = () => {
-        if (!newStrengthText.trim()) return;
+    const handleAddStrength = useCallback(() => {
+        if (!newStrengthText.trim() || !habit) return;
         const newStrength: Strength = {
             id: `strength_${Date.now()}`,
             text: newStrengthText.trim(),
@@ -167,27 +399,29 @@ export function HabitDetailPopup({ popupState, onClose }: {
             return r;
         }));
         setNewStrengthText('');
-    };
+    }, [newStrengthText, habit, setResources]);
 
-    const handleDeleteStopper = (stopperId: string) => {
+    const handleDeleteStopper = useCallback((stopperId: string) => {
+        if (!habit) return;
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
                 return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
             }
             return r;
         }));
-    };
+    }, [habit, setResources]);
     
-    const handleDeleteStrength = (strengthId: string) => {
+    const handleDeleteStrength = useCallback((strengthId: string) => {
+        if (!habit) return;
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
                 return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
             }
             return r;
         }));
-    };
+    }, [habit, setResources]);
 
-    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+    const handleStopperStatusChange = useCallback((e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
         const stopper = habit?.stoppers?.find(s => s.id === stopperId);
 
@@ -200,7 +434,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
             });
         } else {
             setResources(prev => prev.map(r => {
-                if (r.id === habit.id) {
+                if (r.id === habit!.id) {
                     const updatedStoppers = (r.stoppers || []).map(s => 
                         s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
                     );
@@ -209,9 +443,10 @@ export function HabitDetailPopup({ popupState, onClose }: {
                 return r;
             }));
         }
-    };
+    }, [habit, setResources]);
     
-    const handleLinkTechniqueToStopper = (stopperId: string, techniqueId: string) => {
+    const handleLinkTechniqueToStopper = useCallback((stopperId: string, techniqueId: string) => {
+        if (!habit) return;
         setResources(prev => prev.map(r => {
             if (r.id === habit.id) {
                 const updatedStoppers = (r.stoppers || []).map(s => 
@@ -221,101 +456,12 @@ export function HabitDetailPopup({ popupState, onClose }: {
             }
             return r;
         }));
-    };
-    
-    const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
-      
-        return (
-            <div>
-                <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
-                  <div className="space-y-2">
-                      {(habit.stoppers || []).map(stopper => {
-                          const isClickable = !!stopper.linkedResourceId;
-                          return (
-                            <div
-                                key={stopper.id}
-                                className={cn(
-                                    "text-xs p-2 rounded-md bg-background group w-full text-left",
-                                    isClickable ? "cursor-pointer hover:bg-muted/50" : "flex items-center justify-between"
-                                )}
-                                onClick={(e) => {
-                                    if (isClickable && cardRef.current) {
-                                        e.stopPropagation();
-                                        openGeneralPopup(stopper.linkedResourceId!, e, popupState, cardRef.current.getBoundingClientRect());
-                                    }
-                                }}
-                            >
-                                  <div className="flex-grow pr-2">
-                                    <p>{stopper.text}</p>
-                                    {stopper.managementStrategy && (
-                                      <p className="text-muted-foreground text-blue-600 dark:text-blue-400 mt-1 italic">
-                                        Strategy: {stopper.managementStrategy}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, habit.id, stopper.id, 'manageable'); }}>
-                                          <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
-                                      </Button>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, habit.id, 'unmanageable'); }}>
-                                          <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
-                                      </Button>
-                                       <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => handleDeleteStopper(habit.id, stopper.id)}>
-                                          <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                  </div>
-                              </div>
-                          )
-                      })}
-                  </div>
-                </ScrollArea>
-                <div className="mt-2 flex gap-2">
-                    <Input
-                        value={newStopperText}
-                        onChange={(e) => setNewStopperText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(); } }}
-                        placeholder={placeholder}
-                        className="h-8 text-xs"
-                    />
-                    <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
-                </div>
-            </div>
-        );
-    });
-    ResistanceSection.displayName = 'ResistanceSection';
+    }, [habit, setResources]);
 
-    const TruthSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
-      
-        return (
-            <div>
-                <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
-                  <div className="space-y-2">
-                      {(habit.strengths || []).map(strength => (
-                          <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
-                              <p className="flex-grow pr-2">{strength.text}</p>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(habit.id, strength.id)}>
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                          </div>
-                      ))}
-                  </div>
-                </ScrollArea>
-                <div className="mt-2 flex gap-2">
-                    <Input
-                        value={newStrengthText}
-                        onChange={(e) => setNewStrengthText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(); } }}
-                        placeholder={placeholder}
-                        className="h-8 text-xs"
-                    />
-                    <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
-                </div>
-            </div>
-        );
-    });
-    TruthSection.displayName = 'TruthSection';
+    if (!habit) return null;
+    
+    const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
+    const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
 
     const TechniquesSection = React.memo(({ habit }: { habit: Resource }) => {
         const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
@@ -411,10 +557,25 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                     <TabsTrigger value="techniques">Techniques</TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="resistance" className="mt-2">
-                                    <ResistanceSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
+                                    <ResistanceSection 
+                                        habit={habit} 
+                                        isNegative={negativeMechanism?.mechanismFramework === 'negative'}
+                                        newStopperText={newStopperText}
+                                        setNewStopperText={setNewStopperText}
+                                        handleAddStopper={handleAddStopper}
+                                        handleDeleteStopper={handleDeleteStopper}
+                                        handleStopperStatusChange={handleStopperStatusChange}
+                                    />
                                 </TabsContent>
                                 <TabsContent value="truth" className="mt-2">
-                                    <TruthSection habit={habit} isNegative={negativeMechanism?.mechanismFramework === 'negative'}/>
+                                    <TruthSection 
+                                        habit={habit} 
+                                        isNegative={negativeMechanism?.mechanismFramework === 'negative'}
+                                        newStrengthText={newStrengthText}
+                                        setNewStrengthText={setNewStrengthText}
+                                        handleAddStrength={handleAddStrength}
+                                        handleDeleteStrength={handleDeleteStrength}
+                                    />
                                 </TabsContent>
                                 <TabsContent value="techniques" className="mt-2">
                                     <TechniquesSection habit={habit} />
@@ -426,7 +587,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
             </div>
              {manageResistancePopupState && (
                 <ManageResistancePopup
-                    habit={resources.find(r => r.id === manageResistancePopupState!.habitId)!}
+                    habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
                     popupState={manageResistancePopupState}
                     onClose={() => setManageResistancePopupState(null)}
                 />
