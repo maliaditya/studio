@@ -39,7 +39,7 @@ export function SmartLoggingPrompt({
     pillarEquations,
     metaRules,
     deepWorkDefinitions,
-    upskillDefinitions
+    upskillDefinitions,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
 
@@ -55,21 +55,46 @@ export function SmartLoggingPrompt({
     if (!activeFocusSession?.activity) return null;
 
     const { activity } = activeFocusSession;
-    const equationIds = activity.habitEquationIds || [];
+    let equationIds: string[] = [];
 
-    if (equationIds.length === 0) return null;
+    if (activity.type === 'mindset') {
+        // For a generic mindset session, find all techniques that have habits linked
+        mindProgrammingDefinitions.forEach(def => {
+            if (def.habitEquationIds) {
+                equationIds.push(...def.habitEquationIds);
+            }
+        });
+    } else {
+        // For specific tasks, find the definition and its linked habits
+        const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
+        const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+        
+        if (mainDef?.habitEquationIds) {
+            equationIds.push(...mainDef.habitEquationIds);
+        }
+    }
     
-    const linkedEquations = allEquations.filter(eq => equationIds.includes(eq.id));
-    if (linkedEquations.length === 0) return null;
+    // Also include any habits directly linked on the activity itself
+    if (activity.habitEquationIds) {
+        equationIds.push(...activity.habitEquationIds);
+    }
     
-    const equationDetails = linkedEquations.map(eq => {
-      const linkedRules = metaRules.filter(rule => eq.metaRuleIds.includes(rule.id));
-      const habit = habitCards.find(h => h.id === eq.linkedResourceId);
-      return { equation: eq, rules: linkedRules, habit };
-    });
+    const uniqueEquationIds = [...new Set(equationIds)];
+
+    if (uniqueEquationIds.length === 0) return null;
+    
+    const equationDetails = uniqueEquationIds.map(eqId => {
+        const equation = allEquations.find(eq => eq.id === eqId);
+        if (!equation) return null;
+
+        const linkedRules = metaRules.filter(rule => equation.metaRuleIds.includes(rule.id));
+        const habit = habitCards.find(h => h.id === equation.linkedResourceId);
+        return { equation, rules: linkedRules, habit };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return equationDetails.length > 0 ? equationDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
 
 
   const prompts = {
@@ -140,7 +165,7 @@ export function SmartLoggingPrompt({
                         </div>
                     </div>
                 )}
-                {promptType === 'focus' && focusContext && (
+                 {promptType === 'focus' && focusContext && (
                      <ScrollArea className="max-h-60 w-full">
                         <div className="space-y-3 pr-4">
                         {focusContext.map(({ equation, rules, habit }) => (
