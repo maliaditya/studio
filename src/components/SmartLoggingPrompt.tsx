@@ -53,24 +53,25 @@ export function SmartLoggingPrompt({
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const focusContext = React.useMemo(() => {
-    if (!activeFocusSession || !activeFocusSession.activity) {
-        return null;
-    }
-    
-    const activity = activeFocusSession.activity;
-    
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions, ...mindProgrammingDefinitions];
-    const taskDef = allDefs.find(d => activity.taskIds?.some((tid: string) => tid.startsWith(d.id)));
+    if (!activeFocusSession?.activity) return null;
 
-    let equationIds: string[] = [];
-    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
-        equationIds = activity.habitEquationIds;
-    } else if (taskDef && taskDef.habitEquationIds && taskDef.habitEquationIds.length > 0) {
-        equationIds = taskDef.habitEquationIds;
-    }
+    const { activity } = activeFocusSession;
     
+    // Consolidate all definitions into one map for easier lookup
+    const allDefs = new Map([
+        ...deepWorkDefinitions.map(d => [d.id, d]),
+        ...upskillDefinitions.map(d => [d.id, d]),
+        ...mindProgrammingDefinitions.map(d => [d.id, d]),
+    ]);
+
+    // Find the primary definition for the scheduled activity
+    const taskDefId = activity.taskIds?.[0]?.split('-')[0];
+    const taskDef = taskDefId ? allDefs.get(taskDefId) : null;
+    
+    // Get equation IDs from either the activity instance or its base definition
+    const equationIds = activity.habitEquationIds || taskDef?.habitEquationIds || [];
     if (equationIds.length === 0) return null;
-
+    
     const linkedEquations = allEquations.filter(eq => equationIds.includes(eq.id));
     if (linkedEquations.length === 0) return null;
     
@@ -80,7 +81,7 @@ export function SmartLoggingPrompt({
       return { equation: eq, rules: linkedRules, habit };
     });
     
-    return equationDetails;
+    return equationDetails.length > 0 ? equationDetails : null;
   }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
 
 
