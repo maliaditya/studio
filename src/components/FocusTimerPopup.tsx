@@ -41,21 +41,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
-  const [totalSeconds, setTotalSeconds] = useState(duration * 60);
-  const [secondsLeft, setSecondsLeft] = useState(initialSecondsLeft);
   
   const [sessionCompletedSubTaskIds, setSessionCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
-  const BREAK_DURATION = 5 * 60; // 5 minutes
-  const WORK_DURATION = 25 * 60; // 25 minutes
-  const [cycleSecondsLeft, setCycleSecondsLeft] = useState(WORK_DURATION);
-
-  const [sessionState, setSessionState] = useState<'running' | 'paused' | 'idle'>('running');
-  const [currentCycle, setCurrentCycle] = useState<'work' | 'break'>('work');
-  const [subTaskStartTime, setSubTaskStartTime] = useState<number | null>(null);
-  
-  const popupRef = useRef<HTMLDivElement>(null);
-  
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
   const [skipBreaks, setSkipBreaks] = useState(false);
@@ -68,7 +56,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
   });
-  
+
   const allDefinitions = useMemo(() => new Map(
       [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
   ), [deepWorkDefinitions, upskillDefinitions]);
@@ -124,23 +112,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
     const durationMins = subTask.estimatedDuration || 25;
-    const durationSecs = durationMins * 60;
-    
-    setTotalSeconds(durationSecs);
-    setSecondsLeft(durationSecs);
-    setCycleSecondsLeft(WORK_DURATION);
-    setCurrentCycle('work');
-    setSessionState('running');
-    setSubTaskStartTime(Date.now());
+    if (activeFocusSession) {
+        setActiveFocusSession({
+            ...activeFocusSession,
+            duration: durationMins,
+            secondsLeft: durationMins * 60,
+            subTaskStartTime: Date.now(),
+        });
+    }
     setIsAudioPlaying(true);
     setPromptForCompletion(false);
-  }, [WORK_DURATION, setIsAudioPlaying]);
+  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying]);
 
   const handleStop = useCallback((completed: boolean) => {
-    setSessionState('idle');
     setIsAudioPlaying(false);
     
-    if (activity) {
+    if (activity && activeFocusSession) {
       const updatedActivity: Activity = { ...activity, focusSessionEndTime: Date.now() };
       updateActivity(updatedActivity);
 
@@ -157,13 +144,13 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name]);
+  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, activeFocusSession]);
   
   const handleSubTaskComplete = useCallback(() => {
-    if (!activeSubTask) return;
+    if (!activeSubTask || !activeFocusSession?.subTaskStartTime) return;
     
     const completionTime = Date.now();
-    const durationMs = subTaskStartTime ? completionTime - subTaskStartTime : 0;
+    const durationMs = completionTime - activeFocusSession.subTaskStartTime;
     const durationMinutes = Math.floor(durationMs / 60000);
     
     if (durationMinutes > 0) {
@@ -182,7 +169,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     } else {
         handleStop(true);
     }
-  }, [activeSubTask, subTaskStartTime, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop]);
+  }, [activeSubTask, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, activeFocusSession]);
   
   const handleStandaloneTaskComplete = () => {
     const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
@@ -198,36 +185,18 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   };
 
   useEffect(() => {
-    if (sessionState === 'idle' && showSubTasks) {
+    if (activeFocusSession?.state === 'idle' && showSubTasks) {
         if (activeSubTask) {
              handleStartSubTask(activeSubTask);
         } else if (subTasks.length > 0 && completedSubTaskComponents.length === subTasks.length) {
             handleStop(true);
         }
     }
-  }, [sessionState, showSubTasks, activeSubTask, handleStartSubTask, subTasks.length, completedSubTaskComponents.length, handleStop]);
-
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    
-    if (sessionState === 'running') {
-      interval = setInterval(() => {
-        setSecondsLeft(s => Math.max(0, s - 1));
-        if (!skipBreaks) {
-          setCycleSecondsLeft(s => s > 0 ? s - 1 : 0);
-        }
-      }, 1000);
-    }
-  
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [sessionState, skipBreaks]);
+  }, [activeFocusSession?.state, showSubTasks, activeSubTask, handleStartSubTask, subTasks.length, completedSubTaskComponents.length, handleStop]);
 
   useEffect(() => {
-    if (secondsLeft <= 0 && sessionState === 'running') {
-      setSessionState('paused');
+    if (activeFocusSession?.secondsLeft === 0 && activeFocusSession.state === 'running') {
+      setActiveFocusSession(prev => prev ? { ...prev, state: 'paused' } : null);
       setIsAudioPlaying(false);
       
       if (showSubTasks) {
@@ -236,39 +205,29 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
           setPromptForCompletion(true);
       }
     }
-
-    if (!skipBreaks && cycleSecondsLeft <= 0 && sessionState === 'running') {
-        if (currentCycle === 'work') {
-            setCurrentCycle('break');
-            setCycleSecondsLeft(BREAK_DURATION);
-            setIsAudioPlaying(false);
-        } else {
-            setCurrentCycle('work');
-            setCycleSecondsLeft(WORK_DURATION);
-            setIsAudioPlaying(true);
-        }
-    }
-  }, [secondsLeft, cycleSecondsLeft, sessionState, currentCycle, setIsAudioPlaying, showSubTasks, handleSubTaskComplete, BREAK_DURATION, WORK_DURATION, skipBreaks]);
+  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying, showSubTasks, handleSubTaskComplete]);
 
   const handleExtendTimer = () => {
     const additionalSeconds = extendMinutes * 60;
-    setTotalSeconds(prev => prev + additionalSeconds);
-    setSecondsLeft(prev => prev + additionalSeconds);
-    
-    if (!skipBreaks) {
-      const remainingCycleTime = cycleSecondsLeft > 0 ? cycleSecondsLeft : 0;
-      setCycleSecondsLeft(remainingCycleTime + additionalSeconds);
-      setCurrentCycle('work');
+    if (activeFocusSession) {
+        setActiveFocusSession({
+            ...activeFocusSession,
+            secondsLeft: (activeFocusSession.secondsLeft || 0) + additionalSeconds,
+            totalSeconds: (activeFocusSession.totalSeconds || 0) + additionalSeconds,
+            state: 'running',
+        });
     }
-
     setPromptForCompletion(false);
-    setSessionState('running');
     setIsAudioPlaying(true);
   };
   
   const handleTogglePause = () => {
-    const isCurrentlyRunning = sessionState === 'running';
-    setSessionState(isCurrentlyRunning ? 'paused' : 'running');
+    if (!activeFocusSession) return;
+    const isCurrentlyRunning = activeFocusSession.state === 'running';
+    setActiveFocusSession({
+        ...activeFocusSession,
+        state: isCurrentlyRunning ? 'paused' : 'running',
+    });
     setIsAudioPlaying(!isCurrentlyRunning);
   };
   
@@ -277,9 +236,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       const newDuration = parseInt(subTaskDurationInput, 10);
       if (!isNaN(newDuration) && newDuration > 0) {
         updateTaskDuration(editingDurationTaskId, newDuration);
-        if (activeSubTask?.id === editingDurationTaskId) {
-          setTotalSeconds(newDuration * 60);
-          setSecondsLeft(newDuration * 60);
+        if (activeSubTask?.id === editingDurationTaskId && activeFocusSession) {
+            setActiveFocusSession({
+                ...activeFocusSession,
+                totalSeconds: newDuration * 60,
+                secondsLeft: newDuration * 60,
+            });
         }
         setEditingDurationTaskId(null);
         setSubTaskDurationInput('');
@@ -305,15 +267,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     router.push('/deep-work');
   };
 
+  const secondsLeft = activeFocusSession?.secondsLeft ?? 0;
+  const totalSeconds = activeFocusSession?.totalSeconds ?? duration * 60;
+
   const elapsedSeconds = totalSeconds - secondsLeft;
-  
   const minutes = Math.floor(secondsLeft / 60);
   const seconds = secondsLeft % 60;
   
-  const cycleMinutes = Math.floor(cycleSecondsLeft / 60);
-  const cycleSeconds = cycleSecondsLeft % 60;
-
-  if (!activity) return null;
+  if (!activity || !activeFocusSession) return null;
 
   const RADIUS = 70;
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -387,14 +348,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                       </span>
                   </div>
               </div>
-              {!skipBreaks && (
-                <div className="text-center -mt-2">
-                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                        {sessionState === 'running' && (currentCycle === 'work' ? <BrainCircuit className="h-4 w-4" /> : <Coffee className="h-4 w-4" />)}
-                        <span className="font-mono">{String(cycleMinutes).padStart(2, '0')}:{String(cycleSeconds).padStart(2, '0')}</span>
-                    </div>
-                </div>
-              )}
+
               <div className="mt-2 text-center">
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
@@ -413,7 +367,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                   {!promptForCompletion && (
                     <div className="flex items-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
-                          {sessionState === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {activeFocusSession.state === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                       </Button>
                       <Button variant="ghost" size="icon" className="h-7 w-7 text-green-500" onClick={showSubTasks ? handleSubTaskComplete : handleStandaloneTaskComplete}>
                           <Check className="h-4 w-4" />
@@ -448,7 +402,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             size="icon"
                             className="h-7 w-7"
                             onClick={() => handleStartSubTask(task)}
-                            disabled={sessionState === 'running' || promptForCompletion}
+                            disabled={activeFocusSession.state === 'running' || promptForCompletion}
                         >
                             <Play className="h-4 w-4" />
                         </Button>

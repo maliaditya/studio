@@ -47,6 +47,17 @@ interface UserSettings {
   autoPushLimit: number;
 }
 
+interface ActiveFocusSession {
+  activity: Activity;
+  duration: number; // in minutes
+  secondsLeft: number;
+  totalSeconds: number;
+  startTime: number; // Timestamp of when the session (or current work segment) started
+  state: 'running' | 'paused' | 'idle';
+  subTaskStartTime?: number | null;
+}
+
+
 interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
@@ -107,8 +118,8 @@ interface AuthContextType {
   focusDuration: number;
   onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
-  activeFocusSession: { activity: Activity; duration: number; secondsLeft: number } | null;
-  setActiveFocusSession: React.Dispatch<React.SetStateAction<{ activity: Activity; duration: number; secondsLeft: number; } | null>>;
+  activeFocusSession: ActiveFocusSession | null;
+  setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
 
   // Global Logs State
   allUpskillLogs: DatedWorkout[];
@@ -459,7 +470,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
   const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
   const [focusDuration, setFocusDuration] = useState(45);
-  const [activeFocusSession, setActiveFocusSession] = useState<{ activity: Activity, duration: number, secondsLeft: number } | null>(null);
+  const [activeFocusSession, setActiveFocusSession] = useState<ActiveFocusSession | null>(null);
 
   // Canvas State
   const [canvasLayout, setCanvasLayout] = useState<CanvasLayout>({ nodes: [], edges: [] });
@@ -501,6 +512,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+
+  useEffect(() => {
+    const timerInterval = setInterval(() => {
+      if (activeFocusSession && activeFocusSession.state === 'running') {
+        const now = Date.now();
+        const elapsed = (now - activeFocusSession.startTime) / 1000;
+        const newSecondsLeft = Math.max(0, activeFocusSession.totalSeconds - elapsed);
+        setActiveFocusSession(prev => prev ? { ...prev, secondsLeft: newSecondsLeft } : null);
+      }
+    }, 1000);
+    return () => clearInterval(timerInterval);
+  }, [activeFocusSession]);
 
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     if (!subTaskId || durationMinutes <= 0) return;
@@ -798,6 +821,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         activity: updatedActivity,
         duration: duration,
         secondsLeft: duration * 60,
+        totalSeconds: duration * 60,
+        startTime: Date.now(),
+        state: 'running',
     });
     setFocusSessionModalOpen(false);
 };
@@ -1024,7 +1050,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedProjectId(uiState.selectedProjectId || null);
     setSelectedCompanyId(uiState.selectedCompanyId || null);
     setRecentItems(uiState.recentItems || []);
-    setActiveFocusSession(uiState.activeFocusSession || null);
+    if (uiState.activeFocusSession) {
+        const session = uiState.activeFocusSession;
+        const elapsed = (Date.now() - session.startTime) / 1000;
+        const newSecondsLeft = Math.max(0, session.totalSeconds - elapsed);
+        setActiveFocusSession({ ...session, secondsLeft: newSecondsLeft });
+    } else {
+        setActiveFocusSession(null);
+    }
     setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
     
     setTimeout(() => setIsLoadingState(false), 100); 
@@ -2763,5 +2796,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
