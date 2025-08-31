@@ -88,8 +88,7 @@ export function TodaysMindsetModal({
             Perform your chosen mindset techniques.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-grow min-h-0">
-          <ScrollArea className="h-full pr-4">
+        <div className="flex-grow min-h-0 overflow-y-auto pr-4">
             {exercisesForToday.length > 0 ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {exercisesForToday.map(exerciseDef => {
@@ -125,9 +124,8 @@ export function TodaysMindsetModal({
                   <p className="text-sm">Go to the Mind Programming page to add techniques.</p>
                 </div>
             )}
-          </ScrollArea>
         </div>
-        <DialogFooter className="flex-shrink-0 pt-4">
+        <DialogFooter className="flex-shrink-0 pt-4 border-t">
             <Button onClick={handleCompleteMindset}>
                 Mark as Complete & Close
             </Button>
