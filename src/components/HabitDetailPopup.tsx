@@ -115,6 +115,11 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [manageResistancePopupState, setManageResistancePopupState] = useState<{ stopper: Stopper; x: number; y: number; } | null>(null);
+    const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
+
+    const [newStopperText, setNewStopperText] = useState('');
+    const [newStrengthText, setNewStrengthText] = useState('');
+
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -133,7 +138,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
 
-    const handleAddStopper = (habitId: string, newStopperText: string) => {
+    const handleAddStopper = () => {
         if (!newStopperText.trim()) return;
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
@@ -141,48 +146,49 @@ export function HabitDetailPopup({ popupState, onClose }: {
             status: 'none',
         };
         setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
+            if (r.id === habit.id) {
                 return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
             }
             return r;
         }));
+        setNewStopperText('');
     };
     
-    const handleAddStrength = (habitId: string, newStrengthText: string) => {
+    const handleAddStrength = () => {
         if (!newStrengthText.trim()) return;
         const newStrength: Strength = {
             id: `strength_${Date.now()}`,
             text: newStrengthText.trim(),
         };
         setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
+            if (r.id === habit.id) {
                 return { ...r, strengths: [...(r.strengths || []), newStrength] };
             }
             return r;
         }));
+        setNewStrengthText('');
     };
 
-    const handleDeleteStopper = (habitId: string, stopperId: string) => {
+    const handleDeleteStopper = (stopperId: string) => {
         setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
+            if (r.id === habit.id) {
                 return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
             }
             return r;
         }));
     };
     
-    const handleDeleteStrength = (habitId: string, strengthId: string) => {
+    const handleDeleteStrength = (strengthId: string) => {
         setResources(prev => prev.map(r => {
-            if (r.id === habitId) {
+            if (r.id === habit.id) {
                 return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
             }
             return r;
         }));
     };
 
-    const handleStopperStatusChange = (e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
+    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
-        const habit = resources.find(r => r.id === habitId);
         const stopper = habit?.stoppers?.find(s => s.id === stopperId);
 
         if (status === 'manageable' && stopper) {
@@ -194,7 +200,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
             });
         } else {
             setResources(prev => prev.map(r => {
-                if (r.id === habitId) {
+                if (r.id === habit.id) {
                     const updatedStoppers = (r.stoppers || []).map(s => 
                         s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
                     );
@@ -216,9 +222,8 @@ export function HabitDetailPopup({ popupState, onClose }: {
             return r;
         }));
     };
-
-    const ResistanceSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const [newStopperText, setNewStopperText] = useState('');
+    
+    const ResistanceSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
       
         return (
@@ -269,18 +274,18 @@ export function HabitDetailPopup({ popupState, onClose }: {
                     <Input
                         value={newStopperText}
                         onChange={(e) => setNewStopperText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(); } }}
                         placeholder={placeholder}
                         className="h-8 text-xs"
                     />
-                    <Button size="sm" onClick={() => { handleAddStopper(habit.id, newStopperText); setNewStopperText(''); }} className="h-8">Add</Button>
+                    <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
                 </div>
             </div>
         );
-      };
+    });
+    ResistanceSection.displayName = 'ResistanceSection';
 
-    const TruthSection = ({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
-        const [newStrengthText, setNewStrengthText] = useState('');
+    const TruthSection = React.memo(({ habit, isNegative }: { habit: Resource, isNegative: boolean }) => {
         const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
       
         return (
@@ -301,17 +306,18 @@ export function HabitDetailPopup({ popupState, onClose }: {
                     <Input
                         value={newStrengthText}
                         onChange={(e) => setNewStrengthText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); } }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(); } }}
                         placeholder={placeholder}
                         className="h-8 text-xs"
                     />
-                    <Button size="sm" onClick={() => { handleAddStrength(habit.id, newStrengthText); setNewStrengthText(''); }} className="h-8">Add</Button>
+                    <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
                 </div>
             </div>
         );
-    };
+    });
+    TruthSection.displayName = 'TruthSection';
 
-    const TechniquesSection = ({ habit }: { habit: Resource }) => {
+    const TechniquesSection = React.memo(({ habit }: { habit: Resource }) => {
         const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
     
         return (
@@ -358,7 +364,8 @@ export function HabitDetailPopup({ popupState, onClose }: {
                 </ScrollArea>
             </div>
         );
-    };
+    });
+    TechniquesSection.displayName = 'TechniquesSection';
 
 
     return (
@@ -419,7 +426,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
             </div>
              {manageResistancePopupState && (
                 <ManageResistancePopup
-                    habit={resources.find(r => r.id === manageResistancePopupState.habitId)!}
+                    habit={resources.find(r => r.id === manageResistancePopupState!.habitId)!}
                     popupState={manageResistancePopupState}
                     onClose={() => setManageResistancePopupState(null)}
                 />
