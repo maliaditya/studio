@@ -119,6 +119,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     mindsetTechniquePopup,
     closeMindsetTechniquePopup,
     handleMindsetTechniquePopupDragEnd,
+    openMindsetTechniquePopup,
   } = useAuth();
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -369,6 +370,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           metaRules={metaRules}
           deepWorkDefinitions={deepWorkDefinitions}
           upskillDefinitions={upskillDefinitions}
+          openMindsetTechniquePopup={openMindsetTechniquePopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
