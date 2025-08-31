@@ -74,10 +74,14 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
 function AppWrapper({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
+  const authContext = useAuth();
   const { 
-    isPistonsHeadOpen, setIsPistonsHeadOpen, 
-    openPopups, ResourcePopup, handlePopupDragEnd, 
-    intentionPopups, closeIntentionPopup, 
+    isPistonsHeadOpen,
+    handlePopupDragEnd,
+    openPopups, 
+    ResourcePopup, 
+    intentionPopups, 
+    closeIntentionPopup,
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
@@ -104,22 +108,11 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     focusActivity,
     handleStartFocusSession,
     focusDuration,
-    settings,
-    projects,
-    productizationPlans,
-    offerizationPlans,
-    mindProgrammingDefinitions,
-    habitCards,
-    pillarEquations,
-    metaRules,
-    deepWorkDefinitions,
-    upskillDefinitions,
     mindsetTechniquePopup,
     closeMindsetTechniquePopup,
     handleMindsetTechniquePopupDragEnd,
-    openMindsetTechniquePopup,
     currentSlot,
-  } = useAuth();
+  } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState('');
@@ -190,7 +183,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const selectedDaySchedule = schedule[selectedDateKey] || {};
 
   const { promptType, lastSessionReview } = useMemo(() => {
-    if (!settings.smartLogging || !currentSlot) return { promptType: null, lastSessionReview: null };
+    if (!authContext.settings.smartLogging || !currentSlot) return { promptType: null, lastSessionReview: null };
   
     if (activeFocusSession) {
       return { 
@@ -219,7 +212,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     }
   
     return { promptType: null, lastSessionReview: null };
-  }, [settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
+  }, [authContext.settings.smartLogging, selectedDaySchedule, currentSlot, activeFocusSession, remainingTime]);
 
   const activeProjectsForPrompt = useMemo(() => {
     if (promptType !== 'completed') return [];
@@ -227,13 +220,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     const activeProjectIds = new Set<string>();
     const today = startOfToday();
   
-    (projects || []).forEach(project => {
-      if (productizationPlans && productizationPlans[project.name]) {
+    (authContext.projects || []).forEach(project => {
+      if (authContext.productizationPlans && authContext.productizationPlans[project.name]) {
           activeProjectIds.add(project.id);
           return;
       }
 
-      const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+      const isOfferedAndActive = Object.values(authContext.offerizationPlans).some(plan => 
           plan.releases?.some(release => {
               if (release.name !== project.name) return false;
               try {
@@ -246,8 +239,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       }
     });
   
-    return (projects || []).filter(p => activeProjectIds.has(p.id));
-  }, [promptType, projects, productizationPlans, offerizationPlans]);
+    return (authContext.projects || []).filter(p => activeProjectIds.has(p.id));
+  }, [promptType, authContext.projects, authContext.productizationPlans, authContext.offerizationPlans]);
 
   const handleSaveInterrupt = () => {
     const { slotName, activityType } = interruptModalState;
@@ -357,19 +350,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         />
       )}
       <SmartLoggingPrompt 
+          authContext={authContext}
           promptType={promptType} 
           onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
           activeProjects={activeProjectsForPrompt}
           currentSlot={currentSlot}
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
-          mindProgrammingDefinitions={mindProgrammingDefinitions}
-          habitCards={habitCards}
-          pillarEquations={pillarEquations}
-          metaRules={metaRules}
-          deepWorkDefinitions={deepWorkDefinitions}
-          upskillDefinitions={upskillDefinitions}
-          openMindsetTechniquePopup={openMindsetTechniquePopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>

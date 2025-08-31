@@ -8,43 +8,40 @@ import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Z
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, AuthContextType } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 
 interface SmartLoggingPromptProps {
+  authContext: AuthContextType;
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
   activeProjects: Project[];
   onOpenInterruptModal: () => void;
   currentSlot: string;
   activeFocusSession: { activity: any } | null;
   lastSessionReview: PostSessionReview | null;
-  mindProgrammingDefinitions: ExerciseDefinition[];
-  habitCards: Resource[];
-  pillarEquations: Record<string, HabitEquation[]>;
-  metaRules: MetaRule[];
-  deepWorkDefinitions: ExerciseDefinition[];
-  upskillDefinitions: ExerciseDefinition[];
-  openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
 }
 
 export function SmartLoggingPrompt({ 
+    authContext,
     promptType, 
     activeProjects, 
     onOpenInterruptModal, 
     currentSlot, 
     activeFocusSession, 
     lastSessionReview,
-    mindProgrammingDefinitions,
-    habitCards,
+}: SmartLoggingPromptProps) {
+  const router = useRouter();
+  const { 
     pillarEquations,
     metaRules,
+    habitCards,
+    mindProgrammingDefinitions,
     deepWorkDefinitions,
     upskillDefinitions,
     openMindsetTechniquePopup,
-}: SmartLoggingPromptProps) {
-  const router = useRouter();
+  } = authContext;
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
@@ -69,6 +66,7 @@ export function SmartLoggingPrompt({
     // For specific tasks, find the definition and its links.
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const definition = allDefs.find(def => activity.taskIds?.some((tid: string) => tid.startsWith(def.id)));
+    
     const habitIds = activity.habitEquationIds || definition?.habitEquationIds || [];
 
     if (habitIds.length === 0) return null;
