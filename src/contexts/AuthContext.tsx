@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -769,13 +768,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, markObjectiveActivityAsComplete]);
   
   const handleStartFocusSession = (activity: Activity, duration: number) => {
+    const dateKey = format(new Date(), 'yyyy-MM-dd');
+    const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
+
+    const activityToStart = fullActivityFromState || activity;
+    
+    const updatedActivity: Activity = {
+        ...activityToStart,
+        focusSessionInitialStartTime: Date.now(),
+        focusSessionStartTime: Date.now(),
+        focusSessionEndTime: undefined,
+        focusSessionPauses: [],
+        focusSessionInitialDuration: duration,
+    };
+    
+    updateActivity(updatedActivity); // Persist start time immediately
+
     setActiveFocusSession({
-        activity,
+        activity: updatedActivity,
         duration: duration,
         secondsLeft: duration * 60,
     });
     setFocusSessionModalOpen(false);
-  };
+};
 
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2686,3 +2701,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
