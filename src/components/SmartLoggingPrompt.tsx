@@ -55,28 +55,8 @@ export function SmartLoggingPrompt({
     if (!activeFocusSession?.activity) return null;
 
     const { activity } = activeFocusSession;
-    
-    // Consolidate all definitions into one map for easier lookup
-    const allDefs = new Map([
-        ...deepWorkDefinitions.map(d => [d.id, d]),
-        ...upskillDefinitions.map(d => [d.id, d]),
-        ...mindProgrammingDefinitions.map(d => [d.id, d]),
-    ]);
+    const equationIds = activity.habitEquationIds || [];
 
-    let equationIds: string[] = [];
-
-    // Find the primary definition(s) for the scheduled activity
-    if (activity.type === 'mindset') {
-        // For a general mindset session, check all mindset techniques for links
-        equationIds = mindProgrammingDefinitions.flatMap(def => def.habitEquationIds || []);
-    } else {
-        const taskDefId = activity.taskIds?.[0]?.split('-')[0];
-        const taskDef = taskDefId ? allDefs.get(taskDefId) : null;
-        
-        // Get equation IDs from either the activity instance or its base definition
-        equationIds = activity.habitEquationIds || taskDef?.habitEquationIds || [];
-    }
-    
     if (equationIds.length === 0) return null;
     
     const linkedEquations = allEquations.filter(eq => equationIds.includes(eq.id));
@@ -89,7 +69,7 @@ export function SmartLoggingPrompt({
     });
     
     return equationDetails.length > 0 ? equationDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, deepWorkDefinitions, upskillDefinitions, mindProgrammingDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards]);
 
 
   const prompts = {
