@@ -14,23 +14,25 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 
 interface SmartLoggingPromptProps {
-  authContext: AuthContextType;
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
   activeProjects: Project[];
   onOpenInterruptModal: () => void;
   currentSlot: string;
   activeFocusSession: { activity: any } | null;
   lastSessionReview: PostSessionReview | null;
+  authContext: AuthContextType;
+  openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
 }
 
 export function SmartLoggingPrompt({ 
-    authContext,
     promptType, 
     activeProjects, 
     onOpenInterruptModal, 
     currentSlot, 
     activeFocusSession, 
     lastSessionReview,
+    authContext,
+    openMindsetTechniquePopup,
 }: SmartLoggingPromptProps) {
   const router = useRouter();
   const { 
@@ -38,9 +40,6 @@ export function SmartLoggingPrompt({
     metaRules,
     habitCards,
     mindProgrammingDefinitions,
-    deepWorkDefinitions,
-    upskillDefinitions,
-    openMindsetTechniquePopup,
   } = authContext;
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
@@ -63,11 +62,7 @@ export function SmartLoggingPrompt({
         return mindsetHabitDetails.length > 0 ? mindsetHabitDetails : null;
     }
     
-    // For specific tasks, find the definition and its links.
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const definition = allDefs.find(def => activity.taskIds?.some((tid: string) => tid.startsWith(def.id)));
-    
-    const habitIds = activity.habitEquationIds || definition?.habitEquationIds || [];
+    const habitIds = activity.habitEquationIds || [];
 
     if (habitIds.length === 0) return null;
     
@@ -90,7 +85,7 @@ export function SmartLoggingPrompt({
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, mindProgrammingDefinitions, deepWorkDefinitions, upskillDefinitions]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, mindProgrammingDefinitions]);
 
 
   const prompts = {

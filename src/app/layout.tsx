@@ -112,6 +112,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeMindsetTechniquePopup,
     handleMindsetTechniquePopupDragEnd,
     currentSlot,
+    openMindsetTechniquePopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -350,13 +351,14 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         />
       )}
       <SmartLoggingPrompt 
-          authContext={authContext}
           promptType={promptType} 
           onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
           activeProjects={activeProjectsForPrompt}
           currentSlot={currentSlot}
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
+          authContext={authContext}
+          openMindsetTechniquePopup={openMindsetTechniquePopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -519,3 +521,4 @@ export default function RootLayout({
     </html>
   );
 }
+
