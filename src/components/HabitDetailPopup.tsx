@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -225,18 +226,22 @@ const FlowNode = ({ children, className }: { children: React.ReactNode, classNam
     </div>
 );
 
-const ResistanceSection = React.memo(({ habit, isNegative, newStopperText, setNewStopperText, handleAddStopper, handleDeleteStopper, handleStopperStatusChange }: { 
+const ResistanceSection = React.memo(({ habit, isNegative, onStopperStatusChange, onDeleteStopper, onAddStopper }: { 
     habit: Resource, 
     isNegative: boolean,
-    newStopperText: string,
-    setNewStopperText: (text: string) => void,
-    handleAddStopper: () => void,
-    handleDeleteStopper: (stopperId: string) => void,
-    handleStopperStatusChange: (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => void
+    onStopperStatusChange: (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => void,
+    onDeleteStopper: (stopperId: string) => void,
+    onAddStopper: (text: string) => void
 }) => {
     const { openGeneralPopup } = useAuth();
+    const [newStopperText, setNewStopperText] = useState('');
     const placeholder = isNegative ? "What's the urge?" : "What's stopping you?";
   
+    const handleAdd = () => {
+        onAddStopper(newStopperText);
+        setNewStopperText('');
+    };
+
     return (
         <div>
             <ScrollArea className={cn((habit.stoppers || []).length > 4 && "h-40", "pr-2")}>
@@ -266,13 +271,13 @@ const ResistanceSection = React.memo(({ habit, isNegative, newStopperText, setNe
                                 )}
                               </div>
                               <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { handleStopperStatusChange(e, stopper.id, 'manageable'); }}>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { onStopperStatusChange(e, stopper.id, 'manageable'); }}>
                                       <ThumbsUp className={cn("h-4 w-4", stopper.status === 'manageable' ? 'text-green-500' : 'text-muted-foreground')} />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); handleStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={(e) => { e.stopPropagation(); onStopperStatusChange(e, stopper.id, 'unmanageable'); }}>
                                       <ThumbsDown className={cn("h-4 w-4", stopper.status === 'unmanageable' ? 'text-red-500' : 'text-muted-foreground')} />
                                   </Button>
-                                   <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => handleDeleteStopper(stopper.id)}>
+                                   <Button variant="ghost" size="icon" className="h-6 w-6" onPointerDown={() => onDeleteStopper(stopper.id)}>
                                       <Trash2 className="h-3 w-3 text-destructive" />
                                   </Button>
                               </div>
@@ -285,27 +290,31 @@ const ResistanceSection = React.memo(({ habit, isNegative, newStopperText, setNe
                 <Input
                     value={newStopperText}
                     onChange={(e) => setNewStopperText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStopper(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAdd(); } }}
                     placeholder={placeholder}
                     className="h-8 text-xs"
                 />
-                <Button size="sm" onClick={handleAddStopper} className="h-8">Add</Button>
+                <Button size="sm" onClick={handleAdd} className="h-8">Add</Button>
             </div>
         </div>
     );
 });
 ResistanceSection.displayName = 'ResistanceSection';
 
-const TruthSection = React.memo(({ habit, isNegative, newStrengthText, setNewStrengthText, handleAddStrength, handleDeleteStrength }: {
+const TruthSection = React.memo(({ habit, isNegative, onAddStrength, onDeleteStrength }: {
     habit: Resource,
     isNegative: boolean,
-    newStrengthText: string,
-    setNewStrengthText: (text: string) => void,
-    handleAddStrength: () => void,
-    handleDeleteStrength: (strengthId: string) => void
+    onAddStrength: (text: string) => void,
+    onDeleteStrength: (strengthId: string) => void
 }) => {
+    const [newStrengthText, setNewStrengthText] = useState('');
     const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
-  
+    
+    const handleAdd = () => {
+        onAddStrength(newStrengthText);
+        setNewStrengthText('');
+    };
+
     return (
         <div>
             <ScrollArea className={cn((habit.strengths || []).length > 4 && "h-40", "pr-2")}>
@@ -313,7 +322,7 @@ const TruthSection = React.memo(({ habit, isNegative, newStrengthText, setNewStr
                   {(habit.strengths || []).map(strength => (
                       <div key={strength.id} className="text-xs flex items-center justify-between p-2 rounded-md bg-background group w-full text-left">
                           <p className="flex-grow pr-2">{strength.text}</p>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => handleDeleteStrength(strength.id)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onPointerDown={() => onDeleteStrength(strength.id)}>
                             <Trash2 className="h-3 w-3 text-destructive" />
                           </Button>
                       </div>
@@ -324,11 +333,11 @@ const TruthSection = React.memo(({ habit, isNegative, newStrengthText, setNewStr
                 <Input
                     value={newStrengthText}
                     onChange={(e) => setNewStrengthText(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAddStrength(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { handleAdd(); } }}
                     placeholder={placeholder}
                     className="h-8 text-xs"
                 />
-                <Button size="sm" onClick={handleAddStrength} className="h-8">Add</Button>
+                <Button size="sm" onClick={handleAdd} className="h-8">Add</Button>
             </div>
         </div>
     );
@@ -347,12 +356,8 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const cardRef = useRef<HTMLDivElement>(null);
 
     const [logicDiagramRule, setLogicDiagramRule] = useState<LogicDiagramPopupState | null>(null);
-    const [manageResistancePopupState, setManageResistancePopupState] = useState<{ stopper: Stopper; x: number; y: number; } | null>(null);
+    const [manageResistancePopupState, setManageResistancePopupState] = useState<{ habitId: string, stopper: Stopper; x: number; y: number; } | null>(null);
     const [currentHabitIndex, setCurrentHabitIndex] = useState(0);
-
-    const [newStopperText, setNewStopperText] = useState('');
-    const [newStrengthText, setNewStrengthText] = useState('');
-
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -370,71 +375,69 @@ export function HabitDetailPopup({ popupState, onClose }: {
         setCurrentHabitIndex(0);
     }, [habitId]);
     
-    const handleAddStopper = useCallback(() => {
-        if (!newStopperText.trim() || !habit) return;
+    const handleAddStopper = useCallback((habitId: string, newStopperText: string) => {
+        if (!newStopperText.trim()) return;
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
             text: newStopperText.trim(),
             status: 'none',
         };
         setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
+            if (r.id === habitId) {
                 return { ...r, stoppers: [...(r.stoppers || []), newStopper] };
             }
             return r;
         }));
-        setNewStopperText('');
-    }, [newStopperText, habit, setResources]);
+    }, [setResources]);
     
-    const handleAddStrength = useCallback(() => {
-        if (!newStrengthText.trim() || !habit) return;
+    const handleAddStrength = useCallback((habitId: string, newStrengthText: string) => {
+        if (!newStrengthText.trim()) return;
         const newStrength: Strength = {
             id: `strength_${Date.now()}`,
             text: newStrengthText.trim(),
         };
         setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
+            if (r.id === habitId) {
                 return { ...r, strengths: [...(r.strengths || []), newStrength] };
             }
             return r;
         }));
-        setNewStrengthText('');
-    }, [newStrengthText, habit, setResources]);
+    }, [setResources]);
 
-    const handleDeleteStopper = useCallback((stopperId: string) => {
-        if (!habit) return;
+    const handleDeleteStopper = useCallback((habitId: string, stopperId: string) => {
         setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
+            if (r.id === habitId) {
                 return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
             }
             return r;
         }));
-    }, [habit, setResources]);
+    }, [setResources]);
     
-    const handleDeleteStrength = useCallback((strengthId: string) => {
-        if (!habit) return;
+    const handleDeleteStrength = useCallback((habitId: string, strengthId: string) => {
         setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
+            if (r.id === habitId) {
                 return { ...r, strengths: (r.strengths || []).filter(s => s.id !== strengthId) };
             }
             return r;
         }));
-    }, [habit, setResources]);
+    }, [setResources]);
 
-    const handleStopperStatusChange = useCallback((e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+    const handleStopperStatusChange = useCallback((e: React.PointerEvent, habitId: string, stopperId: string, status: Stopper['status']) => {
         e.stopPropagation();
-        const stopper = habit?.stoppers?.find(s => s.id === stopperId);
+        const habitForStopper = resources.find(r => r.id === habitId);
+        const stopper = habitForStopper?.stoppers?.find(s => s.id === stopperId);
 
         if (status === 'manageable' && stopper) {
             const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             setManageResistancePopupState({
+                habitId,
                 stopper,
                 x: rect.right + 10,
                 y: rect.top
             });
         } else {
             setResources(prev => prev.map(r => {
-                if (r.id === habit!.id) {
+                if (r.id === habitId) {
                     const updatedStoppers = (r.stoppers || []).map(s => 
                         s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s
                     );
@@ -443,7 +446,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                 return r;
             }));
         }
-    }, [habit, setResources]);
+    }, [resources, setResources]);
     
     const handleLinkTechniqueToStopper = useCallback((stopperId: string, techniqueId: string) => {
         if (!habit) return;
@@ -463,7 +466,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
     const negativeMechanism = habit ? mechanismCards.find(m => m.id === habit.response?.resourceId) : null;
     const positiveMechanism = habit ? mechanismCards.find(m => m.id === habit.newResponse?.resourceId) : null;
 
-    const TechniquesSection = React.memo(({ habit }: { habit: Resource }) => {
+    const TechniquesSection = React.memo(({ habit, onLinkTechnique }: { habit: Resource, onLinkTechnique: (stopperId: string, techniqueId: string) => void }) => {
         const unassignedStoppers = (habit.stoppers || []).filter(s => !s.linkedTechniqueId);
     
         return (
@@ -491,7 +494,7 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent>
-                                            <Select onValueChange={(stopperId) => handleLinkTechniqueToStopper(stopperId, technique.id)}>
+                                            <Select onValueChange={(stopperId) => onLinkTechnique(stopperId, technique.id)}>
                                                 <SelectTrigger><SelectValue placeholder="Select an urge..." /></SelectTrigger>
                                                 <SelectContent>
                                                     {unassignedStoppers.map(s => (
@@ -560,25 +563,21 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                     <ResistanceSection 
                                         habit={habit} 
                                         isNegative={negativeMechanism?.mechanismFramework === 'negative'}
-                                        newStopperText={newStopperText}
-                                        setNewStopperText={setNewStopperText}
-                                        handleAddStopper={handleAddStopper}
-                                        handleDeleteStopper={handleDeleteStopper}
-                                        handleStopperStatusChange={handleStopperStatusChange}
+                                        onAddStopper={(text) => handleAddStopper(habit.id, text)}
+                                        onDeleteStopper={(id) => handleDeleteStopper(habit.id, id)}
+                                        onStopperStatusChange={handleStopperStatusChange}
                                     />
                                 </TabsContent>
                                 <TabsContent value="truth" className="mt-2">
                                     <TruthSection 
                                         habit={habit} 
                                         isNegative={negativeMechanism?.mechanismFramework === 'negative'}
-                                        newStrengthText={newStrengthText}
-                                        setNewStrengthText={setNewStrengthText}
-                                        handleAddStrength={handleAddStrength}
-                                        handleDeleteStrength={handleDeleteStrength}
+                                        onAddStrength={(text) => handleAddStrength(habit.id, text)}
+                                        onDeleteStrength={(id) => handleDeleteStrength(habit.id, id)}
                                     />
                                 </TabsContent>
                                 <TabsContent value="techniques" className="mt-2">
-                                    <TechniquesSection habit={habit} />
+                                    <TechniquesSection habit={habit} onLinkTechnique={handleLinkTechniqueToStopper} />
                                 </TabsContent>
                             </Tabs>
                         </div>
