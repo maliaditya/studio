@@ -162,7 +162,7 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
 
     return (
         <div className="editable-sentence group/response">
-          <span contentEditable={false} className="uneditable-text">{label}:</span>
+          {label && <span contentEditable={false} className="uneditable-text">{label}: </span>}
           {linkedResource ? (
             <>
                 <button 

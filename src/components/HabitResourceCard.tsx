@@ -44,13 +44,9 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
             </CardHeader>
             <CardContent className="flex-grow space-y-2">
                 <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                <div className="editable-sentence">
-                    <span contentEditable={false} className="font-bold text-foreground">
-                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
-                    </span>
-                </div>
+                <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
                 <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
+                <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={onOpenNestedPopup} />
             </CardContent>
             <CardFooter>
                  <p className="text-xs text-muted-foreground">Double-click any text to edit.</p>
