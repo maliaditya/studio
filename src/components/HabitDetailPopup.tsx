@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -239,6 +238,7 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
     );
 };
 
+
 const ResistanceSection = React.memo(({ habit, isNegative, onAddStopper, onDeleteStopper, onStopperStatusChange, onLinkTechnique }: { 
     habit: Resource, 
     isNegative: boolean,
@@ -342,14 +342,13 @@ const ResistanceSection = React.memo(({ habit, isNegative, onAddStopper, onDelet
 });
 ResistanceSection.displayName = 'ResistanceSection';
 
-const TruthSection = React.memo(({ habit, isNegative, onAddStrength, onDeleteStrength }: {
+const TruthSection = React.memo(({ habit, onAddStrength, onDeleteStrength }: {
     habit: Resource,
-    isNegative: boolean,
     onAddStrength: (text: string) => void,
     onDeleteStrength: (strengthId: string) => void
 }) => {
     const [newStrengthText, setNewStrengthText] = useState('');
-    const placeholder = isNegative ? "What's the truth?" : "What's a reinforcing truth?";
+    const placeholder = "What's a reinforcing truth?";
     
     const handleAdd = () => {
         onAddStrength(newStrengthText);
@@ -385,12 +384,11 @@ const TruthSection = React.memo(({ habit, isNegative, onAddStrength, onDeleteStr
 });
 TruthSection.displayName = 'TruthSection';
 
-
 export function HabitDetailPopup({ popupState, onClose }: { 
     popupState: HabitDetailPopupState;
     onClose: () => void; 
 }) {
-    const { setResources, mechanismCards, resources, openGeneralPopup, mindProgrammingDefinitions, patterns } = useAuth();
+    const { setResources, mechanismCards, resources, openGeneralPopup, mindProgrammingDefinitions, patterns, habitCards } = useAuth();
     const { habitId, x, y } = popupState;
     const habit = resources.find(r => r.id === habitId);
     
@@ -417,6 +415,12 @@ export function HabitDetailPopup({ popupState, onClose }: {
         setCurrentHabitIndex(0);
     }, [habitId]);
     
+    const pattern = useMemo(() => {
+        if (!habit) return null;
+        return patterns.find(p => p.phrases.some(ph => ph.category === 'Habit Cards' && ph.mechanismCardId === habit.id));
+    }, [habit, patterns]);
+
+
     const handleAddStopper = useCallback((habitId: string, newStopperText: string) => {
         if (!newStopperText.trim()) return;
         const newStopper: Stopper = {
@@ -601,7 +605,6 @@ export function HabitDetailPopup({ popupState, onClose }: {
                                 <TabsContent value="truth" className="mt-2">
                                     <TruthSection 
                                         habit={habit} 
-                                        isNegative={negativeMechanism?.mechanismFramework === 'negative'}
                                         onAddStrength={(text) => handleAddStrength(habit.id, text)}
                                         onDeleteStrength={(id) => handleDeleteStrength(habit.id, id)}
                                     />
