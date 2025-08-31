@@ -266,14 +266,15 @@ export function SmartLoggingPrompt({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
-            className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3"
+            className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 max-h-[calc(100vh-7rem)]"
             >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="flex-shrink-0">{currentPrompt.icon}</div>
                 <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
             </div>
-            <p className="text-sm text-muted-foreground w-full">{currentPrompt.description}</p>
-            <div className="w-full space-y-3">
+            <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
+            
+            <div className="w-full space-y-3 flex-grow min-h-0">
                 {promptType === 'completed' && activeProjects.length > 0 && (
                     <div className="w-full">
                         <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
@@ -287,7 +288,7 @@ export function SmartLoggingPrompt({
                     </div>
                 )}
                  {promptType === 'focus' && focusContext && (
-                     <ScrollArea className="w-full max-h-80">
+                     <ScrollArea className="w-full h-full">
                         <div className="space-y-4 pr-4">
                             {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                 <div key={habit.id} className="space-y-3">
@@ -298,7 +299,7 @@ export function SmartLoggingPrompt({
                                         {negativeMechanism && (
                                             <Card className="bg-red-900/10 border-red-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">Negative: {negativeMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                   <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
@@ -309,7 +310,7 @@ export function SmartLoggingPrompt({
                                         {positiveMechanism && (
                                              <Card className="bg-green-900/10 border-green-500/30">
                                                 <CardHeader className="p-2">
-                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">Positive: {positiveMechanism.name}</CardTitle>
+                                                    <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                   <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
@@ -324,7 +325,7 @@ export function SmartLoggingPrompt({
                         </div>
                     </ScrollArea>
                 )}
-                <div className="flex gap-2 w-full">
+                <div className="flex gap-2 w-full flex-shrink-0">
                     {currentPrompt.actions.map(action => (
                         <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
                             {action.label}
