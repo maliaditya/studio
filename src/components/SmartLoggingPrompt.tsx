@@ -53,25 +53,34 @@ export function SmartLoggingPrompt({
 
   const focusContext = React.useMemo(() => {
     if (!activeFocusSession?.activity) return null;
-
+  
     const { activity } = activeFocusSession;
-    const equationIds: string[] = activity.habitEquationIds || [];
-
+    let equationIds: string[] = activity.habitEquationIds || [];
+  
+    // If the activity is a generic "Mindset Session", find all linked habits from definitions
+    if (activity.type === 'mindset' && equationIds.length === 0) {
+      const allLinkedEqIds = new Set<string>();
+      mindProgrammingDefinitions.forEach(def => {
+        (def.habitEquationIds || []).forEach(id => allLinkedEqIds.add(id));
+      });
+      equationIds = Array.from(allLinkedEqIds);
+    }
+  
     if (equationIds.length === 0) return null;
     
     const uniqueEquationIds = [...new Set(equationIds)];
-
+  
     const equationDetails = uniqueEquationIds.map(eqId => {
         const equation = allEquations.find(eq => eq.id === eqId);
         if (!equation) return null;
-
-        const linkedRules = metaRules.filter(rule => equation.metaRuleIds.includes(rule.id));
+  
+        const linkedRules = metaRules.filter(rule => (equation.metaRuleIds || []).includes(rule.id));
         const habit = habitCards.find(h => h.id === equation.linkedResourceId);
         return { equation, rules: linkedRules, habit };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return equationDetails.length > 0 ? equationDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards]);
+  }, [activeFocusSession, allEquations, metaRules, habitCards, mindProgrammingDefinitions]);
 
 
   const prompts = {
