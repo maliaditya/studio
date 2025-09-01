@@ -189,7 +189,7 @@ export function TimeSlots({
                       <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
                         <div className="flex items-start justify-between gap-3">
                           <div
-                            className={cn("flex items-start gap-3 flex-grow", activity.completed ? "opacity-60" : "cursor-pointer")}
+                            className={cn("flex items-start gap-3 flex-grow min-w-0", activity.completed ? "opacity-60" : "cursor-pointer")}
                             onClick={(e) => onActivityClick(slot.name, activity, e)}
                           >
                             <button
