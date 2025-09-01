@@ -44,6 +44,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/TodaysDietCard';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -134,7 +135,7 @@ function MyPlatePageContent() {
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
   const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
   
-  const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null}>({ isOpen: false, slotName: null });
+  const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, type: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, type: null });
   const [interruptDetails, setInterruptDetails] = useState('');
   const [interruptDuration, setInterruptDuration] = useState('');
   const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = useState(false);
@@ -399,11 +400,11 @@ function MyPlatePageContent() {
     const handleAddActivity = (slotName: string, type: ActivityType) => {
     if (!currentUser?.username || !selectedDateKey) return;
     
-    if (type === 'interrupt') {
+    if (type === 'interrupt' || type === 'distraction') {
         setInterruptDetails('');
         setInterruptDuration('');
         setApplyInterruptToFutureSlots(false);
-        setInterruptModalState({ isOpen: true, slotName });
+        setInterruptModalState({ isOpen: true, slotName, type });
         return;
     }
     
@@ -464,8 +465,8 @@ function MyPlatePageContent() {
   };
 
   const handleSaveInterrupt = () => {
-    const { slotName } = interruptModalState;
-    if (!slotName || !interruptDetails.trim()) {
+    const { slotName, type } = interruptModalState;
+    if (!slotName || !type || !interruptDetails.trim()) {
         toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
         return;
     }
@@ -480,6 +481,7 @@ function MyPlatePageContent() {
 
     setSchedule(prev => {
         const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
+        const activityType: ActivityType = type;
 
         if (applyInterruptToFutureSlots) {
             const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
@@ -487,8 +489,8 @@ function MyPlatePageContent() {
             
             slotsToUpdate.forEach(sName => {
                 const newActivity: Activity = {
-                    id: `interrupt-${Date.now()}-${Math.random()}`,
-                    type: 'interrupt',
+                    id: `${activityType}-${Date.now()}-${Math.random()}`,
+                    type: activityType,
                     details: interruptDetails,
                     completed: true,
                     taskIds: [],
@@ -498,11 +500,11 @@ function MyPlatePageContent() {
                 const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
                 newDaySchedule[sName] = [...currentActivities, newActivity];
             });
-            toast({ title: 'Interrupt Logged', description: `Interruption added to all future slots.` });
+            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `Added to all future slots.` });
         } else {
             const newActivity: Activity = {
-                id: `interrupt-${Date.now()}`,
-                type: 'interrupt',
+                id: `${activityType}-${Date.now()}`,
+                type: activityType,
                 details: interruptDetails,
                 completed: true,
                 taskIds: [],
@@ -511,7 +513,7 @@ function MyPlatePageContent() {
             };
             const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
             newDaySchedule[slotName] = [...currentActivities, newActivity];
-            toast({ title: 'Interrupt Logged', description: 'The interruption has been added to your agenda.' });
+            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `The ${activityType} has been added to your agenda.` });
         }
 
         return { ...prev, [selectedDateKey]: newDaySchedule };
@@ -520,7 +522,7 @@ function MyPlatePageContent() {
     setInterruptDetails('');
     setInterruptDuration('');
     setApplyInterruptToFutureSlots(false);
-    setInterruptModalState({ isOpen: false, slotName: null });
+    setInterruptModalState({ isOpen: false, slotName: null, type: null });
   };
   
   const handleSaveEssential = () => {
@@ -1016,6 +1018,7 @@ function MyPlatePageContent() {
         tracking: 'Tracking',
         'lead-generation': 'Lead Gen',
         interrupt: 'Interrupts',
+        distraction: 'Distractions',
         nutrition: 'Nutrition',
     };
 
@@ -1292,16 +1295,22 @@ function MyPlatePageContent() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null })}>
+      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, type: null })}>
           <DialogContent>
               <DialogHeader>
-                  <DialogTitle>Log an Interruption</DialogTitle>
+                  <DialogTitle>Log an {interruptModalState.type === 'distraction' ? 'Distraction' : 'Interruption'}</DialogTitle>
                   <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
+                  {interruptModalState.type === null && (
+                      <RadioGroup onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
+                      </RadioGroup>
+                  )}
                   <div className="space-y-1">
                       <Label htmlFor="interrupt-details">Description</Label>
-                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, urgent email..." />
+                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, browsing social media..." />
                   </div>
                   <div className="space-y-1">
                       <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
@@ -1324,8 +1333,8 @@ function MyPlatePageContent() {
                   </div>
               </div>
               <DialogFooter>
-                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null })}>Cancel</Button>
-                  <Button onClick={handleSaveInterrupt}>Save Interrupt</Button>
+                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null, type: null })}>Cancel</Button>
+                  <Button onClick={handleSaveInterrupt}>Save</Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
