@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -200,7 +201,7 @@ export function TimeSlots({
                             >
                               {activityIcons[activity.type]}
                             </button>
-                            <div className="flex-grow">
+                            <div className="flex-grow min-w-0">
                               <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
                                 {displayDetails}
                               </p>
@@ -209,9 +210,11 @@ export function TimeSlots({
                                 {activityDurations[activity.id] && <span className="font-mono">({activityDurations[activity.id]})</span>}
                               </div>
                               {linkedHabit && (
-                                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
-                                  Habit: {linkedHabit.name}
-                                </p>
+                                <div className="min-w-0">
+                                  <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                                    Habit: {linkedHabit.name}
+                                  </p>
+                                </div>
                               )}
                             </div>
                           </div>
