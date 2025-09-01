@@ -16,25 +16,24 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
     placeholder: string;
     className?: string;
 }) => {
-    const [currentText, setCurrentText] = useState(value);
     const spanRef = useRef<HTMLSpanElement>(null);
+    const initialRender = useRef(true);
 
-    // Update internal state only when the external `value` prop changes.
     useEffect(() => {
-        setCurrentText(value || placeholder);
+        const element = spanRef.current;
+        if (element && (element.textContent !== value || initialRender.current)) {
+            element.textContent = value || placeholder;
+            initialRender.current = false;
+        }
     }, [value, placeholder]);
 
     const handleBlur = () => {
         const newText = spanRef.current?.textContent || '';
-        // Only call the update function if the text has actually changed.
         if (newText !== value) {
             onBlur(newText);
         }
     };
     
-    // We use a controlled input-like pattern with a `span` to avoid cursor jumping.
-    // The `dangerouslySetInnerHTML` is only used for the initial render,
-    // and subsequent updates are handled by the user's direct editing of the contentEditable element.
     return (
         <span
             ref={spanRef}
@@ -42,13 +41,10 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
             suppressContentEditableWarning={true}
             className={className}
             onBlur={handleBlur}
-            onInput={(e) => setCurrentText(e.currentTarget.textContent || '')}
-            // Use a key to ensure React re-creates the element if the value prop changes externally,
-            // which resets its internal state. This prevents stale state issues.
-            key={value}
-        >
-          {currentText}
-        </span>
+            // We only set the initial text with dangerouslySetInnerHTML and let the user control it thereafter
+            // The useEffect above will handle external prop changes.
+            dangerouslySetInnerHTML={{ __html: value || placeholder }}
+        />
     );
 });
 EditableSpan.displayName = 'EditableSpan';
