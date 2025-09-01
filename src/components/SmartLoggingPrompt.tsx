@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -145,7 +146,9 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
         <div className="space-y-2">
             <div className="flex justify-between items-center">
               <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStopper}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+              <div className="flex items-center">
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStopper}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+              </div>
             </div>
             {stoppers.length > 0 && (
                 <ul className="text-xs space-y-1">
@@ -335,7 +338,7 @@ export function SmartLoggingPrompt({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 h-full max-h-80"
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3"
             >
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="flex-shrink-0">{currentPrompt.icon}</div>
@@ -375,7 +378,7 @@ export function SmartLoggingPrompt({
                                                       <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                         <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
                                                         <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
-                                                        <TruthSection habit={habit} />
+                                                        <TruthSection habit={habit} isNegative={false} />
                                                       </CardContent>
                                                   </Card>
                                               )}
