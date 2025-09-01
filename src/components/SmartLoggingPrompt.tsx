@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -318,7 +317,7 @@ export function SmartLoggingPrompt({
     focus: {
         icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
         title: "Focus Session Active",
-        description: "Align your actions with your mental visualization.",
+        description: "Visualize what you want to do, then your actions will follow.",
         actions: []
     }
   };
@@ -368,7 +367,7 @@ export function SmartLoggingPrompt({
                                           <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
                                           </div>
                                           <div className="grid grid-cols-1 gap-3">
-                                               {positiveMechanism && (
+                                              {positiveMechanism && (
                                                   <Card className="bg-green-900/10 border-green-500/30">
                                                       <CardHeader className="p-2">
                                                           <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
