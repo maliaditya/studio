@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1146,21 +1145,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
+
+    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
+    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
+    const today = startOfToday();
+    const todayDateKey = format(today, 'yyyy-MM-dd');
+    if (lastCarryForwardDate === todayDateKey) return;
     
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     if (!currentSettings.carryForward) return;
 
-    const today = startOfToday();
-    const todayDateKey = format(today, 'yyyy-MM-dd');
     const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
-    if (lastCarryForwardDate === todayDateKey) return;
-
+    
     const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
     if (hasTodaysActivities) {
@@ -1222,7 +1221,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (carriedOver) {
         setSchedule(prev => {
             const finalSchedule = { ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } };
-            toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+            // Schedule the toast to run after the current render cycle.
+            setTimeout(() => {
+                toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+            }, 0);
             return finalSchedule;
         });
     }
@@ -2603,6 +2605,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return activeIds;
   }, [projects, productizationPlans, offerizationPlans]);
 
+  const updateActivitySubtask = (activityId: string, subTaskId: string, updates: Partial<SubTask>) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === activityId);
+                    if (activityIndex > -1) {
+                        const newSubTasks = (activities[activityIndex].subTasks || []).map(st =>
+                            st.id === subTaskId ? { ...st, ...updates } : st
+                        );
+                        activities[activityIndex] = { ...activities[activityIndex], subTasks: newSubTasks };
+                        break;
+                    }
+                }
+            }
+        }
+        return newSchedule;
+    });
+  };
+  
+  const deleteActivitySubtask = (activityId: string, subTaskId: string) => {
+      setSchedule(prev => {
+          const newSchedule = { ...prev };
+          for (const dateKey in newSchedule) {
+              for (const slotName in newSchedule[dateKey]) {
+                  const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                  if (Array.isArray(activities)) {
+                      const activityIndex = activities.findIndex(a => a.id === activityId);
+                      if (activityIndex > -1) {
+                          const newSubTasks = (activities[activityIndex].subTasks || []).filter(st => st.id !== subTaskId);
+                          activities[activityIndex] = { ...activities[activityIndex], subTasks: newSubTasks };
+                          break;
+                      }
+                  }
+              }
+          }
+          return newSchedule;
+      });
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2694,6 +2738,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     currentSlot,
     activeProjectIds,
     mindsetTechniquePopup, openMindsetTechniquePopup, closeMindsetTechniquePopup, handleMindsetTechniquePopupDragEnd,
+    updateActivitySubtask, deleteActivitySubtask,
   };
 
   return (
@@ -2816,3 +2861,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
