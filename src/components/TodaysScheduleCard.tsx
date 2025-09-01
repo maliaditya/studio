@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -102,9 +103,11 @@ function AgendaWidgetItem({
             {displayDetails}
           </p>
           {linkedHabit && (
-            <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
-                Habit: {linkedHabit.name}
-            </p>
+            <div className="min-w-0">
+                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                    Habit: {linkedHabit.name}
+                </p>
+            </div>
           )}
         </div>
       </div>
