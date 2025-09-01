@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength, SubTask } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -763,44 +763,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-    
-    if (def) {
-        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-        
-        if (isParentNode) {
-            const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-            const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
-
-            if (allChildrenCompleted) {
-                markObjectiveActivityAsComplete(def.id);
-                return false;
+  const updateActivity = (updatedActivity: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        let found = false;
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+                    if (activityIndex > -1) {
+                        activities[activityIndex] = updatedActivity;
+                        found = true;
+                        break;
+                    }
+                }
             }
-            
-            const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration && node.loggedDuration > 0));
-            if (firstPendingNode) {
-                handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
-            } else {
-                 handleStartFocusSession(activity, 25); // Fallback
-            }
-            return true;
+            if (found) break;
         }
-    }
-    
-    const estDuration = activityDurations[activity.id];
-    let minutes = estDuration ? parseInt(estDuration.replace(/[a-zA-Z\s]/g, '')) || 0 : 45;
-    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+        return newSchedule;
+    });
+  };
 
-    setFocusDuration(minutes);
-    setFocusActivity(activity);
-    setFocusSessionModalOpen(true);
-    return true;
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, markObjectiveActivityAsComplete]);
-  
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     const dateKey = format(new Date(), 'yyyy-MM-dd');
     const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
@@ -827,7 +811,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         state: 'running',
     });
     setFocusSessionModalOpen(false);
-};
+  };
+  
+  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
+    // If it has sub-tasks, handle it like an objective
+    if (activity.subTasks && activity.subTasks.length > 0) {
+      if (activity.subTasks.every(st => st.completed)) {
+        updateActivity({ ...activity, completed: true });
+        return false;
+      }
+      handleStartFocusSession(activity, 25); // Default duration, will adjust for sub-tasks
+      return true;
+    }
+  
+    // Existing logic for deep work / upskill
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+  
+    if (def) {
+      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+      
+      if (isParentNode) {
+        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
+        const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
+  
+        if (allChildrenCompleted) {
+          markObjectiveActivityAsComplete(def.id);
+          return false;
+        }
+        
+        const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration && node.loggedDuration > 0));
+        if (firstPendingNode) {
+          handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
+        } else {
+          handleStartFocusSession(activity, 25); // Fallback
+        }
+        return true;
+      }
+    }
+    
+    // For simple tasks without linked definitions or sub-tasks
+    const estDuration = activityDurations[activity.id];
+    let minutes = estDuration ? parseInt(estDuration.replace(/[a-zA-Z\s]/g, '')) || 0 : 45;
+    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+  
+    setFocusDuration(minutes);
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
+    return true;
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, markObjectiveActivityAsComplete, setFocusDuration, setFocusActivity, setFocusSessionModalOpen, handleStartFocusSession, updateActivity]);
 
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1142,57 +1176,57 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let carriedOver = false;
     
-    setSchedule(prev => {
-        const newTodaySchedule: DailySchedule = {};
-        Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-          const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
-          
-          const activitiesToCarry = incompleteActivities.filter(activity => {
-              if(activity.isRoutine) return true;
-              if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
-              if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
-              return currentSettings.carryForward;
-          });
-    
-          if (activitiesToCarry.length > 0) {
-            newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
-                activitiesToCarry.map(activity => {
-                    let newDetails = activity.details;
-    
-                    if (activity.type === 'workout') {
-                        const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                        newDetails = description.split(' for ')[1] || "Workout";
-                    } else if (!activity.isRoutine) {
-                        switch (activity.type) {
-                          case 'upskill': newDetails = 'Learning Session'; break;
-                          case 'deepwork': newDetails = 'Deep Work Session'; break;
-                          case 'planning': newDetails = 'Planning Session'; break;
-                          case 'tracking': newDetails = 'Tracking Session'; break;
-                          case 'branding': newDetails = 'Branding Session'; break;
-                          case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-                        }
+    const newTodaySchedule: DailySchedule = {};
+    Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
+      const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
+      
+      const activitiesToCarry = incompleteActivities.filter(activity => {
+          if(activity.isRoutine) return true;
+          if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
+          if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
+          return currentSettings.carryForward;
+      });
+
+      if (activitiesToCarry.length > 0) {
+        newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
+            activitiesToCarry.map(activity => {
+                let newDetails = activity.details;
+
+                if (activity.type === 'workout') {
+                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                    newDetails = description.split(' for ')[1] || "Workout";
+                } else if (!activity.isRoutine) {
+                    switch (activity.type) {
+                      case 'upskill': newDetails = 'Learning Session'; break;
+                      case 'deepwork': newDetails = 'Deep Work Session'; break;
+                      case 'planning': newDetails = 'Planning Session'; break;
+                      case 'tracking': newDetails = 'Tracking Session'; break;
+                      case 'branding': newDetails = 'Branding Session'; break;
+                      case 'lead-generation': newDetails = 'Lead Generation Session'; break;
                     }
-    
-                    return {
-                      ...activity,
-                      id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                      completed: false,
-                      details: newDetails,
-                      taskIds: activity.isRoutine ? activity.taskIds : [],
-                    };
-                })
-            );
-            carriedOver = true;
-          }
-        });
+                }
 
-        if (carriedOver) {
-            toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
-        }
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
-
-        return { ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } };
+                return {
+                  ...activity,
+                  id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                  completed: false,
+                  details: newDetails,
+                  taskIds: activity.isRoutine ? activity.taskIds : [],
+                };
+            })
+        );
+        carriedOver = true;
+      }
     });
+
+    if (carriedOver) {
+        setSchedule(prev => {
+            const finalSchedule = { ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } };
+            toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+            return finalSchedule;
+        });
+    }
+    localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
   const register = async (username: string, password: string) => {
@@ -2342,28 +2376,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResources(prev => [...prev, newHabit]);
   };
   
-  const updateActivity = (updatedActivity: Activity) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        let found = false;
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-                    if (activityIndex > -1) {
-                        activities[activityIndex] = updatedActivity;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (found) break;
-        }
-        return newSchedule;
-    });
-  };
-
   const addToRecents = useCallback((item: (ExerciseDefinition | Project) & { type: string }) => {
     setRecentItems(prev => {
         const newItems = prev.filter(i => i.id !== item.id);
@@ -2797,6 +2809,9 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
+
+
 
 
 

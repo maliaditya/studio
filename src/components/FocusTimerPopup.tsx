@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle } from 'lucide-react';
-import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview } from '@/types/workout';
+import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
@@ -76,183 +77,18 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
 });
 EditableStep.displayName = 'EditableStep';
 
-
-const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: { habit: Resource, isNegative: boolean, onTechniqueClick: (techniqueId: string, event: React.MouseEvent) => void }) => {
-    const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
-    const stoppers = isNegative ? (habit.urges || []) : (habit.resistances || []);
-
-    const handleAddStopper = () => {
-        const newStopper: Stopper = {
-            id: `stopper_${Date.now()}`,
-            text: '', // Start with empty text
-            status: 'none',
-        };
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                if (isNegative) {
-                    return { ...r, urges: [...(r.urges || []), newStopper] };
-                } else {
-                    return { ...r, resistances: [...(r.resistances || []), newStopper] };
-                }
-            }
-            return r;
-        }));
-    };
-    
-    const handleUpdateStopper = (stopperId: string, newText: string) => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                 const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? {...s, text: newText} : s);
-                 if(isNegative) return {...r, urges: update(r.urges)};
-                 else return {...r, resistances: update(r.resistances)};
-            }
-            return r;
-        }));
-    };
-
-    const handleLinkTechnique = (stopperId: string, techniqueId: string | null) => {
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                const updateStoppers = (stoppersList: Stopper[] = []) =>
-                    stoppersList.map(s => 
-                        s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId === null ? undefined : techniqueId } : s
-                    );
-
-                if (isNegative) {
-                    return { ...r, urges: updateStoppers(r.urges) };
-                } else {
-                    return { ...r, resistances: updateStoppers(r.resistances) };
-                }
-            }
-            return r;
-        }));
-    };
-    
-    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
-        e.stopPropagation();
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s);
-                if (isNegative) return { ...r, urges: update(r.urges) };
-                else return { ...r, resistances: update(r.resistances) };
-            }
-            return r;
-        }));
-    };
-    
-    return (
-        <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStopper}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
-            </div>
-            {stoppers.length > 0 && (
-                <ul className="text-xs space-y-1">
-                    {stoppers.map(s => {
-                        const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
-                        return (
-                            <li key={s.id} className="border-t pt-2 group/stopper">
-                                <div className="flex items-center gap-1">
-                                    <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
-                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
-                                       <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                             <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                  <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
-                                              </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent className="w-56 z-[150]">
-                                              {mindProgrammingDefinitions.map(tech => (
-                                                  <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
-                                                      {tech.name}
-                                                  </DropdownMenuItem>
-                                              ))}
-                                              <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
-                                                  Unlink
-                                              </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                      </DropdownMenu>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                    </div>
-                                </div>
-                                {linkedTechnique ? (
-                                    <div className="mt-1 pl-6">
-                                        <Badge 
-                                            variant="secondary" 
-                                            className="font-normal truncate cursor-pointer hover:ring-1 hover:ring-primary"
-                                            onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
-                                        >
-                                            <span className="truncate">{linkedTechnique.name}</span>
-                                        </Badge>
-                                    </div>
-                                ) : null}
-                            </li>
-                        )
-                    })}
-                </ul>
-            )}
-        </div>
-    );
-});
-ResistanceSection.displayName = 'ResistanceSection';
-
-const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
-    const { setResources, handleDeleteStrength } = useAuth();
-
-    const handleAddStrength = () => {
-        const newStrength: Strength = {
-            id: `strength_${Date.now()}`,
-            text: '',
-        };
-        setResources(prev => prev.map(r => {
-            if (r.id === habit.id) {
-                return { ...r, strengths: [...(r.strengths || []), newStrength] };
-            }
-            return r;
-        }));
-    };
-    
-    const handleUpdateStrength = (strengthId: string, newText: string) => {
-      setResources(prev => prev.map(r => {
-          if (r.id === habit.id) {
-              return {...r, strengths: (r.strengths || []).map(s => s.id === strengthId ? {...s, text: newText} : s)}
-          }
-          return r;
-      }));
-    };
-
-    return (
-        <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStrength}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
-            </div>
-            {(habit.strengths || []).length > 0 && (
-                <ul className="text-xs list-disc list-inside space-y-1">
-                    {(habit.strengths || []).map(s => (
-                       <EditableStep key={s.id} point={s} onUpdate={(id, text) => handleUpdateStrength(id, text)} onDelete={() => handleDeleteStrength(habit.id, s.id)} />
-                    ))}
-                </ul>
-            )}
-        </div>
-    );
-});
-TruthSection.displayName = 'TruthSection';
-
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
   const { 
       activeFocusSession, setActiveFocusSession, 
       updateActivity, handleToggleComplete,
       deepWorkDefinitions, upskillDefinitions,
-      allDeepWorkLogs, allUpskillLogs,
       logSubTaskTime,
       setIsAudioPlaying,
       updateTaskDuration,
       permanentlyLoggedTaskIds,
       setSelectedDeepWorkTask,
       setSelectedUpskillTask,
+      updateActivitySubtask, deleteActivitySubtask,
   } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -286,18 +122,30 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const subTasks = useMemo(() => {
-      if (!focusedObjective) return [];
-      const childrenIds = [
-          ...(focusedObjective.linkedDeepWorkIds || []), 
-          ...(focusedObjective.linkedUpskillIds || [])
-      ];
-      return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
-  }, [focusedObjective, allDefinitions]);
+    if (activity.subTasks && activity.subTasks.length > 0) {
+      return activity.subTasks.map(st => ({
+        id: st.id,
+        name: st.text,
+        completed: st.completed,
+        estimatedDuration: 25, // Default duration for sub-tasks
+      }));
+    }
+    if (!focusedObjective) return [];
+    const childrenIds = [
+        ...(focusedObjective.linkedDeepWorkIds || []), 
+        ...(focusedObjective.linkedUpskillIds || [])
+    ];
+    return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
+  }, [activity.subTasks, focusedObjective, allDefinitions]);
   
-  const isSubTaskComplete = useCallback((task: ExerciseDefinition) => {
-    return permanentlyLoggedTaskIds.has(task.id) || 
-           sessionCompletedSubTaskIds.has(task.id) ||
-           (task.loggedDuration || 0) > 0;
+  const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition) => {
+    if ('completed' in subTask) { // It's a generic SubTask
+        return subTask.completed;
+    }
+    // It's a deep work/upskill task
+    return permanentlyLoggedTaskIds.has(subTask.id) || 
+           sessionCompletedSubTaskIds.has(subTask.id) ||
+           (subTask.loggedDuration || 0) > 0;
   }, [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds]);
 
   const activeSubTask = useMemo(() => {
@@ -315,8 +163,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [subTasks, isSubTaskComplete]);
 
   const showSubTasks = useMemo(() => {
-      return (activity.type === 'deepwork' || activity.type === 'upskill') && subTasks.length > 0;
-  }, [activity.type, subTasks]);
+      return (activity.type === 'deepwork' || activity.type === 'upskill' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
+  }, [activity.type, activity.subTasks, subTasks]);
 
   const style: React.CSSProperties = {
     position: 'fixed',
@@ -326,8 +174,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
   
-  const handleStartSubTask = useCallback((subTask: ExerciseDefinition) => {
-    const durationMins = subTask.estimatedDuration || 25;
+  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition)) => {
+    const durationMins = 'estimatedDuration' in subTask ? (subTask.estimatedDuration || 25) : 25;
     if (activeFocusSession) {
         setActiveFocusSession({
             ...activeFocusSession,
@@ -356,7 +204,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             }
         }
         handleToggleComplete(activity.slot, activity.id, true);
-        toast({ title: "Objective Complete!", description: `All tasks for "${focusedObjective?.name}" are done.` });
+        toast({ title: "Objective Complete!", description: `All tasks for "${focusedObjective?.name || activity.details}" are done.` });
       }
     }
     onClose();
@@ -365,27 +213,34 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask || !activeFocusSession?.subTaskStartTime) return;
     
-    const completionTime = Date.now();
-    const durationMs = completionTime - activeFocusSession.subTaskStartTime;
-    const durationMinutes = Math.floor(durationMs / 60000);
-    
-    if (durationMinutes > 0) {
-        logSubTaskTime(activeSubTask.id, durationMinutes);
-    } else {
-        logSubTaskTime(activeSubTask.id, 1);
+    if ('completed' in activeSubTask) { // It's a generic SubTask
+        updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
+    } else { // It's a deep work/upskill task
+      const completionTime = Date.now();
+      const durationMs = completionTime - activeFocusSession.subTaskStartTime;
+      const durationMinutes = Math.floor(durationMs / 60000);
+      
+      if (durationMinutes > 0) {
+          logSubTaskTime(activeSubTask.id, durationMinutes);
+      } else {
+          logSubTaskTime(activeSubTask.id, 1);
+      }
+      
+      setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
     }
     
     const newCompletedSet = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    setSessionCompletedSubTaskIds(newCompletedSet);
-    
-    const nextTask = subTasks.find(st => !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id) && (st.loggedDuration || 0) === 0);
+    const nextTask = subTasks.find(st => {
+      if ('completed' in st) return !st.completed && st.id !== activeSubTask.id;
+      return !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id) && (st.loggedDuration || 0) === 0;
+    });
 
     if (nextTask) {
         handleStartSubTask(nextTask);
     } else {
         handleStop(true);
     }
-  }, [activeSubTask, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, activeFocusSession]);
+  }, [activeSubTask, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, activeFocusSession, updateActivitySubtask, activity.id]);
   
   const handleStandaloneTaskComplete = () => {
     const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
@@ -569,7 +424,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                     <p className="text-sm font-semibold truncate" title={nowFocusingText}>{nowFocusingText}</p>
-                    {showSubTasks && activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
+                    {showSubTasks && activeSubTask && 'estimatedDuration' in activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
                         <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
                             <Timer className="h-4 w-4" />
                         </button>
@@ -623,20 +478,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Play className="h-4 w-4" />
                         </Button>
                         <label className="flex-grow">{task.name}</label>
-                         <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
-                            {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
-                            {(task.estimatedDuration === undefined || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
-                                <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
-                                    <Timer className="h-4 w-4"/>
-                                </button>
-                            )}
-                            {editingDurationTaskId === task.id && (
-                                <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
-                                    <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
-                                    <Button size="xs" type="submit">Set</Button>
-                                </form>
-                            )}
-                        </span>
+                        {'estimatedDuration' in task && (
+                            <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+                                {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
+                                {(task.estimatedDuration === undefined || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
+                                    <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
+                                        <Timer className="h-4 w-4"/>
+                                    </button>
+                                )}
+                                {editingDurationTaskId === task.id && (
+                                    <form onSubmit={(e) => { e.preventDefault(); handleSetSubTaskDuration(); }} className="flex items-center gap-1">
+                                        <Input type="number" value={subTaskDurationInput} onChange={e => setSubTaskDurationInput(e.target.value)} className="w-16 h-7 text-xs" autoFocus onBlur={handleSetSubTaskDuration} />
+                                        <Button size="xs" type="submit">Set</Button>
+                                    </form>
+                                )}
+                            </span>
+                        )}
                     </div>
                   ))}
                   {pendingSubTasks.length === 0 && (
@@ -654,7 +511,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            <span className="text-xs text-muted-foreground">{getLoggedMinutesForTask(task.id)}m logged</span>
+                            {'loggedDuration' in task && <span className="text-xs text-muted-foreground">{getLoggedMinutesForTask(task.id)}m logged</span>}
                        </div>
                     ))}
                     {completedSubTaskComponents.length === 0 && (
