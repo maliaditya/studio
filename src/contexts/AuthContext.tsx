@@ -359,6 +359,8 @@ interface AuthContextType {
   openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
   closeMindsetTechniquePopup: (techniqueId: string) => void;
   handleMindsetTechniquePopupDragEnd: (event: DragEndEvent) => void;
+  updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
+  deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -1145,88 +1147,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded) return;
-
+  
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
     const today = startOfToday();
     const todayDateKey = format(today, 'yyyy-MM-dd');
     if (lastCarryForwardDate === todayDateKey) return;
-    
+  
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
     if (!currentSettings.carryForward) return;
-
+  
     const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-    
+  
     const todaysActivities = schedule[todayDateKey];
     const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
     if (hasTodaysActivities) {
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
-        return;
+      localStorage.setItem(lastCarryForwardKey, todayDateKey);
+      return;
     }
-
+  
     const yesterdaysSchedule = schedule[yesterdayKey];
     if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
-        return;
+      localStorage.setItem(lastCarryForwardKey, todayDateKey);
+      return;
     }
-
+  
     let carriedOver = false;
-    
     const newTodaySchedule: DailySchedule = {};
+  
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
       const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
       
       const activitiesToCarry = incompleteActivities.filter(activity => {
-          if(activity.isRoutine) return true;
-          if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
-          if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
-          return currentSettings.carryForward;
+        if (activity.isRoutine) return true;
+        if (activity.type === 'essentials') return currentSettings.carryForwardEssentials;
+        if (activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
+        return currentSettings.carryForward;
       });
-
+  
       if (activitiesToCarry.length > 0) {
         newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
-            activitiesToCarry.map(activity => {
-                let newDetails = activity.details;
-
-                if (activity.type === 'workout') {
-                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                    newDetails = description.split(' for ')[1] || "Workout";
-                } else if (!activity.isRoutine) {
-                    switch (activity.type) {
-                      case 'upskill': newDetails = 'Learning Session'; break;
-                      case 'deepwork': newDetails = 'Deep Work Session'; break;
-                      case 'planning': newDetails = 'Planning Session'; break;
-                      case 'tracking': newDetails = 'Tracking Session'; break;
-                      case 'branding': newDetails = 'Branding Session'; break;
-                      case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-                    }
-                }
-
-                return {
-                  ...activity,
-                  id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                  completed: false,
-                  details: newDetails,
-                  taskIds: activity.isRoutine ? activity.taskIds : [],
-                };
-            })
+          activitiesToCarry.map(activity => {
+            let newDetails = activity.details;
+            if (activity.type === 'workout') {
+              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+              newDetails = description.split(' for ')[1] || "Workout";
+            } else if (!activity.isRoutine) {
+              switch (activity.type) {
+                case 'upskill': newDetails = 'Learning Session'; break;
+                case 'deepwork': newDetails = 'Deep Work Session'; break;
+                case 'planning': newDetails = 'Planning Session'; break;
+                case 'tracking': newDetails = 'Tracking Session'; break;
+                case 'branding': newDetails = 'Branding Session'; break;
+                case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+              }
+            }
+            return { ...activity, id: `${activity.type}-${Date.now()}-${Math.random()}`, completed: false, details: newDetails, taskIds: activity.isRoutine ? activity.taskIds : [] };
+          })
         );
         carriedOver = true;
       }
     });
-
+  
     if (carriedOver) {
-        setSchedule(prev => {
-            const finalSchedule = { ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } };
-            // Schedule the toast to run after the current render cycle.
-            setTimeout(() => {
-                toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
-            }, 0);
-            return finalSchedule;
-        });
+      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
+      // This is the problematic toast call.
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
@@ -2862,5 +2850,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+    
 
     
