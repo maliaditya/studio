@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
-
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 interface FocusTimerPopupProps {
   activity: Activity;
@@ -25,6 +25,221 @@ interface FocusTimerPopupProps {
   onClose: () => void;
   onLogTime: (activity: Activity, minutes: number) => void;
 }
+
+const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
+  const [text, setText] = useState(point.text);
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setText(point.text);
+    if(point.text === '') {
+        textareaRef.current?.focus();
+    }
+  }, [point.text]);
+  
+  useEffect(() => {
+    if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [text]);
+
+  const handleBlur = () => {
+    const newText = text.trim();
+    if (newText === '') {
+      onDelete(point.id);
+    } else if (newText !== point.text) {
+      onUpdate(point.id, newText);
+    }
+  };
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleBlur();
+    }
+  }
+
+  return (
+    <div className="text-sm flex items-start gap-2 group w-full">
+      <Textarea
+        ref={textareaRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1 p-1"
+        rows={1}
+      />
+    </div>
+  );
+});
+EditableStep.displayName = 'EditableStep';
+
+
+const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: { habit: Resource, isNegative: boolean, onTechniqueClick: (techniqueId: string, event: React.MouseEvent) => void }) => {
+    const { setResources, mindProgrammingDefinitions, handleDeleteStopper } = useAuth();
+    const stoppers = isNegative ? (habit.urges || []) : (habit.resistances || []);
+
+    const handleAddStopper = () => {
+        const newStopper: Stopper = {
+            id: `stopper_${Date.now()}`,
+            text: '', // Start with empty text
+            status: 'none',
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                if (isNegative) {
+                    return { ...r, urges: [...(r.urges || []), newStopper] };
+                } else {
+                    return { ...r, resistances: [...(r.resistances || []), newStopper] };
+                }
+            }
+            return r;
+        }));
+    };
+    
+    const handleUpdateStopper = (stopperId: string, newText: string) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                 const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? {...s, text: newText} : s);
+                 if(isNegative) return {...r, urges: update(r.urges)};
+                 else return {...r, resistances: update(r.resistances)};
+            }
+            return r;
+        }));
+    };
+
+    const handleLinkTechnique = (stopperId: string, techniqueId: string | null) => {
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const updateStoppers = (stoppersList: Stopper[] = []) =>
+                    stoppersList.map(s => 
+                        s.id === stopperId ? { ...s, linkedTechniqueId: techniqueId === null ? undefined : techniqueId } : s
+                    );
+
+                if (isNegative) {
+                    return { ...r, urges: updateStoppers(r.urges) };
+                } else {
+                    return { ...r, resistances: updateStoppers(r.resistances) };
+                }
+            }
+            return r;
+        }));
+    };
+    
+    const handleStopperStatusChange = (e: React.PointerEvent, stopperId: string, status: Stopper['status']) => {
+        e.stopPropagation();
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                const update = (list: Stopper[] = []) => list.map(s => s.id === stopperId ? { ...s, status: s.status === status ? 'none' : status } : s);
+                if (isNegative) return { ...r, urges: update(r.urges) };
+                else return { ...r, resistances: update(r.resistances) };
+            }
+            return r;
+        }));
+    };
+    
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold text-xs text-muted-foreground">{isNegative ? 'Urges' : 'Resistance'}</h4>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStopper}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+            </div>
+            {stoppers.length > 0 && (
+                <ul className="text-xs space-y-1">
+                    {stoppers.map(s => {
+                        const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
+                        return (
+                            <li key={s.id} className="border-t pt-2 group/stopper">
+                                <div className="flex items-center gap-1">
+                                    <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
+                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
+                                       <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                             <Button variant="ghost" size="icon" className="h-6 w-6">
+                                                  <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
+                                              </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent className="w-56 z-[150]">
+                                              {mindProgrammingDefinitions.map(tech => (
+                                                  <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
+                                                      {tech.name}
+                                                  </DropdownMenuItem>
+                                              ))}
+                                              <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
+                                                  Unlink
+                                              </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                      </DropdownMenu>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                        <Trash2 className="h-3 w-3 text-destructive" />
+                                      </Button>
+                                    </div>
+                                </div>
+                                {linkedTechnique ? (
+                                    <div className="mt-1 pl-6">
+                                        <Badge 
+                                            variant="secondary" 
+                                            className="font-normal truncate cursor-pointer hover:ring-1 hover:ring-primary"
+                                            onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
+                                        >
+                                            <span className="truncate">{linkedTechnique.name}</span>
+                                        </Badge>
+                                    </div>
+                                ) : null}
+                            </li>
+                        )
+                    })}
+                </ul>
+            )}
+        </div>
+    );
+});
+ResistanceSection.displayName = 'ResistanceSection';
+
+const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
+    const { setResources, handleDeleteStrength } = useAuth();
+
+    const handleAddStrength = () => {
+        const newStrength: Strength = {
+            id: `strength_${Date.now()}`,
+            text: '',
+        };
+        setResources(prev => prev.map(r => {
+            if (r.id === habit.id) {
+                return { ...r, strengths: [...(r.strengths || []), newStrength] };
+            }
+            return r;
+        }));
+    };
+    
+    const handleUpdateStrength = (strengthId: string, newText: string) => {
+      setResources(prev => prev.map(r => {
+          if (r.id === habit.id) {
+              return {...r, strengths: (r.strengths || []).map(s => s.id === strengthId ? {...s, text: newText} : s)}
+          }
+          return r;
+      }));
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h4 className="font-semibold text-xs text-muted-foreground">Truths / Reinforcements</h4>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleAddStrength}><PlusCircle className="h-4 w-4 text-green-500" /></Button>
+            </div>
+            {(habit.strengths || []).length > 0 && (
+                <ul className="text-xs list-disc list-inside space-y-1">
+                    {(habit.strengths || []).map(s => (
+                       <EditableStep key={s.id} point={s} onUpdate={(id, text) => handleUpdateStrength(id, text)} onDelete={() => handleDeleteStrength(habit.id, s.id)} />
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+});
+TruthSection.displayName = 'TruthSection';
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
   const { 
@@ -268,7 +483,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     router.push('/deep-work');
   };
 
-  const secondsLeft = activeFocusSession?.secondsLeft ?? 0;
+  const secondsLeft = Math.floor(activeFocusSession?.secondsLeft ?? 0);
   const totalSeconds = activeFocusSession?.totalSeconds ?? duration * 60;
 
   const elapsedSeconds = totalSeconds - secondsLeft;
