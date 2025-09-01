@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -205,43 +203,43 @@ function MyPlatePageContent() {
   // Carry forward tasks logic
   useEffect(() => {
     if (!currentUser || !isScheduleLoaded || !selectedDate) return;
-
+    
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
-    const todayDateKey = format(selectedDate, 'yyyy-MM-dd');
-    if (lastCarryForwardDate === todayDateKey) return; // Already ran for today
+    const todayStr = format(selectedDate, 'yyyy-MM-dd');
+    const lastRun = localStorage.getItem(lastCarryForwardKey);
+    if (lastRun === todayStr) return;
 
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
-    const storedSettings = localStorage.getItem(settingsKey);
-    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+    if (!settings.carryForward && !settings.carryForwardEssentials && !settings.carryForwardNutrition) {
+      localStorage.setItem(lastCarryForwardKey, todayStr);
+      return;
+    }
     
     const yesterday = addDays(selectedDate, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     
-    const todaysActivities = schedule[todayDateKey];
-    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
-    if (hasTodaysActivities) {
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+    const todaysActivities = schedule[todayStr];
+    if (todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0)) {
+        localStorage.setItem(lastCarryForwardKey, todayStr);
         return;
     }
 
     const yesterdaysSchedule = schedule[yesterdayKey];
     if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+        localStorage.setItem(lastCarryForwardKey, todayStr);
         return;
     }
 
-    const newTodaySchedule: DailySchedule = {};
     let carriedOver = false;
+    const newTodaySchedule: DailySchedule = {};
 
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
         if (Array.isArray(activities) && activities.length > 0) {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
-                if (activity.isRoutine) return true; // Always carry over routine tasks
-                if(activity.completed) return false; // Don't carry over completed non-routine tasks
-                if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
-                if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
-                return currentSettings.carryForward;
+                if (activity.isRoutine) return true;
+                if(activity.completed) return false;
+                if(activity.type === 'essentials') return settings.carryForwardEssentials;
+                if(activity.type === 'nutrition') return settings.carryForwardNutrition;
+                return settings.carryForward;
             });
 
             if (activitiesToCarry.length > 0) {
@@ -249,11 +247,10 @@ function MyPlatePageContent() {
                 (newTodaySchedule[slotName] as Activity[]).push(
                     ...activitiesToCarry.map(activity => {
                         let newDetails = activity.details;
-                        // Always regenerate workout details for today, regardless of routine status
                         if (activity.type === 'workout') {
                             const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
                             newDetails = description.split(' for ')[1] || "Workout";
-                        } else if (!activity.isRoutine) { // For other non-routine tasks, reset details to generic
+                        } else if (!activity.isRoutine) {
                             switch (activity.type) {
                                 case 'upskill': newDetails = 'Learning Session'; break;
                                 case 'deepwork': newDetails = 'Deep Work Session'; break;
@@ -264,14 +261,14 @@ function MyPlatePageContent() {
                                 case 'mindset': newDetails = 'Mindset Session'; break;
                             }
                         }
-                
+                        const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
                         return {
                             ...activity,
                             id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                            completed: false, // Reset completion status for the new day
+                            completed: false,
                             details: newDetails,
-                            // Keep taskIds for routine tasks, clear for non-routine to allow re-selection
                             taskIds: activity.isRoutine ? activity.taskIds : [],
+                            habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
                         };
                     })
                 );
@@ -281,10 +278,11 @@ function MyPlatePageContent() {
     });
 
     if (carriedOver) {
-        setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
+      setSchedule(prev => ({ ...prev, [todayStr]: { ...(prev[todayStr] || {}), ...newTodaySchedule } }));
     }
-    localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+    localStorage.setItem(lastCarryForwardKey, todayStr);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, settings]);
+
   
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
@@ -307,7 +305,7 @@ function MyPlatePageContent() {
                     if (childDef) recurse(childDef);
                 });
                 (d.linkedUpskillIds || []).forEach(childId => {
-                    const childDef = definitions.find(d => d.id === childId);
+                    const childDef = definitions.find(c => c.id === childId);
                     if (childDef) recurse(childDef);
                 });
             } else {
@@ -451,6 +449,8 @@ function MyPlatePageContent() {
         return;
     }
     
+    const defaultHabitId = settings.defaultHabitLinks?.[type] || null;
+
     const newActivity: Activity = { 
       id: `${type}-${Date.now()}-${Math.random()}`, 
       type, 
@@ -458,6 +458,7 @@ function MyPlatePageContent() {
       completed: false,
       taskIds: [],
       slot: slotName,
+      habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
     };
     
     setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity] } }));
@@ -477,45 +478,37 @@ function MyPlatePageContent() {
         toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
         return;
     }
-
+    
+    const activityType: ActivityType = type;
+    const newActivity: Activity = {
+        id: `${activityType}-${Date.now()}`,
+        type: activityType,
+        details: interruptDetails,
+        completed: true,
+        taskIds: [],
+        duration: durationMinutes,
+        slot: slotName,
+    };
+    
     setSchedule(prev => {
         const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
-        const activityType: ActivityType = type;
 
         if (applyInterruptToFutureSlots) {
             const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
             const slotsToUpdate = Object.keys(slotEndHours).slice(currentSlotIndex);
             
             slotsToUpdate.forEach(sName => {
-                const newActivity: Activity = {
-                    id: `${activityType}-${Date.now()}-${Math.random()}`,
-                    type: activityType,
-                    details: interruptDetails,
-                    completed: true,
-                    taskIds: [],
-                    duration: durationMinutes,
-                    slot: sName,
-                };
                 const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
-                newDaySchedule[sName] = [...currentActivities, newActivity];
+                newDaySchedule[sName] = [...currentActivities, { ...newActivity, slot: sName, id: `${activityType}-${Date.now()}-${Math.random()}` }];
             });
         } else {
-            const newActivity: Activity = {
-                id: `${activityType}-${Date.now()}`,
-                type: activityType,
-                details: interruptDetails,
-                completed: true,
-                taskIds: [],
-                duration: durationMinutes,
-                slot: slotName,
-            };
             const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
             newDaySchedule[slotName] = [...currentActivities, newActivity];
         }
 
         return { ...prev, [selectedDateKey]: newDaySchedule };
     });
-
+    
     if (applyInterruptToFutureSlots) {
       toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} Logged`, description: `Added to all future slots.` });
     } else {
@@ -664,7 +657,7 @@ function MyPlatePageContent() {
     if (!activity || activity.completed || !selectedDate) return;
   
     if (activity.type === 'workout') {
-      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
       setTodaysExercises(exercises);
       setTodaysMuscleGroups(muscleGroups);
       setWorkoutActivityToLog(activity);
@@ -1305,12 +1298,13 @@ function MyPlatePageContent() {
                   <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                  {interruptModalState.type === null && (
-                      <RadioGroup value={interruptModalState.type || ''} onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
-                          <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
-                      </RadioGroup>
-                  )}
+                  <div className="space-y-1">
+                      <Label>Type</Label>
+                       <RadioGroup value={interruptModalState.type || ''} onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
+                        </RadioGroup>
+                  </div>
                   <div className="space-y-1">
                       <Label htmlFor="interrupt-details">Description</Label>
                       <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, browsing social media..." />

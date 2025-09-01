@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -350,10 +349,10 @@ export function TodaysScheduleCard({
                     </Button>
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <History className="h-4 w-4" />
-                                <span className="sr-only">Pending Tasks</span>
-                            </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <History className="h-4 w-4" />
+                            <span className="sr-only">Pending Tasks</span>
+                        </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
                             <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
@@ -473,4 +472,5 @@ export function TodaysScheduleCard({
     
 
     
+
 

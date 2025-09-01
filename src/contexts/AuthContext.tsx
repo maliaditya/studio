@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -46,6 +44,10 @@ interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
+  carryForwardEssentials: boolean;
+  carryForwardNutrition: boolean;
+  smartLogging: boolean;
+  defaultHabitLinks: Record<ActivityType, string | null>;
 }
 
 interface ActiveFocusSession {
@@ -71,6 +73,7 @@ interface AuthContextType {
   importData: () => void;
   localChangeCount: number;
   settings: UserSettings;
+  setSettings: React.Dispatch<React.SetStateAction<UserSettings>>;
   isDemoTokenModalOpen: boolean;
   setIsDemoTokenModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   pushDemoDataWithToken: (token: string) => Promise<void>;
@@ -387,6 +390,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     carryForward: false,
     autoPush: false,
     autoPushLimit: 100,
+    carryForwardEssentials: false,
+    carryForwardNutrition: false,
+    smartLogging: false,
+    defaultHabitLinks: {},
   });
 
   // Health State
@@ -517,29 +524,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
 
-  const updateActivity = (updatedActivity: Activity) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        let found = false;
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-                    if (activityIndex > -1) {
-                        activities[activityIndex] = updatedActivity;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (found) break;
-        }
-        return newSchedule;
-    });
-  };
-
-  const handleStartFocusSession = (activity: Activity, duration: number) => {
+  const handleStartFocusSession = useCallback((activity: Activity, duration: number) => {
     const dateKey = format(new Date(), 'yyyy-MM-dd');
     const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
 
@@ -565,6 +550,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         state: 'running',
     });
     setFocusSessionModalOpen(false);
+  }, [schedule]);
+  
+  const updateActivity = (updatedActivity: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        let found = false;
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+                    if (activityIndex > -1) {
+                        activities[activityIndex] = updatedActivity;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found) break;
+        }
+        return newSchedule;
+    });
   };
 
   useEffect(() => {
@@ -1101,129 +1108,80 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => setIsLoadingState(false), 100); 
   };
 
-
-  useEffect(() => {
-    if (!isLoadingState) {
-        if (!currentUser?.username) return;
-        const allData = getAllUserData();
-        try {
-            localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
-            localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
-        } catch (e) {
-            console.error("Failed to save data to localStorage", e);
-            toast({
-                title: "Save Failed",
-                description: "Could not save your changes to the browser.",
-                variant: "destructive",
-            });
-        }
-    }
-  }, [
-    isLoadingState, currentUser, getAllUserData, toast
-  ]);
-
-  useEffect(() => {
-    if (prevUser && !currentUser) {
-      setTimeout(() => {
-        toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      }, 0);
-    }
-  }, [currentUser, prevUser, toast]);
-  
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
-    
-    if (theme === 'matrix') {
-      root.classList.add('theme-matrix');
-    } else if (theme === 'ad-dark') {
-        root.classList.add('theme-ad-dark');
-    } else {
-      root.classList.add('theme-default');
-    }
-    
-    localStorage.setItem('lifeos_theme', theme);
-  }, [theme]);
-
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
-  
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastCarryForwardDate = localStorage.getItem(lastCarryForwardKey);
-    const today = startOfToday();
-    const todayDateKey = format(today, 'yyyy-MM-dd');
-    if (lastCarryForwardDate === todayDateKey) return;
-  
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
-    const storedSettings = localStorage.getItem(settingsKey);
-    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+    if (isLoadingState) return;
+
+    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser?.username}`;
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const lastRun = localStorage.getItem(lastCarryForwardKey);
+    if (lastRun === todayStr) return;
+
+    const settingsKey = `lifeos_settings_${currentUser?.username}`;
+        const storedSettings = localStorage.getItem(settingsKey);
+        const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+
+        if (!currentSettings.carryForward && !currentSettings.carryForwardEssentials && !currentSettings.carryForwardNutrition) {
+          localStorage.setItem(lastCarryForwardKey, todayStr);
+          return;
+        }
     
-    const yesterday = subDays(today, 1);
+    const yesterday = subDays(new Date(), 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-  
-    const todaysActivities = schedule[todayDateKey];
-    const hasTodaysActivities = todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0);
-    if (hasTodaysActivities) {
-      localStorage.setItem(lastCarryForwardKey, todayDateKey);
-      return;
-    }
-  
     const yesterdaysSchedule = schedule[yesterdayKey];
-    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
-      localStorage.setItem(lastCarryForwardKey, todayDateKey);
+
+    if (!yesterdaysSchedule) {
+      localStorage.setItem(lastCarryForwardKey, todayStr);
       return;
     }
-  
-    let carriedOver = false;
-    const newTodaySchedule: DailySchedule = {};
-  
-    Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-      const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
-      
-      const activitiesToCarry = incompleteActivities.filter(activity => {
-        if (activity.isRoutine) return true;
-        if (activity.type === 'essentials') return currentSettings.carryForwardEssentials;
-        if (activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
-        return currentSettings.carryForward;
-      });
-  
-      if (activitiesToCarry.length > 0) {
-        newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
-          activitiesToCarry.map(activity => {
-            let newDetails = activity.details;
-            if (activity.type === 'workout') {
-              const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-              newDetails = description.split(' for ')[1] || "Workout";
-            } else if (!activity.isRoutine) {
-              switch (activity.type) {
-                case 'upskill': newDetails = 'Learning Session'; break;
-                case 'deepwork': newDetails = 'Deep Work Session'; break;
-                case 'planning': newDetails = 'Planning Session'; break;
-                case 'tracking': newDetails = 'Tracking Session'; break;
-                case 'branding': newDetails = 'Branding Session'; break;
-                case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-              }
-            }
-            return { ...activity, id: `${activity.type}-${Date.now()}-${Math.random()}`, completed: false, details: newDetails, taskIds: activity.isRoutine ? activity.taskIds : [] };
-          })
-        );
-        carriedOver = true;
+
+    const carriedOverTasks: Activity[] = [];
+    Object.values(yesterdaysSchedule).flat().forEach(activity => {
+      if (activity && !activity.completed) {
+        if (activity.isRoutine || 
+           (activity.type === 'essentials' && currentSettings.carryForwardEssentials) ||
+           (activity.type === 'nutrition' && currentSettings.carryForwardNutrition) ||
+           currentSettings.carryForward) {
+          
+          let newDetails = activity.details;
+          if (activity.type === 'workout') {
+            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+            newDetails = description.split(' for ')[1] || "Workout";
+          }
+          carriedOverTasks.push({
+            ...activity,
+            id: `${activity.type}-${Date.now()}-${Math.random()}`,
+            completed: false,
+            details: newDetails,
+            taskIds: activity.isRoutine ? activity.taskIds : []
+          });
+        }
       }
     });
-  
-    if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
-      setTimeout(() => {
-        toast({
-            title: "Tasks Carried Over",
-            description: "Yesterday's incomplete routine tasks have been added to today's schedule.",
+
+    if (carriedOverTasks.length > 0) {
+      setSchedule(prev => {
+        const newTodaySchedule = { ...(prev[todayStr] || {}) };
+        carriedOverTasks.forEach(task => {
+            const slotActivities = Array.isArray(newTodaySchedule[task.slot]) ? newTodaySchedule[task.slot] as Activity[] : [];
+            if (slotActivities.length < 2) {
+              newTodaySchedule[task.slot] = [...slotActivities, task];
+            }
         });
-      }, 500);
+        return { ...prev, [todayStr]: newTodaySchedule };
+      });
+      // This toast was causing the issue. It's better to show a more subtle indicator if needed.
+      // setTimeout(() => {
+      //   toast({
+      //       title: "Tasks Carried Over",
+      //       description: "Yesterday's incomplete tasks have been added.",
+      //   });
+      // }, 500);
     }
-    localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+
+    localStorage.setItem(lastCarryForwardKey, todayStr);
+  }, [currentUser, isScheduleLoaded, schedule]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2643,39 +2601,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
     setSchedule(prev => {
-        const newSchedule = { ...prev };
-        let activityFound = false;
+      const newSchedule = { ...prev };
+      let targetDateKey: string | null = null;
+      let targetSlotName: string | null = null;
+      let targetActivityType: ActivityType | null = null;
 
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === activityId);
-                    if (activityIndex > -1) {
-                        const targetType = activities[activityIndex].type;
-                        
-                        // Update all activities of the same type within this specific slot
-                        newSchedule[dateKey][slotName] = activities.map(act => {
-                            if (act.type === targetType) {
-                                const currentHabits = act.habitEquationIds || [];
-                                const newHabits = link
-                                    ? [...new Set([...currentHabits, habitId])]
-                                    : currentHabits.filter(id => id !== habitId);
-                                return { ...act, habitEquationIds: newHabits };
-                            }
-                            return act;
-                        });
-                        
-                        activityFound = true;
-                        break;
-                    }
-                }
+      // First, find the activity to get its date, slot, and type
+      for (const dateKey in newSchedule) {
+        for (const slotName in newSchedule[dateKey]) {
+          const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+          if (Array.isArray(activities)) {
+            const foundActivity = activities.find(act => act.id === activityId);
+            if (foundActivity) {
+              targetDateKey = dateKey;
+              targetSlotName = slotName;
+              targetActivityType = foundActivity.type;
+              break;
             }
-            if (activityFound) break;
+          }
         }
-        return newSchedule;
+        if (targetDateKey) break;
+      }
+
+      // If found, update all activities of the same type in that specific slot
+      if (targetDateKey && targetSlotName && targetActivityType) {
+        const daySchedule = { ...newSchedule[targetDateKey] };
+        const slotActivities = [...(daySchedule[targetSlotName] as Activity[])];
+        daySchedule[targetSlotName] = slotActivities.map(act => {
+          if (act.type === targetActivityType) {
+            const currentHabits = act.habitEquationIds || [];
+            const newHabits = link
+              ? [...new Set([...currentHabits, habitId])]
+              : currentHabits.filter(id => id !== habitId);
+            return { ...act, habitEquationIds: newHabits };
+          }
+          return act;
+        });
+        newSchedule[targetDateKey] = daySchedule;
+      }
+      
+      return newSchedule;
     });
   };
+
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -2686,7 +2654,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     floatingVideoUrl, setFloatingVideoUrl,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
-    settings,
+    settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
@@ -2897,4 +2865,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 

@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -21,32 +20,18 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy } from 'lucide-react';
+import type { ActivityType } from '@/types/workout';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ScrollArea } from './ui/scroll-area';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-interface UserSettings {
-  carryForward: boolean;
-  autoPush: boolean;
-  autoPushLimit: number;
-  carryForwardEssentials: boolean;
-  carryForwardNutrition: boolean;
-  smartLogging: boolean;
-}
-
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards } = useAuth();
   const { toast } = useToast();
-  const [settings, setSettings] = useState<UserSettings>({ 
-    carryForward: false,
-    autoPush: false,
-    autoPushLimit: 100,
-    carryForwardEssentials: false,
-    carryForwardNutrition: false,
-    smartLogging: false,
-  });
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [specializationName, setSpecializationName] = useState('');
@@ -54,31 +39,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
   const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
 
-  useEffect(() => {
-    if (isOpen && settingsKey) {
-      try {
-        const storedSettings = localStorage.getItem(settingsKey);
-        if (storedSettings) {
-          const parsedSettings = JSON.parse(storedSettings);
-          setSettings({
-            carryForward: parsedSettings.carryForward || false,
-            autoPush: parsedSettings.autoPush || false,
-            autoPushLimit: parsedSettings.autoPushLimit || 100,
-            carryForwardEssentials: parsedSettings.carryForwardEssentials || false,
-            carryForwardNutrition: parsedSettings.carryForwardNutrition || false,
-            smartLogging: parsedSettings.smartLogging || false,
-          });
-        } else {
-          setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false, smartLogging: false });
-        }
-      } catch (error) {
-        console.error("Failed to load settings from localStorage", error);
-        setSettings({ carryForward: false, autoPush: false, autoPushLimit: 100, carryForwardEssentials: false, carryForwardNutrition: false, smartLogging: false });
-      }
-    }
-  }, [isOpen, settingsKey]);
-
-  const handleSettingChange = (key: keyof UserSettings, value: boolean | number) => {
+  const handleSettingChange = (key: keyof typeof settings, value: any) => {
     if (!settingsKey) return;
     
     const newSettings = { ...settings, [key]: value };
@@ -98,6 +59,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       });
     }
   };
+
+  const handleDefaultHabitChange = (activityType: ActivityType, habitId: string) => {
+    const newDefaultHabitLinks = {
+        ...settings.defaultHabitLinks,
+        [activityType]: habitId === 'none' ? null : habitId
+    };
+    handleSettingChange('defaultHabitLinks', newDefaultHabitLinks);
+  };
+
 
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
@@ -276,152 +246,191 @@ ${JSON.stringify(finalTemplate, null, 2)}
     setSpecializationName('');
     setIsCopyModalOpen(false);
   };
+  
+  const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
+
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>
               Manage your application preferences here. Changes are saved automatically.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-6">
-            <div className="space-y-4 rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label className="text-base">Theme</Label>
-                <p className="text-sm text-muted-foreground">
-                  Select a visual theme for the application.
-                </p>
-              </div>
-              <RadioGroup
-                value={theme}
-                onValueChange={handleThemeChange}
-                className="grid grid-cols-3 gap-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="default" id="theme-default" />
-                  <Label htmlFor="theme-default" className="font-normal">Default</Label>
+          <div className="py-4 space-y-6 flex-grow min-h-0">
+            <ScrollArea className="h-full pr-4">
+              <div className="space-y-6">
+                <div className="space-y-4 rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Theme</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Select a visual theme for the application.
+                    </p>
+                  </div>
+                  <RadioGroup
+                    value={theme}
+                    onValueChange={handleThemeChange}
+                    className="grid grid-cols-3 gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="default" id="theme-default" />
+                      <Label htmlFor="theme-default" className="font-normal">Default</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="matrix" id="theme-matrix" />
+                      <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="ad-dark" id="theme-ad-dark" />
+                      <Label htmlFor="theme-ad-dark" className="font-normal">Ad Dark</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="matrix" id="theme-matrix" />
-                  <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
+                
+                 <div className="space-y-4 rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">Cloud Sync</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Manage how your data is synced to the cloud.
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="auto-push"
+                      checked={settings.autoPush}
+                      onCheckedChange={(checked) => handleSettingChange('autoPush', checked)}
+                    />
+                    <Label htmlFor="auto-push" className="font-normal">
+                      Auto Push to Cloud
+                    </Label>
+                  </div>
+                   <div className="flex items-center space-x-2">
+                    <Label htmlFor="auto-push-limit" className="font-normal flex-shrink-0">
+                      Push when changes reach:
+                    </Label>
+                    <Input
+                      id="auto-push-limit"
+                      type="number"
+                      value={settings.autoPushLimit}
+                      onChange={(e) => handleSettingChange('autoPushLimit', parseInt(e.target.value, 10) || 0)}
+                      className="w-24 h-8"
+                      disabled={!settings.autoPush}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="ad-dark" id="theme-ad-dark" />
-                  <Label htmlFor="theme-ad-dark" className="font-normal">Ad Dark</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            
-             <div className="space-y-4 rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label className="text-base">Cloud Sync</Label>
-                <p className="text-sm text-muted-foreground">
-                  Manage how your data is synced to the cloud.
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="auto-push"
-                  checked={settings.autoPush}
-                  onCheckedChange={(checked) => handleSettingChange('autoPush', checked)}
-                />
-                <Label htmlFor="auto-push" className="font-normal">
-                  Auto Push to Cloud
-                </Label>
-              </div>
-               <div className="flex items-center space-x-2">
-                <Label htmlFor="auto-push-limit" className="font-normal flex-shrink-0">
-                  Push when changes reach:
-                </Label>
-                <Input
-                  id="auto-push-limit"
-                  type="number"
-                  value={settings.autoPushLimit}
-                  onChange={(e) => handleSettingChange('autoPushLimit', parseInt(e.target.value, 10) || 0)}
-                  className="w-24 h-8"
-                  disabled={!settings.autoPush}
-                />
-              </div>
-            </div>
 
-            <div className="space-y-4 rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <Label className="text-base">General</Label>
-                <p className="text-sm text-muted-foreground">
-                  Manage general application behavior.
-                </p>
+                 <div className="space-y-4 rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                        <Label className="text-base">Default Habit Links</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Automatically link a habit when creating a new activity of a certain type.
+                        </p>
+                    </div>
+                    <div className="space-y-3">
+                        {activityTypesForHabitLinking.map(type => (
+                            <div key={type} className="flex items-center justify-between">
+                                <Label htmlFor={`habit-${type}`} className="capitalize font-normal">
+                                    {type.replace('-', ' ')}
+                                </Label>
+                                <Select
+                                    value={settings.defaultHabitLinks?.[type] || 'none'}
+                                    onValueChange={(value) => handleDefaultHabitChange(type, value)}
+                                >
+                                    <SelectTrigger className="w-[200px]" id={`habit-${type}`}>
+                                        <SelectValue placeholder="Select a habit..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">-- None --</SelectItem>
+                                        {habitCards.map(habit => (
+                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="space-y-4 rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <Label className="text-base">General</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Manage general application behavior.
+                    </p>
+                  </div>
+                   <div className="flex items-center space-x-2">
+                    <Switch
+                      id="smart-logging"
+                      checked={settings.smartLogging}
+                      onCheckedChange={(checked) => handleSettingChange('smartLogging', checked)}
+                    />
+                    <Label htmlFor="smart-logging" className="font-normal">
+                      Enable Smart Logging Prompts
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="carry-forward"
+                      checked={settings.carryForward}
+                      onCheckedChange={(checked) => handleSettingChange('carryForward', checked)}
+                    />
+                    <Label htmlFor="carry-forward" className="font-normal">
+                      Carry-forward yesterday's incomplete tasks.
+                    </Label>
+                  </div>
+                   <div className="flex items-center space-x-2">
+                    <Switch
+                      id="carry-forward-essentials"
+                      checked={settings.carryForwardEssentials}
+                      onCheckedChange={(checked) => handleSettingChange('carryForwardEssentials', checked)}
+                    />
+                    <Label htmlFor="carry-forward-essentials" className="font-normal">
+                      Carry-forward daily essentials.
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                      <Switch
+                          id="carry-forward-nutrition"
+                          checked={settings.carryForwardNutrition}
+                          onCheckedChange={(checked) => handleSettingChange('carryForwardNutrition', checked)}
+                      />
+                      <Label htmlFor="carry-forward-nutrition" className="font-normal">
+                          Carry-forward Nutrition tasks.
+                      </Label>
+                  </div>
+                   <div className="flex items-center justify-between">
+                    <Label htmlFor="reset-landing" className="font-normal">
+                      Show the welcome page on next visit.
+                    </Label>
+                    <Button id="reset-landing" variant="outline" size="sm" onClick={handleResetLandingPage}>
+                      Reset
+                    </Button>
+                  </div>
+                  <Separator />
+                   <div className="flex items-center justify-between">
+                    <Label htmlFor="copy-spec-template" className="font-normal">
+                      Copy specialization upload prompt.
+                    </Label>
+                    <Button id="copy-spec-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('specialization')}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="copy-micro-template" className="font-normal">
+                      Copy micro-skill upload prompt.
+                    </Label>
+                    <Button id="copy-micro-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('micro-skills')}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
               </div>
-               <div className="flex items-center space-x-2">
-                <Switch
-                  id="smart-logging"
-                  checked={settings.smartLogging}
-                  onCheckedChange={(checked) => handleSettingChange('smartLogging', checked)}
-                />
-                <Label htmlFor="smart-logging" className="font-normal">
-                  Enable Smart Logging Prompts
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="carry-forward"
-                  checked={settings.carryForward}
-                  onCheckedChange={(checked) => handleSettingChange('carryForward', checked)}
-                />
-                <Label htmlFor="carry-forward" className="font-normal">
-                  Carry-forward yesterday's incomplete tasks.
-                </Label>
-              </div>
-               <div className="flex items-center space-x-2">
-                <Switch
-                  id="carry-forward-essentials"
-                  checked={settings.carryForwardEssentials}
-                  onCheckedChange={(checked) => handleSettingChange('carryForwardEssentials', checked)}
-                />
-                <Label htmlFor="carry-forward-essentials" className="font-normal">
-                  Carry-forward daily essentials.
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                  <Switch
-                      id="carry-forward-nutrition"
-                      checked={settings.carryForwardNutrition}
-                      onCheckedChange={(checked) => handleSettingChange('carryForwardNutrition', checked)}
-                  />
-                  <Label htmlFor="carry-forward-nutrition" className="font-normal">
-                      Carry-forward Nutrition tasks.
-                  </Label>
-              </div>
-               <div className="flex items-center justify-between">
-                <Label htmlFor="reset-landing" className="font-normal">
-                  Show the welcome page on next visit.
-                </Label>
-                <Button id="reset-landing" variant="outline" size="sm" onClick={handleResetLandingPage}>
-                  Reset
-                </Button>
-              </div>
-              <Separator />
-               <div className="flex items-center justify-between">
-                <Label htmlFor="copy-spec-template" className="font-normal">
-                  Copy specialization upload prompt.
-                </Label>
-                <Button id="copy-spec-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('specialization')}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </Button>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="copy-micro-template" className="font-normal">
-                  Copy micro-skill upload prompt.
-                </Label>
-                <Button id="copy-micro-template" variant="outline" size="sm" onClick={() => handleOpenCopyModal('micro-skills')}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy
-                </Button>
-              </div>
-            </div>
+            </ScrollArea>
           </div>
         </DialogContent>
       </Dialog>
