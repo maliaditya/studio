@@ -1,10 +1,11 @@
 
+
       
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon
 } from 'lucide-react';
@@ -57,6 +58,7 @@ function AgendaWidgetItem({
 
   const linkedHabit = useMemo(() => {
     if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+      // For simplicity, showing the first linked habit. Can be expanded later.
       return habitCards.find(h => h.id === activity.habitEquationIds![0]);
     }
     return null;
@@ -170,7 +172,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules, handleLinkHabit } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState('');
@@ -471,3 +473,4 @@ export function TodaysScheduleCard({
     
 
     
+

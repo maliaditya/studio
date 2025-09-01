@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -361,6 +362,7 @@ interface AuthContextType {
   handleMindsetTechniquePopupDragEnd: (event: DragEndEvent) => void;
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
+  handleLinkHabit: (activityId: string, habitId: string, link: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -763,29 +765,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return newSchedule;
     });
   }, [setSchedule]);
-
-  const updateActivity = (updatedActivity: Activity) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        let found = false;
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-                    if (activityIndex > -1) {
-                        activities[activityIndex] = updatedActivity;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (found) break;
-        }
-        return newSchedule;
-    });
-  };
-
+  
   const handleStartFocusSession = (activity: Activity, duration: number) => {
     const dateKey = format(new Date(), 'yyyy-MM-dd');
     const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
@@ -814,6 +794,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(false);
   };
   
+  const updateActivity = (updatedActivity: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        let found = false;
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+                    if (activityIndex > -1) {
+                        activities[activityIndex] = updatedActivity;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found) break;
+        }
+        return newSchedule;
+    });
+  };
+
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     // If it has sub-tasks, handle it like an objective
     if (activity.subTasks && activity.subTasks.length > 0) {
@@ -980,14 +982,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
    useEffect(() => {
     const interval = setInterval(() => {
-        const now = new Date();
-        const currentHour = now.getHours();
-        if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
-        else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
-        else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
-        else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
-        else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
-        else setCurrentSlot('Night');
+      const now = new Date();
+      const currentHour = now.getHours();
+      if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+      else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+      else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+      else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+      else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+      else setCurrentSlot('Night');
     }, 60000); // Update every minute
 
     // Initial call
@@ -1157,7 +1159,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
-    if (!currentSettings.carryForward) return;
+    if (!currentSettings.carryForward) {
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+        return;
+    }
   
     const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
@@ -1214,10 +1219,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     if (carriedOver) {
       setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
-      // This is the problematic toast call.
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2635,6 +2639,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   };
 
+  const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === activityId);
+                    if (activityIndex > -1) {
+                        const currentHabits = activities[activityIndex].habitEquationIds || [];
+                        const newHabits = link
+                            ? [...currentHabits, habitId]
+                            : currentHabits.filter(id => id !== habitId);
+                        
+                        // Apply to all tasks of the same type in the same slot
+                        const targetType = activities[activityIndex].type;
+                        const updatedActivities = activities.map(act => 
+                            act.type === targetType ? { ...act, habitEquationIds: newHabits } : act
+                        );
+                        newSchedule[dateKey][slotName] = updatedActivities;
+                        break;
+                    }
+                }
+            }
+        }
+        return newSchedule;
+    });
+  };
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2727,6 +2760,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeProjectIds,
     mindsetTechniquePopup, openMindsetTechniquePopup, closeMindsetTechniquePopup, handleMindsetTechniquePopupDragEnd,
     updateActivitySubtask, deleteActivitySubtask,
+    handleLinkHabit,
   };
 
   return (
