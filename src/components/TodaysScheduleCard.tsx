@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -103,7 +102,7 @@ function AgendaWidgetItem({
             {displayDetails}
           </p>
           {linkedHabit && (
-            <p className="text-xs text-primary font-medium truncate">
+            <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
                 Habit: {linkedHabit.name}
             </p>
           )}
@@ -253,7 +252,7 @@ export function TodaysScheduleCard({
     const yesterday = addDays(date, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
-    return Object.values(yesterdaysSchedule)
+    return Object.values(yestersdaysSchedule)
       .flat()
       .filter((activity): activity is Activity => !!activity && !activity.completed);
   }, [schedule, date]);
@@ -466,3 +465,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
