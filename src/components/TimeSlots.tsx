@@ -13,12 +13,13 @@ import {
   Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
   Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon, Brain, Wind
 } from 'lucide-react';
-import type { ActivityType, Activity, DailySchedule, FullSchedule } from '@/types/workout';
+import type { ActivityType, Activity, DailySchedule, FullSchedule, SubTask } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { useState, useMemo } from 'react';
 import { ScrollArea } from './ui/scroll-area';
+import { Input } from './ui/input';
 
 const slots = [
   { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
@@ -133,6 +134,71 @@ export function TimeSlots({
     });
   };
 
+  const handleAddSubTask = (slotName: string, activityId: string) => {
+    const newSubTask: SubTask = { id: `sub_${Date.now()}`, text: '', completed: false };
+    setSchedule(prev => {
+        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
+        if (!dayKey) return prev;
+        const newSchedule = { ...prev };
+        const daySchedule = { ...newSchedule[dayKey] };
+        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
+            act.id === activityId
+                ? { ...act, subTasks: [...(act.subTasks || []), newSubTask] }
+                : act
+        );
+        newSchedule[dayKey] = daySchedule;
+        return newSchedule;
+    });
+  };
+
+  const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
+    setSchedule(prev => {
+        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
+        if (!dayKey) return prev;
+        const newSchedule = { ...prev };
+        const daySchedule = { ...newSchedule[dayKey] };
+        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
+            act.id === activityId
+                ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, text: newText } : st) }
+                : act
+        );
+        newSchedule[dayKey] = daySchedule;
+        return newSchedule;
+    });
+  };
+  
+  const handleToggleSubTask = (slotName: string, activityId: string, subTaskId: string) => {
+    setSchedule(prev => {
+        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
+        if (!dayKey) return prev;
+        const newSchedule = { ...prev };
+        const daySchedule = { ...newSchedule[dayKey] };
+        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
+            act.id === activityId
+                ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, completed: !st.completed } : st) }
+                : act
+        );
+        newSchedule[dayKey] = daySchedule;
+        return newSchedule;
+    });
+  };
+
+  const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
+    setSchedule(prev => {
+      const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
+      if (!dayKey) return prev;
+      const newSchedule = { ...prev };
+      const daySchedule = { ...newSchedule[dayKey] };
+      daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
+        act.id === activityId
+          ? { ...act, subTasks: (act.subTasks || []).filter(st => st.id !== subTaskId) }
+          : act
+      );
+      newSchedule[dayKey] = daySchedule;
+      return newSchedule;
+    });
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
@@ -189,17 +255,20 @@ export function TimeSlots({
                       <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
                         <div className="flex items-start justify-between gap-3">
                           <div
-                            className={cn("flex items-start gap-3 flex-grow min-w-0", activity.completed ? "opacity-60" : "cursor-pointer")}
-                            onClick={(e) => onActivityClick(slot.name, activity, e)}
+                            className="flex items-start gap-3 flex-grow min-w-0"
+                            onClick={(e) => !activity.completed && onActivityClick(slot.name, activity, e)}
                           >
                             <button
                               onClick={(e) => {
                                   e.stopPropagation();
-                                  handleToggleRoutine(slot.name, activity.id);
+                                  onToggleComplete(slot.name, activity.id, !activity.completed);
                               }}
-                              className={cn("pt-0.5", activity.isRoutine ? "text-green-500" : "text-primary")}
+                              className="pt-0.5"
                             >
-                              {activityIcons[activity.type]}
+                              {activity.completed 
+                                ? <CheckSquare className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
+                              }
                             </button>
                             <div className="flex-grow min-w-0">
                               <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
@@ -219,11 +288,6 @@ export function TimeSlots({
                             </div>
                           </div>
                           <div className="flex items-center flex-shrink-0">
-                            <Checkbox
-                              id={`cb-${activity.id}`}
-                              checked={!!activity.completed}
-                              onCheckedChange={(checked) => onToggleComplete(slot.name, activity.id, !!checked)}
-                            />
                              <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
@@ -231,6 +295,10 @@ export function TimeSlots({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleAddSubTask(slot.name, activity.id)}>
+                                    <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleToggleRoutine(slot.name, activity.id)}>{activity.isRoutine ? "Unmark as Routine" : "Mark as Routine"}</DropdownMenuItem>
                                   {activity.type !== 'interrupt' && (
                                     <DropdownMenuSub>
                                       <DropdownMenuSubTrigger>
@@ -260,6 +328,29 @@ export function TimeSlots({
                               </DropdownMenu>
                           </div>
                         </div>
+                        {activity.subTasks && activity.subTasks.length > 0 && (
+                            <div className="pl-8 pt-2 space-y-2">
+                                {activity.subTasks.map(st => (
+                                    <div key={st.id} className="flex items-center gap-2 group/subtask">
+                                        <Checkbox 
+                                            id={`subtask-${st.id}`}
+                                            checked={st.completed}
+                                            onCheckedChange={() => handleToggleSubTask(slot.name, activity.id, st.id)}
+                                        />
+                                        <Input
+                                            value={st.text}
+                                            onChange={(e) => handleUpdateSubTask(slot.name, activity.id, st.id, e.target.value)}
+                                            onBlur={(e) => { if (e.target.value.trim() === '') handleDeleteSubTask(slot.name, activity.id, st.id) }}
+                                            className={cn("h-7 text-xs border-0 bg-transparent px-1 focus-visible:ring-1 focus-visible:ring-ring", st.completed && "line-through text-muted-foreground")}
+                                            placeholder="New sub-task..."
+                                        />
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/subtask:opacity-100" onClick={() => handleDeleteSubTask(slot.name, activity.id, st.id)}>
+                                            <Trash2 className="h-3 w-3 text-destructive"/>
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                       </div>
                     )
                   })

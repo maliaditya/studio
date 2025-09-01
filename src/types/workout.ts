@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -172,6 +173,12 @@ export interface PostSessionReview {
   cortisolLevel: 'low' | 'medium' | 'high';
 }
 
+export interface SubTask {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;
@@ -188,6 +195,7 @@ export interface Activity {
   postSessionReview?: PostSessionReview;
   duration?: number; // For interruptions
   isRoutine?: boolean; // New field for daily routine tasks
+  subTasks?: SubTask[]; // Added for sub-task functionality
 };
 
 export interface Interrupt {
