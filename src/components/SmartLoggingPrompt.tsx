@@ -318,7 +318,7 @@ export function SmartLoggingPrompt({
     focus: {
         icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
         title: "Focus Session Active",
-        description: "your actions follow your visualization that image in your brain.",
+        description: "Align your actions with your mental visualization.",
         actions: []
     }
   };
@@ -336,7 +336,7 @@ export function SmartLoggingPrompt({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
-                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 h-full"
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3 h-full max-h-80"
             >
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="flex-shrink-0">{currentPrompt.icon}</div>
