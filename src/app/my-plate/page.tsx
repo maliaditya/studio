@@ -282,10 +282,9 @@ function MyPlatePageContent() {
 
     if (carriedOver) {
         setSchedule(prev => ({ ...prev, [todayDateKey]: { ...(prev[todayDateKey] || {}), ...newTodaySchedule } }));
-        toast({ title: "Tasks Carried Over", description: "Yesterday's tasks have been moved to today." });
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
@@ -1303,7 +1302,7 @@ function MyPlatePageContent() {
               </DialogHeader>
               <div className="space-y-4 py-4">
                   {interruptModalState.type === null && (
-                      <RadioGroup onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
+                      <RadioGroup value={interruptModalState.type || ''} onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
                           <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
                           <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
                       </RadioGroup>
