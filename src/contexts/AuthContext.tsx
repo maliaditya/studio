@@ -517,6 +517,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
 
+  const updateActivity = (updatedActivity: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        let found = false;
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+                    if (activityIndex > -1) {
+                        activities[activityIndex] = updatedActivity;
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (found) break;
+        }
+        return newSchedule;
+    });
+  };
+
+  const handleStartFocusSession = (activity: Activity, duration: number) => {
+    const dateKey = format(new Date(), 'yyyy-MM-dd');
+    const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
+
+    const activityToStart = fullActivityFromState || activity;
+    
+    const updatedActivity: Activity = {
+        ...activityToStart,
+        focusSessionInitialStartTime: Date.now(),
+        focusSessionStartTime: Date.now(),
+        focusSessionEndTime: undefined,
+        focusSessionPauses: [],
+        focusSessionInitialDuration: duration,
+    };
+    
+    updateActivity(updatedActivity); // Persist start time immediately
+
+    setActiveFocusSession({
+        activity: updatedActivity,
+        duration: duration,
+        secondsLeft: duration * 60,
+        totalSeconds: duration * 60,
+        startTime: Date.now(),
+        state: 'running',
+    });
+    setFocusSessionModalOpen(false);
+  };
+
   useEffect(() => {
     const timerInterval = setInterval(() => {
       if (activeFocusSession && activeFocusSession.state === 'running') {
@@ -766,56 +816,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
   
-  const handleStartFocusSession = (activity: Activity, duration: number) => {
-    const dateKey = format(new Date(), 'yyyy-MM-dd');
-    const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
-
-    const activityToStart = fullActivityFromState || activity;
-    
-    const updatedActivity: Activity = {
-        ...activityToStart,
-        focusSessionInitialStartTime: Date.now(),
-        focusSessionStartTime: Date.now(),
-        focusSessionEndTime: undefined,
-        focusSessionPauses: [],
-        focusSessionInitialDuration: duration,
-    };
-    
-    updateActivity(updatedActivity); // Persist start time immediately
-
-    setActiveFocusSession({
-        activity: updatedActivity,
-        duration: duration,
-        secondsLeft: duration * 60,
-        totalSeconds: duration * 60,
-        startTime: Date.now(),
-        state: 'running',
-    });
-    setFocusSessionModalOpen(false);
-  };
-  
-  const updateActivity = (updatedActivity: Activity) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        let found = false;
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-                    if (activityIndex > -1) {
-                        activities[activityIndex] = updatedActivity;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (found) break;
-        }
-        return newSchedule;
-    });
-  };
-
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     // If it has sub-tasks, handle it like an objective
     if (activity.subTasks && activity.subTasks.length > 0) {
@@ -1159,11 +1159,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const settingsKey = `lifeos_settings_${currentUser.username}`;
     const storedSettings = localStorage.getItem(settingsKey);
     const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
-    if (!currentSettings.carryForward) {
-        localStorage.setItem(lastCarryForwardKey, todayDateKey);
-        return;
-    }
-  
+    
     const yesterday = subDays(today, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
   
@@ -1219,6 +1215,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     if (carriedOver) {
       setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } }));
+      setTimeout(() => {
+        toast({
+            title: "Tasks Carried Over",
+            description: "Yesterday's incomplete routine tasks have been added to today's schedule.",
+        });
+      }, 500);
     }
     localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
@@ -2642,27 +2644,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
     setSchedule(prev => {
         const newSchedule = { ...prev };
+        let activityFound = false;
+
         for (const dateKey in newSchedule) {
             for (const slotName in newSchedule[dateKey]) {
                 const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
                 if (Array.isArray(activities)) {
                     const activityIndex = activities.findIndex(a => a.id === activityId);
                     if (activityIndex > -1) {
-                        const currentHabits = activities[activityIndex].habitEquationIds || [];
-                        const newHabits = link
-                            ? [...currentHabits, habitId]
-                            : currentHabits.filter(id => id !== habitId);
-                        
-                        // Apply to all tasks of the same type in the same slot
                         const targetType = activities[activityIndex].type;
-                        const updatedActivities = activities.map(act => 
-                            act.type === targetType ? { ...act, habitEquationIds: newHabits } : act
-                        );
-                        newSchedule[dateKey][slotName] = updatedActivities;
+                        
+                        // Update all activities of the same type within this specific slot
+                        newSchedule[dateKey][slotName] = activities.map(act => {
+                            if (act.type === targetType) {
+                                const currentHabits = act.habitEquationIds || [];
+                                const newHabits = link
+                                    ? [...new Set([...currentHabits, habitId])]
+                                    : currentHabits.filter(id => id !== habitId);
+                                return { ...act, habitEquationIds: newHabits };
+                            }
+                            return act;
+                        });
+                        
+                        activityFound = true;
                         break;
                     }
                 }
             }
+            if (activityFound) break;
         }
         return newSchedule;
     });
@@ -2888,3 +2897,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
