@@ -16,41 +16,39 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
     placeholder: string;
     className?: string;
 }) => {
-    const ref = useRef<HTMLSpanElement>(null);
+    const [currentText, setCurrentText] = useState(value);
+    const spanRef = useRef<HTMLSpanElement>(null);
 
-    // This effect ensures that the span's content is updated if the `value` prop
-    // changes from outside (e.g., loading data), but it won't interfere
-    // while the user is actively editing.
+    // Update internal state only when the external `value` prop changes.
     useEffect(() => {
-        if (ref.current && ref.current.textContent !== value) {
-            ref.current.textContent = value || placeholder;
-        }
+        setCurrentText(value || placeholder);
     }, [value, placeholder]);
 
     const handleBlur = () => {
-        if (ref.current) {
-            const newValue = ref.current.textContent || '';
-            // Only call the update function if the text has actually changed.
-            if (newValue !== value) {
-                onBlur(newValue);
-            }
+        const newText = spanRef.current?.textContent || '';
+        // Only call the update function if the text has actually changed.
+        if (newText !== value) {
+            onBlur(newText);
         }
     };
     
-    // Using a key derived from the initial value ensures that React creates a new
-    // element if the prop changes, resetting its internal state.
-    // We suppress the warning because we are intentionally managing the content
-    // imperatively to avoid the cursor jumping bug.
+    // We use a controlled input-like pattern with a `span` to avoid cursor jumping.
+    // The `dangerouslySetInnerHTML` is only used for the initial render,
+    // and subsequent updates are handled by the user's direct editing of the contentEditable element.
     return (
         <span
-            key={value}
-            ref={ref}
+            ref={spanRef}
             contentEditable={true}
             suppressContentEditableWarning={true}
             className={className}
             onBlur={handleBlur}
-            dangerouslySetInnerHTML={{ __html: value || placeholder }}
-        />
+            onInput={(e) => setCurrentText(e.currentTarget.textContent || '')}
+            // Use a key to ensure React re-creates the element if the value prop changes externally,
+            // which resets its internal state. This prevents stale state issues.
+            key={value}
+        >
+          {currentText}
+        </span>
     );
 });
 EditableSpan.displayName = 'EditableSpan';
