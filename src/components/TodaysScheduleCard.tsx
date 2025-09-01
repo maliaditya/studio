@@ -222,12 +222,12 @@ export function TodaysScheduleCard({
         } else {
             const durationStr = activityDurations[activity.id];
             if (!durationStr || typeof durationStr !== 'string') return 0;
-            if (/^\\d+$/.test(durationStr.trim())) {
+            if (/^\d+$/.test(durationStr.trim())) {
                 totalMinutes = parseInt(durationStr.trim(), 10);
             } else {
-                const hourMatch = durationStr.match(/(\\d+)\\s*h/);
+                const hourMatch = durationStr.match(/(\d+)\s*h/);
                 if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-                const minMatch = durationStr.match(/(\\d+)\\s*m/);
+                const minMatch = durationStr.match(/(\d+)\s*m/);
                 if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
             }
         }
@@ -252,7 +252,7 @@ export function TodaysScheduleCard({
     const yesterday = addDays(date, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
-    return Object.values(yestersdaysSchedule)
+    return Object.values(yesterdaysSchedule)
       .flat()
       .filter((activity): activity is Activity => !!activity && !activity.completed);
   }, [schedule, date]);
@@ -465,5 +465,7 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
 
     
