@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1139,59 +1140,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    const newTodaySchedule: DailySchedule = {};
     let carriedOver = false;
-
-    Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-      const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
-      
-      const activitiesToCarry = incompleteActivities.filter(activity => {
-          if(activity.isRoutine) return true; // Always carry over routine tasks
-          if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
-          if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
-          return currentSettings.carryForward;
-      });
-
-      if (activitiesToCarry.length > 0) {
-        newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
-            activitiesToCarry.map(activity => {
-                let newDetails = activity.details;
-
-                // Always regenerate workout details for today
-                if (activity.type === 'workout') {
-                    const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                    newDetails = description.split(' for ')[1] || "Workout";
-                } else if (!activity.isRoutine) { // For non-routine, non-workout tasks, reset details
-                    switch (activity.type) {
-                      case 'upskill': newDetails = 'Learning Session'; break;
-                      case 'deepwork': newDetails = 'Deep Work Session'; break;
-                      case 'planning': newDetails = 'Planning Session'; break;
-                      case 'tracking': newDetails = 'Tracking Session'; break;
-                      case 'branding': newDetails = 'Branding Session'; break;
-                      case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+    
+    setSchedule(prev => {
+        const newTodaySchedule: DailySchedule = {};
+        Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
+          const incompleteActivities = (Array.isArray(activities) ? activities : []).filter(activity => activity && !activity.completed);
+          
+          const activitiesToCarry = incompleteActivities.filter(activity => {
+              if(activity.isRoutine) return true;
+              if(activity.type === 'essentials') return currentSettings.carryForwardEssentials;
+              if(activity.type === 'nutrition') return currentSettings.carryForwardNutrition;
+              return currentSettings.carryForward;
+          });
+    
+          if (activitiesToCarry.length > 0) {
+            newTodaySchedule[slotName] = (newTodaySchedule[slotName] || [] as Activity[]).concat(
+                activitiesToCarry.map(activity => {
+                    let newDetails = activity.details;
+    
+                    if (activity.type === 'workout') {
+                        const { description } = getExercisesForDay(today, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                        newDetails = description.split(' for ')[1] || "Workout";
+                    } else if (!activity.isRoutine) {
+                        switch (activity.type) {
+                          case 'upskill': newDetails = 'Learning Session'; break;
+                          case 'deepwork': newDetails = 'Deep Work Session'; break;
+                          case 'planning': newDetails = 'Planning Session'; break;
+                          case 'tracking': newDetails = 'Tracking Session'; break;
+                          case 'branding': newDetails = 'Branding Session'; break;
+                          case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                        }
                     }
-                }
+    
+                    return {
+                      ...activity,
+                      id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                      completed: false,
+                      details: newDetails,
+                      taskIds: activity.isRoutine ? activity.taskIds : [],
+                    };
+                })
+            );
+            carriedOver = true;
+          }
+        });
 
-                return {
-                  ...activity,
-                  id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                  completed: false,
-                  details: newDetails,
-                  // Keep taskIds for routine tasks, clear for non-routine to allow re-selection
-                  taskIds: activity.isRoutine ? activity.taskIds : [],
-                };
-            })
-        );
-        carriedOver = true;
-      }
+        if (carriedOver) {
+            toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
+        }
+        localStorage.setItem(lastCarryForwardKey, todayDateKey);
+
+        return { ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayDateKey] || {}) } };
     });
-
-    if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayDateKey]: { ...newTodaySchedule, ...(prev[todayKey] || {}) } }));
-      toast({ title: "Tasks Carried Over", description: "Yesterday's incomplete tasks have been moved to today." });
-    }
-
-    localStorage.setItem(lastCarryForwardKey, todayDateKey);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, toast, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions]);
   
   const register = async (username: string, password: string) => {
@@ -2796,6 +2797,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
