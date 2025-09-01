@@ -469,7 +469,7 @@ function MyPlatePageContent() {
         toast({ title: 'Invalid Input', description: 'Please provide a description.', variant: 'destructive' });
         return;
     }
-    
+
     let durationMinutes = parseInt(interruptDuration, 10);
     if (applyInterruptToFutureSlots) {
         durationMinutes = 240;
@@ -499,7 +499,6 @@ function MyPlatePageContent() {
                 const currentActivities = Array.isArray(newDaySchedule[sName]) ? newDaySchedule[sName] as Activity[] : [];
                 newDaySchedule[sName] = [...currentActivities, newActivity];
             });
-            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `Added to all future slots.` });
         } else {
             const newActivity: Activity = {
                 id: `${activityType}-${Date.now()}`,
@@ -512,11 +511,16 @@ function MyPlatePageContent() {
             };
             const currentActivities = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
             newDaySchedule[slotName] = [...currentActivities, newActivity];
-            toast({ title: `${activityType.charAt(0).toUpperCase() + activityType.slice(1)} Logged`, description: `The ${activityType} has been added to your agenda.` });
         }
 
         return { ...prev, [selectedDateKey]: newDaySchedule };
     });
+
+    if (applyInterruptToFutureSlots) {
+      toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} Logged`, description: `Added to all future slots.` });
+    } else {
+      toast({ title: `${type.charAt(0).toUpperCase() + type.slice(1)} Logged`, description: `The ${type} has been added to your agenda.` });
+    }
 
     setInterruptDetails('');
     setInterruptDuration('');
@@ -1294,7 +1298,7 @@ function MyPlatePageContent() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, type: null })}>
+      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ ...interruptModalState, isOpen })}>
           <DialogContent>
               <DialogHeader>
                   <DialogTitle>Log an {interruptModalState.type === 'distraction' ? 'Distraction' : 'Interruption'}</DialogTitle>
