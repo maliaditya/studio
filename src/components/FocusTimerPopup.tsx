@@ -41,6 +41,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const popupRef = useRef<HTMLDivElement>(null);
   
   const [sessionCompletedSubTaskIds, setSessionCompletedSubTaskIds] = useState<Set<string>>(new Set());
 
