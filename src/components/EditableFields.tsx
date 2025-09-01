@@ -16,37 +16,40 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
     placeholder: string;
     className?: string;
 }) => {
-    const [currentText, setCurrentText] = useState(value || placeholder);
-    const spanRef = useRef<HTMLSpanElement>(null);
+    const ref = useRef<HTMLSpanElement>(null);
 
-    // Sync state with external prop changes, but only if not currently focused
+    // This effect ensures that if the parent data changes, the span updates,
+    // but it won't overwrite what the user is currently typing.
     useEffect(() => {
-        if (document.activeElement !== spanRef.current) {
-            setCurrentText(value || placeholder);
+        if (ref.current && ref.current.textContent !== value) {
+            ref.current.textContent = value || placeholder;
         }
     }, [value, placeholder]);
 
     const handleBlur = () => {
-        const newText = spanRef.current?.textContent || '';
-        if (newText !== value) {
-            onBlur(newText);
+        if (ref.current) {
+            const newText = ref.current.textContent || '';
+            // Only call onBlur if the text has actually changed.
+            if (newText !== value) {
+                onBlur(newText);
+            }
         }
     };
     
-    const handleInput = (event: React.FormEvent<HTMLSpanElement>) => {
-        setCurrentText(event.currentTarget.textContent || '');
-    };
-
+    // We only need to render the span. The state is now managed directly
+    // in the DOM until the `blur` event, which is more reliable for contentEditable.
     return (
         <span
-            ref={spanRef}
+            ref={ref}
             contentEditable={true}
             suppressContentEditableWarning={true}
             className={className}
             onBlur={handleBlur}
-            onInput={handleInput}
-            dangerouslySetInnerHTML={{ __html: currentText }}
-        />
+            // Use key to force re-mount if the value prop changes, which resets the textContent
+            key={value}
+        >
+            {value || placeholder}
+        </span>
     );
 });
 EditableSpan.displayName = 'EditableSpan';
