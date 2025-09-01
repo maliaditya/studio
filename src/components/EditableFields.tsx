@@ -16,14 +16,13 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
     placeholder: string;
     className?: string;
 }) => {
+    const [currentText, setCurrentText] = useState(value || placeholder);
     const spanRef = useRef<HTMLSpanElement>(null);
-    const initialRender = useRef(true);
 
+    // Sync state with external prop changes, but only if not currently focused
     useEffect(() => {
-        const element = spanRef.current;
-        if (element && (element.textContent !== value || initialRender.current)) {
-            element.textContent = value || placeholder;
-            initialRender.current = false;
+        if (document.activeElement !== spanRef.current) {
+            setCurrentText(value || placeholder);
         }
     }, [value, placeholder]);
 
@@ -34,6 +33,10 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
         }
     };
     
+    const handleInput = (event: React.FormEvent<HTMLSpanElement>) => {
+        setCurrentText(event.currentTarget.textContent || '');
+    };
+
     return (
         <span
             ref={spanRef}
@@ -41,9 +44,8 @@ const EditableSpan = React.memo(({ value, onBlur, placeholder, className }: {
             suppressContentEditableWarning={true}
             className={className}
             onBlur={handleBlur}
-            // We only set the initial text with dangerouslySetInnerHTML and let the user control it thereafter
-            // The useEffect above will handle external prop changes.
-            dangerouslySetInnerHTML={{ __html: value || placeholder }}
+            onInput={handleInput}
+            dangerouslySetInnerHTML={{ __html: currentText }}
         />
     );
 });
