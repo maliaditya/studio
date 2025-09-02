@@ -255,13 +255,13 @@ ${JSON.stringify(finalTemplate, null, 2)}
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>
               Manage your application preferences here. Changes are saved automatically.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-grow min-h-0 py-4">
+          <div className="flex-grow min-h-0">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-6">
                 <div className="space-y-4 rounded-lg border p-4">
