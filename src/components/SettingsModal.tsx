@@ -47,10 +47,6 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
     try {
       localStorage.setItem(settingsKey, JSON.stringify(newSettings));
-      toast({
-        title: "Setting Saved",
-        description: `Your preferences have been updated.`,
-      });
     } catch (error) {
       toast({
         title: "Error",
