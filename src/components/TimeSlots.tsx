@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -303,6 +304,10 @@ export function TimeSlots({
         const review = missedSlotReviews[reviewKey];
         const isSlotComplete = activities.length > 0 && activities.every(a => a.completed);
         const allRulesFollowed = review && allEquations.length > 0 && allEquations.every(eq => review.followedRuleIds.includes(eq.id));
+        
+        const isPartiallyComplete = activities.length > 0 && !isSlotComplete && activities.some(a => a.completed);
+        const partialAndRulesNotFollowed = isPartiallyComplete && review && !allRulesFollowed;
+
         const isSlotFailed = !isSlotComplete && review && !allRulesFollowed;
 
         return (
@@ -315,7 +320,8 @@ export function TimeSlots({
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60',
               (isSlotComplete || allRulesFollowed) && 'border-green-500',
-              isSlotFailed && 'border-red-500'
+              partialAndRulesNotFollowed && 'border-orange-500',
+              isSlotFailed && !isPartiallyComplete && 'border-red-500'
             )}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -538,3 +544,4 @@ export function TimeSlots({
 }
 
     
+

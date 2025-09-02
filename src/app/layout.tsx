@@ -126,7 +126,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
 
   // State for end-of-slot modal
-  const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', incompleteTasks: [] });
+  const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
 
 
   useEffect(() => {
@@ -162,13 +162,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             const pastSlotNames = Object.keys(slotEndHours).slice(0, currentSlotIndex);
 
             for (const slotName of pastSlotNames) {
-                const activitiesInSlot = daySchedule[slotName] as Activity[] | undefined;
                 const reviewKey = `${todayKey}-${slotName}`;
                 const reviewDone = missedSlotReviews[reviewKey];
 
                 if (!reviewDone) {
-                    const incompleteTasks = (activitiesInSlot || []).filter(a => a && !a.completed);
-                    setMissedSlotModalState({ isOpen: true, slotName: slotName, incompleteTasks: incompleteTasks });
+                    const allTasksInSlot = (daySchedule[slotName] as Activity[] | undefined) || [];
+                    const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
+                    setMissedSlotModalState({ isOpen: true, slotName: slotName, allTasks: allTasksInSlot, incompleteTasks: incompleteTasks });
                     break;
                 }
             }
@@ -341,7 +341,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         ...prev,
         [review.id]: review
     }));
-    setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [] });
+    setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
   };
 
 
@@ -354,7 +354,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <PistonsHead />
       <main>{children}</main>
       <Toaster />
-      {isBrowser && <BackgroundAudioPlayer />}
+      <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
        <FocusSessionModal
