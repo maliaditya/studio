@@ -84,11 +84,8 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           if (Array.isArray(activities)) {
             let slotWasModified = false;
             const updatedActivities = activities.map(act => {
-              // Only update non-completed tasks of the matching type
               if (act.type === activityType && !act.completed) {
-                // For simplicity, we replace existing links. A more complex logic could merge them.
                 const newHabitIds = newHabitId ? [newHabitId] : [];
-                // Check if an update is actually needed
                 if (JSON.stringify(act.habitEquationIds || []) !== JSON.stringify(newHabitIds)) {
                   slotWasModified = true;
                   return { ...act, habitEquationIds: newHabitIds };
@@ -303,16 +300,16 @@ ${JSON.stringify(finalTemplate, null, 2)}
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>
               Manage your application preferences here. Changes are saved automatically.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-grow min-h-0">
+          <div className="flex-grow min-h-0 overflow-hidden">
             <ScrollArea className="h-full pr-4">
-              <div className="space-y-6">
+              <div className="space-y-6 py-4">
                 <div className="space-y-4 rounded-lg border p-4">
                   <div className="space-y-0.5">
                     <Label className="text-base">Theme</Label>
