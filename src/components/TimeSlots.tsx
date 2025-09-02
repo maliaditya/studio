@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -213,8 +213,8 @@ export function TimeSlots({
     });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
-    linkHabitFromContext(activityId, habitId, link);
+  const handleLinkHabit = (activityId: string, habitId: string) => {
+    linkHabitFromContext(activityId, habitId, true);
   };
 
   const handleAddSubTask = (slotName: string, activityId: string) => {
@@ -401,7 +401,7 @@ export function TimeSlots({
                                          <DropdownMenuSubContent>
                                           <ScrollArea className="h-48">
                                             {habitCards.map(habit => (
-                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id, !(activity.habitEquationIds || []).includes(habit.id))}>
+                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id)}>
                                                     <Checkbox className="mr-2" checked={(activity.habitEquationIds || []).includes(habit.id)} />
                                                     {habit.name}
                                                 </DropdownMenuItem>
@@ -534,3 +534,5 @@ export function TimeSlots({
     </div>
   );
 }
+
+    
