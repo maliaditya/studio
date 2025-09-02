@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -20,9 +20,6 @@ import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { Checkbox } from './ui/checkbox';
-import {
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind
-} from 'lucide-react';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -187,6 +184,15 @@ export function TimeSlots({
   const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
 
+  const slots = [
+    { name: 'Late Night', time: '12am - 4am', icon: <Moon className="h-5 w-5 text-indigo-400" /> },
+    { name: 'Dawn', time: '4am - 8am', icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
+    { name: 'Morning', time: '8am - 12pm', icon: <Sun className="h-5 w-5 text-yellow-400" /> },
+    { name: 'Afternoon', time: '12pm - 4pm', icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
+    { name: 'Evening', time: '4pm - 8pm', icon: <Sunset className="h-5 w-5 text-purple-500" /> },
+    { name: 'Night', time: '8pm - 12am', icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
+  ];
+
   const handleToggleRoutine = (slotName: string, activityId: string) => {
     setSchedule(prev => {
         const newSchedule = { ...prev };
@@ -303,7 +309,7 @@ export function TimeSlots({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
-        const activities = (schedule[slot.name] as Activity[]) || [];
+        const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
         const currentSlotDuration = activities.reduce((sum, act) => {
             let duration = 0;
             if(act.type === 'essentials' || act.type === 'interrupt') {
@@ -487,54 +493,54 @@ export function TimeSlots({
                   </PopoverTrigger>
                   <PopoverContent className="w-52 p-2" align="end" side="top">
                     <div className="grid gap-1">
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'workout')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'workout')}>
                         <Dumbbell className="h-4 w-4 mr-2" />
                         Add Workout
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'mindset')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'mindset')}>
                         <Brain className="h-4 w-4 mr-2" />
                         Add Mindset
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'upskill')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'upskill')}>
                         <BookOpenCheck className="h-4 w-4 mr-2" />
                         Add Upskill
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'deepwork')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'deepwork')}>
                         <Briefcase className="h-4 w-4 mr-2" />
                         Add Deep Work
                       </Button>
-                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'essentials')}>
+                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'essentials')}>
                         <CheckSquare className="h-4 w-4 mr-2" />
                         Add Daily Essentials
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'nutrition')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'nutrition')}>
                         <Utensils className="h-4 w-4 mr-2" />
                         Add Nutrition
                       </Button>
                       <Separator className="my-1" />
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'branding')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'branding')}>
                         <Share2 className="h-4 w-4 mr-2" />
                         Add Branding
                       </Button>
-                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'lead-generation')}>
+                       <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'lead-generation')}>
                         <Magnet className="h-4 w-4 mr-2" />
                         Add Lead Gen
                       </Button>
                       <Separator className="my-1" />
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'planning')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'planning')}>
                         <ClipboardList className="h-4 w-4 mr-2" />
                         Add Planning
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name, 'tracking')}>
+                      <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'tracking')}>
                         <ClipboardCheck className="h-4 w-4 mr-2" />
                         Add Tracking
                       </Button>
                       <Separator className="my-1" />
-                      <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name, 'interrupt')}>
+                      <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name as string, 'interrupt')}>
                         <AlertCircle className="h-4 w-4 mr-2" />
                         Add Interrupt
                       </Button>
-                      <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name, 'distraction')}>
+                      <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name as string, 'distraction')}>
                         <Wind className="h-4 w-4 mr-2" />
                         Add Distraction
                       </Button>
