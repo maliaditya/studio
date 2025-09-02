@@ -297,7 +297,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-xl">
-          <DialogHeader className="flex-shrink-0">
+          <DialogHeader>
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>
               Manage your application preferences here. Changes are saved automatically.
