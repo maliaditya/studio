@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,7 +38,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { Project, Activity } from '@/types/workout';
+import type { Project, Activity, MissedSlotReview } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetTechniquePopup } from '@/components/MindsetTechniquePopup';
@@ -112,6 +113,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleMindsetTechniquePopupDragEnd,
     currentSlot,
     openMindsetTechniquePopup,
+    missedSlotReviews,
+    setMissedSlotReviews,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -121,6 +124,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [interruptDetails, setInterruptDetails] = React.useState('');
   const [interruptDuration, setInterruptDuration] = React.useState('');
   const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
+
+  // State for end-of-slot modal
+  const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', incompleteTasks: [] });
+
 
   useEffect(() => {
     document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
@@ -137,15 +144,34 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         const slotEndHour = slotEndHours[currentSlot];
         const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
         const diff = slotEndTime.getTime() - now.getTime();
+        
         if (diff > 0) {
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff / 1000 / 60) % 60);
             const seconds = Math.floor((diff / 1000) % 60);
             setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
-        } else { setRemainingTime('00:00:00'); }
+        } else { 
+            setRemainingTime('00:00:00'); 
+            
+            // Check for incomplete tasks at the end of the slot
+            const todayKey = format(new Date(), 'yyyy-MM-dd');
+            const daySchedule = schedule[todayKey];
+            if (daySchedule) {
+                const activitiesInSlot = daySchedule[currentSlot] as Activity[] | undefined;
+                const incompleteTasks = (activitiesInSlot || []).filter(a => !a.completed);
+
+                // Check if a review for this slot on this day has already been done
+                const reviewKey = `${todayKey}-${currentSlot}`;
+                const reviewDone = missedSlotReviews[reviewKey];
+
+                if (incompleteTasks.length > 0 && !reviewDone && !missedSlotModalState.isOpen) {
+                    setMissedSlotModalState({ isOpen: true, slotName: currentSlot, incompleteTasks });
+                }
+            }
+        }
     }, 1000);
     return () => clearInterval(timerInterval);
-  }, [currentSlot]);
+  }, [currentSlot, schedule, missedSlotReviews, missedSlotModalState.isOpen]);
 
 
   useEffect(() => {
@@ -305,6 +331,14 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setApplyInterruptToFutureSlots(false);
     setInterruptModalState({ isOpen: false, slotName: null, activityType: null });
   };
+  
+  const handleSaveMissedSlotReview = (review: MissedSlotReview) => {
+    setMissedSlotReviews(prev => ({
+        ...prev,
+        [review.id]: review
+    }));
+    setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [] });
+  };
 
 
   return (
@@ -362,6 +396,11 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           lastSessionReview={lastSessionReview}
           openMindsetTechniquePopup={openMindsetTechniquePopup}
           openHabitDetailPopup={authContext.openHabitDetailPopup}
+      />
+      <MissedSlotModal 
+          state={missedSlotModalState}
+          onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({ ...prev, isOpen }))}
+          onSave={handleSaveMissedSlotReview}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -518,5 +557,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    

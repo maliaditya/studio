@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength, SubTask } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength, SubTask, MissedSlotReview } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -368,6 +368,8 @@ interface AuthContextType {
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
   handleLinkHabit: (activityId: string, habitId: string, link: boolean) => void;
+  missedSlotReviews: Record<string, MissedSlotReview>;
+  setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -426,15 +428,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [topicGoals, setTopicGoals] = useState<Record<string, TopicGoal>>({});
   const [deepWorkDefinitions, setDeepWorkDefinitions] = useState<ExerciseDefinition[]>([]);
   const [leadGenDefinitions, setLeadGenDefinitions] = useState<ExerciseDefinition[]>(LEAD_GEN_DEFINITIONS);
-  const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
-  const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [mindProgrammingDefinitions, setMindProgrammingDefinitions] = useState<ExerciseDefinition[]>(DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
   const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
   const [mindProgrammingCategories, setMindProgrammingCategories] = useState<ExerciseCategory[]>(defaultMindsetCategories);
   const [mindProgrammingMode, setMindProgrammingMode] = useState<WorkoutMode>('two-muscle');
   const [mindProgrammingPlans, setMindProgrammingPlans] = useState<AllWorkoutPlans>(INITIAL_PLANS);
   const [mindProgrammingPlanRotation, setMindProgrammingPlanRotation] = useState<boolean>(true);
-  
+  const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
+  const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
+
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
@@ -471,6 +473,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Mindset Technique Popup
   const [mindsetTechniquePopup, setMindsetTechniquePopup] = useState<MindsetTechniquePopupState | null>(null);
+  
+  // End-of-slot review state
+  const [missedSlotReviews, setMissedSlotReviews] = useState<Record<string, MissedSlotReview>>({});
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -958,6 +963,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         autoSuggestions,
         pathNodes,
         mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation,
+        missedSlotReviews,
       },
       ui: {
         pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
@@ -968,7 +974,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
   const saveState = useCallback(() => {
@@ -997,7 +1003,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setLocalChangeCount(c => c + 1);
     }
   }, [
-    isLoadingState, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
+    isLoadingState, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
   const loadState = (username: string) => {
@@ -1068,6 +1074,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
     setAutoSuggestions(mainData.autoSuggestions || {});
     setPathNodes(mainData.pathNodes || []);
+    setMissedSlotReviews(mainData.missedSlotReviews || {});
     
     // Set UI State
     setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
@@ -1450,6 +1457,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
     setAutoSuggestions(mainData.autoSuggestions || {});
     setPathNodes(mainData.pathNodes || []);
+    setMissedSlotReviews(mainData.missedSlotReviews || {});
     
     // UI State
     setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
@@ -2783,6 +2791,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     mindsetTechniquePopup, openMindsetTechniquePopup, closeMindsetTechniquePopup, handleMindsetTechniquePopupDragEnd,
     updateActivitySubtask, deleteActivitySubtask,
     handleLinkHabit,
+    missedSlotReviews, setMissedSlotReviews,
   };
 
   useEffect(() => {
@@ -2955,6 +2964,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
