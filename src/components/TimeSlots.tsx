@@ -18,7 +18,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent } from './ui/dropdown-menu';
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 
@@ -182,9 +182,9 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations } = useAuth();
+  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
   const SLOT_CAPACITY_MINUTES = 240;
-
+  
   const slots = [
     { name: 'Late Night', time: '12am - 4am', icon: <Moon className="h-5 w-5 text-indigo-400" /> },
     { name: 'Dawn', time: '4am - 8am', icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
@@ -213,31 +213,8 @@ export function TimeSlots({
     });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        for (const dateKey in newSchedule) {
-            const day = newSchedule[dateKey];
-            for(const slotName in day) {
-                if (Array.isArray(day[slotName])) {
-                    const activities = day[slotName] as Activity[];
-                    const activityIndex = activities.findIndex(a => a.id === activityId);
-                    if (activityIndex > -1) {
-                        const updatedActivities = [...activities];
-                        const currentHabits = updatedActivities[activityIndex].habitEquationIds || [];
-                        const isLinked = currentHabits.includes(habitId);
-                        updatedActivities[activityIndex] = {
-                            ...updatedActivities[activityIndex],
-                            habitEquationIds: isLinked ? currentHabits.filter(id => id !== habitId) : [...currentHabits, habitId]
-                        };
-                        newSchedule[dateKey] = { ...day, [slotName]: updatedActivities };
-                        return newSchedule; // Exit after finding and updating
-                    }
-                }
-            }
-        }
-        return newSchedule;
-    });
+  const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
+    linkHabitFromContext(activityId, habitId, link);
   };
 
   const handleAddSubTask = (slotName: string, activityId: string) => {
@@ -324,7 +301,7 @@ export function TimeSlots({
         const reviewKey = `${format(date, 'yyyy-MM-dd')}-${slot.name}`;
         const review = missedSlotReviews[reviewKey];
         const isSlotComplete = activities.length > 0 && activities.every(a => a.completed);
-        const allRulesFollowed = review && allEquations.every(eq => review.followedRuleIds.includes(eq.id));
+        const allRulesFollowed = review && allEquations.length > 0 && allEquations.every(eq => review.followedRuleIds.includes(eq.id));
 
 
         return (
@@ -424,7 +401,8 @@ export function TimeSlots({
                                          <DropdownMenuSubContent>
                                           <ScrollArea className="h-48">
                                             {habitCards.map(habit => (
-                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id)}>
+                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id, !(activity.habitEquationIds || []).includes(habit.id))}>
+                                                    <Checkbox className="mr-2" checked={(activity.habitEquationIds || []).includes(habit.id)} />
                                                     {habit.name}
                                                 </DropdownMenuItem>
                                             ))}
@@ -556,5 +534,3 @@ export function TimeSlots({
     </div>
   );
 }
-
-    
