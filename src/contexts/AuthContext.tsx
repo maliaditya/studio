@@ -711,19 +711,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (activity.duration) {
                     totalMinutes = activity.duration;
                     suffix = ' logged';
+                } else if (activity.type === 'workout') {
+                  const log = allWorkoutLogs.find(l => l.date === dateKey);
+                  if (log) {
+                    totalMinutes = log.exercises
+                      .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
+                      .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set.weight > 0 ? 1.5 : 1), 0), 0);
+                  }
+                  suffix = ' logged';
                 } else {
                     let logs, durationField;
                     if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
                     else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                    else if (activity.type === 'workout') { // Correctly calculate workout time
-                        const log = allWorkoutLogs.find(l => l.date === dateKey);
-                        if (log) {
-                            totalMinutes = log.exercises
-                                .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
-                                .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set.weight > 0 ? 1.5 : 1), 0), 0); // Simplified: 1.5 min/set with weight, 1 min/set bodyweight
-                        }
-                        suffix = ' logged';
-                    }
                     
                     if (logs && durationField) {
                         const loggedDuration = (logs.find(log => log.date === dateKey)
@@ -2973,6 +2972,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
