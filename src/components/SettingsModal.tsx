@@ -23,6 +23,7 @@ import { Copy } from 'lucide-react';
 import type { ActivityType } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -253,14 +254,14 @@ ${JSON.stringify(finalTemplate, null, 2)}
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh]">
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Application Settings</DialogTitle>
             <DialogDescription>
               Manage your application preferences here. Changes are saved automatically.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-6 flex-grow min-h-0">
+          <div className="flex-grow min-h-0 py-4">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-6">
                 <div className="space-y-4 rounded-lg border p-4">
@@ -322,37 +323,43 @@ ${JSON.stringify(finalTemplate, null, 2)}
                   </div>
                 </div>
 
-                 <div className="space-y-4 rounded-lg border p-4">
-                    <div className="space-y-0.5">
+                <Accordion type="single" collapsible className="w-full rounded-lg border">
+                  <AccordionItem value="item-1" className="border-b-0">
+                    <AccordionTrigger className="px-4 py-3">
+                      <div className="space-y-0.5 text-left">
                         <Label className="text-base">Default Habit Links</Label>
                         <p className="text-sm text-muted-foreground">
-                            Automatically link a habit when creating a new activity of a certain type.
+                          Automatically link a habit when creating a new activity.
                         </p>
-                    </div>
-                    <div className="space-y-3">
-                        {activityTypesForHabitLinking.map(type => (
-                            <div key={type} className="flex items-center justify-between">
-                                <Label htmlFor={`habit-${type}`} className="capitalize font-normal">
-                                    {type.replace('-', ' ')}
-                                </Label>
-                                <Select
-                                    value={settings.defaultHabitLinks?.[type] || 'none'}
-                                    onValueChange={(value) => handleDefaultHabitChange(type, value)}
-                                >
-                                    <SelectTrigger className="w-[200px]" id={`habit-${type}`}>
-                                        <SelectValue placeholder="Select a habit..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">-- None --</SelectItem>
-                                        {habitCards.map(habit => (
-                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-3 pt-4 border-t">
+                            {activityTypesForHabitLinking.map(type => (
+                                <div key={type} className="flex items-center justify-between">
+                                    <Label htmlFor={`habit-${type}`} className="capitalize font-normal">
+                                        {type.replace('-', ' ')}
+                                    </Label>
+                                    <Select
+                                        value={settings.defaultHabitLinks?.[type] || 'none'}
+                                        onValueChange={(value) => handleDefaultHabitChange(type, value)}
+                                    >
+                                        <SelectTrigger className="w-[200px]" id={`habit-${type}`}>
+                                            <SelectValue placeholder="Select a habit..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">-- None --</SelectItem>
+                                            {habitCards.map(habit => (
+                                                <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
 
                 <div className="space-y-4 rounded-lg border p-4">
                   <div className="space-y-0.5">
