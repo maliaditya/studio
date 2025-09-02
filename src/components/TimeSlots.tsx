@@ -1,47 +1,148 @@
 
 "use client";
 
-import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask } from '@/types/workout';
 import {
-  Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, PlusCircle, Trash2,
-  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Link as LinkIcon, Brain, Wind
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon
 } from 'lucide-react';
-import type { ActivityType, Activity, DailySchedule, FullSchedule, SubTask } from '@/types/workout';
-import { useAuth } from '@/contexts/AuthContext';
-import { getExercisesForDay } from '@/lib/workoutUtils';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuSeparator } from './ui/dropdown-menu';
-import { useState, useMemo } from 'react';
-import { ScrollArea } from './ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { useAuth } from '@/contexts/AuthContext';
+import { format, addDays } from 'date-fns';
+import { ScrollArea } from './ui/scroll-area';
+import { useRouter } from 'next/navigation';
+import { getExercisesForDay } from '@/lib/workoutUtils';
+import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
+import { Checkbox } from './ui/checkbox';
+import {
+  Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind
+} from 'lucide-react';
 
-const slots = [
-  { name: 'Late Night', time: '12 AM - 4 AM', icon: <Moon className="h-6 w-6 text-indigo-400" /> },
-  { name: 'Dawn', time: '4 AM - 8 AM', icon: <Sunrise className="h-6 w-6 text-orange-400" /> },
-  { name: 'Morning', time: '8 AM - 12 PM', icon: <Sun className="h-6 w-6 text-yellow-400" /> },
-  { name: 'Afternoon', time: '12 PM - 4 PM', icon: <CloudSun className="h-6 w-6 text-sky-500" /> },
-  { name: 'Evening', time: '4 PM - 8 PM', icon: <Sunset className="h-6 w-6 text-purple-500" /> },
-  { name: 'Night', time: '8 PM - 12 AM', icon: <MoonStar className="h-6 w-6 text-indigo-500" /> }
-];
+const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-const activityIcons: Record<ActivityType, React.ReactNode> = {
-  workout: <Dumbbell className="h-5 w-5" />,
-  upskill: <BookOpenCheck className="h-5 w-5" />,
-  deepwork: <Briefcase className="h-5 w-5" />,
-  planning: <ClipboardList className="h-5 w-5" />,
-  tracking: <ClipboardCheck className="h-5 w-5" />,
-  branding: <Share2 className="h-5 w-5" />,
-  'lead-generation': <Magnet className="h-5 w-5" />,
-  interrupt: <AlertCircle className="h-5 w-5 text-destructive" />,
-  distraction: <Wind className="h-5 w-5 text-yellow-500" />,
-  essentials: <CheckSquare className="h-5 w-5" />,
-  nutrition: <Utensils className="h-5 w-5" />,
-  mindset: <Brain className="h-5 w-5" />,
-};
+interface AgendaWidgetItemProps {
+  activity: Activity & { slot: keyof DailySchedule };
+  duration: string | undefined;
+  date: Date;
+  onLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  onStartWorkoutLog: (activity: Activity) => void;
+  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
+  onStartLeadGenLog: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
+  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+}
+
+function AgendaWidgetItem({ 
+    activity, 
+    duration, 
+    date,
+    onStartWorkoutLog, 
+    onToggleComplete, 
+    onStartLeadGenLog, 
+    onOpenFocusModal, 
+    onOpenTaskContext,
+    onOpenHabitPopup,
+}: AgendaWidgetItemProps) {
+  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
+  const { toast } = useToast();
+  
+  let displayDetails = activity.details;
+  if (activity.type === 'workout') {
+    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+    displayDetails = description.split(' for ')[1] || "Workout";
+  }
+
+  const linkedHabit = useMemo(() => {
+    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+      // For simplicity, showing the first linked habit. Can be expanded later.
+      return habitCards.find(h => h.id === activity.habitEquationIds![0]);
+    }
+    return null;
+  }, [activity.habitEquationIds, habitCards]);
+
+  const handleTitleClick = (event: React.MouseEvent) => {
+    if (activity.completed) {
+      onToggleComplete(activity.slot, activity.id, false);
+      return;
+    }
+    
+    if (linkedHabit) {
+        onOpenHabitPopup(linkedHabit.id, event);
+        return;
+    }
+  };
+
+  const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    const shouldOpenModal = onOpenFocusModal(activity);
+    if (!shouldOpenModal) {
+      toast({
+        title: "Objective Already Complete",
+        description: `All sub-tasks for "${activity.details}" are already logged.`,
+      });
+    }
+  };
+  
+  const itemContent = (
+    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
+      <div className="flex items-start gap-3 min-w-0 flex-grow">
+        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
+            {activity.completed 
+              ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+              : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            }
+        </button>
+        <div 
+          className={cn("flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
+          onClick={handleTitleClick}
+        >
+          <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
+            {displayDetails}
+          </p>
+          {linkedHabit && (
+            <div className="min-w-0">
+                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                    Habit: {linkedHabit.name}
+                </p>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="flex-shrink-0 flex items-center text-right gap-1">
+        {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
+        {!activity.completed && activity.type !== 'interrupt' ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleFocusClick}
+            >
+                <Timer className="h-4 w-4" />
+            </Button>
+        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => onOpenTaskContext(activity.id, e)}
+            >
+                <GitBranch className="h-4 w-4" />
+            </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+  
+  return <li>{itemContent}</li>;
+}
+
 
 interface TimeSlotsProps {
   date: Date;
