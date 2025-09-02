@@ -717,7 +717,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const totalSets = log.exercises
                       .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
                       .reduce((total, ex) => total + ex.loggedSets.length, 0);
-                    totalMinutes = totalSets * 1.5; // Estimate 1.5 minutes per set
+                    const setMultiplier = strengthTrainingMode === 'calisthenics' ? 1 : 1.5;
+                    totalMinutes = totalSets * setMultiplier;
                   }
                   suffix = ' logged';
                 } else {
@@ -776,7 +777,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
@@ -1054,18 +1055,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
     setProductizationPlans(mainData.productizationPlans || {});
     setOfferizationPlans(mainData.offerizationPlans || {});
-
-    const storedFolders = mainData.resourceFolders || [];
-    const hasQuickAccess = storedFolders.some((f: ResourceFolder) => f.name === 'Quick Access' && !f.parentId);
-    if (!hasQuickAccess) {
-      storedFolders.push({
-        id: `folder_quick_access_${Date.now()}`,
-        name: 'Quick Access',
-        parentId: null,
-        icon: 'Zap'
-      });
-    }
-    setResourceFolders(storedFolders);
+    setResourceFolders(mainData.resourceFolders || []);
     setResources(mainData.resources || []);
     
     setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
@@ -2973,6 +2963,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
