@@ -20,6 +20,7 @@ import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator } from './ui/dropdown-menu';
 import { Checkbox } from './ui/checkbox';
+import { Separator } from './ui/separator';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -555,3 +556,5 @@ export function TimeSlots({
     </div>
   );
 }
+
+    
