@@ -714,11 +714,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (activity.type === 'workout') {
                   const log = allWorkoutLogs.find(l => l.date === dateKey);
                   if (log) {
-                    const totalSets = log.exercises
-                      .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
-                      .reduce((total, ex) => total + ex.loggedSets.length, 0);
                     const setMultiplier = strengthTrainingMode === 'calisthenics' ? 1 : 1.5;
-                    totalMinutes = totalSets * setMultiplier;
+                    totalMinutes = log.exercises
+                      .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
+                      .reduce((total, ex) => total + (ex.loggedSets.length * setMultiplier), 0);
                   }
                   suffix = ' logged';
                 } else {
@@ -1511,6 +1510,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...activity,
         id: `${activity.type}-${Date.now()}-${Math.random()}`,
         completed: false,
+        taskIds: activity.isRoutine ? activity.taskIds : []
     };
     
     setSchedule(prev => {
@@ -2890,37 +2890,12 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
-    
-
 
     
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     
 
-
-
-
-    
-
-    
 
 
 
@@ -2944,6 +2919,32 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
 
 
 
@@ -2963,6 +2964,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
