@@ -715,6 +715,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     let logs, durationField;
                     if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
                     else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                    else if (activity.type === 'workout') { // Correctly calculate workout time
+                        const log = allWorkoutLogs.find(l => l.date === dateKey);
+                        if (log) {
+                            totalMinutes = log.exercises
+                                .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
+                                .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set.weight > 0 ? 1.5 : 1), 0), 0); // Simplified: 1.5 min/set with weight, 1 min/set bodyweight
+                        }
+                        suffix = ' logged';
+                    }
                     
                     if (logs && durationField) {
                         const loggedDuration = (logs.find(log => log.date === dateKey)
@@ -767,7 +776,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
@@ -1106,14 +1115,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
   useEffect(() => {
-    if (isLoadingState) return;
+    if (!currentUser || !isScheduleLoaded || !settings.carryForward) return;
 
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser?.username}`;
+    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     const lastRun = localStorage.getItem(lastCarryForwardKey);
     if (lastRun === todayStr) return;
-
-    const settingsKey = `lifeos_settings_${currentUser?.username}`;
+    
+    const settingsKey = `lifeos_settings_${currentUser.username}`;
         const storedSettings = localStorage.getItem(settingsKey);
         const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
 
@@ -1168,7 +1177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     localStorage.setItem(lastCarryForwardKey, todayStr);
-  }, [currentUser, isLoadingState, schedule]);
+  }, [currentUser, isScheduleLoaded, schedule]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2964,6 +2973,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
