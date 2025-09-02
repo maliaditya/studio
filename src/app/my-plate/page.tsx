@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -218,12 +219,6 @@ function MyPlatePageContent() {
     const yesterday = addDays(selectedDate, -1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     
-    const todaysActivities = schedule[todayStr];
-    if (todaysActivities && Object.keys(todaysActivities).length > 0 && Object.values(todaysActivities).some(slot => Array.isArray(slot) && slot.length > 0)) {
-        localStorage.setItem(lastCarryForwardKey, todayStr);
-        return;
-    }
-
     const yesterdaysSchedule = schedule[yesterdayKey];
     if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
         localStorage.setItem(lastCarryForwardKey, todayStr);
@@ -231,13 +226,15 @@ function MyPlatePageContent() {
     }
 
     let carriedOver = false;
-    const newTodaySchedule: DailySchedule = {};
+    const newTodaySchedule: DailySchedule = schedule[todayStr] ? JSON.parse(JSON.stringify(schedule[todayStr])) : {};
 
     Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
         if (Array.isArray(activities) && activities.length > 0) {
             const activitiesToCarry = (activities as Activity[]).filter(activity => {
-                if (activity.isRoutine) return true;
+                if (activity.isRoutine) return true; // Always carry routine tasks
                 if(activity.completed) return false;
+                
+                // For non-routine, only carry if the relevant setting is on
                 if(activity.type === 'essentials') return settings.carryForwardEssentials;
                 if(activity.type === 'nutrition') return settings.carryForwardNutrition;
                 return settings.carryForward;
@@ -245,41 +242,48 @@ function MyPlatePageContent() {
 
             if (activitiesToCarry.length > 0) {
                 if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-                (newTodaySchedule[slotName] as Activity[]).push(
-                    ...activitiesToCarry.map(activity => {
-                        let newDetails = activity.details;
-                        if (activity.type === 'workout') {
-                            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                            newDetails = description.split(' for ')[1] || "Workout";
-                        } else if (!activity.isRoutine) {
-                            switch (activity.type) {
-                                case 'upskill': newDetails = 'Learning Session'; break;
-                                case 'deepwork': newDetails = 'Deep Work Session'; break;
-                                case 'planning': newDetails = 'Planning Session'; break;
-                                case 'tracking': newDetails = 'Tracking Session'; break;
-                                case 'branding': newDetails = 'Branding Session'; break;
-                                case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-                                case 'mindset': newDetails = 'Mindset Session'; break;
-                            }
+                const existingIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.id.split('-')[0]));
+                
+                const newActivitiesForSlot = activitiesToCarry.filter(act => {
+                    const baseId = act.id.split('-')[0];
+                    return !existingIdsInSlot.has(baseId);
+                }).map(activity => {
+                    let newDetails = activity.details;
+                    if (activity.type === 'workout') {
+                        const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+                        newDetails = description.split(' for ')[1] || "Workout";
+                    } else if (!activity.isRoutine) {
+                        switch (activity.type) {
+                            case 'upskill': newDetails = 'Learning Session'; break;
+                            case 'deepwork': newDetails = 'Deep Work Session'; break;
+                            case 'planning': newDetails = 'Planning Session'; break;
+                            case 'tracking': newDetails = 'Tracking Session'; break;
+                            case 'branding': newDetails = 'Branding Session'; break;
+                            case 'lead-generation': newDetails = 'Lead Generation Session'; break;
+                            case 'mindset': newDetails = 'Mindset Session'; break;
                         }
-                        const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
-                        return {
-                            ...activity,
-                            id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                            completed: false,
-                            details: newDetails,
-                            taskIds: activity.isRoutine ? activity.taskIds : [],
-                            habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
-                        };
-                    })
-                );
-                carriedOver = true;
+                    }
+                    const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
+                    return {
+                        ...activity,
+                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                        completed: false,
+                        details: newDetails,
+                        taskIds: activity.isRoutine ? activity.taskIds : [],
+                        habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+                    };
+                });
+
+                if (newActivitiesForSlot.length > 0) {
+                  (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
+                  carriedOver = true;
+                }
             }
         }
     });
 
     if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayStr]: { ...(prev[todayStr] || {}), ...newTodaySchedule } }));
+      setSchedule(prev => ({ ...prev, [todayStr]: newTodaySchedule }));
     }
     localStorage.setItem(lastCarryForwardKey, todayStr);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, settings]);
@@ -1399,4 +1403,3 @@ export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
 
-    
