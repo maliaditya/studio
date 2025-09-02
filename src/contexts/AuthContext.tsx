@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -529,6 +530,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setThemeState(newTheme);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lifeos_theme', newTheme);
+      document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
+      document.body.classList.add(`theme-${newTheme}`);
     }
   };
 
@@ -997,51 +1000,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoadingState, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
-  useEffect(() => {
-    if (currentUser?.username) {
-        const settingsKey = `lifeos_settings_${currentUser.username}`;
-        const storedSettings = localStorage.getItem(settingsKey);
-        if (storedSettings) {
-          setSettings(JSON.parse(storedSettings));
-        }
-        loadState(currentUser.username);
-    }
-  }, [currentUser]);
-
-  useEffect(() => {
-    const user = getCurrentLocalUser();
-    setCurrentUser(user);
-    setLoading(false);
-    
-    const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
-    setTheme(savedTheme);
-  }, []);
-  
-   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const currentHour = now.getHours();
-      if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
-      else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
-      else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
-      else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
-      else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
-      else setCurrentSlot('Night');
-    }, 60000); // Update every minute
-
-    // Initial call
-    const now = new Date();
-    const currentHour = now.getHours();
-    if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
-    else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
-    else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
-    else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
-    else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
-    else setCurrentSlot('Night');
-
-    return () => clearInterval(interval);
-  }, []);
-
   const loadState = (username: string) => {
     setIsLoadingState(true);
     const mainDataString = localStorage.getItem(`lifeos_data_${username}`);
@@ -1427,12 +1385,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               topicGoals: mainData.topicGoals || mainData.upskillTopicGoals || {},
             };
   
-            // Save both main data and UI state to localStorage
-            localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(dataToLoad));
-            localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(uiData));
+            // Apply imported data to state immediately
+            loadImportedData(dataToLoad, uiData);
   
-            toast({ title: "Import Successful", description: "Your data has been imported. The app will now reload." });
-            setTimeout(() => window.location.reload(), 1500);
+            toast({ title: "Import Successful", description: "Your data has been loaded into the application." });
   
           } catch (error) {
             console.error("Import failed:", error);
@@ -1445,6 +1401,73 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     input.click();
   };
+
+  const loadImportedData = (mainData: any, uiData: any) => {
+    setWeightLogs(mainData.weightLogs || []);
+    setGoalWeight(mainData.goalWeight || null);
+    setHeight(mainData.height || null);
+    setDateOfBirth(mainData.dateOfBirth || null);
+    setGender(mainData.gender || null);
+    setDietPlan(mainData.dietPlan || []);
+    setSchedule(mainData.schedule || {});
+    setDailyPurposes(mainData.dailyPurposes || {});
+    setAllUpskillLogs(mainData.allUpskillLogs || []);
+    setAllDeepWorkLogs(mainData.allDeepWorkLogs || []);
+    setAllWorkoutLogs(mainData.allWorkoutLogs || []);
+    setAllBrandingLogs(mainData.brandingLogs || []);
+    setAllLeadGenLogs(mainData.allLeadGenLogs || []);
+    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
+    setWorkoutMode(mainData.workoutMode || 'two-muscle');
+    setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
+    setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
+    setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
+    setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
+    setUpskillDefinitions(mainData.upskillDefinitions || []);
+    setTopicGoals(mainData.topicGoals || {});
+    setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
+    setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
+    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
+    setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
+    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
+    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
+    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
+    setProductizationPlans(mainData.productizationPlans || {});
+    setOfferizationPlans(mainData.offerizationPlans || {});
+    setResourceFolders(mainData.resourceFolders || []);
+    setResources(mainData.resources || []);
+    setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
+    setMindsetCards(mainData.mindsetCards || []);
+    setPistons(mainData.pistons || {});
+    setSkillDomains(mainData.skillDomains || []);
+    setCoreSkills(mainData.coreSkills || []);
+    setProjects(mainData.projects || []);
+    setCompanies(mainData.companies || []);
+    setPositions(mainData.positions || []);
+    setPurposeData(mainData.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
+    setPatterns(mainData.patterns || []);
+    setMetaRules(mainData.metaRules || []);
+    setPillarEquations(mainData.pillarEquations || {});
+    setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
+    setAutoSuggestions(mainData.autoSuggestions || {});
+    setPathNodes(mainData.pathNodes || []);
+    
+    // UI State
+    setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
+    setActiveResourceTabIds(uiData.activeResourceTabIds || []);
+    setSelectedResourceFolderId(uiData.selectedResourceFolderId || null);
+    setLastSelectedHabitFolder(uiData.lastSelectedHabitFolder || null);
+    setSelectedUpskillTask(uiData.selectedUpskillTask || null);
+    setSelectedDeepWorkTask(uiData.selectedDeepWorkTask || null);
+    setSelectedMicroSkill(uiData.selectedMicroSkill || null);
+    setExpandedItems(uiData.expandedItems || []);
+    setSelectedDomainId(uiData.selectedDomainId || null);
+    setSelectedSkillId(uiData.selectedSkillId || null);
+    setSelectedProjectId(uiData.selectedProjectId || null);
+    setSelectedCompanyId(uiData.selectedCompanyId || null);
+    setRecentItems(uiData.recentItems || []);
+    setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
+  };
+
 
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2762,6 +2785,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleLinkHabit,
   };
 
+  useEffect(() => {
+    if (currentUser?.username) {
+        const settingsKey = `lifeos_settings_${currentUser.username}`;
+        const storedSettings = localStorage.getItem(settingsKey);
+        if (storedSettings) {
+          setSettings(JSON.parse(storedSettings));
+        }
+        loadState(currentUser.username);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    const user = getCurrentLocalUser();
+    setCurrentUser(user);
+    setLoading(false);
+    
+    const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
+    setTheme(savedTheme);
+  }, []);
+  
+   useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+      else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+      else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+      else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+      else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+      else setCurrentSlot('Night');
+    }, 60000); // Update every minute
+
+    // Initial call
+    const now = new Date();
+    const currentHour = now.getHours();
+    if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+    else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+    else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+    else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+    else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+    else setCurrentSlot('Night');
+
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -2887,6 +2955,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
