@@ -163,13 +163,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
             for (const slotName of pastSlotNames) {
                 const activitiesInSlot = daySchedule[slotName] as Activity[] | undefined;
-                const incompleteTasks = (activitiesInSlot || []).filter(a => a && !a.completed);
                 const reviewKey = `${todayKey}-${slotName}`;
                 const reviewDone = missedSlotReviews[reviewKey];
 
-                if (incompleteTasks.length > 0 && !reviewDone) {
-                    setMissedSlotModalState({ isOpen: true, slotName: slotName, incompleteTasks });
-                    break; 
+                if (!reviewDone) {
+                    const incompleteTasks = (activitiesInSlot || []).filter(a => a && !a.completed);
+                    setMissedSlotModalState({ isOpen: true, slotName: slotName, incompleteTasks: incompleteTasks });
+                    break;
                 }
             }
         }
