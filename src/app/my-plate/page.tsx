@@ -211,32 +211,28 @@ function MyPlatePageContent() {
       return;
     }
     
-    const hasAnyTaskToday = schedule[todayStr] && Object.values(schedule[todayStr]).flat().length > 0;
-    
-    // Determine if we need to carry anything over
-    const shouldCarryForwardRegular = settings.carryForward || settings.carryForwardEssentials || settings.carryForwardNutrition;
-    // Always check for routines
+    // Always check for routines and other carry-forward tasks
     const yesterday = subDays(selectedDate, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
 
-    if (!yesterdaysSchedule && !shouldCarryForwardRegular) {
+    if (!yesterdaysSchedule) {
         localStorage.setItem(lastCarryForwardKey, todayStr);
         setCarryOverComplete(true);
         return;
     }
 
-    let carriedOver = false;
-    const newTodaySchedule: DailySchedule = schedule[todayStr] ? JSON.parse(JSON.stringify(schedule[todayStr])) : {};
+    setSchedule(currentSchedule => {
+        const newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
+        let carriedOver = false;
 
-    if (yesterdaysSchedule) {
         Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
             if (Array.isArray(activities) && activities.length > 0) {
                 const activitiesToCarry = activities.filter(activity => {
-                    // Always carry routine tasks, regardless of completion status
-                    if (activity.isRoutine) return true;
-                    // For non-routine, only carry incomplete tasks based on settings
-                    if (activity.completed) return false;
+                    if (activity.isRoutine) return true; // Always carry routine tasks, regardless of completion
+                    if (activity.completed) return false; // Never carry completed non-routine tasks
+                    
+                    // Check settings for other types
                     if (activity.type === 'essentials') return settings.carryForwardEssentials;
                     if (activity.type === 'nutrition') return settings.carryForwardNutrition;
                     return settings.carryForward;
@@ -244,33 +240,33 @@ function MyPlatePageContent() {
                 
                 if (activitiesToCarry.length > 0) {
                     if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-                    const todaysIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details.split('-')[0]));
-                    
-                    const newActivitiesForSlot = activitiesToCarry.filter(act => {
-                        const baseDetails = act.details.split('-')[0];
-                        return !todaysIdsInSlot.has(baseDetails);
-                    }).map(activity => {
-                      const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
-                      return {
-                        ...activity,
-                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false, // Always reset completion for carried-over tasks
-                        habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
-                      };
-                    });
+                    const todaysActivityDetails = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details));
 
+                    const newActivitiesForSlot = activitiesToCarry
+                        .filter(act => !todaysActivityDetails.has(act.details)) // Prevent duplicates based on details
+                        .map(activity => {
+                            const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
+                            return {
+                                ...activity,
+                                id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                                completed: false, // Always reset completion status
+                                habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+                            };
+                        });
+                    
                     if (newActivitiesForSlot.length > 0) {
-                      (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
-                      carriedOver = true;
+                        (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
+                        carriedOver = true;
                     }
                 }
             }
         });
-    }
 
-    if (carriedOver) {
-      setSchedule(prev => ({ ...prev, [todayStr]: newTodaySchedule }));
-    }
+        if (carriedOver) {
+            return { ...currentSchedule, [todayStr]: newTodaySchedule };
+        }
+        return currentSchedule; // No changes, return original schedule
+    });
     
     localStorage.setItem(lastCarryForwardKey, todayStr);
     setCarryOverComplete(true);
@@ -1390,6 +1386,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 

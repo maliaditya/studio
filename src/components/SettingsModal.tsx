@@ -19,7 +19,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy } from 'lucide-react';
-import type { ActivityType } from '@/types/workout';
+import type { Activity, ActivityType } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -30,7 +30,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme, settings, setSettings, habitCards } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule } = useAuth();
   const { toast } = useToast();
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -61,11 +61,61 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   };
 
   const handleDefaultHabitChange = (activityType: ActivityType, habitId: string) => {
+    const newHabitId = habitId === 'none' ? null : habitId;
+
+    // 1. Update settings
     const newDefaultHabitLinks = {
         ...settings.defaultHabitLinks,
-        [activityType]: habitId === 'none' ? null : habitId
+        [activityType]: newHabitId,
     };
     handleSettingChange('defaultHabitLinks', newDefaultHabitLinks);
+
+    // 2. Update all existing non-completed tasks in the schedule
+    setSchedule(currentSchedule => {
+      const updatedSchedule = { ...currentSchedule };
+      
+      Object.keys(updatedSchedule).forEach(dateKey => {
+        const daySchedule = { ...updatedSchedule[dateKey] };
+        let dayWasModified = false;
+
+        Object.keys(daySchedule).forEach(slotName => {
+          const activities = daySchedule[slotName] as Activity[] | undefined;
+
+          if (Array.isArray(activities)) {
+            let slotWasModified = false;
+            const updatedActivities = activities.map(act => {
+              // Only update non-completed tasks of the matching type
+              if (act.type === activityType && !act.completed) {
+                // For simplicity, we replace existing links. A more complex logic could merge them.
+                const newHabitIds = newHabitId ? [newHabitId] : [];
+                // Check if an update is actually needed
+                if (JSON.stringify(act.habitEquationIds || []) !== JSON.stringify(newHabitIds)) {
+                  slotWasModified = true;
+                  return { ...act, habitEquationIds: newHabitIds };
+                }
+              }
+              return act;
+            });
+
+            if (slotWasModified) {
+              daySchedule[slotName] = updatedActivities;
+              dayWasModified = true;
+            }
+          }
+        });
+        
+        if (dayWasModified) {
+          updatedSchedule[dateKey] = daySchedule;
+        }
+      });
+
+      return updatedSchedule;
+    });
+
+    toast({
+        title: "Default Habit Updated",
+        description: `All scheduled '${activityType}' tasks have been updated.`,
+    });
   };
 
 
