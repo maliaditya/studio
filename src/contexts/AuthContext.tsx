@@ -714,9 +714,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (activity.type === 'workout') {
                   const log = allWorkoutLogs.find(l => l.date === dateKey);
                   if (log) {
-                    totalMinutes = log.exercises
+                    const totalSets = log.exercises
                       .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
-                      .reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set.weight > 0 ? 1.5 : 1), 0), 0);
+                      .reduce((total, ex) => total + ex.loggedSets.length, 0);
+                    totalMinutes = totalSets * 1.5; // Estimate 1.5 minutes per set
                   }
                   suffix = ' logged';
                 } else {
@@ -2972,6 +2973,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
