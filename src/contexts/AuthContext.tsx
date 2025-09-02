@@ -714,9 +714,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (activity.type === 'workout') {
                     const log = allWorkoutLogs.find(l => l.date === dateKey);
                     if (log) {
-                        totalMinutes = log.exercises
-                            .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
-                            .reduce((total, ex) => total + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0);
+                        const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
+                        if(workoutExercise) {
+                           totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        }
                     }
                     suffix = ' logged';
                 } else {
@@ -2980,3 +2981,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
