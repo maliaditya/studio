@@ -161,7 +161,6 @@ function MyPlatePageContent() {
   
   const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
   
-  // New state to track if carry-over has run
   const [carryOverComplete, setCarryOverComplete] = useState(false);
   
   const habitResources = useMemo(() => {
@@ -169,7 +168,6 @@ function MyPlatePageContent() {
   }, [resources]);
 
   useEffect(() => {
-    // Correctly initialize date on client-side to prevent hydration mismatch
     setSelectedDate(new Date());
   }, []);
 
@@ -179,7 +177,6 @@ function MyPlatePageContent() {
     }
   }, [selectedDate]);
 
-  // Effect to set schedule as loaded once user is available
   useEffect(() => {
     if (currentUser?.username) {
         setIsScheduleLoaded(true);
@@ -202,91 +199,75 @@ function MyPlatePageContent() {
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
 
-  // Carry forward tasks logic
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
-    
+    if (!currentUser || !isScheduleLoaded || !selectedDate || carryOverComplete) return;
+
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const todayStr = format(selectedDate, 'yyyy-MM-dd');
     const lastRun = localStorage.getItem(lastCarryForwardKey);
-    if (lastRun === todayStr) return;
+
+    if (lastRun === todayStr) {
+      setCarryOverComplete(true);
+      return;
+    }
 
     if (!settings.carryForward && !settings.carryForwardEssentials && !settings.carryForwardNutrition) {
       localStorage.setItem(lastCarryForwardKey, todayStr);
+      setCarryOverComplete(true);
       return;
     }
-    
-    const yesterday = addDays(selectedDate, -1);
+
+    const yesterday = subDays(selectedDate, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-    
     const yesterdaysSchedule = schedule[yesterdayKey];
-    if (!yesterdaysSchedule || Object.keys(yesterdaysSchedule).length === 0) {
-        localStorage.setItem(lastCarryForwardKey, todayStr);
-        return;
-    }
 
     let carriedOver = false;
     const newTodaySchedule: DailySchedule = schedule[todayStr] ? JSON.parse(JSON.stringify(schedule[todayStr])) : {};
 
-    Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
+    if (yesterdaysSchedule) {
+      Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
         if (Array.isArray(activities) && activities.length > 0) {
-            const activitiesToCarry = (activities as Activity[]).filter(activity => {
-                if (activity.isRoutine) return true; // Always carry routine tasks
-                if(activity.completed) return false;
-                
-                // For non-routine, only carry if the relevant setting is on
-                if(activity.type === 'essentials') return settings.carryForwardEssentials;
-                if(activity.type === 'nutrition') return settings.carryForwardNutrition;
-                return settings.carryForward;
+          const activitiesToCarry = activities.filter(activity => {
+            if (activity.isRoutine) return true;
+            if (activity.completed) return false;
+            
+            if(activity.type === 'essentials') return settings.carryForwardEssentials;
+            if(activity.type === 'nutrition') return settings.carryForwardNutrition;
+            return settings.carryForward;
+          });
+
+          if (activitiesToCarry.length > 0) {
+            if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
+            const todaysIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details.split('-')[0]));
+            
+            const newActivitiesForSlot = activitiesToCarry.filter(act => {
+                return !todaysIdsInSlot.has(act.details.split('-')[0]);
+            }).map(activity => {
+              const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
+              return {
+                ...activity,
+                id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                completed: false,
+                habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+              };
             });
 
-            if (activitiesToCarry.length > 0) {
-                if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-                const existingIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.id.split('-')[0]));
-                
-                const newActivitiesForSlot = activitiesToCarry.filter(act => {
-                    const baseId = act.id.split('-')[0];
-                    return !existingIdsInSlot.has(baseId);
-                }).map(activity => {
-                    let newDetails = activity.details;
-                    if (activity.type === 'workout') {
-                        const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-                        newDetails = description.split(' for ')[1] || "Workout";
-                    } else if (!activity.isRoutine) {
-                        switch (activity.type) {
-                            case 'upskill': newDetails = 'Learning Session'; break;
-                            case 'deepwork': newDetails = 'Deep Work Session'; break;
-                            case 'planning': newDetails = 'Planning Session'; break;
-                            case 'tracking': newDetails = 'Tracking Session'; break;
-                            case 'branding': newDetails = 'Branding Session'; break;
-                            case 'lead-generation': newDetails = 'Lead Generation Session'; break;
-                            case 'mindset': newDetails = 'Mindset Session'; break;
-                        }
-                    }
-                    const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
-                    return {
-                        ...activity,
-                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false,
-                        details: newDetails,
-                        taskIds: activity.isRoutine ? activity.taskIds : [],
-                        habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
-                    };
-                });
-
-                if (newActivitiesForSlot.length > 0) {
-                  (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
-                  carriedOver = true;
-                }
+            if (newActivitiesForSlot.length > 0) {
+              (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
+              carriedOver = true;
             }
+          }
         }
-    });
+      });
+    }
 
     if (carriedOver) {
       setSchedule(prev => ({ ...prev, [todayStr]: newTodaySchedule }));
     }
+    
     localStorage.setItem(lastCarryForwardKey, todayStr);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, workoutMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, settings]);
+    setCarryOverComplete(true);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, settings, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, carryOverComplete]);
 
   
   const activityDurations = useMemo(() => {
@@ -641,7 +622,7 @@ function MyPlatePageContent() {
 
   const handleStartWorkoutLog = (activity: Activity) => {
     if(!selectedDate) return;
-    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
     setTodaysExercises(exercises);
     setTodaysMuscleGroups(muscleGroups);
     setWorkoutActivityToLog(activity);
@@ -1402,4 +1383,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 

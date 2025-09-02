@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -374,7 +375,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
-  const [theme, setTheme] = useState('ad-dark');
+  const [theme, setThemeState] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [globalVolume, setGlobalVolume] = useState(0.2);
@@ -523,6 +524,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+
+  const setTheme = (newTheme: string) => {
+    setThemeState(newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos_theme', newTheme);
+    }
+  };
 
   const handleStartFocusSession = useCallback((activity: Activity, duration: number) => {
     const dateKey = format(new Date(), 'yyyy-MM-dd');
@@ -714,6 +722,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
                 case 'workout': totalMinutes = 90; break;
+                case 'mindset': totalMinutes = 15; break;
                 case 'upskill':
                 case 'deepwork':
                 case 'branding':
@@ -959,12 +968,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
+  const saveState = useCallback(() => {
+    if (currentUser?.username) {
+        const allData = getAllUserData();
+        localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
+        localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
+    }
+  }, [currentUser, getAllUserData]);
+
+  useEffect(() => {
+    if (!isLoadingState) {
+        const handler = setTimeout(() => {
+            saveState();
+            setLocalChangeCount(0); // Reset after saving
+        }, 1000); // Debounce save operations
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }
+  }, [localChangeCount, saveState, isLoadingState]);
+
   useEffect(() => {
     if (!isLoadingState) {
         setLocalChangeCount(c => c + 1);
     }
   }, [
-    isLoadingState, getAllUserData
+    isLoadingState, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems
   ]);
 
   useEffect(() => {
@@ -1153,7 +1183,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             ...activity,
             id: `${activity.type}-${Date.now()}-${Math.random()}`,
             completed: false,
-            details: newDetails,
             taskIds: activity.isRoutine ? activity.taskIds : []
           });
         }
@@ -1171,17 +1200,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         return { ...prev, [todayStr]: newTodaySchedule };
       });
-      // This toast was causing the issue. It's better to show a more subtle indicator if needed.
-      // setTimeout(() => {
-      //   toast({
-      //       title: "Tasks Carried Over",
-      //       description: "Yesterday's incomplete tasks have been added.",
-      //   });
-      // }, 500);
     }
 
     localStorage.setItem(lastCarryForwardKey, todayStr);
-  }, [currentUser, isScheduleLoaded, schedule]);
+  }, [currentUser, isLoadingState, schedule]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2865,5 +2887,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
