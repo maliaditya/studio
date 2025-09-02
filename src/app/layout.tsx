@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -75,6 +74,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const authContext = useAuth();
   const { 
+    theme,
     isPistonsHeadOpen,
     handlePopupDragEnd,
     openPopups, 
@@ -122,6 +122,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [interruptDuration, setInterruptDuration] = React.useState('');
   const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
 
+  useEffect(() => {
+    document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
+    document.body.classList.add(`theme-${theme}`);
+  }, [theme]);
 
   useEffect(() => {
     setIsBrowser(true);
@@ -357,7 +361,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
           openMindsetTechniquePopup={openMindsetTechniquePopup}
-          openHabitDetailPopup={openRuleDetailPopup}
+          openHabitDetailPopup={authContext.openHabitDetailPopup}
       />
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
           <DialogContent>
@@ -514,3 +518,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    
