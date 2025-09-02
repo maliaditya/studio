@@ -152,20 +152,24 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
         } else { 
             setRemainingTime('00:00:00'); 
-            
-            // Check for incomplete tasks at the end of the slot
-            const todayKey = format(new Date(), 'yyyy-MM-dd');
-            const daySchedule = schedule[todayKey];
-            if (daySchedule) {
-                const activitiesInSlot = daySchedule[currentSlot] as Activity[] | undefined;
-                const incompleteTasks = (activitiesInSlot || []).filter(a => !a.completed);
+        }
 
-                // Check if a review for this slot on this day has already been done
-                const reviewKey = `${todayKey}-${currentSlot}`;
+        // --- Persistent Missed Slot Check ---
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        const daySchedule = schedule[todayKey];
+        if (daySchedule && !missedSlotModalState.isOpen) {
+            const currentSlotIndex = Object.keys(slotEndHours).indexOf(currentSlot);
+            const pastSlotNames = Object.keys(slotEndHours).slice(0, currentSlotIndex);
+
+            for (const slotName of pastSlotNames) {
+                const activitiesInSlot = daySchedule[slotName] as Activity[] | undefined;
+                const incompleteTasks = (activitiesInSlot || []).filter(a => a && !a.completed);
+                const reviewKey = `${todayKey}-${slotName}`;
                 const reviewDone = missedSlotReviews[reviewKey];
 
-                if (incompleteTasks.length > 0 && !reviewDone && !missedSlotModalState.isOpen) {
-                    setMissedSlotModalState({ isOpen: true, slotName: currentSlot, incompleteTasks });
+                if (incompleteTasks.length > 0 && !reviewDone) {
+                    setMissedSlotModalState({ isOpen: true, slotName: slotName, incompleteTasks });
+                    break; 
                 }
             }
         }
@@ -350,7 +354,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <PistonsHead />
       <main>{children}</main>
       <Toaster />
-      <BackgroundAudioPlayer />
+      {isBrowser && <BackgroundAudioPlayer />}
       <FloatingVideoPlayer />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
        <FocusSessionModal
@@ -557,3 +561,4 @@ export default function RootLayout({
     </html>
   );
 }
+
