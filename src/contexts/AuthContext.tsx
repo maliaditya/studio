@@ -713,7 +713,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 } else if (activity.type === 'workout') {
                   const log = allWorkoutLogs.find(l => l.date === dateKey);
                   if (log) {
-                    const setMultiplier = strengthTrainingMode === 'calisthenics' ? 1 : 1.5;
+                    const setMultiplier = 1.5; 
                     totalMinutes = log.exercises
                       .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
                       .reduce((total, ex) => total + (ex.loggedSets.length * setMultiplier), 0);
@@ -2976,5 +2976,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+    
 
     
