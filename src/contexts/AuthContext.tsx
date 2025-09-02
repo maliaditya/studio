@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -711,14 +712,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     totalMinutes = activity.duration;
                     suffix = ' logged';
                 } else if (activity.type === 'workout') {
-                  const log = allWorkoutLogs.find(l => l.date === dateKey);
-                  if (log) {
-                    const setMultiplier = 1.5; 
-                    totalMinutes = log.exercises
-                      .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
-                      .reduce((total, ex) => total + (ex.loggedSets.length * setMultiplier), 0);
-                  }
-                  suffix = ' logged';
+                    const log = allWorkoutLogs.find(l => l.date === dateKey);
+                    if (log) {
+                        totalMinutes = log.exercises
+                            .filter(ex => activity.taskIds?.some(tid => tid === ex.id))
+                            .reduce((total, ex) => total + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0);
+                    }
+                    suffix = ' logged';
                 } else {
                     let logs, durationField;
                     if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
