@@ -389,10 +389,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [settings, setSettings] = useState<UserSettings>({ 
-    carryForward: false,
+    carryForward: true,
     autoPush: false,
     autoPushLimit: 100,
-    carryForwardEssentials: false,
+    carryForwardEssentials: true,
     carryForwardNutrition: false,
     smartLogging: false,
     defaultHabitLinks: {},
@@ -2955,6 +2955,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

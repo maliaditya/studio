@@ -210,55 +210,62 @@ function MyPlatePageContent() {
       setCarryOverComplete(true);
       return;
     }
-
-    if (!settings.carryForward && !settings.carryForwardEssentials && !settings.carryForwardNutrition) {
-      localStorage.setItem(lastCarryForwardKey, todayStr);
-      setCarryOverComplete(true);
-      return;
-    }
-
+    
+    const hasAnyTaskToday = schedule[todayStr] && Object.values(schedule[todayStr]).flat().length > 0;
+    
+    // Determine if we need to carry anything over
+    const shouldCarryForwardRegular = settings.carryForward || settings.carryForwardEssentials || settings.carryForwardNutrition;
+    // Always check for routines
     const yesterday = subDays(selectedDate, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
+
+    if (!yesterdaysSchedule && !shouldCarryForwardRegular) {
+        localStorage.setItem(lastCarryForwardKey, todayStr);
+        setCarryOverComplete(true);
+        return;
+    }
 
     let carriedOver = false;
     const newTodaySchedule: DailySchedule = schedule[todayStr] ? JSON.parse(JSON.stringify(schedule[todayStr])) : {};
 
     if (yesterdaysSchedule) {
-      Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-        if (Array.isArray(activities) && activities.length > 0) {
-          const activitiesToCarry = activities.filter(activity => {
-            if (activity.isRoutine) return true;
-            if (activity.completed) return false;
-            
-            if(activity.type === 'essentials') return settings.carryForwardEssentials;
-            if(activity.type === 'nutrition') return settings.carryForwardNutrition;
-            return settings.carryForward;
-          });
+        Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
+            if (Array.isArray(activities) && activities.length > 0) {
+                const activitiesToCarry = activities.filter(activity => {
+                    // Always carry routine tasks, regardless of completion status
+                    if (activity.isRoutine) return true;
+                    // For non-routine, only carry incomplete tasks based on settings
+                    if (activity.completed) return false;
+                    if (activity.type === 'essentials') return settings.carryForwardEssentials;
+                    if (activity.type === 'nutrition') return settings.carryForwardNutrition;
+                    return settings.carryForward;
+                });
+                
+                if (activitiesToCarry.length > 0) {
+                    if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
+                    const todaysIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details.split('-')[0]));
+                    
+                    const newActivitiesForSlot = activitiesToCarry.filter(act => {
+                        const baseDetails = act.details.split('-')[0];
+                        return !todaysIdsInSlot.has(baseDetails);
+                    }).map(activity => {
+                      const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
+                      return {
+                        ...activity,
+                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                        completed: false, // Always reset completion for carried-over tasks
+                        habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+                      };
+                    });
 
-          if (activitiesToCarry.length > 0) {
-            if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-            const todaysIdsInSlot = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details.split('-')[0]));
-            
-            const newActivitiesForSlot = activitiesToCarry.filter(act => {
-                return !todaysIdsInSlot.has(act.details.split('-')[0]);
-            }).map(activity => {
-              const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
-              return {
-                ...activity,
-                id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                completed: false,
-                habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
-              };
-            });
-
-            if (newActivitiesForSlot.length > 0) {
-              (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
-              carriedOver = true;
+                    if (newActivitiesForSlot.length > 0) {
+                      (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
+                      carriedOver = true;
+                    }
+                }
             }
-          }
-        }
-      });
+        });
     }
 
     if (carriedOver) {
@@ -1383,5 +1390,6 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
