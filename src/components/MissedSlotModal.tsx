@@ -27,8 +27,22 @@ interface MissedSlotModalProps {
     incompleteTasks: Activity[];
   };
   onOpenChange: (isOpen: boolean) => void;
-  onSave: (review: MissedSlotReview) => void;
+  onSave: (review: MissedSlotReview, newDistraction?: Activity) => void;
 }
+
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    return totalMinutes;
+};
+
 
 export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModalProps) {
   const { isOpen, slotName, allTasks, incompleteTasks } = state;
@@ -46,18 +60,7 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
 
   const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
   
-  const totalMinutesInSlot = 240;
   const loggedMinutes = useMemo(() => {
-    const parseDurationToMinutes = (durationStr: string | undefined): number => {
-        if (!durationStr) return 0;
-        if (/^\d+$/.test(durationStr.trim())) return parseInt(durationStr.trim(), 10);
-        let total = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
-        if (hourMatch) total += parseInt(hourMatch[1], 10) * 60;
-        const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) total += parseInt(minMatch[1], 10);
-        return total;
-    };
     return allTasks
       .filter(t => t.completed)
       .reduce((sum, task) => sum + parseDurationToMinutes(activityDurations[task.id]), 0);
@@ -65,26 +68,34 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
 
 
   const modalContent = useMemo(() => {
+    const totalMinutesInSlot = 240;
+    const remainingMinutes = totalMinutesInSlot - loggedMinutes;
+
     if (incompleteTasks.length > 0) {
       return {
         title: `Review Your Incomplete '${slotName}' Slot`,
         question: "What happened? Why were these tasks not completed?",
-        taskList: incompleteTasks
+        taskList: incompleteTasks,
+        isDistractionLoggable: true,
+        freeTime: remainingMinutes,
       };
     }
     if (allTasks.length > 0 && incompleteTasks.length === 0) {
-      const remainingMinutes = totalMinutesInSlot - loggedMinutes;
       return {
         title: `Review Your Completed '${slotName}' Slot`,
         question: `You finished all tasks with ${remainingMinutes > 0 ? `${remainingMinutes} minutes` : 'time'} to spare. What did you do with the extra time?`,
-        taskList: allTasks
+        taskList: allTasks,
+        isDistractionLoggable: true,
+        freeTime: remainingMinutes,
       };
     }
     // No tasks were scheduled
     return {
       title: `Review Your Empty '${slotName}' Slot`,
       question: "You had nothing scheduled for this block. What did you end up doing?",
-      taskList: []
+      taskList: [],
+      isDistractionLoggable: true,
+      freeTime: totalMinutesInSlot,
     };
   }, [slotName, allTasks, incompleteTasks, loggedMinutes]);
 
@@ -95,7 +106,20 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
       reason,
       followedRuleIds,
     };
-    onSave(review);
+
+    let newDistraction: Activity | undefined = undefined;
+    if (modalContent.isDistractionLoggable && reason.trim() && modalContent.freeTime > 0) {
+        newDistraction = {
+            id: `distraction_${Date.now()}`,
+            type: 'distraction',
+            details: reason.trim(),
+            completed: true, // Logged distractions are 'complete' by nature
+            duration: modalContent.freeTime,
+            slot: slotName,
+        };
+    }
+
+    onSave(review, newDistraction);
   };
 
   return (

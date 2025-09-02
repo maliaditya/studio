@@ -168,6 +168,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 if (!reviewDone) {
                     const allTasksInSlot = (daySchedule[slotName] as Activity[] | undefined) || [];
                     const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
+                    // This now triggers even for empty slots
                     setMissedSlotModalState({ isOpen: true, slotName: slotName, allTasks: allTasksInSlot, incompleteTasks: incompleteTasks });
                     break;
                 }
@@ -336,11 +337,27 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setInterruptModalState({ isOpen: false, slotName: null, activityType: null });
   };
   
-  const handleSaveMissedSlotReview = (review: MissedSlotReview) => {
+  const handleSaveMissedSlotReview = (review: MissedSlotReview, newDistraction?: Activity) => {
     setMissedSlotReviews(prev => ({
         ...prev,
         [review.id]: review
     }));
+
+    if (newDistraction) {
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        setSchedule(prev => {
+            const newDaySchedule = { ...(prev[todayKey] || {}) };
+            const currentActivities = Array.isArray(newDaySchedule[newDistraction.slot]) 
+                ? newDaySchedule[newDistraction.slot] as Activity[]
+                : [];
+            
+            newDaySchedule[newDistraction.slot] = [...currentActivities, newDistraction];
+            
+            return { ...prev, [todayKey]: newDaySchedule };
+        });
+        toast({ title: 'Distraction Logged', description: 'Your unscheduled time has been logged as a distraction.' });
+    }
+
     setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
   };
 
@@ -561,4 +578,3 @@ export default function RootLayout({
     </html>
   );
 }
-
