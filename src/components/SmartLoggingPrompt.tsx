@@ -367,7 +367,7 @@ export function SmartLoggingPrompt({
                                   {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                       <div key={habit.id} className="space-y-3">
                                           <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
-                                          <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary truncate">{habit.name}</span>
+                                          <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span>
                                           </div>
                                           <div className="grid grid-cols-1 gap-3">
                                               {positiveMechanism && (
