@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -2293,7 +2292,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let y = event.clientY;
 
     if (x + popupWidth > window.innerWidth) x = window.innerWidth - popupWidth - 20;
-    if (y + popupHeight > window.innerHeight) y = window.innerHeight - popupHeight - 20;
+    if (y + popupHeight > window.innerHeight) y = window.innerHeight - 20;
 
     setTodaysDietPopup({ id: 'todays-diet', x, y, z: 80 });
   };
@@ -2976,3 +2975,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
