@@ -1,4 +1,5 @@
 
+      
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -13,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -302,7 +303,7 @@ export function TimeSlots({
         const review = missedSlotReviews[reviewKey];
         const isSlotComplete = activities.length > 0 && activities.every(a => a.completed);
         const allRulesFollowed = review && allEquations.length > 0 && allEquations.every(eq => review.followedRuleIds.includes(eq.id));
-
+        const isSlotFailed = !isSlotComplete && review && !allRulesFollowed;
 
         return (
           <Card
@@ -313,7 +314,8 @@ export function TimeSlots({
               currentSlot === slot.name
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60',
-              (isSlotComplete || allRulesFollowed) && 'border-green-500'
+              (isSlotComplete || allRulesFollowed) && 'border-green-500',
+              isSlotFailed && 'border-red-500'
             )}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
