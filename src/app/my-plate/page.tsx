@@ -87,6 +87,7 @@ function MyPlatePageContent() {
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
     workoutPlanRotation,
+    strengthTrainingMode,
     upskillDefinitions, topicGoals, deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
     projects,
@@ -1396,6 +1397,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
