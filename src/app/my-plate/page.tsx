@@ -177,61 +177,57 @@ function MyPlatePageContent() {
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
   
-  useEffect(() => {
-    if (!currentUser || !selectedDate) return;
-  
-    const dateToProcess = selectedDate;
-    const dateToProcessKey = format(dateToProcess, 'yyyy-MM-dd');
-    const today = startOfToday();
-  
-    // Only process future or today's dates that don't have a schedule yet
-    if (isBefore(dateToProcess, today) || schedule[dateToProcessKey]) {
-      return;
-    }
-  
-    // Look back to the previous day for routines
-    const referenceDate = subDays(dateToProcess, 1);
-    const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
-    const referenceSchedule = schedule[referenceDateKey];
-      
-    if (!referenceSchedule) {
-      return;
-    }
-  
-    // Find all tasks marked as routine from the previous day
-    const routineTasksToCarry = Object.values(referenceSchedule)
-      .flat()
-      .filter((act): act is Activity => {
-        if (!act) return false;
-        return !!act.isRoutine;
-      });
-      
-    if (routineTasksToCarry.length > 0) {
-      const newDaySchedule: DailySchedule = {};
-      routineTasksToCarry.forEach(activity => {
-        // Reset the activity for the new day
-        const newActivity: Activity = {
-          ...activity,
-          id: `${activity.type}-${Date.now()}-${Math.random()}`,
-          completed: false, // Always start as not completed
-        };
-        
-        const slot = activity.slot as keyof DailySchedule;
-        if (!newDaySchedule[slot]) {
-          newDaySchedule[slot] = [];
+    useEffect(() => {
+        if (!currentUser || !schedule) return;
+
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        // Prevent re-running if today's schedule already exists.
+        if (schedule[todayKey]) {
+            return;
         }
-        (newDaySchedule[slot] as Activity[]).push(newActivity);
-      });
-  
-      setSchedule(currentSchedule => ({
-        ...currentSchedule,
-        [dateToProcessKey]: newDaySchedule
-      }));
-    }
-  
-  }, [selectedDate, currentUser, schedule, setSchedule]);
-  
-  
+
+        const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+        const yesterdaysSchedule = schedule[yesterdayKey];
+
+        if (!yesterdaysSchedule) {
+            return;
+        }
+
+        const routineTasksToCarryOver: Activity[] = [];
+
+        Object.values(yesterdaysSchedule).forEach(slotActivities => {
+            if (Array.isArray(slotActivities)) {
+                slotActivities.forEach(activity => {
+                    if (activity && activity.isRoutine) {
+                        const newActivity = {
+                            ...activity,
+                            id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                            completed: false,
+                        };
+                        routineTasksToCarryOver.push(newActivity);
+                    }
+                });
+            }
+        });
+
+        if (routineTasksToCarryOver.length > 0) {
+            const newDaySchedule: DailySchedule = {};
+            routineTasksToCarryOver.forEach(activity => {
+                const slot = activity.slot as keyof DailySchedule;
+                if (!newDaySchedule[slot]) {
+                    newDaySchedule[slot] = [];
+                }
+                (newDaySchedule[slot] as Activity[]).push(activity);
+            });
+
+            setSchedule(currentSchedule => ({
+                ...currentSchedule,
+                [todayKey]: newDaySchedule
+            }));
+        }
+    }, [currentUser, schedule, setSchedule]);
+
+
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
@@ -1000,7 +996,7 @@ function MyPlatePageContent() {
   const timeAllocationData = useMemo(() => {
     const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
     const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-    const activityNameMap: Record<ActivityTypeType, string> = {
+    const activityNameMap: Record<ActivityType, string> = {
         deepwork: 'Deep Work',
         upskill: 'Learning',
         workout: 'Workout',
