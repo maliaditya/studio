@@ -42,6 +42,7 @@ import type { Project, Activity, MissedSlotReview } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetTechniquePopup } from '@/components/MindsetTechniquePopup';
+import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 
 
 const slotEndHours: Record<string, number> = {
@@ -373,6 +374,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
+      <ActivityDistributionCard />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
        <FocusSessionModal
           isOpen={focusSessionModalOpen}
