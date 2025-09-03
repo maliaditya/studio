@@ -189,12 +189,12 @@ export function TimeSlots({
   const SLOT_CAPACITY_MINUTES = 240;
   
   const slots = [
-    { name: 'Late Night', time: '12am - 4am', icon: <Moon className="h-5 w-5 text-indigo-400" /> },
-    { name: 'Dawn', time: '4am - 8am', icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
-    { name: 'Morning', time: '8am - 12pm', icon: <Sun className="h-5 w-5 text-yellow-400" /> },
-    { name: 'Afternoon', time: '12pm - 4pm', icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
-    { name: 'Evening', time: '4pm - 8pm', icon: <Sunset className="h-5 w-5 text-purple-500" /> },
-    { name: 'Night', time: '8pm - 12am', icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
+    { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
+    { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
+    { name: 'Morning', time: '8am - 12pm', endHour: 12, icon: <Sun className="h-5 w-5 text-yellow-400" /> },
+    { name: 'Afternoon', time: '12pm - 4pm', endHour: 16, icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
+    { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
+    { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
   ];
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
@@ -313,7 +313,11 @@ export function TimeSlots({
 
         const isSlotFailed = !isSlotComplete && review && !allRulesFollowed;
         const hasLongDistraction = activities.some(act => act.type === 'distraction' && (act.duration || 0) > 30);
-
+        
+        const now = new Date();
+        const todayKey = format(now, 'yyyy-MM-dd');
+        const selectedDateKey = format(date, 'yyyy-MM-dd');
+        const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
 
         return (
           <Card
@@ -321,7 +325,7 @@ export function TimeSlots({
             id={`slot-card-${slot.name.replace(/\s+/g, '-')}`}
             className={cn(
               "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
-              currentSlot === slot.name
+              currentSlot === slot.name && selectedDateKey === todayKey
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60',
               (isSlotComplete || allRulesFollowed) && 'border-green-500',
@@ -335,7 +339,7 @@ export function TimeSlots({
                 <CardDescription>{slot.time}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {currentSlot === slot.name ? (
+                {currentSlot === slot.name && selectedDateKey === todayKey ? (
                   <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
                     {remainingTime}
                   </div>
@@ -465,7 +469,7 @@ export function TimeSlots({
                   })
                 ) : (
                   <div className="flex-grow flex items-center justify-center h-full">
-                    {currentSlot === slot.name ? (
+                    {currentSlot === slot.name && selectedDateKey === todayKey ? (
                       <div className="text-center">
                         <p className="text-lg text-muted-foreground">Current Focus</p>
                       </div>
@@ -481,7 +485,7 @@ export function TimeSlots({
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between items-center">
                     <p className="text-xs text-muted-foreground">
-                        {currentSlot === slot.name || isBefore(parseISO(format(new Date(), 'yyyy-MM-dd') + 'T' + slot.time.split(' - ')[0]), new Date()) 
+                       {isPastSlot
                           ? `${SLOT_CAPACITY_MINUTES - completedMinutes} min wasted`
                           : `${SLOT_CAPACITY_MINUTES - completedMinutes} min free`}
                     </p>
