@@ -60,7 +60,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
     
     return totalMinutes;
 };
@@ -163,9 +163,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
             for (const slotName of pastSlotNames) {
                 const reviewKey = `${todayKey}-${slotName}`;
-                const reviewDone = missedSlotReviews[reviewKey];
+                const reviewData = missedSlotReviews[reviewKey];
 
-                if (!reviewDone) {
+                if (!reviewData || (reviewData.snoozedUntil && reviewData.snoozedUntil < Date.now())) {
                     const allTasksInSlot = (daySchedule[slotName] as Activity[] | undefined) || [];
                     const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
                     // This now triggers even for empty slots

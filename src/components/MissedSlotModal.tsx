@@ -121,6 +121,21 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
 
     onSave(review, newDistraction);
   };
+  
+  const handleSnooze = () => {
+    const { setMissedSlotReviews } = useAuth();
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const reviewKey = `${today}-${slotName}`;
+
+    setMissedSlotReviews(prev => ({
+        ...prev,
+        [reviewKey]: {
+            ...prev[reviewKey],
+            snoozedUntil: Date.now() + 5 * 60 * 1000 // 5 minutes from now
+        }
+    }));
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -178,9 +193,12 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
             </ScrollArea>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave}>Save Review</Button>
+        <DialogFooter className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:justify-end">
+          <Button variant="secondary" onClick={handleSnooze}>Remind in 5 Mins</Button>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save Review</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

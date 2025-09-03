@@ -595,3 +595,10 @@ export interface MindsetTechniquePopupState {
   level: number;
   z?: number;
 }
+
+export interface MissedSlotReview {
+    id: string; // composite key: `${date}-${slotName}`
+    reason: string;
+    followedRuleIds: string[];
+    snoozedUntil?: number; // timestamp
+}
