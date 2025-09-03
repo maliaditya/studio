@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -72,56 +72,57 @@ export function ActivityDistributionCard() {
         activityDurations
     } = useAuth();
     
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const [timeAllocation, setTimeAllocation] = useState<{ name: string; time: number }[]>([]);
 
-    const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-        if (!activity.completed) return 0;
-      
-        const activityTaskIds = new Set(activity.taskIds || []);
+    useEffect(() => {
+        const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
+            if (!activity.completed) return 0;
+          
+            const activityTaskIds = new Set(activity.taskIds || []);
+            
+            let logs: DatedWorkout[] = [];
+            let durationField: 'reps' | 'weight' | null = null;
+            let isWorkout = false;
+          
+            switch (activity.type) {
+              case 'upskill':
+                logs = allUpskillLogs;
+                durationField = 'weight';
+                break;
+              case 'deepwork':
+              case 'branding':
+              case 'lead-generation':
+                logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
+                durationField = 'weight'; 
+                break;
+              case 'workout':
+                logs = allWorkoutLogs;
+                isWorkout = true;
+                break;
+              default:
+                return activity.duration || 0;
+            }
+          
+            if (activityTaskIds.size === 0) {
+              return activity.duration || 0;
+            }
         
-        let logs: DatedWorkout[] = [];
-        let durationField: 'reps' | 'weight' | null = null;
-        let isWorkout = false;
-      
-        switch (activity.type) {
-          case 'upskill':
-            logs = allUpskillLogs;
-            durationField = 'weight'; // Corrected: duration is stored in 'weight' for upskill
-            break;
-          case 'deepwork':
-          case 'branding':
-          case 'lead-generation':
-            logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
-            durationField = 'weight'; 
-            break;
-          case 'workout':
-            logs = allWorkoutLogs;
-            isWorkout = true;
-            break;
-          default:
-            return activity.duration || 0;
-        }
-      
-        if (activityTaskIds.size === 0) {
-          return activity.duration || 0;
-        }
-    
-        const logForDay = logs.find(l => l.date === dateKey);
-        if (!logForDay) return 0;
-      
-        return logForDay.exercises
-          .filter(ex => activityTaskIds.has(ex.id))
-          .reduce((sum, ex) => {
-            return sum + (ex.loggedSets || []).reduce((setSum, set) => {
-              if (isWorkout) {
-                return setSum + 15;
-              }
-              return setSum + (set[durationField!] || 0);
-            }, 0);
-          }, 0);
-      };
+            const logForDay = logs.find(l => l.date === dateKey);
+            if (!logForDay) return 0;
+          
+            return logForDay.exercises
+              .filter(ex => activityTaskIds.has(ex.id))
+              .reduce((sum, ex) => {
+                return sum + (ex.loggedSets || []).reduce((setSum, set) => {
+                  if (isWorkout) {
+                    return setSum + 15;
+                  }
+                  return setSum + (set[durationField!] || 0);
+                }, 0);
+              }, 0);
+          };
 
-    const timeAllocation = useMemo(() => {
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
         const dailySchedule = schedule[todayKey] || {};
         const totals: Record<string, number> = {};
         let wastedTime = 0;
@@ -170,12 +171,14 @@ export function ActivityDistributionCard() {
             totals['Free Time'] = freeTime;
         }
 
-
-        return Object.entries(totals)
+        const newTimeAllocation = Object.entries(totals)
             .map(([name, time]) => ({ name, time }))
             .sort((a, b) => b.time - a.time);
 
-    }, [schedule, todayKey, getLoggedMinutes, currentSlot, activityDurations]);
+        setTimeAllocation(newTimeAllocation);
+        
+    }, [schedule, currentSlot, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, activityDurations]);
+
 
     if (timeAllocation.length === 0) {
         return null;
