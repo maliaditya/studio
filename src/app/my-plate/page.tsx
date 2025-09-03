@@ -50,23 +50,6 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    
-    // Handle "30" as "30m"
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
-
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-    
-    return totalMinutes;
-};
-
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -301,12 +284,41 @@ function MyPlatePageContent() {
     
                         let totalMinutes = 0;
                         let suffix = '';
-    
+                        
                         if (activity.completed) {
-                            totalMinutes = activity.duration || 0;
                             suffix = ' logged';
+                            // For completed tasks, calculate from logs if needed
+                            switch(activity.type) {
+                                case 'workout':
+                                    const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
+                                    if (workoutLog) {
+                                        totalMinutes = workoutLog.exercises
+                                            .filter(ex => activity.taskIds?.includes(ex.id))
+                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration ?? 1), 0), 0);
+                                    }
+                                    break;
+                                case 'upskill':
+                                    const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
+                                    if (upskillLog) {
+                                        totalMinutes = upskillLog.exercises
+                                            .filter(ex => activity.taskIds?.includes(ex.id))
+                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0);
+                                    }
+                                    break;
+                                case 'deepwork':
+                                    const deepWorkLog = allDeepWorkLogs.find(log => log.date === dateKey);
+                                    if (deepWorkLog) {
+                                        totalMinutes = deepWorkLog.exercises
+                                            .filter(ex => activity.taskIds?.includes(ex.id))
+                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0);
+                                    }
+                                    break;
+                                default:
+                                    totalMinutes = activity.duration || 0;
+                                    break;
+                            }
                         } else {
-                            // For non-completed tasks, calculate estimated duration
+                            // For non-completed tasks, use estimates
                             switch(activity.type) {
                                 case 'workout': totalMinutes = 90; break;
                                 case 'mindset': totalMinutes = 15; break;
@@ -342,7 +354,7 @@ function MyPlatePageContent() {
             }
         }
         return newDurations;
-      }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
+    }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -1349,3 +1361,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
