@@ -158,10 +158,13 @@ interface TimeSlotsProps {
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
     if (!durationStr || typeof durationStr !== 'string') return 0;
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
+    
     const durationWithoutLogged = durationStr.replace(/logged/i, '').trim();
+
+    if (/^\d+$/.test(durationWithoutLogged)) {
+        return parseInt(durationWithoutLogged, 10);
+    }
+    
     let totalMinutes = 0;
     const hourMatch = durationWithoutLogged.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
@@ -312,6 +315,8 @@ export function TimeSlots({
         const partialAndRulesNotFollowed = isPartiallyComplete && review && !allRulesFollowed;
 
         const isSlotFailed = !isSlotComplete && review && !allRulesFollowed;
+        const hasLongDistraction = activities.some(act => act.type === 'distraction' && (act.duration || 0) > 30);
+
 
         return (
           <Card
@@ -324,7 +329,7 @@ export function TimeSlots({
                 : 'shadow-md bg-card/60',
               (isSlotComplete || allRulesFollowed) && 'border-green-500',
               partialAndRulesNotFollowed && 'border-orange-500',
-              isSlotFailed && !isPartiallyComplete && 'border-red-500'
+              (isSlotFailed && !isPartiallyComplete || hasLongDistraction) && 'border-red-500'
             )}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -376,8 +381,7 @@ export function TimeSlots({
                             <div className="flex-grow min-w-0">
                               <p className={cn(
                                   "font-semibold text-foreground", 
-                                  activity.completed && "line-through",
-                                  activity.type === 'distraction' && activity.duration && activity.duration > 30 && "text-red-500"
+                                  activity.completed && "line-through"
                               )}>
                                 {displayDetails}
                               </p>
@@ -559,3 +563,4 @@ export function TimeSlots({
 
     
     
+
