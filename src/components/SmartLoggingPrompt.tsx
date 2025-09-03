@@ -326,9 +326,9 @@ export function SmartLoggingPrompt({
                 return sum + duration;
             }, 0);
         
-        const endHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
+        const slotEndHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
         const slotEndTime = new Date();
-        slotEndTime.setHours(endHour, 0, 0, 0);
+        slotEndTime.setHours(slotEndHour, 0, 0, 0);
 
         const isPast = now > slotEndTime;
         const isCurrent = slotName === currentSlot;
@@ -410,37 +410,54 @@ export function SmartLoggingPrompt({
   const renderCarouselItem = (item: any) => {
     if (item.type === 'slot') {
         return (
-            <div className="p-1 h-full flex flex-col justify-between">
-                <div>
-                    <h4 className="font-semibold text-sm">🕒 {item.name} ({item.time})</h4>
-                    <div className="text-xs space-y-1 mt-1 pl-2">
-                        <p><b className="text-foreground">Planned:</b> {item.plannedTasks}</p>
-                        <p><b className="text-foreground">Logged:</b> {item.loggedTime} min</p>
-                        <p><b className="text-foreground">Unused/Wasted:</b> {item.wastedTime} min</p>
-                        <p className="italic text-muted-foreground/80 mt-2">👉 {item.insight}</p>
-                    </div>
-                </div>
-                <div className="flex justify-end mt-2">
-                    <Button size="sm" variant="ghost" onClick={() => router.push('/my-plate')}>View Agenda</Button>
-                </div>
-            </div>
-        )
+          <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
+            <CardHeader className="p-3">
+              <CardTitle className="text-base">🕒 {item.name} <span className="text-sm font-normal text-muted-foreground">({item.time})</span></CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                  <div>
+                      <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
+                      <p className="text-xs text-muted-foreground">Minutes Logged</p>
+                  </div>
+                  <div>
+                      <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
+                      <p className="text-xs text-muted-foreground">Minutes Wasted</p>
+                  </div>
+              </div>
+              <div>
+                  <p className="font-semibold text-xs text-foreground">Planned:</p>
+                  <p className="text-xs text-muted-foreground">{item.plannedTasks}</p>
+              </div>
+              <p className="italic text-xs text-muted-foreground/90 pt-2 border-t">
+                  "{item.insight}"
+              </p>
+            </CardContent>
+          </Card>
+        );
     }
     if (item.type === 'summary') {
         return (
-            <div className="p-1 h-full flex flex-col justify-between">
-                 <div>
-                    <h4 className="font-semibold text-sm">📊 Daily Summary</h4>
-                    <div className="text-xs space-y-1 mt-1 pl-2">
-                        <p><b className="text-foreground">Total Logged:</b> {item.totalLogged} min</p>
-                        <p><b className="text-foreground">Total Wasted/Free:</b> {item.totalWasted} min</p>
-                        <p className="italic text-muted-foreground/80 mt-2">👉 {item.insight}</p>
+            <Card className="h-full flex flex-col justify-between bg-muted/30 border-0 shadow-none">
+                <CardHeader className="p-3">
+                    <CardTitle className="text-base">📊 Daily Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0 text-sm space-y-3">
+                     <div className="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
+                            <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
+                        </div>
+                        <div>
+                            <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
+                            <p className="text-xs text-muted-foreground">Total Minutes Wasted</p>
+                        </div>
                     </div>
-                </div>
-                 <div className="flex justify-end mt-2">
-                    <Button size="sm" variant="ghost" onClick={() => router.push('/my-plate')}>View Agenda</Button>
-                </div>
-            </div>
+                     <p className="italic text-xs text-muted-foreground/90 pt-2 border-t">
+                        "{item.insight}"
+                    </p>
+                </CardContent>
+            </Card>
         )
     }
     return null;
