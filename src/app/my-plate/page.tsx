@@ -189,16 +189,8 @@ function MyPlatePageContent() {
       return;
     }
   
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
-    const storedSettings = localStorage.getItem(settingsKey);
-    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
-    
-    if (!currentSettings.carryForward && !currentSettings.carryForwardEssentials && !currentSettings.carryForwardNutrition) {
-      return;
-    }
-
-    // Look back 7 days to find the schedule for the same day of the week
-    const referenceDate = subDays(dateToProcess, 7);
+    // Look back to the previous day for routines
+    const referenceDate = subDays(dateToProcess, 1);
     const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
     const referenceSchedule = schedule[referenceDateKey];
       
@@ -206,24 +198,22 @@ function MyPlatePageContent() {
       return;
     }
   
+    // Find all tasks marked as routine from the previous day
     const routineTasksToCarry = Object.values(referenceSchedule)
       .flat()
       .filter((act): act is Activity => {
         if (!act) return false;
-        if (act.type === 'essentials' && currentSettings.carryForwardEssentials) return true;
-        if (act.type === 'nutrition' && currentSettings.carryForwardNutrition) return true;
-        if (act.isRoutine && currentSettings.carryForward) return true;
-        return false;
+        return !!act.isRoutine;
       });
       
     if (routineTasksToCarry.length > 0) {
       const newDaySchedule: DailySchedule = {};
       routineTasksToCarry.forEach(activity => {
+        // Reset the activity for the new day
         const newActivity: Activity = {
           ...activity,
           id: `${activity.type}-${Date.now()}-${Math.random()}`,
-          completed: false,
-          taskIds: activity.isRoutine ? activity.taskIds : [], // Only carry over taskIds for routines, not one-offs
+          completed: false, // Always start as not completed
         };
         
         const slot = activity.slot as keyof DailySchedule;
@@ -239,7 +229,7 @@ function MyPlatePageContent() {
       }));
     }
   
-  }, [selectedDate, currentUser, schedule, setSchedule, settings.carryForward, settings.carryForwardEssentials, settings.carryForwardNutrition]);
+  }, [selectedDate, currentUser, schedule, setSchedule]);
   
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
