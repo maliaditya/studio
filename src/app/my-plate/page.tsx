@@ -224,44 +224,44 @@ function MyPlatePageContent() {
 
     setSchedule(currentSchedule => {
         const newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
-        let carriedOver = false;
+        let tasksAdded = false;
 
-        const activitiesToCarry = Object.values(yesterdaysSchedule).flat().filter(activity => {
-            if (!activity) return false;
-            // Always carry over routine tasks
-            if (activity.isRoutine) return true;
+        const activitiesFromYesterday = Object.values(yesterdaysSchedule).flat();
+        
+        activitiesFromYesterday.forEach(activity => {
+            if (!activity) return;
 
-            // Carry over incomplete non-routine tasks based on settings
-            if (!activity.completed) {
-                if (activity.type === 'essentials') return settings.carryForwardEssentials;
-                if (activity.type === 'nutrition') return settings.carryForwardNutrition;
-                return settings.carryForward;
-            }
-            return false;
-        });
+            const shouldCarryOver =
+                activity.isRoutine ||
+                (!activity.completed && (
+                    (activity.type === 'essentials' && settings.carryForwardEssentials) ||
+                    (activity.type === 'nutrition' && settings.carryForwardNutrition) ||
+                    (activity.type !== 'essentials' && activity.type !== 'nutrition' && settings.carryForward)
+                ));
 
-        if (activitiesToCarry.length > 0) {
-            activitiesToCarry.forEach(activity => {
+            if (shouldCarryOver) {
                 const slotName = activity.slot;
-                if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-                
-                const todaysSlotActivities = newTodaySchedule[slotName] as Activity[];
-                
-                // Prevent duplicate details in the same slot for today
-                if (!todaysSlotActivities.some(a => a.details === activity.details)) {
-                    carriedOver = true;
-                    todaysSlotActivities.push({
+                const todaysSlotActivities = (newTodaySchedule[slotName] as Activity[] | undefined) || [];
+
+                // Prevent carrying over if the same task already exists today (avoids duplicates from multiple runs)
+                if (!todaysSlotActivities.some(a => a.details === activity.details && a.type === activity.type)) {
+                    if (!newTodaySchedule[slotName]) {
+                        newTodaySchedule[slotName] = [];
+                    }
+                    (newTodaySchedule[slotName] as Activity[]).push({
                         ...activity,
                         id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false, // Always reset completion status
+                        completed: false, // ALWAYS reset completion status for the new day
                     });
+                    tasksAdded = true;
                 }
-            });
-        }
-        
-        if (carriedOver) {
+            }
+        });
+
+        if (tasksAdded) {
             return { ...currentSchedule, [todayStr]: newTodaySchedule };
         }
+        
         return currentSchedule;
     });
     
