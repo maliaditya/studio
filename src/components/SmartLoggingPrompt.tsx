@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -248,14 +247,59 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
 });
 TruthSection.displayName = 'TruthSection';
 
-const slotOrder: { name: string; time: string }[] = [
-    { name: 'Late Night', time: '12am–4am' },
-    { name: 'Dawn', time: '4am–8am' },
-    { name: 'Morning', time: '8am–12pm' },
-    { name: 'Afternoon', time: '12pm–4pm' },
-    { name: 'Evening', time: '4pm–8pm' },
-    { name: 'Night', time: '8pm–12am' }
+const slotOrder: { name: string; time: string; endHour: number }[] = [
+    { name: 'Late Night', time: '12am–4am', endHour: 4 },
+    { name: 'Dawn', time: '4am–8am', endHour: 8 },
+    { name: 'Morning', time: '8am–12pm', endHour: 12 },
+    { name: 'Afternoon', time: '12pm–4pm', endHour: 16 },
+    { name: 'Evening', time: '4pm–8pm', endHour: 20 },
+    { name: 'Night', time: '8pm–12am', endHour: 24 }
 ];
+
+const DailyReviewDialog = ({ analysis, isOpen, onOpenChange }: { analysis: any, isOpen: boolean, onOpenChange: (open: boolean) => void }) => (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Daily Time Analysis</DialogTitle>
+                <DialogDescription>
+                    Here's a breakdown of how your time was spent today.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-96 pr-4">
+                <div className="space-y-4 py-4">
+                    {analysis.carouselItems.map((item: any, index: number) => {
+                        if (item.type === 'slot') {
+                            return (
+                                <div key={index}>
+                                    <h4 className="font-semibold">{item.name} ({item.time})</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Logged: {item.loggedTime} min | Wasted: {item.wastedTime} min
+                                    </p>
+                                    <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
+                                        {item.insight}
+                                    </blockquote>
+                                </div>
+                            );
+                        } else if (item.type === 'summary') {
+                             return (
+                                <div key="summary" className="pt-4 border-t">
+                                    <h4 className="font-semibold">Daily Summary</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Logged: {item.totalLogged} min | Total Wasted: {item.totalWasted} min
+                                    </p>
+                                     <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
+                                        {item.insight}
+                                    </blockquote>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+            </ScrollArea>
+        </DialogContent>
+    </Dialog>
+);
 
 
 export function SmartLoggingPrompt({ 
@@ -284,33 +328,6 @@ export function SmartLoggingPrompt({
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
-
-  const focusContext = React.useMemo(() => {
-    if (!activeFocusSession?.activity?.habitEquationIds) return null;
-    
-    const habitIds = activeFocusSession.activity.habitEquationIds;
-    if (habitIds.length === 0) return null;
-    
-    const uniqueHabitIds = [...new Set(habitIds)];
-
-    const habitDetails = uniqueHabitIds.map(habitId => {
-        const habit = habitCards.find(h => h.id === habitId);
-        if (!habit) return null;
-        
-        const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-        const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-
-        return {
-            habit,
-            positiveMechanism,
-            negativeMechanism,
-        };
-    }).filter((item): item is NonNullable<typeof item> => item !== null);
-    
-    return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
-  
   const getLoggedMinutes = useCallback((activity: ActivityType, dateKey: string): number => {
     if (!activity.completed) return 0;
   
@@ -351,7 +368,8 @@ export function SmartLoggingPrompt({
       .reduce((sum, ex) => {
         return sum + (ex.loggedSets || []).reduce((setSum, set) => {
           if (isWorkout) {
-            return setSum + (set.reps * set.weight || 15);
+            // This is a placeholder for a more complex duration calculation for workouts
+            return setSum + 15; // Assume 15 min per logged workout set for now
           }
           return setSum + (set[durationField!] || 0);
         }, 0);
@@ -369,21 +387,28 @@ export function SmartLoggingPrompt({
         const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task, todayKey), 0);
         
         totalLogged += loggedTime;
-        const isPast = slotOrder.findIndex(s => s.name === slot.name) < slotOrder.findIndex(s => s.name === currentSlot);
-        const isCurrent = slot.name === currentSlot;
-        
-        const wastedTime = isPast ? Math.max(0, 240 - loggedTime) : 0;
-        const freeTime = isCurrent ? Math.max(0, 240 - loggedTime) : 0;
+        const now = new Date();
+        const isPastDay = isBefore(startOfDay(parseISO(todayKey)), startOfDay(now));
+        const isPastSlot = isPastDay || now.getHours() >= slot.endHour;
+
+        const wastedTime = isPastSlot ? Math.max(0, 240 - loggedTime) : 0;
         
         const plannedTaskDetails = activities.map(a => a.details).join(', ') || 'None';
 
         let insight = "";
-        if (isPast) {
-            insight = `You captured ${loggedTime} min of value${wastedTime > 0 ? `, but ${wastedTime} min drifted away` : ''}.`;
-        } else if (isCurrent) {
-            insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
-        } else {
-            insight = "This slot is upcoming. Plan it wisely.";
+        const loggedHours = Math.floor(loggedTime / 60);
+        const wastedHours = Math.floor(wastedTime / 60);
+
+        if (!isPastSlot) {
+           insight = slot.name === currentSlot ? `This block is active. You have ${240 - loggedTime} min remaining to make an impact.` : "This slot is upcoming. Plan it wisely.";
+        } else if (loggedTime === 0) {
+          insight = "You let the whole block slip away—4 hours drifted without return.";
+        } else if (loggedTime < 180) { // Less than 3 hours
+          insight = `You gained ${loggedHours > 0 ? `${loggedHours} hour${loggedHours > 1 ? 's' : ''} of value` : `${loggedTime} minutes of value`}, but ${wastedHours > 0 ? `${wastedHours} hour${wastedHours > 1 ? 's' : ''}`: `${wastedTime} minutes`} slipped through your fingers.`;
+        } else if (loggedTime < 240) { // 3-4 hours
+          insight = "Strong effort: most of the hours worked for you, only a little escaped.";
+        } else { // 4+ hours
+          insight = "Full power—every minute of this block was captured. Nothing wasted.";
         }
 
         return {
@@ -408,6 +433,33 @@ export function SmartLoggingPrompt({
     };
   }, [schedule, currentSlot, getLoggedMinutes]);
 
+  const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
+  
+  const focusContext = React.useMemo(() => {
+    if (!activeFocusSession?.activity?.habitEquationIds) return null;
+    
+    const habitIds = activeFocusSession.activity.habitEquationIds;
+    if (habitIds.length === 0) return null;
+    
+    const uniqueHabitIds = [...new Set(habitIds)];
+
+    const habitDetails = uniqueHabitIds.map(habitId => {
+        const habit = habitCards.find(h => h.id === habitId);
+        if (!habit) return null;
+        
+        const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+        const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+
+        return {
+            habit,
+            positiveMechanism,
+            negativeMechanism,
+        };
+    }).filter((item): item is NonNullable<typeof item> => item !== null);
+    
+    return habitDetails.length > 0 ? habitDetails : null;
+  }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
+
   const prompts = {
     empty: {
       icon: <Lightbulb className="h-6 w-6 text-yellow-500" />,
@@ -423,7 +475,7 @@ export function SmartLoggingPrompt({
       title: "Today's Analysis",
       description: "You have tasks scheduled. Ready to start a focus session?",
        actions: [
-        { label: "View Agenda", onClick: () => router.push('/my-plate') },
+        { label: "Full Review", onClick: () => setIsReviewOpen(true) },
        ]
     },
     completed: {
@@ -445,7 +497,7 @@ export function SmartLoggingPrompt({
   const currentPrompt = promptType ? prompts[promptType] : null;
 
   if (!currentPrompt) return null;
-
+  
   const renderCarouselItem = (item: any) => {
     if (item.type === 'slot') {
         return (
@@ -501,51 +553,6 @@ export function SmartLoggingPrompt({
     }
     return null;
   }
-  
-  const DailyReviewDialog = ({ analysis }: { analysis: any }) => (
-    <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Daily Time Analysis</DialogTitle>
-                <DialogDescription>
-                    Here's a breakdown of how your time was spent today.
-                </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="h-96 pr-4">
-                <div className="space-y-4 py-4">
-                    {analysis.carouselItems.map((item: any, index: number) => {
-                        if (item.type === 'slot') {
-                            return (
-                                <div key={index}>
-                                    <h4 className="font-semibold">{item.name} ({item.time})</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Logged: {item.loggedTime} min | Wasted: {item.wastedTime} min
-                                    </p>
-                                    <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
-                                        {item.insight}
-                                    </blockquote>
-                                </div>
-                            );
-                        } else if (item.type === 'summary') {
-                             return (
-                                <div key="summary" className="pt-4 border-t">
-                                    <h4 className="font-semibold">Daily Summary</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Logged: {item.totalLogged} min | Total Wasted: {item.totalWasted} min
-                                    </p>
-                                     <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
-                                        {item.insight}
-                                    </blockquote>
-                                </div>
-                            );
-                        }
-                        return null;
-                    })}
-                </div>
-            </ScrollArea>
-        </DialogContent>
-    </Dialog>
-  );
 
   return (
     <>
@@ -634,7 +641,7 @@ export function SmartLoggingPrompt({
         </div>
       )}
     </AnimatePresence>
-    <DailyReviewDialog analysis={dailyAnalysis} />
+    <DailyReviewDialog analysis={dailyAnalysis} isOpen={isReviewOpen} onOpenChange={setIsReviewOpen} />
     </>
   );
 }
