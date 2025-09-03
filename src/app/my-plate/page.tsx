@@ -180,26 +180,25 @@ function MyPlatePageContent() {
   useEffect(() => {
     if (!currentUser || !selectedDate) return;
   
-    // Only proceed if today is the selected day and its schedule hasn't been populated yet
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    if (format(selectedDate, 'yyyy-MM-dd') !== todayKey || schedule[todayKey]) {
-      return;
-    }
-  
-    // Prevent re-running this logic multiple times a day
-    const lastRunKey = `lifeos_routine_populate_${currentUser.username}_${todayKey}`;
-    if (localStorage.getItem(lastRunKey)) return;
-  
-    // Find yesterday's routine tasks
-    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
+    const today = startOfToday();
+    const dateToProcess = selectedDate;
+    const dateToProcessKey = format(dateToProcess, 'yyyy-MM-dd');
     
-    if (!yesterdaysSchedule) {
-      localStorage.setItem(lastRunKey, todayKey);
+    // Only process future or today's dates that don't have a schedule yet
+    if (isBefore(dateToProcess, today) || schedule[dateToProcessKey]) {
       return;
     }
   
-    const routineTasksToCarry = Object.values(yesterdaysSchedule)
+    // Look back 7 days to find the schedule for the same day of the week
+    const referenceDate = subDays(dateToProcess, 7);
+    const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
+    const referenceSchedule = schedule[referenceDateKey];
+      
+    if (!referenceSchedule) {
+      return;
+    }
+  
+    const routineTasksToCarry = Object.values(referenceSchedule)
       .flat()
       .filter((act): act is Activity => !!act && act.isRoutine);
       
@@ -210,7 +209,6 @@ function MyPlatePageContent() {
           ...activity,
           id: `${activity.type}-${Date.now()}-${Math.random()}`,
           completed: false,
-          // Reset taskIds for non-routine activities to allow re-selection
           taskIds: activity.isRoutine ? activity.taskIds : [], 
         };
         
@@ -223,13 +221,11 @@ function MyPlatePageContent() {
   
       setSchedule(currentSchedule => ({
         ...currentSchedule,
-        [todayKey]: newDaySchedule
+        [dateToProcessKey]: newDaySchedule
       }));
     }
-    
-    localStorage.setItem(lastRunKey, todayKey);
   
-  }, [currentUser, selectedDate, schedule, setSchedule]);
+  }, [selectedDate, currentUser, schedule, setSchedule, settings.carryForward, settings.carryForwardEssentials, settings.carryForwardNutrition]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
