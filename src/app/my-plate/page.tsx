@@ -179,56 +179,70 @@ function MyPlatePageContent() {
   
   useEffect(() => {
     if (!currentUser || !selectedDate) return;
-
+  
     const today = startOfToday();
-    const isFutureDate = isAfter(selectedDate, today);
+    if (isBefore(selectedDate, today)) return;
+  
     const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
-    
-    // Don't modify past dates or days that already have activities
-    if (isBefore(selectedDate, today) || schedule[selectedDateKey]) {
-        return;
-    }
-
+    if (schedule[selectedDateKey]) return; // Don't overwrite existing days
+  
     const lastRunKey = `lifeos_routine_populate_${currentUser.username}_${selectedDateKey}`;
-    if (localStorage.getItem(lastRunKey)) {
-        return;
-    }
-    
-    // Check yesterday for routine tasks to carry forward.
-    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
+    if (localStorage.getItem(lastRunKey)) return;
+  
+    const dayOfWeek = getDay(selectedDate);
     let routineTasksToCarry: Activity[] = [];
-
-    if (yesterdaysSchedule) {
-        routineTasksToCarry = Object.values(yesterdaysSchedule)
-            .flat()
-            .filter((act): act is Activity => !!act && act.isRoutine);
-    }
-    
-    if (routineTasksToCarry.length > 0) {
-        const newDaySchedule: DailySchedule = {};
-        routineTasksToCarry.forEach(activity => {
-            const newActivity: Activity = { 
-                ...activity, 
-                id: `${activity.type}-${Date.now()}-${Math.random()}`, 
-                completed: false,
-                taskIds: activity.isRoutine ? activity.taskIds : [] // Keep taskIds if it's a routine
-            };
-            
-            if (!newDaySchedule[activity.slot]) {
-                newDaySchedule[activity.slot] = [];
+  
+    // Find the most recent instance of this day of the week in the past 7 days
+    for (let i = 1; i <= 7; i++) {
+        const pastDate = subDays(selectedDate, i);
+        if (getDay(pastDate) === dayOfWeek) {
+            const pastDateKey = format(pastDate, 'yyyy-MM-dd');
+            const pastSchedule = schedule[pastDateKey];
+            if (pastSchedule) {
+                routineTasksToCarry = Object.values(pastSchedule)
+                    .flat()
+                    .filter((act): act is Activity => !!act && act.isRoutine);
+                if (routineTasksToCarry.length > 0) {
+                    break; // Found the routines, no need to look further back
+                }
             }
-            (newDaySchedule[activity.slot] as Activity[]).push(newActivity);
-        });
-
-        setSchedule(currentSchedule => ({
-            ...currentSchedule,
-            [selectedDateKey]: newDaySchedule
-        }));
+        }
     }
-
+  
+    // If no routines found from the same weekday, check yesterday as a fallback
+    if (routineTasksToCarry.length === 0) {
+        const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+        const yesterdaysSchedule = schedule[yesterdayKey];
+        if (yesterdaysSchedule) {
+             routineTasksToCarry = Object.values(yesterdaysSchedule)
+                .flat()
+                .filter((act): act is Activity => !!act && act.isRoutine);
+        }
+    }
+  
+    if (routineTasksToCarry.length > 0) {
+      const newDaySchedule: DailySchedule = {};
+      routineTasksToCarry.forEach(activity => {
+        const newActivity: Activity = {
+          ...activity,
+          id: `${activity.type}-${Date.now()}-${Math.random()}`,
+          completed: false,
+          taskIds: activity.isRoutine ? activity.taskIds : [],
+        };
+        if (!newDaySchedule[activity.slot]) {
+          newDaySchedule[activity.slot] = [];
+        }
+        (newDaySchedule[activity.slot] as Activity[]).push(newActivity);
+      });
+  
+      setSchedule(currentSchedule => ({
+        ...currentSchedule,
+        [selectedDateKey]: newDaySchedule
+      }));
+    }
+  
     localStorage.setItem(lastRunKey, 'true');
-
+  
   }, [currentUser, selectedDate, schedule, setSchedule, settings]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
