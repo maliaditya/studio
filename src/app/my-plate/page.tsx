@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday, subYears } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday, isSameDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -178,79 +178,50 @@ function MyPlatePageContent() {
   }, [currentSlot]);
   
   useEffect(() => {
-    if (!currentUser || !settings.carryForward) return;
-  
+    if (!currentUser || Object.keys(schedule).length === 0) return;
+
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastRun = localStorage.getItem(lastCarryForwardKey);
-  
-    // Only run this logic once per day
+
     if (lastRun === todayKey) {
       return;
     }
-  
-    // Do not run if today's schedule already has entries.
-    if (schedule[todayKey] && Object.values(schedule[todayKey]).flat().length > 0) {
+
+    const todaySchedule = schedule[todayKey];
+    if (todaySchedule && Object.values(todaySchedule).flat().length > 0) {
       localStorage.setItem(lastCarryForwardKey, todayKey);
       return;
-    }
-  
-    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
-  
-    if (!yesterdaysSchedule) {
-      localStorage.setItem(lastCarryForwardKey, todayKey);
-      return;
-    }
-  
-    const routineTasksToCarryOver: Activity[] = [];
-  
-    Object.values(yesterdaysSchedule).forEach(slotActivities => {
-      if (Array.isArray(slotActivities)) {
-        slotActivities.forEach(activity => {
-          if (activity?.isRoutine) {
-            routineTasksToCarryOver.push({
-              ...activity,
-              id: `${activity.type}-${Date.now()}-${Math.random()}`,
-              completed: false,
-              taskIds: activity.taskIds || [], // Ensure taskIds are carried
-            });
-          }
-        });
-      }
-    });
-  
-    if (routineTasksToCarryOver.length > 0) {
-      setSchedule(prevSchedule => {
-        const newTodaySchedule = { ...(prevSchedule[todayKey] || {}) };
-        
-        routineTasksToCarryOver.forEach(task => {
-          const slot = task.slot as keyof DailySchedule;
-          if (!newTodaySchedule[slot]) {
-            newTodaySchedule[slot] = [];
-          }
-          // Avoid adding duplicates if some logic already ran
-          if (!(newTodaySchedule[slot] as Activity[]).some(a => a.details === task.details)) {
-             (newTodaySchedule[slot] as Activity[]).push(task);
-          }
-        });
-  
-        return {
-          ...prevSchedule,
-          [todayKey]: newTodaySchedule
-        };
-      });
-  
-      toast({
-        title: "Routines Carried Over",
-        description: `${routineTasksToCarryOver.length} routine task(s) from yesterday have been added to your agenda.`,
-      });
     }
     
-    // Mark as run for today
+    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+    const yesterdaysSchedule = schedule[yesterdayKey];
+
+    if (yesterdaysSchedule) {
+        const routineTasksToCarry = Object.values(yesterdaysSchedule)
+            .flat()
+            .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
+
+        if (routineTasksToCarry.length > 0) {
+            const newTodaySchedule = { ...schedule[todayKey] };
+            routineTasksToCarry.forEach(task => {
+                const slot = task.slot as keyof DailySchedule;
+                if (!newTodaySchedule[slot]) {
+                    newTodaySchedule[slot] = [];
+                }
+                const newActivity = {
+                    ...task,
+                    id: `${task.type}-${Date.now()}-${Math.random()}`,
+                    completed: false,
+                };
+                (newTodaySchedule[slot] as Activity[]).push(newActivity);
+            });
+            setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
+        }
+    }
+    
     localStorage.setItem(lastCarryForwardKey, todayKey);
-  
-  }, [currentUser, schedule, settings.carryForward, setSchedule, toast]);
+  }, [currentUser, schedule]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
