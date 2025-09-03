@@ -180,46 +180,29 @@ function MyPlatePageContent() {
   useEffect(() => {
     if (!currentUser || !selectedDate) return;
   
-    const today = startOfToday();
-    if (isBefore(selectedDate, today)) return;
+    // Only proceed if today is the selected day and its schedule hasn't been populated yet
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    if (format(selectedDate, 'yyyy-MM-dd') !== todayKey || schedule[todayKey]) {
+      return;
+    }
   
-    const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
-    if (schedule[selectedDateKey]) return; // Don't overwrite existing days
-  
-    const lastRunKey = `lifeos_routine_populate_${currentUser.username}_${selectedDateKey}`;
+    // Prevent re-running this logic multiple times a day
+    const lastRunKey = `lifeos_routine_populate_${currentUser.username}_${todayKey}`;
     if (localStorage.getItem(lastRunKey)) return;
   
-    const dayOfWeek = getDay(selectedDate);
-    let routineTasksToCarry: Activity[] = [];
-  
-    // Find the most recent instance of this day of the week in the past 7 days
-    for (let i = 1; i <= 7; i++) {
-        const pastDate = subDays(selectedDate, i);
-        if (getDay(pastDate) === dayOfWeek) {
-            const pastDateKey = format(pastDate, 'yyyy-MM-dd');
-            const pastSchedule = schedule[pastDateKey];
-            if (pastSchedule) {
-                routineTasksToCarry = Object.values(pastSchedule)
-                    .flat()
-                    .filter((act): act is Activity => !!act && act.isRoutine);
-                if (routineTasksToCarry.length > 0) {
-                    break; // Found the routines, no need to look further back
-                }
-            }
-        }
+    // Find yesterday's routine tasks
+    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+    const yesterdaysSchedule = schedule[yesterdayKey];
+    
+    if (!yesterdaysSchedule) {
+      localStorage.setItem(lastRunKey, todayKey);
+      return;
     }
   
-    // If no routines found from the same weekday, check yesterday as a fallback
-    if (routineTasksToCarry.length === 0) {
-        const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-        const yesterdaysSchedule = schedule[yesterdayKey];
-        if (yesterdaysSchedule) {
-             routineTasksToCarry = Object.values(yesterdaysSchedule)
-                .flat()
-                .filter((act): act is Activity => !!act && act.isRoutine);
-        }
-    }
-  
+    const routineTasksToCarry = Object.values(yesterdaysSchedule)
+      .flat()
+      .filter((act): act is Activity => !!act && act.isRoutine);
+      
     if (routineTasksToCarry.length > 0) {
       const newDaySchedule: DailySchedule = {};
       routineTasksToCarry.forEach(activity => {
@@ -227,23 +210,26 @@ function MyPlatePageContent() {
           ...activity,
           id: `${activity.type}-${Date.now()}-${Math.random()}`,
           completed: false,
-          taskIds: activity.isRoutine ? activity.taskIds : [],
+          // Reset taskIds for non-routine activities to allow re-selection
+          taskIds: activity.isRoutine ? activity.taskIds : [], 
         };
-        if (!newDaySchedule[activity.slot]) {
-          newDaySchedule[activity.slot] = [];
+        
+        const slot = activity.slot as keyof DailySchedule;
+        if (!newDaySchedule[slot]) {
+          newDaySchedule[slot] = [];
         }
-        (newDaySchedule[activity.slot] as Activity[]).push(newActivity);
+        (newDaySchedule[slot] as Activity[]).push(newActivity);
       });
   
       setSchedule(currentSchedule => ({
         ...currentSchedule,
-        [selectedDateKey]: newDaySchedule
+        [todayKey]: newDaySchedule
       }));
     }
+    
+    localStorage.setItem(lastRunKey, todayKey);
   
-    localStorage.setItem(lastRunKey, 'true');
-  
-  }, [currentUser, selectedDate, schedule, setSchedule, settings]);
+  }, [currentUser, selectedDate, schedule, setSchedule]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
