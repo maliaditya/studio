@@ -249,108 +249,19 @@ TruthSection.displayName = 'TruthSection';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-const DailyReviewDialog = () => {
-    const { schedule, activityDurations, currentSlot } = useAuth();
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const todaysSchedule = schedule[todayKey] || {};
-    
-    const slotData = [
-        { name: 'Late Night', time: '12am – 4am' },
-        { name: 'Dawn', time: '4am – 8am' },
-        { name: 'Morning', time: '8am – 12pm' },
-        { name: 'Afternoon', time: '12pm – 4pm' },
-        { name: 'Evening', time: '4pm – 8pm' },
-        { name: 'Night', time: '8pm – 12am' },
-    ];
-    
-    const analysis = useMemo(() => {
-        let totalLogged = 0;
-        const slotAnalyses = slotData.map(slot => {
-            const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-            const loggedTime = activities
-                .filter(a => a.completed)
-                .reduce((sum, a) => sum + (parseInt(activityDurations[a.id]?.replace(' min logged', '') || '0')), 0);
-            
-            totalLogged += loggedTime;
-            const isPast = slotOrder.indexOf(slot.name as keyof DailySchedule) < slotOrder.indexOf(currentSlot as keyof DailySchedule);
-            const isCurrent = slot.name === currentSlot;
-            const wastedTime = isPast ? 240 - loggedTime : 0;
-            const freeTime = isCurrent ? 240 - loggedTime : 0;
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    return totalMinutes;
+};
 
-            let insight = "";
-            if (isPast) {
-                if (loggedTime === 0 && activities.length > 0) insight = "Planned but didn't execute. A missed opportunity.";
-                else if (loggedTime === 0) insight = "4 hours completely gone. How could this time have served your goals?";
-                else insight = `You captured ${loggedTime} min of value. ${wastedTime} min drifted away.`;
-            } else if (isCurrent) {
-                insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
-            } else {
-                insight = "This slot is upcoming. Plan it wisely.";
-            }
-
-            return {
-                ...slot,
-                loggedTime,
-                wastedTime,
-                freeTime,
-                isPast,
-                isCurrent,
-                insight,
-                activities: activities.filter(a => !a.completed).map(a => a.details),
-                completedActivities: activities.filter(a => a.completed).map(a => a.details)
-            };
-        });
-        
-        return {
-            slotAnalyses,
-            totalLogged,
-            totalWasted: slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0),
-        };
-    }, [todaysSchedule, activityDurations, currentSlot]);
-
-    return (
-        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-                <DialogTitle>Daily Review & Analysis</DialogTitle>
-                <DialogDescription>A breakdown of your time usage for today.</DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                <ScrollArea className="h-full pr-4">
-                    <div className="space-y-4">
-                        {analysis.slotAnalyses.map(slot => (
-                            <div key={slot.name}>
-                                <h4 className="font-semibold text-sm">{slot.name} ({slot.time})</h4>
-                                <div className="text-xs p-3 rounded-md bg-muted/50 mt-1 space-y-2">
-                                    <div className="flex justify-between font-medium">
-                                        <span>Logged: <span className="text-green-500">{slot.loggedTime} min</span></span>
-                                        {slot.isPast && <span className="text-red-500">Wasted: {slot.wastedTime} min</span>}
-                                        {slot.isCurrent && <span>Free: {slot.freeTime} min</span>}
-                                    </div>
-                                    {(slot.activities.length > 0 || slot.completedActivities.length > 0) && (
-                                        <div className="pt-2 border-t text-muted-foreground">
-                                            {slot.completedActivities.length > 0 && <p><b>Done:</b> {slot.completedActivities.join(', ')}</p>}
-                                            {slot.activities.length > 0 && <p><b>Planned:</b> {slot.activities.join(', ')}</p>}
-                                        </div>
-                                    )}
-                                    <p className="italic text-muted-foreground pt-2 border-t">👉 {slot.insight}</p>
-                                </div>
-                            </div>
-                        ))}
-                         <Separator className="my-4" />
-                        <div>
-                            <h4 className="font-semibold">🚀 Overall Daily Breakdown</h4>
-                            <div className="text-sm p-3 rounded-md bg-muted/50 mt-1 space-y-2">
-                                <p><b>Logged:</b> {analysis.totalLogged} minutes</p>
-                                <p><b>Wasted:</b> {analysis.totalWasted} minutes</p>
-                                <p className="italic text-muted-foreground pt-2 border-t">👉 Even small, consistent efforts compound into life-changing progress. You have the power to direct your focus.</p>
-                            </div>
-                        </div>
-                    </div>
-                </ScrollArea>
-            </div>
-        </DialogContent>
-    );
-}
 
 export function SmartLoggingPrompt({ 
     promptType, 
@@ -368,6 +279,8 @@ export function SmartLoggingPrompt({
     metaRules,
     habitCards,
     mechanismCards,
+    schedule,
+    activityDurations,
   } = useAuth();
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
@@ -396,6 +309,61 @@ export function SmartLoggingPrompt({
     
     return habitDetails.length > 0 ? habitDetails : null;
   }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
+  
+  const dailyAnalysis = useMemo(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysSchedule = schedule[todayKey] || {};
+
+    const slotAnalyses = slotOrder.map(slotName => {
+        const activities = (todaysSchedule[slotName] as ActivityType[]) || [];
+        const loggedTime = activities
+          .filter(a => a.completed)
+          .reduce((sum, task) => sum + parseDurationToMinutes(activityDurations[task.id]), 0);
+        
+        const plannedTasks = activities.filter(a => !a.completed);
+        
+        const slotEndTime = new Date();
+        const endHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
+        slotEndTime.setHours(endHour, 0, 0, 0);
+        const isPast = new Date() > slotEndTime;
+
+        const wastedTime = isPast ? 240 - loggedTime : 0;
+        const freeTime = !isPast ? 240 - loggedTime : 0;
+        
+        let insight = "";
+        if (isPast) {
+          if (loggedTime === 0 && activities.length > 0) insight = `You didn’t act on your plan. That’s 4 hours of potential lost.`;
+          else if (loggedTime === 0) insight = `4 hours completely gone. Imagine using half that time for your goals.`;
+          else insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away.`;
+        } else if (slotName === currentSlot) {
+          insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
+        } else {
+          insight = "This slot is upcoming. Plan it wisely.";
+        }
+
+        return {
+            name: slotName,
+            time: { 'Late Night': '12am–4am', 'Dawn': '4am–8am', 'Morning': '8am–12pm', 'Afternoon': '12pm–4pm', 'Evening': '4pm–8pm', 'Night': '8pm–12am' }[slotName],
+            plannedTasks: plannedTasks.map(a => a.details).join(', ') || 'None',
+            loggedTime,
+            wastedTime,
+            insight,
+        };
+    });
+
+    const totalLogged = slotAnalyses.reduce((sum, s) => sum + s.loggedTime, 0);
+    const totalWasted = slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0);
+
+    const summaryInsight = `You invested in ${totalLogged} minutes of focused work, but let go of ${totalWasted} minutes. Turning just 1 of those wasted hours into focus daily compounds into 7 hours a week—a massive shift in progress.`;
+
+    return {
+        slotAnalyses,
+        totalLogged,
+        totalWasted,
+        summaryInsight,
+    }
+  }, [schedule, activityDurations, currentSlot]);
+
 
   const prompts = {
     empty: {
@@ -409,8 +377,8 @@ export function SmartLoggingPrompt({
     },
     inactive: {
       icon: <ListChecks className="h-6 w-6 text-blue-500" />,
-      title: "You have tasks scheduled.",
-      description: "Ready to start a focus session and make progress?",
+      title: "Today's Analysis",
+      description: "You have tasks scheduled. Ready to start a focus session?",
        actions: [
         { label: "View Agenda", onClick: () => router.push('/my-plate') },
        ]
@@ -450,25 +418,50 @@ export function SmartLoggingPrompt({
                     <div className="flex-shrink-0">{currentPrompt.icon}</div>
                     <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
                 </div>
-                <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
                 
                 <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
-                    {promptType === 'completed' && activeProjects.length > 0 && (
-                        <div className="w-full">
-                            <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
-                            <div className="flex flex-wrap gap-2">
-                                {activeProjects.map(p => (
-                                    <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
-                                        {p.name}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex-grow min-h-0">
-                      <ScrollArea className="h-full">
+                    <ScrollArea className="h-full max-h-80">
                         <div className="space-y-4 pr-4">
-                          {promptType === 'focus' && focusContext && (
+                            {promptType === 'inactive' ? (
+                                <div className="space-y-4">
+                                    {dailyAnalysis.slotAnalyses.map(slot => (
+                                        <div key={slot.name}>
+                                            <h4 className="font-semibold text-sm">⏳ {slot.name} ({slot.time})</h4>
+                                            <div className="text-xs pl-6 space-y-1 mt-1">
+                                                <p><b className="text-foreground">Planned:</b> {slot.plannedTasks}</p>
+                                                <p><b className="text-foreground">Logged:</b> {slot.loggedTime} min</p>
+                                                <p><b className="text-foreground">Unused/Wasted:</b> {slot.wastedTime} min</p>
+                                                <p className="italic text-muted-foreground/80">👉 {slot.insight}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <Separator />
+                                    <div>
+                                        <h4 className="font-semibold text-sm">📊 Daily Summary</h4>
+                                         <div className="text-xs pl-6 space-y-1 mt-1">
+                                            <p><b className="text-foreground">Total Logged:</b> {dailyAnalysis.totalLogged} min</p>
+                                            <p><b className="text-foreground">Total Wasted/Free:</b> {dailyAnalysis.totalWasted} min</p>
+                                            <p className="italic text-muted-foreground/80">👉 {dailyAnalysis.summaryInsight}</p>
+                                         </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
+                            )}
+
+                            {promptType === 'completed' && activeProjects.length > 0 && (
+                                <div className="w-full">
+                                    <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {activeProjects.map(p => (
+                                            <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
+                                                {p.name}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {promptType === 'focus' && focusContext && (
                               <>
                                   {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
                                       <div key={habit.id} className="space-y-3">
@@ -503,24 +496,15 @@ export function SmartLoggingPrompt({
                                       </div>
                                   ))}
                               </>
-                          )}
+                            )}
                         </div>
-                      </ScrollArea>
-                    </div>
-                    <div className="flex gap-2 w-full flex-shrink-0">
+                    </ScrollArea>
+                    <div className="flex gap-2 w-full flex-shrink-0 pt-2">
                         {currentPrompt.actions.map(action => (
                             <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
                                 {action.label}
                             </Button>
                         ))}
-                        {promptType === 'inactive' && (
-                            <Dialog>
-                                <DialogTrigger asChild>
-                                    <Button size="sm" variant="secondary" className="flex-1">Review Day</Button>
-                                </DialogTrigger>
-                                <DailyReviewDialog />
-                            </Dialog>
-                        )}
                     </div>
                 </div>
             </motion.div>
