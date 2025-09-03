@@ -51,13 +51,13 @@ const formatMinutes = (minutes: number) => {
     return `${mins}m`;
 };
 
-const slotOrder: { name: string; endHour: number }[] = [
-    { name: 'Late Night', endHour: 4 },
-    { name: 'Dawn', endHour: 8 },
-    { name: 'Morning', endHour: 12 },
-    { name: 'Afternoon', endHour: 16 },
-    { name: 'Evening', endHour: 20 },
-    { name: 'Night', endHour: 24 }
+const slotOrder: { name: string; endHour: number, startHour: number }[] = [
+    { name: 'Late Night', endHour: 4, startHour: 0 },
+    { name: 'Dawn', endHour: 8, startHour: 4 },
+    { name: 'Morning', endHour: 12, startHour: 8 },
+    { name: 'Afternoon', endHour: 16, startHour: 12 },
+    { name: 'Evening', endHour: 20, startHour: 16 },
+    { name: 'Night', endHour: 24, startHour: 20 }
 ];
 
 export function ActivityDistributionCard() {
@@ -127,7 +127,9 @@ export function ActivityDistributionCard() {
         let wastedTime = 0;
         let scheduledButNotCompletedTime = 0;
 
-        const currentHour = new Date().getHours();
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
         
         slotOrder.forEach(slot => {
             const activities = (dailySchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
@@ -148,8 +150,11 @@ export function ActivityDistributionCard() {
                 }
             });
 
-            if (currentHour >= slot.endHour) { // Slot has passed
+            if (currentHour >= slot.endHour) { // Slot has fully passed
                 wastedTime += Math.max(0, 240 - loggedInSlot);
+            } else if (currentSlot === slot.name) { // It's the current slot
+                const minutesElapsedInSlot = (currentHour - slot.startHour) * 60 + currentMinute;
+                wastedTime += Math.max(0, minutesElapsedInSlot - loggedInSlot);
             }
         });
         
