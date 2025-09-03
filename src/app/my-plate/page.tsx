@@ -35,7 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -62,7 +62,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
     
     return totalMinutes;
 };
@@ -223,42 +223,38 @@ function MyPlatePageContent() {
     }
 
     setSchedule(currentSchedule => {
-        const newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
-        let tasksAdded = false;
-
+        let newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
         const activitiesFromYesterday = Object.values(yesterdaysSchedule).flat();
-        
+        let tasksWereCarriedOver = false;
+
         activitiesFromYesterday.forEach(activity => {
             if (!activity) return;
 
-            const shouldCarryOver =
-                activity.isRoutine ||
-                (!activity.completed && (
-                    (activity.type === 'essentials' && settings.carryForwardEssentials) ||
-                    (activity.type === 'nutrition' && settings.carryForwardNutrition) ||
-                    (activity.type !== 'essentials' && activity.type !== 'nutrition' && settings.carryForward)
-                ));
+            const isRoutine = !!activity.isRoutine;
+            const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
+            const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
+            const isGeneralIncomplete = !activity.completed && settings.carryForward;
 
+            const shouldCarryOver = isRoutine || isEssential || isNutrition || isGeneralIncomplete;
+            
             if (shouldCarryOver) {
-                const slotName = activity.slot;
-                const todaysSlotActivities = (newTodaySchedule[slotName] as Activity[] | undefined) || [];
-
-                // Prevent carrying over if the same task already exists today (avoids duplicates from multiple runs)
-                if (!todaysSlotActivities.some(a => a.details === activity.details && a.type === activity.type)) {
-                    if (!newTodaySchedule[slotName]) {
-                        newTodaySchedule[slotName] = [];
+                const todaysSlotActivities = (newTodaySchedule[activity.slot] as Activity[] | undefined) || [];
+                const alreadyExistsToday = todaysSlotActivities.some(a => a.details === activity.details && a.type === activity.type);
+                
+                // Only carry over if it's a routine task OR it doesn't already exist today.
+                if (isRoutine || !alreadyExistsToday) {
+                    tasksWereCarriedOver = true;
+                    if (!newTodaySchedule[activity.slot]) {
+                        newTodaySchedule[activity.slot] = [];
                     }
-                    (newTodaySchedule[slotName] as Activity[]).push({
-                        ...activity,
-                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                        completed: false, // ALWAYS reset completion status for the new day
-                    });
-                    tasksAdded = true;
+                    // Give it a new ID to treat it as a new instance for the new day
+                    const newActivity = { ...activity, id: `${activity.type}-${Date.now()}-${Math.random()}`, completed: false };
+                    (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
                 }
             }
         });
 
-        if (tasksAdded) {
+        if (tasksWereCarriedOver) {
             return { ...currentSchedule, [todayStr]: newTodaySchedule };
         }
         
@@ -268,7 +264,6 @@ function MyPlatePageContent() {
     localStorage.setItem(lastCarryForwardKey, todayStr);
     setCarryOverComplete(true);
   }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, settings, carryOverComplete]);
-
   
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
@@ -1237,6 +1232,7 @@ function MyPlatePageContent() {
             initialSelectedIds={editingActivity.activity.taskIds || []}
             onSave={handleSaveTaskSelection}
             pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
+            disabledTaskIds={[]}
             deepWorkDefinitions={deepWorkDefinitions}
             upskillDefinitions={upskillDefinitions}
             setDeepWorkDefinitions={setDeepWorkDefinitions}
