@@ -180,15 +180,23 @@ function MyPlatePageContent() {
   useEffect(() => {
     if (!currentUser || !selectedDate) return;
   
-    const today = startOfToday();
     const dateToProcess = selectedDate;
     const dateToProcessKey = format(dateToProcess, 'yyyy-MM-dd');
-    
+    const today = startOfToday();
+  
     // Only process future or today's dates that don't have a schedule yet
     if (isBefore(dateToProcess, today) || schedule[dateToProcessKey]) {
       return;
     }
   
+    const settingsKey = `lifeos_settings_${currentUser.username}`;
+    const storedSettings = localStorage.getItem(settingsKey);
+    const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+    
+    if (!currentSettings.carryForward && !currentSettings.carryForwardEssentials && !currentSettings.carryForwardNutrition) {
+      return;
+    }
+
     // Look back 7 days to find the schedule for the same day of the week
     const referenceDate = subDays(dateToProcess, 7);
     const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
@@ -200,7 +208,13 @@ function MyPlatePageContent() {
   
     const routineTasksToCarry = Object.values(referenceSchedule)
       .flat()
-      .filter((act): act is Activity => !!act && act.isRoutine);
+      .filter((act): act is Activity => {
+        if (!act) return false;
+        if (act.type === 'essentials' && currentSettings.carryForwardEssentials) return true;
+        if (act.type === 'nutrition' && currentSettings.carryForwardNutrition) return true;
+        if (act.isRoutine && currentSettings.carryForward) return true;
+        return false;
+      });
       
     if (routineTasksToCarry.length > 0) {
       const newDaySchedule: DailySchedule = {};
@@ -209,7 +223,7 @@ function MyPlatePageContent() {
           ...activity,
           id: `${activity.type}-${Date.now()}-${Math.random()}`,
           completed: false,
-          taskIds: activity.isRoutine ? activity.taskIds : [], 
+          taskIds: activity.isRoutine ? activity.taskIds : [], // Only carry over taskIds for routines, not one-offs
         };
         
         const slot = activity.slot as keyof DailySchedule;
@@ -226,6 +240,7 @@ function MyPlatePageContent() {
     }
   
   }, [selectedDate, currentUser, schedule, setSchedule, settings.carryForward, settings.carryForwardEssentials, settings.carryForwardNutrition]);
+  
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
@@ -287,17 +302,24 @@ function MyPlatePageContent() {
                         } else if (activity.duration) {
                             totalMinutes = activity.duration;
                             suffix = ' logged';
+                        } else if (activity.type === 'workout') {
+                            const log = allWorkoutLogs.find(l => l.date === dateKey);
+                            if (log) {
+                                const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
+                                if(workoutExercise) {
+                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                                }
+                            }
+                            suffix = ' logged';
                         } else {
-                            // This part calculates logged time for individual (non-parent) tasks.
                             let logs, durationField;
                             if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
                             else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                            else if (activity.type === 'workout') { logs = allWorkoutLogs; durationField = 'duration'; }
                             
                             if (logs && durationField) {
                                 const loggedDuration = (logs.find(log => log.date === dateKey)
                                   ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField] || 0), 0), 0) || 0);
+                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
                                 
                                 if (loggedDuration > 0) {
                                     totalMinutes = loggedDuration;
@@ -347,7 +369,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
   
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
@@ -888,7 +910,7 @@ function MyPlatePageContent() {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
     const today = startOfToday();
 
-    const processPlan = (plan: any, topicName: string, type: 'product' | 'service') => {
+    const processPlan = (plan: any, topicId: string, topicName: string, type: 'product' | 'service') => {
       if (plan.releases) {
         plan.releases.forEach((release: Release) => {
           try {
@@ -910,14 +932,14 @@ function MyPlatePageContent() {
     if (productizationPlans) {
       Object.entries(productizationPlans).forEach(([projectId, plan]) => {
         const project = projects.find(p => p.id === projectId);
-        processPlan(plan, project?.name || projectId, 'product');
+        processPlan(plan, projectId, project?.name || projectId, 'product');
       });
     }
 
     if (offerizationPlans) {
       Object.entries(offerizationPlans).forEach(([specId, plan]) => {
         const specialization = coreSkills.find(s => s.id === specId);
-        processPlan(plan, specialization?.name || specId, 'service');
+        processPlan(plan, specId, specialization?.name || specId, 'service');
       });
     }
 
