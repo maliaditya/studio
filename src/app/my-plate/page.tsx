@@ -253,21 +253,18 @@ function MyPlatePageContent() {
 
   }, [currentUser, selectedDate, schedule, setSchedule, settings]);
   
-  const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
-
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
-    const calculateTotalEstimate = (def: ExerciseDefinition): number => {
+    const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
         const visited = new Set<string>();
+        
         const definitions = [...deepWorkDefinitions, ...upskillDefinitions];
 
         function recurse(d: ExerciseDefinition) {
             if (visited.has(d.id)) return;
             visited.add(d.id);
+    
             const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
+    
             if (hasChildren) {
                 (d.linkedDeepWorkIds || []).forEach(childId => {
                     const childDef = definitions.find(c => c.id === childId);
@@ -277,13 +274,20 @@ function MyPlatePageContent() {
                     const childDef = definitions.find(c => c.id === childId);
                     if (childDef) recurse(childDef);
                 });
-            } else {
+            }
+            else {
                 total += d.estimatedDuration || 0;
             }
         }
         recurse(def);
         return total;
-    };
+    }, [deepWorkDefinitions, upskillDefinitions]);
+
+    const activityDurations = useMemo(() => {
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
+
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
 
     for (const dateKey in schedule) {
         const daySchedule = schedule[dateKey];
@@ -297,21 +301,10 @@ function MyPlatePageContent() {
 
                     let totalMinutes = 0;
                     let suffix = '';
-
+                    
                     if (activity.completed) {
-                        if (activity.type === 'workout') {
-                            const log = allWorkoutLogs.find(l => l.date === dateKey);
-                            if (log) {
-                                const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
-                                if (workoutExercise) {
-                                  // The duration is stored in reps for workouts in this system
-                                  totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-                                }
-                            }
-                        } else {
-                            // This correctly handles other task types by using their logged duration.
-                            totalMinutes = activity.duration || 0;
-                        }
+                        // Use the duration property logged by the focus timer for all completed tasks.
+                        totalMinutes = activity.duration || 0;
                         suffix = ' logged';
                     } else {
                         // For non-completed tasks, calculate estimated duration
@@ -335,7 +328,7 @@ function MyPlatePageContent() {
                               break;
                             case 'planning': case 'tracking': totalMinutes = 30; break;
                             case 'lead-generation': totalMinutes = 45; break;
-                            case 'essentials': case 'interrupt': totalMinutes = activity.duration || 0; break;
+                            case 'essentials': case 'interrupt': case 'distraction': totalMinutes = activity.duration || 0; break;
                             default: totalMinutes = 0;
                         }
                     }
@@ -350,7 +343,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -732,7 +725,7 @@ function MyPlatePageContent() {
   const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
     const dailyLog = logs.find(log => log.date === dateKey);
     if (!dailyLog) return 0;
-    const durationField = taskType === 'deepwork' ? 'weight' : 'reps';
+    const durationField = taskType === 'deepwork' ? 'weight' : 'duration';
     return dailyLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
   }, []);
 
@@ -817,7 +810,7 @@ function MyPlatePageContent() {
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
                 if (allUpskillTaskIds.has(ex.definitionId)) {
-                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.duration || 0), 0);
                 }
             });
         });
@@ -825,7 +818,7 @@ function MyPlatePageContent() {
         allDeepWorkLogs.forEach(log => {
             log.exercises.forEach(ex => {
                 if (allDeepWorkTaskIds.has(ex.definitionId)) {
-                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.duration || 0), 0);
                 }
             });
         });
@@ -984,7 +977,7 @@ function MyPlatePageContent() {
                 if (!totals[mappedName]) {
                     totals[mappedName] = { time: 0, activities: [] };
                 }
-                const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                const duration = activity.duration || 0;
                 totals[mappedName].time += duration;
                 totals[mappedName].activities.push({ name: activity.details, duration });
             }
@@ -1361,3 +1354,4 @@ export default function MyPlatePage() {
     
 
     
+

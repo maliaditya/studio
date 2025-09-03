@@ -171,7 +171,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, openRuleDetailPopup, patterns, metaRules, handleLinkHabit } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState('');
@@ -211,45 +211,6 @@ export function TodaysScheduleCard({
         return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
     });
   }, [todaysSchedule, showCurrentSlotOnly, currentSlot]);
-
-  const timeSummary = React.useMemo(() => {
-    const dailyActivities = Object.values(todaysSchedule).flat();
-    if (dailyActivities.length === 0) {
-        return { completed: 0, total: 0 };
-    }
-
-    const parseDurationToHours = (activity: Activity): number => {
-        let totalMinutes = 0;
-        if (activity.completed && activity.duration) {
-            totalMinutes = activity.duration;
-        } else {
-            const durationStr = activityDurations[activity.id];
-            if (!durationStr || typeof durationStr !== 'string') return 0;
-            if (/^\d+$/.test(durationStr.trim())) {
-                totalMinutes = parseInt(durationStr.trim(), 10);
-            } else {
-                const hourMatch = durationStr.match(/(\d+)\s*h/);
-                if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-                const minMatch = durationStr.match(/(\d+)\s*m/);
-                if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-            }
-        }
-        return totalMinutes / 60;
-    };
-
-    const totalScheduledHours = dailyActivities.reduce((sum, activity) => {
-        return sum + parseDurationToHours(activity);
-    }, 0);
-
-    const completedHours = dailyActivities
-        .filter(activity => activity.completed)
-        .reduce((sum, activity) => {
-            return sum + parseDurationToHours(activity);
-        }, 0);
-
-    return { completed: completedHours, total: totalScheduledHours };
-  }, [todaysSchedule, activityDurations]);
-
 
   const pendingTasks = React.useMemo(() => {
     const yesterday = addDays(date, -1);
@@ -339,11 +300,6 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Agenda</CardTitle>
                 <div className="flex items-center">
-                    {timeSummary.total > 0 && (
-                        <span className="font-mono text-sm font-medium text-muted-foreground">
-                            {timeSummary.completed.toFixed(1)} / {timeSummary.total.toFixed(1)}h
-                        </span>
-                    )}
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
                         <Focus className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
                     </Button>
@@ -472,5 +428,6 @@ export function TodaysScheduleCard({
     
 
     
+
 
 
