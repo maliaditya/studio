@@ -283,6 +283,8 @@ export function SmartLoggingPrompt({
     schedule,
     activityDurations,
   } = useAuth();
+  
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
@@ -315,8 +317,7 @@ export function SmartLoggingPrompt({
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
     const slotTimes: Record<string, string> = { 'Late Night': '12am–4am', 'Dawn': '4am–8am', 'Morning': '8am–12pm', 'Afternoon': '12pm–4pm', 'Evening': '4pm–8pm', 'Night': '8pm–12am' };
-    const now = new Date();
-
+    
     const slotAnalyses = slotOrder.map(slotName => {
         const activities = (todaysSchedule[slotName] as ActivityType[]) || [];
         const loggedTime = activities
@@ -326,6 +327,7 @@ export function SmartLoggingPrompt({
                 return sum + duration;
             }, 0);
         
+        const now = new Date();
         const slotEndHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
         const slotEndTime = new Date();
         slotEndTime.setHours(slotEndHour, 0, 0, 0);
@@ -338,7 +340,7 @@ export function SmartLoggingPrompt({
         
         let insight = "";
         if (isPast) {
-            insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away.`;
+            insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away. Imagine if you had used even 2 of those hours for sleep or upskill—you’d have felt fresher and moved closer to your goals.`;
         } else if (slotName === currentSlot) {
             insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
         } else {
@@ -429,9 +431,9 @@ export function SmartLoggingPrompt({
                   <p className="font-semibold text-xs text-foreground">Planned:</p>
                   <p className="text-xs text-muted-foreground">{item.plannedTasks}</p>
               </div>
-              <p className="italic text-xs text-muted-foreground/90 pt-2 border-t">
-                  "{item.insight}"
-              </p>
+              <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                  {item.insight}
+              </blockquote>
             </CardContent>
           </Card>
         );
@@ -453,9 +455,9 @@ export function SmartLoggingPrompt({
                             <p className="text-xs text-muted-foreground">Total Minutes Wasted</p>
                         </div>
                     </div>
-                     <p className="italic text-xs text-muted-foreground/90 pt-2 border-t">
-                        "{item.insight}"
-                    </p>
+                     <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                        {item.insight}
+                    </blockquote>
                 </CardContent>
             </Card>
         )
