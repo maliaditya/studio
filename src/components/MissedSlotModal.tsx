@@ -46,7 +46,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
 export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModalProps) {
   const { isOpen, slotName, allTasks, incompleteTasks } = state;
-  const { pillarEquations, activityDurations } = useAuth();
+  const { pillarEquations, activityDurations, setMissedSlotReviews } = useAuth();
   
   const [reason, setReason] = useState('');
   const [followedRuleIds, setFollowedRuleIds] = useState<string[]>([]);
@@ -123,14 +123,13 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
   };
   
   const handleSnooze = () => {
-    const { setMissedSlotReviews } = useAuth();
     const today = format(new Date(), 'yyyy-MM-dd');
     const reviewKey = `${today}-${slotName}`;
 
     setMissedSlotReviews(prev => ({
         ...prev,
         [reviewKey]: {
-            ...prev[reviewKey],
+            ...(prev[reviewKey] || { id: reviewKey, reason: '', followedRuleIds: [] }),
             snoozedUntil: Date.now() + 5 * 60 * 1000 // 5 minutes from now
         }
     }));
