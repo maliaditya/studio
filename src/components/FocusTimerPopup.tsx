@@ -213,27 +213,29 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, activeFocusSession]);
   
   const handleSubTaskComplete = useCallback(() => {
-    if (!activeSubTask || !activeFocusSession?.subTaskStartTime) return;
+    if (!activeSubTask || !activeFocusSession) return;
   
-    // Log time for the completed sub-task
+    // Log time for the completed sub-task, even if finished early
     if ('completed' in activeSubTask) {
       updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
     } else {
-      const completionTime = Date.now();
-      const durationMs = completionTime - activeFocusSession.subTaskStartTime;
+      // Calculate elapsed time for the current sub-task and log it
+      const startTime = activeFocusSession.subTaskStartTime || activeFocusSession.startTime;
+      const durationMs = Date.now() - startTime;
       const durationMinutes = Math.max(1, Math.floor(durationMs / 60000));
       logSubTaskTime(activeSubTask.id, durationMinutes);
       setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
     }
   
     // Find the next task in the original list
-    const currentTaskIndex = subTasks.findIndex(t => t.id === activeSubTask.id);
-    const nextTask = subTasks.slice(currentTaskIndex + 1).find(st => !isSubTaskComplete(st));
+    // Crucially, we need to find the next task that is *not yet complete* in this session
+    const nextTask = subTasks.find(st => st.id !== activeSubTask.id && !isSubTaskComplete(st));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
     } else {
-      handleStop(true); // All tasks are now complete
+      // No more pending tasks, the objective is complete
+      handleStop(true);
     }
   }, [
     activeSubTask,
