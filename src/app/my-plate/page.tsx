@@ -229,11 +229,12 @@ function MyPlatePageContent() {
         Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
             if (Array.isArray(activities) && activities.length > 0) {
                 const activitiesToCarry = activities.filter(activity => {
-                    // This is the fix: Always carry over routine tasks.
+                    if (!activity) return false;
+                    
                     if (activity.isRoutine) return true;
                     
+                    // Standard carry-forward logic for non-routine tasks
                     if (activity.completed) return false;
-                    
                     if (activity.type === 'essentials') return settings.carryForwardEssentials;
                     if (activity.type === 'nutrition') return settings.carryForwardNutrition;
                     return settings.carryForward;
@@ -323,7 +324,7 @@ function MyPlatePageContent() {
                         const mainDefId = activity.taskIds?.[0]?.split('-')[0];
                         const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
                         
-                        if (mainDef && (mainDef.linkedDeepWorkIds || mainDef.linkedUpskillIds)) {
+                        if (mainDef && ((mainDef.linkedDeepWorkIds?.length ?? 0) > 0 || (mainDef.linkedUpskillIds?.length ?? 0) > 0)) {
                              const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
                              totalMinutes = leafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
                              suffix = ' logged';
@@ -335,7 +336,7 @@ function MyPlatePageContent() {
                             if (log) {
                                 const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
                                 if(workoutExercise) {
-                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0) * 1.5;
                                 }
                             }
                             suffix = ' logged';
@@ -1397,6 +1398,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
