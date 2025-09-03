@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -192,70 +192,89 @@ function MyPlatePageContent() {
   }, [currentSlot]);
   
   useEffect(() => {
-    if (!currentUser || !selectedDate || !isToday(selectedDate)) {
-        return;
-    }
+    if (!currentUser || !selectedDate) return;
 
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const lastRunKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastRunDate = localStorage.getItem(lastRunKey);
+    const today = startOfToday();
+    const isFutureDate = isAfter(selectedDate, today);
+    const isTodayDate = isToday(selectedDate);
+    const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
     
-    if (lastRunDate === todayKey) {
+    // Don't modify past dates or days that already have activities
+    if (isBefore(selectedDate, today) || schedule[selectedDateKey]) {
         return;
     }
 
-    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
-
-    if (!yesterdaysSchedule) {
-        localStorage.setItem(lastRunKey, todayKey);
+    const lastRunKey = `lifeos_routine_populate_${currentUser.username}_${selectedDateKey}`;
+    if (localStorage.getItem(lastRunKey)) {
         return;
     }
 
-    const activitiesToCarryOver = Object.values(yesterdaysSchedule).flat().filter((activity): activity is Activity => {
-        if (!activity) return false;
-        
-        // Always carry over routine tasks, regardless of completion status.
-        if (activity.isRoutine) return true;
-        
-        // Carry over other tasks based on settings, only if they are incomplete.
-        if (activity.completed) return false;
-        if (activity.type === 'essentials' && settings.carryForwardEssentials) return true;
-        if (activity.type === 'nutrition' && settings.carryForwardNutrition) return true;
-        if (settings.carryForward) return true;
+    let routineTasksToCarry: Activity[] = [];
+    let sourceDateKey: string | null = null;
+    let daysToCheck = 30; // Look back up to 30 days for a routine template
+    
+    // Find the most recent previous day with routine tasks defined
+    for (let i = 1; i <= daysToCheck; i++) {
+        const checkDate = subDays(selectedDate, i);
+        const checkDateKey = format(checkDate, 'yyyy-MM-dd');
+        const daySchedule = schedule[checkDateKey];
+        if (daySchedule) {
+            const routinesInDay = Object.values(daySchedule).flat().filter((act): act is Activity => !!act && act.isRoutine);
+            if (routinesInDay.length > 0) {
+                sourceDateKey = checkDateKey;
+                routineTasksToCarry = routinesInDay;
+                break;
+            }
+        }
+    }
+    
+    // If today is the selected date, also carry over incomplete non-routine tasks from yesterday
+    if (isTodayDate) {
+      const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+      const yesterdaysSchedule = schedule[yesterdayKey];
+      if (yesterdaysSchedule) {
+          const incompleteTasks = Object.values(yesterdaysSchedule).flat().filter((activity): activity is Activity => {
+              if (!activity || activity.isRoutine) return false;
+              if (activity.completed) return false;
+              if (activity.type === 'essentials' && settings.carryForwardEssentials) return true;
+              if (activity.type === 'nutrition' && settings.carryForwardNutrition) return true;
+              if (settings.carryForward) return true;
+              return false;
+          });
+          // Add incomplete tasks, but don't overwrite routines if found from a different source
+          incompleteTasks.forEach(task => {
+            if (!routineTasksToCarry.some(rt => rt.details === task.details && rt.type === task.type)) {
+              routineTasksToCarry.push(task);
+            }
+          });
+      }
+    }
 
-        return false;
-    });
-
-    if (activitiesToCarryOver.length > 0) {
-        setSchedule(currentSchedule => {
-            const newTodaySchedule = { ...(currentSchedule[todayKey] || {}) };
-            const todaysActivities = Object.values(newTodaySchedule).flat();
-
-            activitiesToCarryOver.forEach(activity => {
-                const alreadyExists = todaysActivities.some(
-                    todayAct => todayAct.details === activity.details && todayAct.type === activity.type && todayAct.slot === activity.slot
-                );
-
-                if (!alreadyExists) {
-                    const newActivity: Activity = { 
-                        ...activity, 
-                        id: `${activity.type}-${Date.now()}-${Math.random()}`, 
-                        completed: false 
-                    };
-                    
-                    if (!newTodaySchedule[activity.slot]) {
-                        newTodaySchedule[activity.slot] = [];
-                    }
-                    (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
-                }
-            });
-
-            return { ...currentSchedule, [todayKey]: newTodaySchedule };
+    if (routineTasksToCarry.length > 0) {
+        const newDaySchedule: DailySchedule = {};
+        routineTasksToCarry.forEach(activity => {
+            const newActivity: Activity = { 
+                ...activity, 
+                id: `${activity.type}-${Date.now()}-${Math.random()}`, 
+                completed: false,
+                // For non-routine tasks, reset taskIds to force re-selection
+                taskIds: activity.isRoutine ? activity.taskIds : []
+            };
+            
+            if (!newDaySchedule[activity.slot]) {
+                newDaySchedule[activity.slot] = [];
+            }
+            (newDaySchedule[activity.slot] as Activity[]).push(newActivity);
         });
+
+        setSchedule(currentSchedule => ({
+            ...currentSchedule,
+            [selectedDateKey]: newDaySchedule
+        }));
     }
 
-    localStorage.setItem(lastRunKey, todayKey);
+    localStorage.setItem(lastRunKey, 'true');
+
   }, [currentUser, selectedDate, schedule, setSchedule, settings]);
   
   const activityDurations = useMemo(() => {
@@ -1365,3 +1384,4 @@ export default function MyPlatePage() {
 
     
 
+    
