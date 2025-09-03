@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide, Expand } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -287,7 +287,7 @@ function MyPlatePageContent() {
 
                     let totalMinutes = 0;
                     let suffix = '';
-
+                    
                     if (activity.completed) {
                         const mainDefId = activity.taskIds?.[0]?.split('-')[0];
                         const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
@@ -1147,8 +1147,12 @@ function MyPlatePageContent() {
                     />
                 ) : (
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
+                             <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
+                                <Expand className="h-4 w-4" />
+                                <span className="sr-only">Open Time Allocation in Modal</span>
+                            </Button>
                         </CardHeader>
                         <CardContent>
                             <TimeAllocationChart timeAllocationData={timeAllocationData} />
