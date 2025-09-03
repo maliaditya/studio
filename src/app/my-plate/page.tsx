@@ -177,51 +177,53 @@ function MyPlatePageContent() {
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
   
+  const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !currentUser, [schedule, currentUser]);
+  
   useEffect(() => {
-    if (!currentUser || Object.keys(schedule).length === 0) return;
-
+    if (!currentUser || !isScheduleLoaded) return;
+  
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastRun = localStorage.getItem(lastCarryForwardKey);
-
+  
     if (lastRun === todayKey) {
-      return;
+      return; // Already ran today
     }
-
-    const todaySchedule = schedule[todayKey];
-    if (todaySchedule && Object.values(todaySchedule).flat().length > 0) {
+  
+    const todaySchedule = schedule[todayKey] || {};
+    if (Object.values(todaySchedule).flat().length > 0) {
       localStorage.setItem(lastCarryForwardKey, todayKey);
-      return;
+      return; // Today already has tasks, don't carry over
     }
-    
+  
     const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
-
+  
     if (yesterdaysSchedule) {
-        const routineTasksToCarry = Object.values(yesterdaysSchedule)
-            .flat()
-            .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
-
-        if (routineTasksToCarry.length > 0) {
-            const newTodaySchedule = { ...schedule[todayKey] };
-            routineTasksToCarry.forEach(task => {
-                const slot = task.slot as keyof DailySchedule;
-                if (!newTodaySchedule[slot]) {
-                    newTodaySchedule[slot] = [];
-                }
-                const newActivity = {
-                    ...task,
-                    id: `${task.type}-${Date.now()}-${Math.random()}`,
-                    completed: false,
-                };
-                (newTodaySchedule[slot] as Activity[]).push(newActivity);
-            });
-            setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
-        }
+      const routineTasksToCarry = Object.values(yesterdaysSchedule)
+        .flat()
+        .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
+  
+      if (routineTasksToCarry.length > 0) {
+        const newTodaySchedule: DailySchedule = {};
+        routineTasksToCarry.forEach(task => {
+          const slot = task.slot as keyof DailySchedule;
+          if (!newTodaySchedule[slot]) {
+            newTodaySchedule[slot] = [];
+          }
+          (newTodaySchedule[slot] as Activity[]).push({
+            ...task,
+            id: `${task.type}-${Date.now()}-${Math.random()}`,
+            completed: false, // Always reset completion status
+            taskIds: [], // Start with empty task IDs for non-routine carry over
+          });
+        });
+        setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
+      }
     }
-    
+  
     localStorage.setItem(lastCarryForwardKey, todayKey);
-  }, [currentUser, schedule, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -1405,4 +1407,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
