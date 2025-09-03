@@ -193,24 +193,16 @@ function MyPlatePageContent() {
     if (localStorage.getItem(lastRunKey)) {
         return;
     }
-
-    let routineTasksToCarry: Activity[] = [];
-    let sourceDateKey: string | null = null;
-    let daysToCheck = 30; // Look back up to 30 days for a routine template
     
-    // Find the most recent previous day with routine tasks defined
-    for (let i = 1; i <= daysToCheck; i++) {
-        const checkDate = subDays(selectedDate, i);
-        const checkDateKey = format(checkDate, 'yyyy-MM-dd');
-        const daySchedule = schedule[checkDateKey];
-        if (daySchedule) {
-            const routinesInDay = Object.values(daySchedule).flat().filter((act): act is Activity => !!act && act.isRoutine);
-            if (routinesInDay.length > 0) {
-                sourceDateKey = checkDateKey;
-                routineTasksToCarry = routinesInDay;
-                break;
-            }
-        }
+    // Check yesterday for routine tasks to carry forward.
+    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+    const yesterdaysSchedule = schedule[yesterdayKey];
+    let routineTasksToCarry: Activity[] = [];
+
+    if (yesterdaysSchedule) {
+        routineTasksToCarry = Object.values(yesterdaysSchedule)
+            .flat()
+            .filter((act): act is Activity => !!act && act.isRoutine);
     }
     
     if (routineTasksToCarry.length > 0) {
@@ -220,7 +212,7 @@ function MyPlatePageContent() {
                 ...activity, 
                 id: `${activity.type}-${Date.now()}-${Math.random()}`, 
                 completed: false,
-                taskIds: activity.isRoutine ? activity.taskIds : []
+                taskIds: activity.isRoutine ? activity.taskIds : [] // Keep taskIds if it's a routine
             };
             
             if (!newDaySchedule[activity.slot]) {
