@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -14,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, addDays, parseISO, isBefore } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -157,17 +158,15 @@ interface TimeSlotsProps {
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
     if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-    // Handle "30" as "30m"
     if (/^\d+$/.test(durationStr.trim())) {
         return parseInt(durationStr.trim(), 10);
     }
-
+    const durationWithoutLogged = durationStr.replace(/logged/i, '').trim();
     let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    const hourMatch = durationWithoutLogged.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    const minMatch = durationWithoutLogged.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
     
     return totalMinutes;
 };
@@ -294,7 +293,7 @@ export function TimeSlots({
           .filter(act => act.completed)
           .reduce((sum, act) => {
               let duration = 0;
-              if (act.type === 'essentials' || act.type === 'interrupt') {
+              if (act.type === 'essentials' || act.type === 'interrupt' || act.type === 'distraction') {
                   duration = act.duration || 0;
               } else {
                   duration = parseDurationToMinutes(activityDurations[act.id]);
@@ -375,7 +374,11 @@ export function TimeSlots({
                               }
                             </button>
                             <div className="flex-grow min-w-0">
-                              <p className={cn("font-semibold text-foreground", activity.completed && "line-through")}>
+                              <p className={cn(
+                                  "font-semibold text-foreground", 
+                                  activity.completed && "line-through",
+                                  activity.type === 'distraction' && activity.duration && activity.duration > 30 && "text-red-500"
+                              )}>
                                 {displayDetails}
                               </p>
                               <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
@@ -477,7 +480,9 @@ export function TimeSlots({
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between items-center">
                     <p className="text-xs text-muted-foreground">
-                        {completedMinutes > 0 ? `${Math.round(completedMinutes)} min completed` : `${SLOT_CAPACITY_MINUTES} min free`}
+                        {currentSlot === slot.name || isBefore(parseISO(format(new Date(), 'yyyy-MM-dd') + 'T' + slot.time.split(' - ')[0]), new Date()) 
+                          ? `${SLOT_CAPACITY_MINUTES - completedMinutes} min wasted`
+                          : `${SLOT_CAPACITY_MINUTES - completedMinutes} min free`}
                     </p>
                     <Popover>
                     <PopoverTrigger asChild>
