@@ -169,7 +169,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationWithoutLogged.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationWithoutLogged.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
     
     return totalMinutes;
 };
@@ -200,22 +200,24 @@ export function TimeSlots({
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
     setSchedule(prev => {
+        const dateKey = format(date, 'yyyy-MM-dd');
         const newSchedule = { ...prev };
-        for (const dateKey in newSchedule) {
-            const day = newSchedule[dateKey];
-            if (day[slotName] && Array.isArray(day[slotName])) {
-                const activities = day[slotName] as Activity[];
-                const activityIndex = activities.findIndex(a => a.id === activityId);
-                if (activityIndex > -1) {
-                    const updatedActivities = [...activities];
-                    updatedActivities[activityIndex] = { ...updatedActivities[activityIndex], isRoutine: !updatedActivities[activityIndex].isRoutine };
-                    newSchedule[dateKey] = { ...day, [slotName]: updatedActivities };
+        const daySchedule = { ...newSchedule[dateKey] };
+        
+        if (daySchedule[slotName] && Array.isArray(daySchedule[slotName])) {
+            const activities = daySchedule[slotName] as Activity[];
+            const updatedActivities = activities.map(act => {
+                if (act.id === activityId) {
+                    return { ...act, isRoutine: !act.isRoutine };
                 }
-            }
+                return act;
+            });
+            daySchedule[slotName] = updatedActivities;
+            newSchedule[dateKey] = daySchedule;
         }
         return newSchedule;
     });
-  };
+};
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
     linkHabitFromContext(activityId, habitId, true);
@@ -563,4 +565,5 @@ export function TimeSlots({
 
     
     
+
 
