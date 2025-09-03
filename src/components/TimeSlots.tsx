@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -15,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, parseISO, isBefore } from 'date-fns';
+import { format, addDays, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -273,9 +272,9 @@ export function TimeSlots({
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
         const slotData = slotDurations[slot.name] || { logged: 0, total: 0 };
-        const { logged: loggedTime, total: totalTime } = slotData;
+        const { logged: loggedTime } = slotData;
         const freeTime = 240 - loggedTime;
-        const progress = totalTime > 0 ? (loggedTime / 240) * 100 : 0;
+        const progress = (loggedTime / 240) * 100;
         
         const reviewKey = `${format(date, 'yyyy-MM-dd')}-${slot.name}`;
         const review = missedSlotReviews[reviewKey];
@@ -291,6 +290,8 @@ export function TimeSlots({
         const now = new Date();
         const todayKey = format(now, 'yyyy-MM-dd');
         const selectedDateKey = format(date, 'yyyy-MM-dd');
+        const isPastDay = isBefore(startOfDay(date), startOfDay(now));
+        const isPastSlot = isPastDay || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
         
         return (
           <Card
@@ -457,7 +458,7 @@ export function TimeSlots({
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{loggedTime} min logged</span>
-                    <span>{freeTime} min free</span>
+                    <span>{freeTime} min {isPastSlot ? 'wasted' : 'free'}</span>
                 </div>
                 <div className="flex justify-end items-center">
                     <Popover>
