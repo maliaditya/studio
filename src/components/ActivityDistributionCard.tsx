@@ -143,7 +143,7 @@ export function ActivityDistributionCard() {
 
     return (
         <motion.div
-            className="fixed bottom-4 left-4 z-50 w-full max-w-xs"
+            className="fixed bottom-20 left-4 z-50 w-full max-w-xs"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
