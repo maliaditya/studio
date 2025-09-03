@@ -86,7 +86,7 @@ export function ActivityDistributionCard() {
         switch (activity.type) {
           case 'upskill':
             logs = allUpskillLogs;
-            durationField = 'reps';
+            durationField = 'weight'; // Corrected: duration is stored in 'weight' for upskill
             break;
           case 'deepwork':
           case 'branding':
@@ -150,9 +150,9 @@ export function ActivityDistributionCard() {
                 }
             });
 
-            if (currentHour >= slot.endHour) { // Slot has fully passed
+            if (currentHour >= slot.endHour) {
                 wastedTime += Math.max(0, 240 - loggedInSlot);
-            } else if (currentSlot === slot.name) { // It's the current slot
+            } else if (currentSlot === slot.name) {
                 const minutesElapsedInSlot = (currentHour - slot.startHour) * 60 + currentMinute;
                 wastedTime += Math.max(0, minutesElapsedInSlot - loggedInSlot);
             }
