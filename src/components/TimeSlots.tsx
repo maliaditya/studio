@@ -155,25 +155,6 @@ interface TimeSlotsProps {
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
 }
 
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-    const durationWithoutLogged = durationStr.replace(/logged/i, '').trim();
-
-    if (/^\d+$/.test(durationWithoutLogged)) {
-        return parseInt(durationWithoutLogged, 10);
-    }
-    
-    let totalMinutes = 0;
-    const hourMatch = durationWithoutLogged.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationWithoutLogged.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
-    
-    return totalMinutes;
-};
-
-
 export function TimeSlots({
   date,
   schedule,
@@ -185,8 +166,7 @@ export function TimeSlots({
   onActivityClick,
 }: TimeSlotsProps) {
 
-  const { activityDurations, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
-  const SLOT_CAPACITY_MINUTES = 240;
+  const { setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
   
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -289,19 +269,6 @@ export function TimeSlots({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
-        const completedMinutes = activities
-          .filter(act => act.completed)
-          .reduce((sum, act) => {
-              let duration = 0;
-              if (act.type === 'essentials' || act.type === 'interrupt' || act.type === 'distraction') {
-                  duration = act.duration || 0;
-              } else {
-                  duration = parseDurationToMinutes(activityDurations[act.id]);
-              }
-              return sum + duration;
-          }, 0);
-
-        const progress = Math.min(100, (completedMinutes / SLOT_CAPACITY_MINUTES) * 100);
         
         const reviewKey = `${format(date, 'yyyy-MM-dd')}-${slot.name}`;
         const review = missedSlotReviews[reviewKey];
@@ -317,8 +284,7 @@ export function TimeSlots({
         const now = new Date();
         const todayKey = format(now, 'yyyy-MM-dd');
         const selectedDateKey = format(date, 'yyyy-MM-dd');
-        const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
-
+        
         return (
           <Card
             key={slot.name}
@@ -388,7 +354,6 @@ export function TimeSlots({
                               </p>
                               <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
                                 <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
-                                {activityDurations[activity.id] && <span className="font-mono">({activityDurations[activity.id]})</span>}
                               </div>
                               {linkedHabit && (
                                 <div className="min-w-0">
@@ -482,13 +447,7 @@ export function TimeSlots({
                 )}
               </div>
               <div className="flex-shrink-0 mt-2 space-y-2">
-                <Progress value={progress} className="h-2" />
-                <div className="flex justify-between items-center">
-                    <p className="text-xs text-muted-foreground">
-                       {isPastSlot
-                          ? `${SLOT_CAPACITY_MINUTES - completedMinutes} min wasted`
-                          : `${SLOT_CAPACITY_MINUTES - completedMinutes} min free`}
-                    </p>
+                <div className="flex justify-end items-center">
                     <Popover>
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
@@ -561,11 +520,3 @@ export function TimeSlots({
     </div>
   );
 }
-
-    
-    
-
-
-
-
-    
