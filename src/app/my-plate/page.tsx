@@ -287,35 +287,24 @@ function MyPlatePageContent() {
                         
                         if (activity.completed) {
                             suffix = ' logged';
-                            // For completed tasks, calculate from logs if needed
-                            switch(activity.type) {
-                                case 'workout':
-                                    const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
-                                    if (workoutLog) {
-                                        totalMinutes = workoutLog.exercises
-                                            .filter(ex => activity.taskIds?.includes(ex.id))
-                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration ?? 1), 0), 0);
-                                    }
-                                    break;
-                                case 'upskill':
-                                    const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
-                                    if (upskillLog) {
-                                        totalMinutes = upskillLog.exercises
-                                            .filter(ex => activity.taskIds?.includes(ex.id))
-                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0);
-                                    }
-                                    break;
-                                case 'deepwork':
-                                    const deepWorkLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                                    if (deepWorkLog) {
-                                        totalMinutes = deepWorkLog.exercises
-                                            .filter(ex => activity.taskIds?.includes(ex.id))
-                                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0);
-                                    }
-                                    break;
-                                default:
-                                    totalMinutes = activity.duration || 0;
-                                    break;
+                            // Logic for completed tasks
+                            if (activity.type === 'workout') {
+                                const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
+                                totalMinutes = workoutLog?.exercises
+                                  .filter(ex => activity.taskIds?.includes(ex.id))
+                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration ?? 0), 0), 0) || 0;
+                            } else if (activity.type === 'upskill') {
+                                const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
+                                totalMinutes = upskillLog?.exercises
+                                  .filter(ex => activity.taskIds?.includes(ex.id))
+                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
+                            } else if (activity.type === 'deepwork') {
+                                const deepWorkLog = allDeepWorkLogs.find(log => log.date === dateKey);
+                                totalMinutes = deepWorkLog?.exercises
+                                  .filter(ex => activity.taskIds?.includes(ex.id))
+                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
+                            } else {
+                                totalMinutes = activity.duration || 0;
                             }
                         } else {
                             // For non-completed tasks, use estimates
@@ -355,6 +344,35 @@ function MyPlatePageContent() {
         }
         return newDurations;
     }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
+
+    const slotDurations = useMemo(() => {
+        const durations: Record<string, { logged: number; total: number }> = {};
+        if (!schedule || !selectedDate) return durations;
+    
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const daySchedule = schedule[dateKey];
+        if (!daySchedule) return durations;
+    
+        for (const slotName of slotOrder) {
+            let loggedTime = 0;
+            let totalTime = 0;
+    
+            const activities = (daySchedule as any)[slotName] || [];
+            if (Array.isArray(activities)) {
+                for (const activity of activities) {
+                    const durationStr = activityDurations[activity.id] || '0m';
+                    const minutes = parseInt(durationStr.replace(/[^\d]/g, ''), 10) || 0;
+                    
+                    totalTime += minutes;
+                    if (activity.completed) {
+                        loggedTime += minutes;
+                    }
+                }
+            }
+            durations[slotName] = { logged: loggedTime, total: totalTime };
+        }
+        return durations;
+    }, [schedule, selectedDate, activityDurations]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -736,7 +754,7 @@ function MyPlatePageContent() {
   const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
     const dailyLog = logs.find(log => log.date === dateKey);
     if (!dailyLog) return 0;
-    const durationField = taskType === 'deepwork' ? 'weight' : 'duration';
+    const durationField = taskType === 'deepwork' ? 'weight' : 'reps';
     return dailyLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
   }, []);
 
@@ -1152,6 +1170,7 @@ function MyPlatePageContent() {
               onRemoveActivity={handleRemoveActivity}
               onToggleComplete={handleToggleComplete}
               onActivityClick={handleActivityClick}
+              slotDurations={slotDurations}
             />
           </CardContent>
         </Card>
@@ -1361,4 +1380,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-

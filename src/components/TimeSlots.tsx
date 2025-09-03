@@ -154,6 +154,7 @@ interface TimeSlotsProps {
   onRemoveActivity: (slotName: string, activityId: string) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
+  slotDurations: Record<string, { logged: number; total: number }>;
 }
 
 export function TimeSlots({
@@ -165,6 +166,7 @@ export function TimeSlots({
   onRemoveActivity,
   onToggleComplete,
   onActivityClick,
+  slotDurations,
 }: TimeSlotsProps) {
 
   const { setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
@@ -270,6 +272,10 @@ export function TimeSlots({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
+        const slotData = slotDurations[slot.name] || { logged: 0, total: 0 };
+        const { logged: loggedTime, total: totalTime } = slotData;
+        const freeTime = 240 - loggedTime;
+        const progress = totalTime > 0 ? (loggedTime / 240) * 100 : 0;
         
         const reviewKey = `${format(date, 'yyyy-MM-dd')}-${slot.name}`;
         const review = missedSlotReviews[reviewKey];
@@ -448,6 +454,11 @@ export function TimeSlots({
                 )}
               </div>
               <div className="flex-shrink-0 mt-2 space-y-2">
+                <Progress value={progress} className="h-2" />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{loggedTime} min logged</span>
+                    <span>{freeTime} min free</span>
+                </div>
                 <div className="flex justify-end items-center">
                     <Popover>
                     <PopoverTrigger asChild>
