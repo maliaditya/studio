@@ -181,7 +181,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             ...activeFocusSession,
             duration: durationMins,
             secondsLeft: durationMins * 60,
+            totalSeconds: durationMins * 60,
             subTaskStartTime: Date.now(),
+            state: 'running',
         });
     }
     setIsAudioPlaying(true);
@@ -212,35 +214,38 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask || !activeFocusSession?.subTaskStartTime) return;
-    
-    if ('completed' in activeSubTask) { // It's a generic SubTask
-        updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
-    } else { // It's a deep work/upskill task
+  
+    // Log time for the completed sub-task
+    if ('completed' in activeSubTask) {
+      updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
+    } else {
       const completionTime = Date.now();
       const durationMs = completionTime - activeFocusSession.subTaskStartTime;
-      const durationMinutes = Math.floor(durationMs / 60000);
-      
-      if (durationMinutes > 0) {
-          logSubTaskTime(activeSubTask.id, durationMinutes);
-      } else {
-          logSubTaskTime(activeSubTask.id, 1);
-      }
-      
+      const durationMinutes = Math.max(1, Math.floor(durationMs / 60000));
+      logSubTaskTime(activeSubTask.id, durationMinutes);
       setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
     }
-    
-    const newCompletedSet = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => {
-      if ('completed' in st) return !st.completed && st.id !== activeSubTask.id;
-      return !newCompletedSet.has(st.id) && !permanentlyLoggedTaskIds.has(st.id) && (st.loggedDuration || 0) === 0;
-    });
-
+  
+    // Find the next task in the original list
+    const currentTaskIndex = subTasks.findIndex(t => t.id === activeSubTask.id);
+    const nextTask = subTasks.slice(currentTaskIndex + 1).find(st => !isSubTaskComplete(st));
+  
     if (nextTask) {
-        handleStartSubTask(nextTask);
+      handleStartSubTask(nextTask);
     } else {
-        handleStop(true);
+      handleStop(true); // All tasks are now complete
     }
-  }, [activeSubTask, sessionCompletedSubTaskIds, subTasks, permanentlyLoggedTaskIds, logSubTaskTime, handleStartSubTask, handleStop, activeFocusSession, updateActivitySubtask, activity.id]);
+  }, [
+    activeSubTask,
+    subTasks,
+    isSubTaskComplete,
+    logSubTaskTime,
+    handleStartSubTask,
+    handleStop,
+    activeFocusSession,
+    activity.id,
+    updateActivitySubtask,
+  ]);
   
   const handleStandaloneTaskComplete = () => {
     const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
