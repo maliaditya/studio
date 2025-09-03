@@ -4,7 +4,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday, isBefore } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subYears, differenceInYears, addWeeks, startOfISOWeek, setISOWeek, getISOWeekYear, subDays, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -61,7 +61,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
     
     return totalMinutes;
 };
@@ -119,7 +119,6 @@ function MyPlatePageContent() {
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
-  const [isScheduleLoaded, setIsScheduleLoaded] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   // State for Modals
@@ -161,8 +160,6 @@ function MyPlatePageContent() {
   
   const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
   
-  const [carryOverComplete, setCarryOverComplete] = useState(false);
-  
   const habitResources = useMemo(() => {
     return resources.filter(r => r.type === 'habit');
   }, [resources]);
@@ -176,12 +173,6 @@ function MyPlatePageContent() {
       setOneYearAgo(subYears(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 1));
     }
   }, [selectedDate]);
-
-  useEffect(() => {
-    if (currentUser?.username) {
-        setIsScheduleLoaded(true);
-    }
-  }, [currentUser]);
 
   useEffect(() => {
     const timerInterval = setInterval(() => {
@@ -200,73 +191,74 @@ function MyPlatePageContent() {
   }, [currentSlot]);
 
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !selectedDate || carryOverComplete) return;
-
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const todayStr = format(selectedDate, 'yyyy-MM-dd');
-    const lastRun = localStorage.getItem(lastCarryForwardKey);
-
-    if (lastRun === todayStr) {
-      setCarryOverComplete(true);
-      return;
+    if (!currentUser || !selectedDate || !isToday(selectedDate)) {
+        return;
     }
 
-    const yesterday = subDays(selectedDate, 1);
-    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
+    const todayKey = format(selectedDate, 'yyyy-MM-dd');
+    const lastRunKey = `lifeos_last_carry_forward_${currentUser.username}`;
+    const lastRunDate = localStorage.getItem(lastRunKey);
+    
+    // Only run this once per day
+    if (lastRunDate === todayKey) {
+        return;
+    }
+
+    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
 
     if (!yesterdaysSchedule) {
-      localStorage.setItem(lastCarryForwardKey, todayStr);
-      setCarryOverComplete(true);
-      return;
+        localStorage.setItem(lastRunKey, todayKey);
+        return;
     }
 
     setSchedule(currentSchedule => {
-      let newTodaySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
-      
-      const activitiesFromYesterday = Object.values(yesterdaysSchedule).flat();
-      let tasksWereCarriedOver = false;
+        let newTodaySchedule = { ...(currentSchedule[todayKey] || {}) };
+        let tasksWereCarriedOver = false;
 
-      activitiesFromYesterday.forEach(activity => {
-        if (!activity) return;
-        
-        const isRoutine = !!activity.isRoutine;
-        const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
-        const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
-        const isGeneralIncomplete = !activity.completed && settings.carryForward;
+        const yesterdaysActivities = Object.values(yesterdaysSchedule).flat();
+        const todaysScheduledDetails = new Set(Object.values(newTodaySchedule).flat().map(a => a.details));
 
-        if (isRoutine || isEssential || isNutrition || isGeneralIncomplete) {
-            const newActivity = { 
-              ...activity, 
-              id: `${activity.type}-${Date.now()}-${Math.random()}`, 
-              completed: false 
-            };
+        yesterdaysActivities.forEach(activity => {
+            if (!activity) return;
 
-            if (!newTodaySchedule[activity.slot]) {
-              newTodaySchedule[activity.slot] = [];
-            }
+            const isRoutine = activity.isRoutine;
+            const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
+            const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
+            const isGeneralIncomplete = !activity.completed && settings.carryForward;
             
-            // Check for duplicates based on details for non-routine tasks, but always add routines
-            const todaysSlotActivities = (newTodaySchedule[activity.slot] as Activity[] | undefined) || [];
-            const alreadyExists = todaysSlotActivities.some(a => a.details === newActivity.details && a.type === newActivity.type);
+            // Routines are always carried over, others depend on settings and completion status
+            if (isRoutine || isEssential || isNutrition || isGeneralIncomplete) {
+                // For non-routine tasks, check if it's already scheduled for today to avoid duplicates
+                if (!isRoutine && todaysScheduledDetails.has(activity.details)) {
+                    return;
+                }
 
-            if (isRoutine || !alreadyExists) {
-              (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
-              tasksWereCarriedOver = true;
+                // Create a new instance for the new day
+                const newActivity: Activity = { 
+                  ...activity, 
+                  id: `${activity.type}-${Date.now()}-${Math.random()}`, 
+                  completed: false 
+                };
+
+                if (!newTodaySchedule[activity.slot]) {
+                  newTodaySchedule[activity.slot] = [];
+                }
+
+                (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
+                tasksWereCarriedOver = true;
             }
+        });
+      
+        if (tasksWereCarriedOver) {
+            return { ...currentSchedule, [todayKey]: newTodaySchedule };
         }
-      });
       
-      if (tasksWereCarriedOver) {
-        return { ...currentSchedule, [todayStr]: newTodaySchedule };
-      }
-      
-      return currentSchedule;
+        return currentSchedule;
     });
     
-    localStorage.setItem(lastCarryForwardKey, todayStr);
-    setCarryOverComplete(true);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, settings, carryOverComplete]);
+    localStorage.setItem(lastRunKey, todayKey);
+  }, [currentUser, selectedDate, schedule, setSchedule, settings]);
   
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
@@ -314,40 +306,20 @@ function MyPlatePageContent() {
                     let suffix = '';
 
                     if (activity.completed) {
-                        const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-                        const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
-                        
-                        if (mainDef && ((mainDef.linkedDeepWorkIds?.length ?? 0) > 0 || (mainDef.linkedUpskillIds?.length ?? 0) > 0)) {
-                             const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
-                             totalMinutes = leafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
-                             suffix = ' logged';
-                        } else if (activity.duration) {
-                            totalMinutes = activity.duration;
-                            suffix = ' logged';
-                        } else if (activity.type === 'workout') {
+                        if (activity.type === 'workout') {
                             const log = allWorkoutLogs.find(l => l.date === dateKey);
                             if (log) {
                                 const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
-                                if(workoutExercise) {
-                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + set.reps, 0);
+                                if (workoutExercise) {
+                                  // The duration is stored in reps for workouts in this system
+                                  totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
                                 }
                             }
-                            suffix = ' logged';
                         } else {
-                            let logs, durationField;
-                            if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
-                            else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-                            
-                            if (logs && durationField) {
-                                const loggedDuration = (logs.find(log => log.date === dateKey)
-                                  ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
-                                if (loggedDuration > 0) {
-                                    totalMinutes = loggedDuration;
-                                    suffix = ' logged';
-                                }
-                            }
+                            // This correctly handles other task types by using their logged duration.
+                            totalMinutes = activity.duration || 0;
                         }
+                        suffix = ' logged';
                     } else {
                         // For non-completed tasks, calculate estimated duration
                         switch(activity.type) {
@@ -385,7 +357,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, strengthTrainingMode]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
