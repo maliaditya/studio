@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
+import { Carousel } from './ui/carousel';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -313,38 +314,42 @@ export function SmartLoggingPrompt({
   const dailyAnalysis = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
+    const slotTimes: Record<string, string> = { 'Late Night': '12am–4am', 'Dawn': '4am–8am', 'Morning': '8am–12pm', 'Afternoon': '12pm–4pm', 'Evening': '4pm–8pm', 'Night': '8pm–12am' };
+    const now = new Date();
 
     const slotAnalyses = slotOrder.map(slotName => {
         const activities = (todaysSchedule[slotName] as ActivityType[]) || [];
         const loggedTime = activities
-          .filter(a => a.completed)
-          .reduce((sum, task) => sum + parseDurationToMinutes(activityDurations[task.id]), 0);
+            .filter(a => a.completed)
+            .reduce((sum, task) => {
+                const duration = parseDurationToMinutes(activityDurations[task.id]);
+                return sum + duration;
+            }, 0);
         
-        const plannedTasks = activities.filter(a => !a.completed);
-        
-        const slotEndTime = new Date();
         const endHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
+        const slotEndTime = new Date();
         slotEndTime.setHours(endHour, 0, 0, 0);
-        const isPast = new Date() > slotEndTime;
 
-        const wastedTime = isPast ? 240 - loggedTime : 0;
-        const freeTime = !isPast ? 240 - loggedTime : 0;
+        const isPast = now > slotEndTime;
+        const isCurrent = slotName === currentSlot;
+        
+        const wastedTime = isPast ? Math.max(0, 240 - loggedTime) : 0;
+        const freeTime = isCurrent ? Math.max(0, 240 - loggedTime) : 0;
         
         let insight = "";
         if (isPast) {
-          if (loggedTime === 0 && activities.length > 0) insight = `You didn’t act on your plan. That’s 4 hours of potential lost.`;
-          else if (loggedTime === 0) insight = `4 hours completely gone. Imagine using half that time for your goals.`;
-          else insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away.`;
+            insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away.`;
         } else if (slotName === currentSlot) {
-          insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
+            insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
         } else {
-          insight = "This slot is upcoming. Plan it wisely.";
+            insight = "This slot is upcoming. Plan it wisely.";
         }
 
         return {
+            type: 'slot' as const,
             name: slotName,
-            time: { 'Late Night': '12am–4am', 'Dawn': '4am–8am', 'Morning': '8am–12pm', 'Afternoon': '12pm–4pm', 'Evening': '4pm–8pm', 'Night': '8pm–12am' }[slotName],
-            plannedTasks: plannedTasks.map(a => a.details).join(', ') || 'None',
+            time: slotTimes[slotName],
+            plannedTasks: (activities.map(a => a.details).join(', ') || 'None'),
             loggedTime,
             wastedTime,
             insight,
@@ -353,15 +358,14 @@ export function SmartLoggingPrompt({
 
     const totalLogged = slotAnalyses.reduce((sum, s) => sum + s.loggedTime, 0);
     const totalWasted = slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0);
-
     const summaryInsight = `You invested in ${totalLogged} minutes of focused work, but let go of ${totalWasted} minutes. Turning just 1 of those wasted hours into focus daily compounds into 7 hours a week—a massive shift in progress.`;
 
     return {
-        slotAnalyses,
-        totalLogged,
-        totalWasted,
-        summaryInsight,
-    }
+        carouselItems: [
+            ...slotAnalyses,
+            { type: 'summary' as const, totalLogged, totalWasted, insight: summaryInsight }
+        ]
+    };
   }, [schedule, activityDurations, currentSlot]);
 
 
@@ -403,6 +407,45 @@ export function SmartLoggingPrompt({
 
   if (!currentPrompt) return null;
 
+  const renderCarouselItem = (item: any) => {
+    if (item.type === 'slot') {
+        return (
+            <div className="p-1 h-full flex flex-col justify-between">
+                <div>
+                    <h4 className="font-semibold text-sm">🕒 {item.name} ({item.time})</h4>
+                    <div className="text-xs space-y-1 mt-1 pl-2">
+                        <p><b className="text-foreground">Planned:</b> {item.plannedTasks}</p>
+                        <p><b className="text-foreground">Logged:</b> {item.loggedTime} min</p>
+                        <p><b className="text-foreground">Unused/Wasted:</b> {item.wastedTime} min</p>
+                        <p className="italic text-muted-foreground/80 mt-2">👉 {item.insight}</p>
+                    </div>
+                </div>
+                <div className="flex justify-end mt-2">
+                    <Button size="sm" variant="ghost" onClick={() => router.push('/my-plate')}>View Agenda</Button>
+                </div>
+            </div>
+        )
+    }
+    if (item.type === 'summary') {
+        return (
+            <div className="p-1 h-full flex flex-col justify-between">
+                 <div>
+                    <h4 className="font-semibold text-sm">📊 Daily Summary</h4>
+                    <div className="text-xs space-y-1 mt-1 pl-2">
+                        <p><b className="text-foreground">Total Logged:</b> {item.totalLogged} min</p>
+                        <p><b className="text-foreground">Total Wasted/Free:</b> {item.totalWasted} min</p>
+                        <p className="italic text-muted-foreground/80 mt-2">👉 {item.insight}</p>
+                    </div>
+                </div>
+                 <div className="flex justify-end mt-2">
+                    <Button size="sm" variant="ghost" onClick={() => router.push('/my-plate')}>View Agenda</Button>
+                </div>
+            </div>
+        )
+    }
+    return null;
+  }
+
   return (
     <AnimatePresence>
       {currentPrompt && (
@@ -420,85 +463,61 @@ export function SmartLoggingPrompt({
                 </div>
                 
                 <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
-                    <ScrollArea className="h-full max-h-80">
-                        <div className="space-y-4 pr-4">
-                            {promptType === 'inactive' ? (
-                                <div className="space-y-4">
-                                    {dailyAnalysis.slotAnalyses.map(slot => (
-                                        <div key={slot.name}>
-                                            <h4 className="font-semibold text-sm">⏳ {slot.name} ({slot.time})</h4>
-                                            <div className="text-xs pl-6 space-y-1 mt-1">
-                                                <p><b className="text-foreground">Planned:</b> {slot.plannedTasks}</p>
-                                                <p><b className="text-foreground">Logged:</b> {slot.loggedTime} min</p>
-                                                <p><b className="text-foreground">Unused/Wasted:</b> {slot.wastedTime} min</p>
-                                                <p className="italic text-muted-foreground/80">👉 {slot.insight}</p>
-                                            </div>
-                                        </div>
+                    <div className="flex-grow">
+                        {promptType === 'inactive' ? (
+                            <Carousel items={dailyAnalysis.carouselItems} renderItem={renderCarouselItem} />
+                        ) : (
+                            <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
+                        )}
+                        {promptType === 'completed' && activeProjects.length > 0 && (
+                            <div className="w-full">
+                                <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {activeProjects.map(p => (
+                                        <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
+                                            {p.name}
+                                        </Button>
                                     ))}
-                                    <Separator />
-                                    <div>
-                                        <h4 className="font-semibold text-sm">📊 Daily Summary</h4>
-                                         <div className="text-xs pl-6 space-y-1 mt-1">
-                                            <p><b className="text-foreground">Total Logged:</b> {dailyAnalysis.totalLogged} min</p>
-                                            <p><b className="text-foreground">Total Wasted/Free:</b> {dailyAnalysis.totalWasted} min</p>
-                                            <p className="italic text-muted-foreground/80">👉 {dailyAnalysis.summaryInsight}</p>
-                                         </div>
-                                    </div>
                                 </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
-                            )}
-
-                            {promptType === 'completed' && activeProjects.length > 0 && (
-                                <div className="w-full">
-                                    <p className="text-xs text-left font-semibold mb-2">Active Projects:</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {activeProjects.map(p => (
-                                            <Button key={p.id} size="sm" variant="outline" onClick={() => router.push(`/deep-work?projectId=${p.id}`)}>
-                                                {p.name}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {promptType === 'focus' && focusContext && (
-                              <>
-                                  {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
-                                      <div key={habit.id} className="space-y-3">
-                                          <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
-                                          <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span>
-                                          </div>
-                                          <div className="grid grid-cols-1 gap-3">
-                                              {positiveMechanism && (
-                                                  <Card className="bg-green-900/10 border-green-500/30">
-                                                      <CardHeader className="p-2">
-                                                          <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
-                                                      </CardHeader>
-                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                        <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
-                                                        <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
-                                                        <TruthSection habit={habit} />
-                                                      </CardContent>
-                                                  </Card>
-                                              )}
-                                              {negativeMechanism && (
-                                                  <Card className="bg-red-900/10 border-red-500/30">
-                                                      <CardHeader className="p-2">
-                                                          <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
-                                                      </CardHeader>
-                                                      <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
-                                                        <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
-                                                        <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
-                                                      </CardContent>
-                                                  </Card>
-                                              )}
-                                          </div>
+                            </div>
+                        )}
+                        {promptType === 'focus' && focusContext && (
+                          <ScrollArea className="h-64 pr-2">
+                              {focusContext.map(({ habit, positiveMechanism, negativeMechanism }) => (
+                                  <div key={habit.id} className="space-y-3">
+                                      <div className="font-semibold flex items-center gap-2 cursor-pointer" onClick={(e) => openHabitDetailPopup(habit.id, e)}>
+                                      <Zap className="h-4 w-4 text-yellow-500"/> Habit: <span className="text-primary">{habit.name}</span>
                                       </div>
-                                  ))}
-                              </>
-                            )}
-                        </div>
-                    </ScrollArea>
+                                      <div className="grid grid-cols-1 gap-3">
+                                          {positiveMechanism && (
+                                              <Card className="bg-green-900/10 border-green-500/30">
+                                                  <CardHeader className="p-2">
+                                                      <CardTitle className="text-sm text-green-600 dark:text-green-400">{positiveMechanism.name}</CardTitle>
+                                                  </CardHeader>
+                                                  <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                    <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
+                                                    <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
+                                                    <TruthSection habit={habit} />
+                                                  </CardContent>
+                                              </Card>
+                                          )}
+                                          {negativeMechanism && (
+                                              <Card className="bg-red-900/10 border-red-500/30">
+                                                  <CardHeader className="p-2">
+                                                      <CardTitle className="text-sm text-red-600 dark:text-red-400">{negativeMechanism.name}</CardTitle>
+                                                  </CardHeader>
+                                                  <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
+                                                    <p><span className="font-semibold text-foreground">Response:</span> {habit.response?.text}</p>
+                                                    <ResistanceSection habit={habit} isNegative={true} onTechniqueClick={openMindsetTechniquePopup} />
+                                                  </CardContent>
+                                              </Card>
+                                          )}
+                                      </div>
+                                  </div>
+                              ))}
+                          </ScrollArea>
+                        )}
+                    </div>
                     <div className="flex gap-2 w-full flex-shrink-0 pt-2">
                         {currentPrompt.actions.map(action => (
                             <Button key={action.label} size="sm" variant={action.variant as any} onClick={action.onClick} className="flex-1">
