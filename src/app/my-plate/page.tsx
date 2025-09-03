@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday, subYears } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -62,7 +62,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
     
     return totalMinutes;
 };
@@ -196,7 +196,6 @@ function MyPlatePageContent() {
 
     const today = startOfToday();
     const isFutureDate = isAfter(selectedDate, today);
-    const isTodayDate = isToday(selectedDate);
     const selectedDateKey = format(selectedDate, 'yyyy-MM-dd');
     
     // Don't modify past dates or days that already have activities
@@ -228,28 +227,6 @@ function MyPlatePageContent() {
         }
     }
     
-    // If today is the selected date, also carry over incomplete non-routine tasks from yesterday
-    if (isTodayDate) {
-      const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-      const yesterdaysSchedule = schedule[yesterdayKey];
-      if (yesterdaysSchedule) {
-          const incompleteTasks = Object.values(yesterdaysSchedule).flat().filter((activity): activity is Activity => {
-              if (!activity || activity.isRoutine) return false;
-              if (activity.completed) return false;
-              if (activity.type === 'essentials' && settings.carryForwardEssentials) return true;
-              if (activity.type === 'nutrition' && settings.carryForwardNutrition) return true;
-              if (settings.carryForward) return true;
-              return false;
-          });
-          // Add incomplete tasks, but don't overwrite routines if found from a different source
-          incompleteTasks.forEach(task => {
-            if (!routineTasksToCarry.some(rt => rt.details === task.details && rt.type === task.type)) {
-              routineTasksToCarry.push(task);
-            }
-          });
-      }
-    }
-
     if (routineTasksToCarry.length > 0) {
         const newDaySchedule: DailySchedule = {};
         routineTasksToCarry.forEach(activity => {
@@ -257,7 +234,6 @@ function MyPlatePageContent() {
                 ...activity, 
                 id: `${activity.type}-${Date.now()}-${Math.random()}`, 
                 completed: false,
-                // For non-routine tasks, reset taskIds to force re-selection
                 taskIds: activity.isRoutine ? activity.taskIds : []
             };
             
