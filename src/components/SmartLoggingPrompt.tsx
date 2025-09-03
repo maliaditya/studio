@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -245,6 +246,8 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
     );
 });
 TruthSection.displayName = 'TruthSection';
+
+const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 const DailyReviewDialog = () => {
     const { schedule, activityDurations, currentSlot } = useAuth();
