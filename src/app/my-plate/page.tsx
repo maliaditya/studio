@@ -208,10 +208,10 @@ function MyPlatePageContent() {
     const lastRun = localStorage.getItem(lastCarryForwardKey);
 
     if (lastRun === todayStr) {
-      setCarryOverComplete(true);
-      return;
+        setCarryOverComplete(true);
+        return;
     }
-    
+
     const yesterday = subDays(selectedDate, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
@@ -233,8 +233,9 @@ function MyPlatePageContent() {
                     
                     if (activity.isRoutine) return true;
                     
-                    // Standard carry-forward logic for non-routine tasks
                     if (activity.completed) return false;
+
+                    // Standard carry-forward logic for non-routine, non-completed tasks
                     if (activity.type === 'essentials') return settings.carryForwardEssentials;
                     if (activity.type === 'nutrition') return settings.carryForwardNutrition;
                     return settings.carryForward;
@@ -247,11 +248,11 @@ function MyPlatePageContent() {
                     const newActivitiesForSlot = activitiesToCarry
                         .filter(act => !todaysActivityDetails.has(act.details))
                         .map(activity => {
-                            const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
+                            const defaultHabitId = activity.isRoutine ? null : settings.defaultHabitLinks?.[activity.type] || null;
                             return {
                                 ...activity,
                                 id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                                completed: false, // Always reset completion for the new day
+                                completed: false,
                                 habitEquationIds: activity.isRoutine ? activity.habitEquationIds : (defaultHabitId ? [defaultHabitId] : []),
                             };
                         });
@@ -336,7 +337,7 @@ function MyPlatePageContent() {
                             if (log) {
                                 const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
                                 if(workoutExercise) {
-                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0) * 1.5;
+                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + 1.5, 0);
                                 }
                             }
                             suffix = ' logged';
@@ -392,7 +393,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, strengthTrainingMode]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -1398,6 +1399,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
