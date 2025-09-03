@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
-import type { Activity, ActivityType, DatedWorkout } from '@/types/workout';
+import type { Activity, ActivityType, DatedWorkout, DailySchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { PieChart as PieChartIcon } from 'lucide-react';
 
@@ -38,6 +38,8 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'bg-orange-600',
     'Distractions': 'bg-amber-600',
     'Nutrition': 'bg-lime-500',
+    'Wasted Time': 'bg-orange-600',
+    'Free Time': 'bg-gray-400',
 };
 
 const formatMinutes = (minutes: number) => {
@@ -49,9 +51,19 @@ const formatMinutes = (minutes: number) => {
     return `${mins}m`;
 };
 
+const slotOrder: { name: string; endHour: number }[] = [
+    { name: 'Late Night', endHour: 4 },
+    { name: 'Dawn', endHour: 8 },
+    { name: 'Morning', endHour: 12 },
+    { name: 'Afternoon', endHour: 16 },
+    { name: 'Evening', endHour: 20 },
+    { name: 'Night', endHour: 24 }
+];
+
 export function ActivityDistributionCard() {
     const { 
         schedule, 
+        currentSlot,
         allDeepWorkLogs, 
         allUpskillLogs,
         allWorkoutLogs,
@@ -77,16 +89,10 @@ export function ActivityDistributionCard() {
             durationField = 'reps';
             break;
           case 'deepwork':
-            logs = allDeepWorkLogs;
-            durationField = 'weight'; 
-            break;
           case 'branding':
-            logs = brandingLogs;
-            durationField = 'weight';
-            break;
           case 'lead-generation':
-            logs = allLeadGenLogs;
-            durationField = 'weight'; // Assuming 1 action = 1 min for simplicity in this context
+            logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
+            durationField = 'weight'; 
             break;
           case 'workout':
             logs = allWorkoutLogs;
@@ -117,25 +123,54 @@ export function ActivityDistributionCard() {
 
     const timeAllocation = useMemo(() => {
         const dailySchedule = schedule[todayKey] || {};
-        const activities = Object.values(dailySchedule).flat() as Activity[];
-        
         const totals: Record<string, number> = {};
+        let wastedTime = 0;
+        let scheduledButNotCompletedTime = 0;
 
-        activities.forEach(activity => {
-            if (activity && activity.completed) {
-                const mappedName = activityNameMap[activity.type];
+        const currentHour = new Date().getHours();
+        
+        slotOrder.forEach(slot => {
+            const activities = (dailySchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
+            let loggedInSlot = 0;
+
+            activities.forEach(activity => {
                 const duration = getLoggedMinutes(activity, todayKey);
-                if (mappedName && duration > 0) {
-                    totals[mappedName] = (totals[mappedName] || 0) + duration;
+                if (activity.completed && duration > 0) {
+                    const mappedName = activityNameMap[activity.type];
+                    if (mappedName) {
+                        totals[mappedName] = (totals[mappedName] || 0) + duration;
+                    }
+                    loggedInSlot += duration;
+                } else if (!activity.completed) {
+                   const estDurationStr = activityDurations[activity.id];
+                   const estDuration = estDurationStr ? parseInt(estDurationStr.replace(/[a-zA-Z\s]/g, '')) || 0 : 0;
+                   scheduledButNotCompletedTime += estDuration;
                 }
+            });
+
+            if (currentHour >= slot.endHour) { // Slot has passed
+                wastedTime += Math.max(0, 240 - loggedInSlot);
             }
         });
+        
+        if (wastedTime > 0) {
+          totals['Wasted Time'] = wastedTime;
+        }
+        
+        const totalLoggedAndWasted = Object.values(totals).reduce((sum, t) => sum + t, 0);
+        const totalMinutesInDay = 24 * 60;
+        const freeTime = totalMinutesInDay - totalLoggedAndWasted - scheduledButNotCompletedTime;
+
+        if (freeTime > 0) {
+            totals['Free Time'] = freeTime;
+        }
+
 
         return Object.entries(totals)
             .map(([name, time]) => ({ name, time }))
             .sort((a, b) => b.time - a.time);
 
-    }, [schedule, todayKey, getLoggedMinutes]);
+    }, [schedule, todayKey, getLoggedMinutes, currentSlot, activityDurations]);
 
     if (timeAllocation.length === 0) {
         return null;
