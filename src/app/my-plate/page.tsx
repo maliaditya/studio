@@ -342,50 +342,47 @@ function MyPlatePageContent() {
             let totalTime = 0;
     
             const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
-            if (Array.isArray(activities)) {
-                for (const activity of activities) {
-                    let activityMinutes = 0;
-                    let isLogged = false;
+            
+            activities.forEach(activity => {
+                let activityMinutes = 0;
     
-                    if (activity.completed) {
-                        isLogged = true;
-                        if (activity.type === 'workout') {
-                            const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
-                            const loggedSets = workoutLog?.exercises
-                                .filter(ex => activity.taskIds?.includes(ex.id))
-                                .flatMap(ex => ex.loggedSets) || [];
-                            activityMinutes = loggedSets.reduce((sum, set) => sum + (set.duration || 15), 0); 
-                        } else if (activity.type === 'upskill') {
-                            const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
-                            const loggedSets = upskillLog?.exercises
-                                .filter(ex => activity.taskIds?.includes(ex.id))
-                                .flatMap(ex => ex.loggedSets) || [];
-                            activityMinutes = loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                        } else if (activity.type === 'deepwork') {
-                            const deepWorkLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                            const loggedSets = deepWorkLog?.exercises
-                                .filter(ex => activity.taskIds?.includes(ex.id))
-                                .flatMap(ex => ex.loggedSets) || [];
-                            activityMinutes = loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                        } else if (activity.duration) {
-                            activityMinutes = activity.duration;
-                        }
+                if (activity.completed) {
+                    // Logic for specific completed task types
+                    if (activity.type === 'workout') {
+                        const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
+                        activityMinutes = workoutLog?.exercises
+                            .filter(ex => activity.taskIds?.includes(ex.id))
+                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 15), 0), 0) || 0;
+                    } else if (activity.type === 'upskill') {
+                        const log = allUpskillLogs.find(l => l.date === dateKey);
+                        activityMinutes = log?.exercises
+                            .filter(ex => activity.taskIds?.includes(ex.id))
+                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0) || 0;
+                    } else if (activity.type === 'deepwork') {
+                        const log = allDeepWorkLogs.find(l => l.date === dateKey);
+                        activityMinutes = log?.exercises
+                            .filter(ex => activity.taskIds?.includes(ex.id))
+                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0) || 0;
                     } else {
-                        const estDurationStr = activityDurations[activity.id];
-                        const durationMatch = estDurationStr?.match(/^(\d+h)?\s*(\d+m)?/);
+                        // General case for other completed tasks
+                        activityMinutes = activity.duration || 0;
+                    }
+                    loggedTime += activityMinutes;
+                } else {
+                    // Logic for uncompleted tasks (use estimated time)
+                    const estDurationStr = activityDurations[activity.id];
+                    if (estDurationStr) {
+                      const durationMatch = estDurationStr.match(/(\d+h)?\s*(\d+m)?/);
                         if (durationMatch) {
-                            const hours = parseInt(durationMatch[1] || '0', 10);
-                            const minutes = parseInt(durationMatch[2] || '0', 10);
+                            const hours = parseInt(durationMatch[1]?.replace('h', '') || '0', 10);
+                            const minutes = parseInt(durationMatch[2]?.replace('m', '') || '0', 10);
                             activityMinutes = (hours * 60) + minutes;
                         }
                     }
-    
-                    totalTime += activityMinutes;
-                    if (isLogged) {
-                        loggedTime += activityMinutes;
-                    }
                 }
-            }
+                totalTime += activityMinutes;
+            });
+    
             durations[slotName] = { logged: loggedTime, total: totalTime };
         }
         return durations;
