@@ -211,7 +211,6 @@ function MyPlatePageContent() {
       return;
     }
     
-    // Always check for routines and other carry-forward tasks
     const yesterday = subDays(selectedDate, 1);
     const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
     const yesterdaysSchedule = schedule[yesterdayKey];
@@ -229,10 +228,11 @@ function MyPlatePageContent() {
         Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
             if (Array.isArray(activities) && activities.length > 0) {
                 const activitiesToCarry = activities.filter(activity => {
-                    if (activity.isRoutine) return true; // Always carry routine tasks, regardless of completion
-                    if (activity.completed) return false; // Never carry completed non-routine tasks
+                    // This is the fix: Always carry over routine tasks.
+                    if (activity.isRoutine) return true;
                     
-                    // Check settings for other types
+                    if (activity.completed) return false;
+                    
                     if (activity.type === 'essentials') return settings.carryForwardEssentials;
                     if (activity.type === 'nutrition') return settings.carryForwardNutrition;
                     return settings.carryForward;
@@ -243,14 +243,14 @@ function MyPlatePageContent() {
                     const todaysActivityDetails = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details));
 
                     const newActivitiesForSlot = activitiesToCarry
-                        .filter(act => !todaysActivityDetails.has(act.details)) // Prevent duplicates based on details
+                        .filter(act => !todaysActivityDetails.has(act.details))
                         .map(activity => {
                             const defaultHabitId = settings.defaultHabitLinks?.[activity.type] || null;
                             return {
                                 ...activity,
                                 id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                                completed: false, // Always reset completion status
-                                habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+                                completed: false, // Always reset completion for the new day
+                                habitEquationIds: activity.isRoutine ? activity.habitEquationIds : (defaultHabitId ? [defaultHabitId] : []),
                             };
                         });
                     
@@ -265,7 +265,7 @@ function MyPlatePageContent() {
         if (carriedOver) {
             return { ...currentSchedule, [todayStr]: newTodaySchedule };
         }
-        return currentSchedule; // No changes, return original schedule
+        return currentSchedule;
     });
     
     localStorage.setItem(lastCarryForwardKey, todayStr);
@@ -329,15 +329,24 @@ function MyPlatePageContent() {
                         } else if (activity.duration) {
                             totalMinutes = activity.duration;
                             suffix = ' logged';
+                        } else if (activity.type === 'workout') {
+                            const log = allWorkoutLogs.find(l => l.date === dateKey);
+                            if (log) {
+                                const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
+                                if(workoutExercise) {
+                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                                }
+                            }
+                            suffix = ' logged';
                         } else {
                             let logs, durationField;
-                            if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; }
+                            if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
                             else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
-
+                            
                             if (logs && durationField) {
                                 const loggedDuration = (logs.find(log => log.date === dateKey)
-                                    ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps' | 'weight'] || 0), 0), 0) || 0);
+                                  ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
                                 if (loggedDuration > 0) {
                                     totalMinutes = loggedDuration;
                                     suffix = ' logged';
@@ -345,24 +354,25 @@ function MyPlatePageContent() {
                             }
                         }
                     } else {
-                        switch (activity.type) {
+                        // For non-completed tasks, calculate estimated duration
+                        switch(activity.type) {
                             case 'workout': totalMinutes = 90; break;
                             case 'mindset': totalMinutes = 15; break;
                             case 'upskill':
                             case 'deepwork':
                             case 'branding':
-                                if (activity.taskIds && activity.taskIds.length > 0) {
-                                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                                    const taskDef = allDefs.get(mainTaskDefId);
-                                    if (taskDef) {
-                                        totalMinutes = calculateTotalEstimate(taskDef);
-                                    } else {
-                                        totalMinutes = 120;
-                                    }
+                              if (activity.taskIds && activity.taskIds.length > 0) {
+                                const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                                const taskDef = allDefs.get(mainTaskDefId);
+                                if (taskDef) {
+                                  totalMinutes = calculateTotalEstimate(taskDef);
                                 } else {
-                                    totalMinutes = 120;
+                                  totalMinutes = 120;
                                 }
-                                break;
+                              } else {
+                                totalMinutes = 120;
+                              }
+                              break;
                             case 'planning': case 'tracking': totalMinutes = 30; break;
                             case 'lead-generation': totalMinutes = 45; break;
                             case 'essentials': case 'interrupt': totalMinutes = activity.duration || 0; break;
@@ -371,16 +381,16 @@ function MyPlatePageContent() {
                     }
 
                     if (totalMinutes > 0) {
-                        const h = Math.floor(totalMinutes / 60);
-                        const m = Math.round(totalMinutes % 60);
-                        newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
+                      const h = Math.floor(totalMinutes / 60);
+                      const m = Math.round(totalMinutes % 60);
+                      newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
                     }
                 }
             }
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, strengthTrainingMode]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -1386,6 +1396,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
