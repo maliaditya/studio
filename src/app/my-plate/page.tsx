@@ -286,26 +286,21 @@ function MyPlatePageContent() {
                         let suffix = '';
                         
                         if (activity.completed) {
-                            suffix = ' logged';
-                            // Logic for completed tasks
                             if (activity.type === 'workout') {
                                 const workoutLog = allWorkoutLogs.find(log => log.date === dateKey);
                                 totalMinutes = workoutLog?.exercises
                                   .filter(ex => activity.taskIds?.includes(ex.id))
                                   .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration ?? 0), 0), 0) || 0;
-                            } else if (activity.type === 'upskill') {
-                                const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
-                                totalMinutes = upskillLog?.exercises
-                                  .filter(ex => activity.taskIds?.includes(ex.id))
-                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
-                            } else if (activity.type === 'deepwork') {
-                                const deepWorkLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                                totalMinutes = deepWorkLog?.exercises
-                                  .filter(ex => activity.taskIds?.includes(ex.id))
-                                  .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
-                            } else {
-                                totalMinutes = activity.duration || 0;
+                            } else if (['upskill', 'deepwork'].includes(activity.type)) {
+                                const logs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+                                const logForDay = logs.find(log => log.date === dateKey);
+                                totalMinutes = logForDay?.exercises
+                                    .filter(ex => activity.taskIds?.includes(ex.id))
+                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
+                            } else if (activity.duration) {
+                                totalMinutes = activity.duration;
                             }
+                            suffix = ' logged';
                         } else {
                             // For non-completed tasks, use estimates
                             switch(activity.type) {
@@ -345,6 +340,8 @@ function MyPlatePageContent() {
         return newDurations;
     }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
 
+    const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
     const slotDurations = useMemo(() => {
         const durations: Record<string, { logged: number; total: number }> = {};
         if (!schedule || !selectedDate) return durations;
@@ -361,10 +358,11 @@ function MyPlatePageContent() {
             if (Array.isArray(activities)) {
                 for (const activity of activities) {
                     const durationStr = activityDurations[activity.id] || '0m';
+                    const isLogged = durationStr.includes('logged');
                     const minutes = parseInt(durationStr.replace(/[^\d]/g, ''), 10) || 0;
                     
                     totalTime += minutes;
-                    if (activity.completed) {
+                    if (isLogged) {
                         loggedTime += minutes;
                     }
                 }
@@ -811,7 +809,7 @@ function MyPlatePageContent() {
         return leafNodes;
     };
   
-    const learningStats: Record<string, { logged: number, estimated: number }> = {};
+    const learningStats: Record<string, { logged: number; estimated: number }> = {};
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
 
     specializations.forEach(spec => {
