@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -208,8 +207,8 @@ function MyPlatePageContent() {
     const lastRun = localStorage.getItem(lastCarryForwardKey);
 
     if (lastRun === todayStr) {
-        setCarryOverComplete(true);
-        return;
+      setCarryOverComplete(true);
+      return;
     }
 
     const yesterday = subDays(selectedDate, 1);
@@ -217,48 +216,52 @@ function MyPlatePageContent() {
     const yesterdaysSchedule = schedule[yesterdayKey];
 
     if (!yesterdaysSchedule) {
-        localStorage.setItem(lastCarryForwardKey, todayStr);
-        setCarryOverComplete(true);
-        return;
+      localStorage.setItem(lastCarryForwardKey, todayStr);
+      setCarryOverComplete(true);
+      return;
     }
 
     setSchedule(currentSchedule => {
-        let newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
-        const activitiesFromYesterday = Object.values(yesterdaysSchedule).flat();
-        let tasksWereCarriedOver = false;
+      let newTodaySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
+      
+      const activitiesFromYesterday = Object.values(yesterdaysSchedule).flat();
+      let tasksWereCarriedOver = false;
 
-        activitiesFromYesterday.forEach(activity => {
-            if (!activity) return;
-
-            const isRoutine = !!activity.isRoutine;
-            const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
-            const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
-            const isGeneralIncomplete = !activity.completed && settings.carryForward;
-
-            const shouldCarryOver = isRoutine || isEssential || isNutrition || isGeneralIncomplete;
-            
-            if (shouldCarryOver) {
-                const todaysSlotActivities = (newTodaySchedule[activity.slot] as Activity[] | undefined) || [];
-                const alreadyExistsToday = todaysSlotActivities.some(a => a.details === activity.details && a.type === activity.type);
-                
-                // Only carry over if it's a routine task OR it doesn't already exist today.
-                if (isRoutine || !alreadyExistsToday) {
-                    tasksWereCarriedOver = true;
-                    if (!newTodaySchedule[activity.slot]) {
-                        newTodaySchedule[activity.slot] = [];
-                    }
-                    // Give it a new ID to treat it as a new instance for the new day
-                    const newActivity = { ...activity, id: `${activity.type}-${Date.now()}-${Math.random()}`, completed: false };
-                    (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
-                }
-            }
-        });
-
-        if (tasksWereCarriedOver) {
-            return { ...currentSchedule, [todayStr]: newTodaySchedule };
-        }
+      activitiesFromYesterday.forEach(activity => {
+        if (!activity) return;
         
-        return currentSchedule;
+        const isRoutine = !!activity.isRoutine;
+        const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
+        const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
+        const isGeneralIncomplete = !activity.completed && settings.carryForward;
+
+        if (isRoutine || isEssential || isNutrition || isGeneralIncomplete) {
+            const newActivity = { 
+              ...activity, 
+              id: `${activity.type}-${Date.now()}-${Math.random()}`, 
+              completed: false 
+            };
+
+            if (!newTodaySchedule[activity.slot]) {
+              newTodaySchedule[activity.slot] = [];
+            }
+            
+            // Check for duplicates based on details for non-routine tasks, but always add routines
+            const todaysSlotActivities = (newTodaySchedule[activity.slot] as Activity[] | undefined) || [];
+            const alreadyExists = todaysSlotActivities.some(a => a.details === newActivity.details && a.type === newActivity.type);
+
+            if (isRoutine || !alreadyExists) {
+              (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
+              tasksWereCarriedOver = true;
+            }
+        }
+      });
+      
+      if (tasksWereCarriedOver) {
+        return { ...currentSchedule, [todayStr]: newTodaySchedule };
+      }
+      
+      return currentSchedule;
     });
     
     localStorage.setItem(lastCarryForwardKey, todayStr);
@@ -326,7 +329,7 @@ function MyPlatePageContent() {
                             if (log) {
                                 const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
                                 if(workoutExercise) {
-                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + 1.5, 0);
+                                   totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + set.reps, 0);
                                 }
                             }
                             suffix = ' logged';
@@ -382,7 +385,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, strengthTrainingMode]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
@@ -1389,3 +1392,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    

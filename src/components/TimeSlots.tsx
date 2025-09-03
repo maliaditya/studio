@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -199,10 +198,10 @@ export function TimeSlots({
   ];
 
   const handleToggleRoutine = (slotName: string, activityId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
     setSchedule(prev => {
-        const dateKey = format(date, 'yyyy-MM-dd');
         const newSchedule = { ...prev };
-        const daySchedule = { ...newSchedule[dateKey] };
+        const daySchedule = newSchedule[dateKey] ? { ...newSchedule[dateKey] } : {};
         
         if (daySchedule[slotName] && Array.isArray(daySchedule[slotName])) {
             const activities = daySchedule[slotName] as Activity[];
@@ -226,10 +225,9 @@ export function TimeSlots({
   const handleAddSubTask = (slotName: string, activityId: string) => {
     const newSubTask: SubTask = { id: `sub_${Date.now()}`, text: '', completed: false };
     setSchedule(prev => {
-        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
-        if (!dayKey) return prev;
+        const dayKey = format(date, 'yyyy-MM-dd');
         const newSchedule = { ...prev };
-        const daySchedule = { ...newSchedule[dayKey] };
+        const daySchedule = { ...(newSchedule[dayKey] || {}) };
         daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
             act.id === activityId
                 ? { ...act, subTasks: [...(act.subTasks || []), newSubTask] }
@@ -242,10 +240,9 @@ export function TimeSlots({
 
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     setSchedule(prev => {
-        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
-        if (!dayKey) return prev;
+        const dayKey = format(date, 'yyyy-MM-dd');
         const newSchedule = { ...prev };
-        const daySchedule = { ...newSchedule[dayKey] };
+        const daySchedule = { ...(newSchedule[dayKey] || {}) };
         daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
             act.id === activityId
                 ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, text: newText } : st) }
@@ -258,10 +255,9 @@ export function TimeSlots({
   
   const handleToggleSubTask = (slotName: string, activityId: string, subTaskId: string) => {
     setSchedule(prev => {
-        const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
-        if (!dayKey) return prev;
+        const dayKey = format(date, 'yyyy-MM-dd');
         const newSchedule = { ...prev };
-        const daySchedule = { ...newSchedule[dayKey] };
+        const daySchedule = { ...(newSchedule[dayKey] || {}) };
         daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
             act.id === activityId
                 ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, completed: !st.completed } : st) }
@@ -274,10 +270,9 @@ export function TimeSlots({
 
   const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
     setSchedule(prev => {
-      const dayKey = Object.keys(prev).find(key => prev[key][slotName]?.some(act => act.id === activityId));
-      if (!dayKey) return prev;
+      const dayKey = format(date, 'yyyy-MM-dd');
       const newSchedule = { ...prev };
-      const daySchedule = { ...newSchedule[dayKey] };
+      const daySchedule = { ...(newSchedule[dayKey] || {}) };
       daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
         act.id === activityId
           ? { ...act, subTasks: (act.subTasks || []).filter(st => st.id !== subTaskId) }
@@ -567,3 +562,6 @@ export function TimeSlots({
     
 
 
+
+
+    
