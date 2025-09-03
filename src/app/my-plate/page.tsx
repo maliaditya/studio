@@ -288,7 +288,6 @@ function MyPlatePageContent() {
         if (!schedule) return newDurations;
     
         const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
     
         for (const dateKey in schedule) {
             const daySchedule = schedule[dateKey];
@@ -304,24 +303,7 @@ function MyPlatePageContent() {
                         let suffix = '';
     
                         if (activity.completed) {
-                            if (activity.type === 'workout') {
-                                const log = allWorkoutLogs.find(l => l.date === dateKey);
-                                totalMinutes = log?.exercises
-                                    .filter(ex => activity.taskIds?.includes(ex.id))
-                                    .reduce((sum, ex) => sum + (ex.duration || 0), 0) || 0;
-                            } else if (activity.type === 'upskill') {
-                                const log = allUpskillLogs.find(l => l.date === dateKey);
-                                totalMinutes = log?.exercises
-                                    .filter(ex => activity.taskIds?.includes(ex.id))
-                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
-                            } else if (activity.type === 'deepwork') {
-                                const log = allDeepWorkLogs.find(l => l.date === dateKey);
-                                totalMinutes = log?.exercises
-                                    .filter(ex => activity.taskIds?.includes(ex.id))
-                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.duration || 0), 0), 0) || 0;
-                            } else {
-                                totalMinutes = activity.duration || 0;
-                            }
+                            totalMinutes = activity.duration || 0;
                             suffix = ' logged';
                         } else {
                             // For non-completed tasks, calculate estimated duration
@@ -360,7 +342,7 @@ function MyPlatePageContent() {
             }
         }
         return newDurations;
-      }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+      }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
