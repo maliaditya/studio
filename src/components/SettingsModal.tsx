@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import type { Activity, ActivityType } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
@@ -82,9 +82,9 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             const updatedActivities = activities.map(act => {
               if (act.type === activityType && !act.completed) {
                 const newHabitIds = newHabitId ? [newHabitId] : [];
-                if (JSON.stringify(act.habitEquationIds || []) !== JSON.stringify(newHabitIds)) {
+                if (JSON.stringify(act.habitEquationIds || []) !== JSON.stringify(newHabits)) {
                   slotWasModified = true;
-                  return { ...act, habitEquationIds: newHabitIds };
+                  return { ...act, habitEquationIds: newHabits };
                 }
               }
               return act;
@@ -292,6 +292,45 @@ ${JSON.stringify(finalTemplate, null, 2)}
   
   const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
 
+  const routineTasks = useMemo(() => {
+    const uniqueRoutines = new Map<string, Activity>();
+    Object.values(schedule).forEach(day => {
+        Object.values(day).flat().forEach(activity => {
+            if (activity && activity.isRoutine) {
+                const key = `${activity.type}-${activity.details}`;
+                if (!uniqueRoutines.has(key)) {
+                    uniqueRoutines.set(key, activity);
+                }
+            }
+        });
+    });
+    return Array.from(uniqueRoutines.values());
+  }, [schedule]);
+
+  const handleRemoveRoutine = (activityToRemove: Activity) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        for (const date in newSchedule) {
+            for (const slot in newSchedule[date]) {
+                const activities = newSchedule[date][slot] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    newSchedule[date][slot] = activities.map(act => {
+                        if (act.type === activityToRemove.type && act.details === activityToRemove.details) {
+                            return { ...act, isRoutine: false };
+                        }
+                        return act;
+                    });
+                }
+            }
+        }
+        return newSchedule;
+    });
+    toast({
+        title: "Routine Task Updated",
+        description: `"${activityToRemove.details}" will no longer be carried forward daily.`,
+    });
+  };
+
 
   return (
     <>
@@ -304,7 +343,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
             </DialogDescription>
           </DialogHeader>
           <div className="flex-grow min-h-0 overflow-hidden">
-            <ScrollArea className="h-full pr-4">
+            <ScrollArea className="h-[60vh] pr-4">
               <div className="space-y-6 py-4">
                 <div className="space-y-4 rounded-lg border p-4">
                   <div className="space-y-0.5">
@@ -365,8 +404,8 @@ ${JSON.stringify(finalTemplate, null, 2)}
                   </div>
                 </div>
 
-                <Accordion type="single" collapsible className="w-full rounded-lg border">
-                  <AccordionItem value="item-1" className="border-b-0">
+                <Accordion type="multiple" className="w-full">
+                  <AccordionItem value="item-1" className="border rounded-lg">
                     <AccordionTrigger className="px-4 py-3">
                       <div className="space-y-0.5 text-left">
                         <Label className="text-base">Default Habit Links</Label>
@@ -398,6 +437,35 @@ ${JSON.stringify(finalTemplate, null, 2)}
                                     </Select>
                                 </div>
                             ))}
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="item-2" className="border rounded-lg mt-6">
+                    <AccordionTrigger className="px-4 py-3">
+                       <div className="space-y-0.5 text-left">
+                        <Label className="text-base">Manage Routine Tasks</Label>
+                        <p className="text-sm text-muted-foreground">
+                          View and remove tasks that are set to repeat daily.
+                        </p>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-2 pt-4 border-t">
+                            {routineTasks.length === 0 ? (
+                                <p className="text-center text-sm text-muted-foreground py-4">No tasks are marked as routine.</p>
+                            ) : (
+                                routineTasks.map(task => (
+                                    <div key={task.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                        <div>
+                                            <p className="font-medium text-sm">{task.details}</p>
+                                            <p className="text-xs text-muted-foreground capitalize">{task.type}</p>
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveRoutine(task)}>
+                                            <Trash2 className="h-4 w-4 text-destructive"/>
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
