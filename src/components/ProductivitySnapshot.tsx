@@ -513,13 +513,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           {showTimeAllocation && (
             <>
                 <Separator className="my-6" />
-                 <CardHeader className="flex flex-row items-center justify-between pt-0 px-0">
+                 <div className="flex flex-row items-center justify-between px-6">
                     <CardTitle className="flex items-center gap-2 text-primary"><PieChartIcon /> Daily Time Allocation</CardTitle>
                     <Button variant="outline" size="icon" onClick={onOpenTimeAllocationModal}>
                         <Expand className="h-4 w-4" />
                         <span className="sr-only">Open Time Allocation in Modal</span>
                     </Button>
-                </CardHeader>
+                </div>
                 <div className="flex items-center justify-center">
                   <TimeAllocationChart timeAllocationData={timeAllocationData} />
                 </div>
