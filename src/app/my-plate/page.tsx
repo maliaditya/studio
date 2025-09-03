@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -61,7 +62,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
     
     return totalMinutes;
 };
@@ -189,17 +190,16 @@ function MyPlatePageContent() {
     }, 1000);
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
-
+  
   useEffect(() => {
     if (!currentUser || !selectedDate || !isToday(selectedDate)) {
         return;
     }
 
-    const todayKey = format(selectedDate, 'yyyy-MM-dd');
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
     const lastRunKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const lastRunDate = localStorage.getItem(lastRunKey);
     
-    // Only run this once per day
     if (lastRunDate === todayKey) {
         return;
     }
@@ -212,51 +212,49 @@ function MyPlatePageContent() {
         return;
     }
 
-    setSchedule(currentSchedule => {
-        let newTodaySchedule = { ...(currentSchedule[todayKey] || {}) };
-        let tasksWereCarriedOver = false;
+    const activitiesToCarryOver = Object.values(yesterdaysSchedule).flat().filter((activity): activity is Activity => {
+        if (!activity) return false;
+        
+        // Always carry over routine tasks, regardless of completion status.
+        if (activity.isRoutine) return true;
+        
+        // Carry over other tasks based on settings, only if they are incomplete.
+        if (activity.completed) return false;
+        if (activity.type === 'essentials' && settings.carryForwardEssentials) return true;
+        if (activity.type === 'nutrition' && settings.carryForwardNutrition) return true;
+        if (settings.carryForward) return true;
 
-        const yesterdaysActivities = Object.values(yesterdaysSchedule).flat();
-        const todaysScheduledDetails = new Set(Object.values(newTodaySchedule).flat().map(a => a.details));
-
-        yesterdaysActivities.forEach(activity => {
-            if (!activity) return;
-
-            const isRoutine = activity.isRoutine;
-            const isEssential = activity.type === 'essentials' && settings.carryForwardEssentials;
-            const isNutrition = activity.type === 'nutrition' && settings.carryForwardNutrition;
-            const isGeneralIncomplete = !activity.completed && settings.carryForward;
-            
-            // Routines are always carried over, others depend on settings and completion status
-            if (isRoutine || isEssential || isNutrition || isGeneralIncomplete) {
-                // For non-routine tasks, check if it's already scheduled for today to avoid duplicates
-                if (!isRoutine && todaysScheduledDetails.has(activity.details)) {
-                    return;
-                }
-
-                // Create a new instance for the new day
-                const newActivity: Activity = { 
-                  ...activity, 
-                  id: `${activity.type}-${Date.now()}-${Math.random()}`, 
-                  completed: false 
-                };
-
-                if (!newTodaySchedule[activity.slot]) {
-                  newTodaySchedule[activity.slot] = [];
-                }
-
-                (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
-                tasksWereCarriedOver = true;
-            }
-        });
-      
-        if (tasksWereCarriedOver) {
-            return { ...currentSchedule, [todayKey]: newTodaySchedule };
-        }
-      
-        return currentSchedule;
+        return false;
     });
-    
+
+    if (activitiesToCarryOver.length > 0) {
+        setSchedule(currentSchedule => {
+            const newTodaySchedule = { ...(currentSchedule[todayKey] || {}) };
+            const todaysActivities = Object.values(newTodaySchedule).flat();
+
+            activitiesToCarryOver.forEach(activity => {
+                const alreadyExists = todaysActivities.some(
+                    todayAct => todayAct.details === activity.details && todayAct.type === activity.type && todayAct.slot === activity.slot
+                );
+
+                if (!alreadyExists) {
+                    const newActivity: Activity = { 
+                        ...activity, 
+                        id: `${activity.type}-${Date.now()}-${Math.random()}`, 
+                        completed: false 
+                    };
+                    
+                    if (!newTodaySchedule[activity.slot]) {
+                        newTodaySchedule[activity.slot] = [];
+                    }
+                    (newTodaySchedule[activity.slot] as Activity[]).push(newActivity);
+                }
+            });
+
+            return { ...currentSchedule, [todayKey]: newTodaySchedule };
+        });
+    }
+
     localStorage.setItem(lastRunKey, todayKey);
   }, [currentUser, selectedDate, schedule, setSchedule, settings]);
   
@@ -969,7 +967,7 @@ function MyPlatePageContent() {
   const timeAllocationData = useMemo(() => {
     const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
     const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-    const activityNameMap: Record<ActivityType, string> = {
+    const activityNameMap: Record<ActivityTypeType, string> = {
         deepwork: 'Deep Work',
         upskill: 'Learning',
         workout: 'Workout',
@@ -1366,3 +1364,4 @@ export default function MyPlatePage() {
 }
 
     
+
