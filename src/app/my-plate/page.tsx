@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday, isSameDay } from 'date-fns';
+import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isToday, isSameDay, subYears } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -221,7 +221,7 @@ function MyPlatePageContent() {
     }
     
     localStorage.setItem(lastCarryForwardKey, todayKey);
-  }, [currentUser, schedule]);
+  }, [currentUser, schedule, setSchedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -1405,3 +1405,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
