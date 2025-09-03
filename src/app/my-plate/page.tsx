@@ -226,45 +226,39 @@ function MyPlatePageContent() {
         const newTodaySchedule: DailySchedule = currentSchedule[todayStr] ? JSON.parse(JSON.stringify(currentSchedule[todayStr])) : {};
         let carriedOver = false;
 
-        Object.entries(yesterdaysSchedule).forEach(([slotName, activities]) => {
-            if (Array.isArray(activities) && activities.length > 0) {
-                const activitiesToCarry = activities.filter(activity => {
-                    if (!activity) return false;
-                    
-                    if (activity.isRoutine) return true;
-                    
-                    if (activity.completed) return false;
+        const activitiesToCarry = Object.values(yesterdaysSchedule).flat().filter(activity => {
+            if (!activity) return false;
+            // Always carry over routine tasks
+            if (activity.isRoutine) return true;
 
-                    // Standard carry-forward logic for non-routine, non-completed tasks
-                    if (activity.type === 'essentials') return settings.carryForwardEssentials;
-                    if (activity.type === 'nutrition') return settings.carryForwardNutrition;
-                    return settings.carryForward;
-                });
-                
-                if (activitiesToCarry.length > 0) {
-                    if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
-                    const todaysActivityDetails = new Set((newTodaySchedule[slotName] as Activity[]).map(a => a.details));
-
-                    const newActivitiesForSlot = activitiesToCarry
-                        .filter(act => !todaysActivityDetails.has(act.details))
-                        .map(activity => {
-                            const defaultHabitId = activity.isRoutine ? null : settings.defaultHabitLinks?.[activity.type] || null;
-                            return {
-                                ...activity,
-                                id: `${activity.type}-${Date.now()}-${Math.random()}`,
-                                completed: false,
-                                habitEquationIds: activity.isRoutine ? activity.habitEquationIds : (defaultHabitId ? [defaultHabitId] : []),
-                            };
-                        });
-                    
-                    if (newActivitiesForSlot.length > 0) {
-                        (newTodaySchedule[slotName] as Activity[]).push(...newActivitiesForSlot);
-                        carriedOver = true;
-                    }
-                }
+            // Carry over incomplete non-routine tasks based on settings
+            if (!activity.completed) {
+                if (activity.type === 'essentials') return settings.carryForwardEssentials;
+                if (activity.type === 'nutrition') return settings.carryForwardNutrition;
+                return settings.carryForward;
             }
+            return false;
         });
 
+        if (activitiesToCarry.length > 0) {
+            activitiesToCarry.forEach(activity => {
+                const slotName = activity.slot;
+                if (!newTodaySchedule[slotName]) newTodaySchedule[slotName] = [];
+                
+                const todaysSlotActivities = newTodaySchedule[slotName] as Activity[];
+                
+                // Prevent duplicate details in the same slot for today
+                if (!todaysSlotActivities.some(a => a.details === activity.details)) {
+                    carriedOver = true;
+                    todaysSlotActivities.push({
+                        ...activity,
+                        id: `${activity.type}-${Date.now()}-${Math.random()}`,
+                        completed: false, // Always reset completion status
+                    });
+                }
+            });
+        }
+        
         if (carriedOver) {
             return { ...currentSchedule, [todayStr]: newTodaySchedule };
         }
@@ -273,7 +267,7 @@ function MyPlatePageContent() {
     
     localStorage.setItem(lastCarryForwardKey, todayStr);
     setCarryOverComplete(true);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, settings, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, carryOverComplete]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate, settings, carryOverComplete]);
 
   
   const activityDurations = useMemo(() => {
@@ -1399,12 +1393,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-
-
-
-
-
-
