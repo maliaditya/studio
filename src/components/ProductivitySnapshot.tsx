@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -514,7 +513,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
             <>
                 <Separator className="my-6" />
                  <CardHeader className="flex flex-row items-center justify-between pt-0 px-0">
-                    <CardTitle className="flex items-center gap-2 text-primary">Daily Time Allocation</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-primary"><PieChartIcon /> Daily Time Allocation</CardTitle>
                     <Button variant="outline" size="icon" onClick={onOpenTimeAllocationModal}>
                         <Expand className="h-4 w-4" />
                         <span className="sr-only">Open Time Allocation in Modal</span>
