@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -50,6 +50,7 @@ interface ProductivitySnapshotProps {
   timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[];
   onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
+  onOpenTimeAllocationModal: () => void;
   todaysSchedule: DailySchedule;
   activityDurations: Record<string, string>;
   showTimeAllocation?: boolean;
@@ -224,7 +225,7 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 };
 
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
@@ -512,6 +513,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           {showTimeAllocation && (
             <>
                 <Separator className="my-6" />
+                 <CardHeader className="flex flex-row items-center justify-between pt-0 px-0">
+                    <CardTitle className="flex items-center gap-2 text-primary">Daily Time Allocation</CardTitle>
+                    <Button variant="outline" size="icon" onClick={onOpenTimeAllocationModal}>
+                        <Expand className="h-4 w-4" />
+                        <span className="sr-only">Open Time Allocation in Modal</span>
+                    </Button>
+                </CardHeader>
                 <div className="flex items-center justify-center">
                   <TimeAllocationChart timeAllocationData={timeAllocationData} />
                 </div>

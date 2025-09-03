@@ -116,6 +116,7 @@ function MyPlatePageContent() {
   const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
+  const [isTimeAllocationModalOpen, setIsTimeAllocationModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
   const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
@@ -1121,6 +1122,7 @@ function MyPlatePageContent() {
                     timeAllocationData={timeAllocationData}
                     onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                     onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
+                    onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
                     activityDurations={activityDurations}
                     showTimeAllocation={isAgendaDocked}
@@ -1265,6 +1267,18 @@ function MyPlatePageContent() {
         totalHoursData={[]}
         todayHoursData={[]}
       />
+      
+      <Dialog open={isTimeAllocationModalOpen} onOpenChange={setIsTimeAllocationModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Daily Time Allocation</DialogTitle>
+            <DialogDescription>A breakdown of your logged time for {format(selectedDate, 'PPP')}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 h-[400px]">
+            <TimeAllocationChart timeAllocationData={timeAllocationData} />
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
           <DialogContent className="max-w-7xl h-[90vh] p-0">
