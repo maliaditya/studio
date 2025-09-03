@@ -1,13 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength, DailySchedule, Activity as ActivityType } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength, DailySchedule, Activity as ActivityType, DatedWorkout } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
@@ -16,7 +16,7 @@ import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 import { Carousel } from './ui/carousel';
 
@@ -257,6 +257,7 @@ const slotOrder: { name: string; time: string }[] = [
     { name: 'Night', time: '8pm–12am' }
 ];
 
+
 export function SmartLoggingPrompt({ 
     promptType, 
     activeProjects, 
@@ -310,67 +311,76 @@ export function SmartLoggingPrompt({
     return habitDetails.length > 0 ? habitDetails : null;
   }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
   
+  const getLoggedMinutes = useCallback((activity: ActivityType, dateKey: string): number => {
+    if (!activity.completed) return 0;
+  
+    const activityTaskIds = new Set(activity.taskIds || []);
+    
+    let logs: DatedWorkout[] = [];
+    let durationField: 'reps' | 'weight' | null = null;
+    let isWorkout = false;
+  
+    switch (activity.type) {
+      case 'upskill':
+        logs = allUpskillLogs;
+        durationField = 'reps';
+        break;
+      case 'deepwork':
+      case 'branding':
+      case 'lead-generation':
+        logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
+        durationField = 'weight'; 
+        break;
+      case 'workout':
+        logs = allWorkoutLogs;
+        isWorkout = true;
+        break;
+      default:
+        return activity.duration || 0;
+    }
+  
+    if (activityTaskIds.size === 0) {
+      return activity.duration || 0;
+    }
+
+    const logForDay = logs.find(l => l.date === dateKey);
+    if (!logForDay) return 0;
+  
+    return logForDay.exercises
+      .filter(ex => activityTaskIds.has(ex.id))
+      .reduce((sum, ex) => {
+        return sum + (ex.loggedSets || []).reduce((setSum, set) => {
+          if (isWorkout) {
+            return setSum + (set.reps * set.weight || 15);
+          }
+          return setSum + (set[durationField!] || 0);
+        }, 0);
+      }, 0);
+  }, [allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs]);
+  
   const dailyAnalysis = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
-    
-    const getLoggedMinutes = (activity: ActivityType, dateKey: string): number => {
-        if (!activity.completed) return 0;
 
-        let logs: any[] = [];
-        let durationField: 'reps' | 'weight' | null = null;
-        let isWorkout = false;
-
-        switch (activity.type) {
-            case 'upskill':
-                logs = allUpskillLogs.find(log => log.date === dateKey)?.exercises || [];
-                durationField = 'reps';
-                break;
-            case 'deepwork':
-                logs = allDeepWorkLogs.find(log => log.date === dateKey)?.exercises || [];
-                durationField = 'weight';
-                break;
-            case 'workout':
-                logs = allWorkoutLogs.find(log => log.date === dateKey)?.exercises || [];
-                isWorkout = true;
-                break;
-            case 'interrupt':
-            case 'distraction':
-            case 'essentials':
-                return activity.duration || 0;
-            default:
-                return 0;
-        }
-
-        if (!logs.length) return 0;
-        
-        return logs
-            .filter(ex => activity.taskIds?.includes(ex.id))
-            .reduce((sum, ex) => {
-                return sum + ex.loggedSets.reduce((setSum: number, set: any) => {
-                    if (isWorkout) {
-                        // Assuming a default of 15 minutes per set for workouts if duration isn't explicitly logged.
-                        return setSum + (set.duration || 15);
-                    }
-                    return setSum + (set[durationField!] || 0);
-                }, 0);
-            }, 0);
-    };
+    let totalLogged = 0;
 
     const slotAnalyses = slotOrder.map(slot => {
         const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
         const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task, todayKey), 0);
-            
+        
+        totalLogged += loggedTime;
         const isPast = slotOrder.findIndex(s => s.name === slot.name) < slotOrder.findIndex(s => s.name === currentSlot);
+        const isCurrent = slot.name === currentSlot;
+        
         const wastedTime = isPast ? Math.max(0, 240 - loggedTime) : 0;
+        const freeTime = isCurrent ? Math.max(0, 240 - loggedTime) : 0;
         
         const plannedTaskDetails = activities.map(a => a.details).join(', ') || 'None';
 
         let insight = "";
         if (isPast) {
-            insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away. Imagine if you had used even 2 of those hours for sleep or upskill—you’d have felt fresher and moved closer to your goals.`;
-        } else if (slot.name === currentSlot) {
-             const freeTime = Math.max(0, 240 - loggedTime);
+            insight = `You captured ${loggedTime} min of value${wastedTime > 0 ? `, but ${wastedTime} min drifted away` : ''}.`;
+        } else if (isCurrent) {
             insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
         } else {
             insight = "This slot is upcoming. Plan it wisely.";
@@ -387,9 +397,8 @@ export function SmartLoggingPrompt({
         };
     });
 
-    const totalLogged = slotAnalyses.reduce((sum, s) => sum + s.loggedTime, 0);
     const totalWasted = slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0);
-    const summaryInsight = `You invested in ${totalLogged} minutes of focused work, but let go of ${totalWasted} minutes. Turning just 1 of those wasted hours into focus daily compounds into 7 hours a week—a massive shift in progress.`;
+    const summaryInsight = `You've invested ${totalLogged} minutes in focused work today${totalWasted > 0 ? `, while ${totalWasted} minutes were unallocated` : ''}. Keep the momentum going.`;
 
     return {
         carouselItems: [
@@ -397,7 +406,7 @@ export function SmartLoggingPrompt({
             { type: 'summary' as const, totalLogged, totalWasted, insight: summaryInsight }
         ]
     };
-  }, [schedule, currentSlot, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, allLeadGenLogs, brandingLogs]);
+  }, [schedule, currentSlot, getLoggedMinutes]);
 
   const prompts = {
     empty: {
@@ -492,8 +501,54 @@ export function SmartLoggingPrompt({
     }
     return null;
   }
+  
+  const DailyReviewDialog = ({ analysis }: { analysis: any }) => (
+    <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Daily Time Analysis</DialogTitle>
+                <DialogDescription>
+                    Here's a breakdown of how your time was spent today.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="h-96 pr-4">
+                <div className="space-y-4 py-4">
+                    {analysis.carouselItems.map((item: any, index: number) => {
+                        if (item.type === 'slot') {
+                            return (
+                                <div key={index}>
+                                    <h4 className="font-semibold">{item.name} ({item.time})</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Logged: {item.loggedTime} min | Wasted: {item.wastedTime} min
+                                    </p>
+                                    <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
+                                        {item.insight}
+                                    </blockquote>
+                                </div>
+                            );
+                        } else if (item.type === 'summary') {
+                             return (
+                                <div key="summary" className="pt-4 border-t">
+                                    <h4 className="font-semibold">Daily Summary</h4>
+                                    <p className="text-sm text-muted-foreground">
+                                        Total Logged: {item.totalLogged} min | Total Wasted: {item.totalWasted} min
+                                    </p>
+                                     <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
+                                        {item.insight}
+                                    </blockquote>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+            </ScrollArea>
+        </DialogContent>
+    </Dialog>
+  );
 
   return (
+    <>
     <AnimatePresence>
       {currentPrompt && (
         <div className="fixed bottom-24 right-6 z-50 max-w-sm w-full">
@@ -512,7 +567,9 @@ export function SmartLoggingPrompt({
                 <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
                     <div className="flex-grow">
                         {promptType === 'inactive' ? (
-                            <Carousel items={dailyAnalysis.carouselItems} renderItem={renderCarouselItem} />
+                            <div className="h-48 -mx-2">
+                              <Carousel items={dailyAnalysis.carouselItems} renderItem={renderCarouselItem} />
+                            </div>
                         ) : (
                             <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
                         )}
@@ -577,5 +634,7 @@ export function SmartLoggingPrompt({
         </div>
       )}
     </AnimatePresence>
+    <DailyReviewDialog analysis={dailyAnalysis} />
+    </>
   );
 }
