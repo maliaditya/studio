@@ -16,7 +16,7 @@ import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 import { Carousel } from './ui/carousel';
 
@@ -248,21 +248,14 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
 });
 TruthSection.displayName = 'TruthSection';
 
-const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
-
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
-    return totalMinutes;
-};
-
+const slotOrder: { name: string; time: string }[] = [
+    { name: 'Late Night', time: '12am–4am' },
+    { name: 'Dawn', time: '4am–8am' },
+    { name: 'Morning', time: '8am–12pm' },
+    { name: 'Afternoon', time: '12pm–4pm' },
+    { name: 'Evening', time: '4pm–8pm' },
+    { name: 'Night', time: '8pm–12am' }
+];
 
 export function SmartLoggingPrompt({ 
     promptType, 
@@ -281,7 +274,11 @@ export function SmartLoggingPrompt({
     habitCards,
     mechanismCards,
     schedule,
-    activityDurations,
+    allUpskillLogs,
+    allDeepWorkLogs,
+    allWorkoutLogs,
+    allLeadGenLogs,
+    brandingLogs
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -316,32 +313,64 @@ export function SmartLoggingPrompt({
   const dailyAnalysis = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
-    const slotTimes: Record<string, string> = { 'Late Night': '12am–4am', 'Dawn': '4am–8am', 'Morning': '8am–12pm', 'Afternoon': '12pm–4pm', 'Evening': '4pm–8pm', 'Night': '8pm–12am' };
     
-    const slotAnalyses = slotOrder.map(slotName => {
-        const activities = (todaysSchedule[slotName] as ActivityType[]) || [];
-        const loggedTime = activities
-            .filter(a => a.completed)
-            .reduce((sum, task) => {
-                const duration = parseDurationToMinutes(activityDurations[task.id]);
-                return sum + duration;
-            }, 0);
-        
-        const now = new Date();
-        const slotEndHour = { 'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24 }[slotName] || 0;
-        const slotEndTime = new Date();
-        slotEndTime.setHours(slotEndHour, 0, 0, 0);
+    const getLoggedMinutes = (activity: ActivityType, dateKey: string): number => {
+        if (!activity.completed) return 0;
 
-        const isPast = now > slotEndTime;
-        const isCurrent = slotName === currentSlot;
+        let logs: any[] = [];
+        let durationField: 'reps' | 'weight' | null = null;
+        let isWorkout = false;
+
+        switch (activity.type) {
+            case 'upskill':
+                logs = allUpskillLogs.find(log => log.date === dateKey)?.exercises || [];
+                durationField = 'reps';
+                break;
+            case 'deepwork':
+                logs = allDeepWorkLogs.find(log => log.date === dateKey)?.exercises || [];
+                durationField = 'weight';
+                break;
+            case 'workout':
+                logs = allWorkoutLogs.find(log => log.date === dateKey)?.exercises || [];
+                isWorkout = true;
+                break;
+            case 'interrupt':
+            case 'distraction':
+            case 'essentials':
+                return activity.duration || 0;
+            default:
+                return 0;
+        }
+
+        if (!logs.length) return 0;
         
+        return logs
+            .filter(ex => activity.taskIds?.includes(ex.id))
+            .reduce((sum, ex) => {
+                return sum + ex.loggedSets.reduce((setSum: number, set: any) => {
+                    if (isWorkout) {
+                        // Assuming a default of 15 minutes per set for workouts if duration isn't explicitly logged.
+                        return setSum + (set.duration || 15);
+                    }
+                    return setSum + (set[durationField!] || 0);
+                }, 0);
+            }, 0);
+    };
+
+    const slotAnalyses = slotOrder.map(slot => {
+        const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+        const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task, todayKey), 0);
+            
+        const isPast = slotOrder.findIndex(s => s.name === slot.name) < slotOrder.findIndex(s => s.name === currentSlot);
         const wastedTime = isPast ? Math.max(0, 240 - loggedTime) : 0;
-        const freeTime = isCurrent ? Math.max(0, 240 - loggedTime) : 0;
         
+        const plannedTaskDetails = activities.map(a => a.details).join(', ') || 'None';
+
         let insight = "";
         if (isPast) {
             insight = `You captured ${loggedTime} min of value, but ${wastedTime} min drifted away. Imagine if you had used even 2 of those hours for sleep or upskill—you’d have felt fresher and moved closer to your goals.`;
-        } else if (slotName === currentSlot) {
+        } else if (slot.name === currentSlot) {
+             const freeTime = Math.max(0, 240 - loggedTime);
             insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
         } else {
             insight = "This slot is upcoming. Plan it wisely.";
@@ -349,12 +378,12 @@ export function SmartLoggingPrompt({
 
         return {
             type: 'slot' as const,
-            name: slotName,
-            time: slotTimes[slotName],
-            plannedTasks: (activities.map(a => a.details).join(', ') || 'None'),
-            loggedTime,
-            wastedTime,
-            insight,
+            name: slot.name,
+            time: slot.time,
+            plannedTasks: plannedTaskDetails,
+            loggedTime: loggedTime,
+            wastedTime: wastedTime,
+            insight: insight,
         };
     });
 
@@ -368,8 +397,7 @@ export function SmartLoggingPrompt({
             { type: 'summary' as const, totalLogged, totalWasted, insight: summaryInsight }
         ]
     };
-  }, [schedule, activityDurations, currentSlot]);
-
+  }, [schedule, currentSlot, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, allLeadGenLogs, brandingLogs]);
 
   const prompts = {
     empty: {
@@ -429,7 +457,7 @@ export function SmartLoggingPrompt({
               </div>
               <div>
                   <p className="font-semibold text-xs text-foreground">Planned:</p>
-                  <p className="text-xs text-muted-foreground">{item.plannedTasks}</p>
+                  <p className="text-xs text-muted-foreground truncate" title={item.plannedTasks}>{item.plannedTasks}</p>
               </div>
               <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
                   {item.insight}
