@@ -1,13 +1,12 @@
-
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength, DailySchedule, Activity as ActivityType } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
@@ -16,6 +15,8 @@ import { Input } from './ui/input';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -245,6 +246,109 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
 });
 TruthSection.displayName = 'TruthSection';
 
+const DailyReviewDialog = () => {
+    const { schedule, activityDurations, currentSlot } = useAuth();
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysSchedule = schedule[todayKey] || {};
+    
+    const slotData = [
+        { name: 'Late Night', time: '12am – 4am' },
+        { name: 'Dawn', time: '4am – 8am' },
+        { name: 'Morning', time: '8am – 12pm' },
+        { name: 'Afternoon', time: '12pm – 4pm' },
+        { name: 'Evening', time: '4pm – 8pm' },
+        { name: 'Night', time: '8pm – 12am' },
+    ];
+    
+    const analysis = useMemo(() => {
+        let totalLogged = 0;
+        const slotAnalyses = slotData.map(slot => {
+            const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+            const loggedTime = activities
+                .filter(a => a.completed)
+                .reduce((sum, a) => sum + (parseInt(activityDurations[a.id]?.replace(' min logged', '') || '0')), 0);
+            
+            totalLogged += loggedTime;
+            const isPast = slotOrder.indexOf(slot.name as keyof DailySchedule) < slotOrder.indexOf(currentSlot as keyof DailySchedule);
+            const isCurrent = slot.name === currentSlot;
+            const wastedTime = isPast ? 240 - loggedTime : 0;
+            const freeTime = isCurrent ? 240 - loggedTime : 0;
+
+            let insight = "";
+            if (isPast) {
+                if (loggedTime === 0 && activities.length > 0) insight = "Planned but didn't execute. A missed opportunity.";
+                else if (loggedTime === 0) insight = "4 hours completely gone. How could this time have served your goals?";
+                else insight = `You captured ${loggedTime} min of value. ${wastedTime} min drifted away.`;
+            } else if (isCurrent) {
+                insight = `This block is active. You have ${freeTime} min remaining to make an impact.`;
+            } else {
+                insight = "This slot is upcoming. Plan it wisely.";
+            }
+
+            return {
+                ...slot,
+                loggedTime,
+                wastedTime,
+                freeTime,
+                isPast,
+                isCurrent,
+                insight,
+                activities: activities.filter(a => !a.completed).map(a => a.details),
+                completedActivities: activities.filter(a => a.completed).map(a => a.details)
+            };
+        });
+        
+        return {
+            slotAnalyses,
+            totalLogged,
+            totalWasted: slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0),
+        };
+    }, [todaysSchedule, activityDurations, currentSlot]);
+
+    return (
+        <DialogContent className="sm:max-w-xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle>Daily Review & Analysis</DialogTitle>
+                <DialogDescription>A breakdown of your time usage for today.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <ScrollArea className="h-full pr-4">
+                    <div className="space-y-4">
+                        {analysis.slotAnalyses.map(slot => (
+                            <div key={slot.name}>
+                                <h4 className="font-semibold text-sm">{slot.name} ({slot.time})</h4>
+                                <div className="text-xs p-3 rounded-md bg-muted/50 mt-1 space-y-2">
+                                    <div className="flex justify-between font-medium">
+                                        <span>Logged: <span className="text-green-500">{slot.loggedTime} min</span></span>
+                                        {slot.isPast && <span className="text-red-500">Wasted: {slot.wastedTime} min</span>}
+                                        {slot.isCurrent && <span>Free: {slot.freeTime} min</span>}
+                                    </div>
+                                    {(slot.activities.length > 0 || slot.completedActivities.length > 0) && (
+                                        <div className="pt-2 border-t text-muted-foreground">
+                                            {slot.completedActivities.length > 0 && <p><b>Done:</b> {slot.completedActivities.join(', ')}</p>}
+                                            {slot.activities.length > 0 && <p><b>Planned:</b> {slot.activities.join(', ')}</p>}
+                                        </div>
+                                    )}
+                                    <p className="italic text-muted-foreground pt-2 border-t">👉 {slot.insight}</p>
+                                </div>
+                            </div>
+                        ))}
+                         <Separator className="my-4" />
+                        <div>
+                            <h4 className="font-semibold">🚀 Overall Daily Breakdown</h4>
+                            <div className="text-sm p-3 rounded-md bg-muted/50 mt-1 space-y-2">
+                                <p><b>Logged:</b> {analysis.totalLogged} minutes</p>
+                                <p><b>Wasted:</b> {analysis.totalWasted} minutes</p>
+                                <p className="italic text-muted-foreground pt-2 border-t">👉 Even small, consistent efforts compound into life-changing progress. You have the power to direct your focus.</p>
+                            </div>
+                        </div>
+                    </div>
+                </ScrollArea>
+            </div>
+        </DialogContent>
+    );
+}
+
 export function SmartLoggingPrompt({ 
     promptType, 
     activeProjects, 
@@ -306,8 +410,7 @@ export function SmartLoggingPrompt({
       description: "Ready to start a focus session and make progress?",
        actions: [
         { label: "View Agenda", onClick: () => router.push('/my-plate') },
-        { label: "Log Interruption", onClick: onOpenInterruptModal, variant: "secondary" },
-      ]
+       ]
     },
     completed: {
       icon: <CheckCircle className="h-6 w-6 text-green-500" />,
@@ -378,7 +481,7 @@ export function SmartLoggingPrompt({
                                                       <CardContent className="p-2 pt-0 text-xs text-muted-foreground space-y-2">
                                                         <p><span className="font-semibold text-foreground">New Response:</span> {habit.newResponse?.text}</p>
                                                         <ResistanceSection habit={habit} isNegative={false} onTechniqueClick={openMindsetTechniquePopup} />
-                                                        <TruthSection habit={habit} isNegative={false} />
+                                                        <TruthSection habit={habit} />
                                                       </CardContent>
                                                   </Card>
                                               )}
@@ -407,6 +510,14 @@ export function SmartLoggingPrompt({
                                 {action.label}
                             </Button>
                         ))}
+                        {promptType === 'inactive' && (
+                            <Dialog>
+                                <DialogTrigger asChild>
+                                    <Button size="sm" variant="secondary" className="flex-1">Review Day</Button>
+                                </DialogTrigger>
+                                <DailyReviewDialog />
+                            </Dialog>
+                        )}
                     </div>
                 </div>
             </motion.div>
