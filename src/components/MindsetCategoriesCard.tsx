@@ -2,36 +2,76 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
-import { cn } from '@/lib/utils';
+import { format, isBefore, startOfDay, parseISO } from 'date-fns';
+import type { Activity, ActivityType, DatedWorkout, DailySchedule, Resource, Stopper } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import type { Stopper, Resource } from '@/types/workout';
+import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle } from 'lucide-react';
+import { Button } from './ui/button';
+import { cn } from '@/lib/utils';
+
+const activityNameMap: Record<ActivityType, string> = {
+    deepwork: 'Deep Work',
+    upskill: 'Learning',
+    workout: 'Workout',
+    mindset: 'Mindset',
+    branding: 'Branding',
+    essentials: 'Essentials',
+    planning: 'Planning',
+    tracking: 'Tracking',
+    'lead-generation': 'Lead Gen',
+    interrupt: 'Interrupts',
+    distraction: 'Distractions',
+    nutrition: 'Nutrition',
+};
+
+const activityColorMapping: Record<string, string> = {
+    'Deep Work': 'bg-green-500',
+    'Learning': 'bg-blue-500',
+    'Workout': 'bg-red-500',
+    'Mindset': 'bg-purple-500',
+    'Branding': 'bg-pink-500',
+    'Lead Gen': 'bg-yellow-500',
+    'Essentials': 'bg-gray-400',
+    'Planning': 'bg-teal-500',
+    'Tracking': 'bg-indigo-500',
+    'Interrupts': 'bg-orange-600',
+    'Distractions': 'bg-amber-600',
+    'Nutrition': 'bg-lime-500',
+    'Wasted Time': 'bg-orange-600',
+    'Scheduled': 'bg-sky-500',
+    'Free Time': 'bg-gray-400',
+};
+
+const slotOrder: { name: string; endHour: number, startHour: number }[] = [
+    { name: 'Late Night', endHour: 4, startHour: 0 },
+    { name: 'Dawn', endHour: 8, startHour: 4 },
+    { name: 'Morning', endHour: 12, startHour: 8 },
+    { name: 'Afternoon', endHour: 16, startHour: 12 },
+    { name: 'Evening', endHour: 20, startHour: 16 },
+    { name: 'Night', endHour: 24, startHour: 20 }
+];
+
 
 export function MindsetCategoriesCard() {
     const { 
         mindProgrammingCategories,
         mindProgrammingDefinitions,
-        openLinkedResistancePopup,
         habitCards,
         mechanismCards,
         logStopperEncounter,
+        openLinkedResistancePopup,
     } = useAuth();
     
     const [isClient, setIsClient] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
+    const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
 
     const [position, setPosition] = useState({ x: 20, y: 150 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
-    
-    const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
-    const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
 
     useEffect(() => {
       setIsClient(true);
@@ -101,7 +141,6 @@ export function MindsetCategoriesCard() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        // This is a more robust way to check if the click originated from a button or its child
         if (target.closest('button')) {
             return;
         }
@@ -138,6 +177,13 @@ export function MindsetCategoriesCard() {
           window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isDragging, dragStartOffset]);
+    
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: position.y,
+        left: position.x,
+        willChange: 'transform',
+    };
 
     const techniquesByCategory = React.useMemo(() => {
         const map: Record<string, typeof mindProgrammingDefinitions> = {};
@@ -156,7 +202,6 @@ export function MindsetCategoriesCard() {
         const bIsHot = hotResistances.has(b.stopper.id);
         if (aIsHot && !bIsHot) return -1;
         if (!aIsHot && bIsHot) return 1;
-        // Optional: further sort by other criteria if needed, e.g., timestamp
         const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
         const lastTsB = Math.max(0, ...(b.stopper.timestamps || []));
         return lastTsB - lastTsA;
@@ -239,10 +284,9 @@ export function MindsetCategoriesCard() {
             onMouseDown={handleMouseDown}
         >
             <Card 
-                ref={setNodeRef}
                 className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
             >
-                <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+                <div className="cursor-grab active:cursor-grabbing">
                     <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
                         {view === 'all-resistances' && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
