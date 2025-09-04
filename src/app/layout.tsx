@@ -61,7 +61,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     const hourMatch = durationStr.match(/(\d+)\s*h/);
     if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
     const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
     
     return totalMinutes;
 };
