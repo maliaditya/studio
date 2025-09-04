@@ -18,7 +18,7 @@ import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
-import { RuleDetailPopupCard } from '@/components/RuleDetailPopup';
+import { RuleDetailPopupCard, LinkedResistancePopup } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -113,6 +113,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     openMindsetTechniquePopup,
     missedSlotReviews,
     setMissedSlotReviews,
+    linkedResistancePopup,
+    setLinkedResistancePopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -489,6 +491,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     onClose={closeRuleDetailPopup}
                 />
             )}
+             {linkedResistancePopup && (
+                <LinkedResistancePopup
+                    popupState={linkedResistancePopup}
+                    onClose={() => setLinkedResistancePopup(null)}
+                />
+            )}
             {Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
                     key={popupState.activityId}
@@ -570,3 +578,6 @@ export default function RootLayout({
     </html>
   );
 }
+
+
+  

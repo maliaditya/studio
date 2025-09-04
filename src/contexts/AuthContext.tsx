@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -366,6 +366,11 @@ interface AuthContextType {
   handleLinkHabit: (activityId: string, habitId: string, link: boolean) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
+  
+  // Mindset Technique Popup
+  linkedResistancePopup: MindsetTechniquePopupState | null;
+  setLinkedResistancePopup: React.Dispatch<React.SetStateAction<MindsetTechniquePopupState | null>>;
+  openLinkedResistancePopup: (techniqueId: string, event: React.MouseEvent) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -524,6 +529,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Path Diagram State
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
+  
+  // Mindset Technique Popup
+  const [linkedResistancePopup, setLinkedResistancePopup] = useState<MindsetTechniquePopupState | null>(null);
+
+  const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
+    const popupWidth = 384; // w-96
+    const popupHeight = 400; // estimated
+    const targetRect = (event.target as HTMLElement).getBoundingClientRect();
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    let x, y;
+
+    if (targetRect.right + popupWidth < screenWidth) {
+      x = targetRect.right + 10;
+    } else {
+      x = targetRect.left - popupWidth - 10;
+    }
+    y = targetRect.top;
+
+    if (x < 10) x = 10;
+    if (x + popupWidth > screenWidth - 10) x = screenWidth - popupWidth - 10;
+    if (y < 10) y = 10;
+    if (y + popupHeight > screenHeight - 10) y = screenHeight - popupHeight - 10;
+    
+    setLinkedResistancePopup({ techniqueId, x, y, level: 0, z: 100 });
+  };
 
   const setTheme = (newTheme: string) => {
     setThemeState(newTheme);
@@ -2733,6 +2764,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateActivitySubtask, deleteActivitySubtask,
     handleLinkHabit,
     missedSlotReviews, setMissedSlotReviews,
+    linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup
   };
 
   useEffect(() => {
@@ -2928,3 +2960,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+  
