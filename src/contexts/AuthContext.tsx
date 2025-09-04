@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, MindsetTechniquePopupState, Stopper, Strength, SubTask, MissedSlotReview } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -361,11 +361,6 @@ interface AuthContextType {
   currentSlot: string;
   activeProjectIds: Set<string>;
 
-  // Mindset Technique Popup
-  mindsetTechniquePopup: MindsetTechniquePopupState | null;
-  openMindsetTechniquePopup: (techniqueId: string, event: React.MouseEvent) => void;
-  closeMindsetTechniquePopup: (techniqueId: string) => void;
-  handleMindsetTechniquePopupDragEnd: (event: DragEndEvent) => void;
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
   handleLinkHabit: (activityId: string, habitId: string, link: boolean) => void;
@@ -472,9 +467,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Today's Diet Popup
   const [todaysDietPopup, setTodaysDietPopup] = useState<TodaysDietPopupState | null>(null);
-  
-  // Mindset Technique Popup
-  const [mindsetTechniquePopup, setMindsetTechniquePopup] = useState<MindsetTechniquePopupState | null>(null);
   
   // End-of-slot review state
   const [missedSlotReviews, setMissedSlotReviews] = useState<Record<string, MissedSlotReview>>({});
@@ -2281,30 +2273,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const openMindsetTechniquePopup = (techniqueId: string, event: React.MouseEvent) => {
-    const popupWidth = 384; // w-96
-    const popupHeight = 400; // Estimated
-    let x = event.clientX;
-    let y = event.clientY;
-
-    if (x + popupWidth > window.innerWidth) x = window.innerWidth - popupWidth - 20;
-    if (y + popupHeight > window.innerHeight) y = window.innerHeight - popupHeight - 20;
-
-    setMindsetTechniquePopup({ techniqueId, x, y, level: 0, z: 105 });
-  };
-
-  const closeMindsetTechniquePopup = (techniqueId: string) => {
-    if (mindsetTechniquePopup?.techniqueId === techniqueId) {
-      setMindsetTechniquePopup(null);
-    }
-  };
-
-  const handleMindsetTechniquePopupDragEnd = (event: DragEndEvent) => {
-    if (mindsetTechniquePopup && event.active.id === `mindset-technique-popup-${mindsetTechniquePopup.techniqueId}`) {
-      setMindsetTechniquePopup(prev => prev ? { ...prev, x: prev.x + event.delta.x, y: prev.y + event.delta.y } : null);
-    }
-  };
-
   const swapMealInSchedule = (targetSlot: string, targetActivityId: string, sourceDay: string, sourceMeal: 'meal1' | 'meal2' | 'meal3') => {
     const dayPlan = dietPlan.find(p => p.day === sourceDay);
     if (!dayPlan) return;
@@ -2762,7 +2730,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     recentItems, addToRecents,
     currentSlot,
     activeProjectIds,
-    mindsetTechniquePopup, openMindsetTechniquePopup, closeMindsetTechniquePopup, handleMindsetTechniquePopupDragEnd,
     updateActivitySubtask, deleteActivitySubtask,
     handleLinkHabit,
     missedSlotReviews, setMissedSlotReviews,
@@ -2956,6 +2923,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

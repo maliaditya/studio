@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Project, Activity, MissedSlotReview } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MindsetTechniquePopup } from '@/components/MindsetTechniquePopup';
+import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 
 
@@ -109,9 +109,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     focusActivity,
     handleStartFocusSession,
     focusDuration,
-    mindsetTechniquePopup,
-    closeMindsetTechniquePopup,
-    handleMindsetTechniquePopupDragEnd,
     currentSlot,
     openMindsetTechniquePopup,
     missedSlotReviews,
@@ -190,7 +187,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         if (ruleDetailPopup) closeRuleDetailPopup();
         if (habitDetailPopup) closeHabitDetailPopup();
         if (todaysDietPopup) closeTodaysDietPopup();
-        if (mindsetTechniquePopup) closeMindsetTechniquePopup();
         return;
       }
       
@@ -204,7 +200,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup, closeRuleDetailPopup, habitDetailPopup, closeHabitDetailPopup, todaysDietPopup, closeTodaysDietPopup, mindsetTechniquePopup, closeMindsetTechniquePopup]);
+  }, [openPopups, generalPopups, closeAllResourcePopups, ruleDetailPopup, closeRuleDetailPopup, habitDetailPopup, closeHabitDetailPopup, todaysDietPopup, closeTodaysDietPopup]);
   
   const handleDragEnd = (event: DragEndEvent) => {
     handlePopupDragEnd(event);
@@ -212,7 +208,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleHabitDetailPopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
-    handleMindsetTechniquePopupDragEnd(event);
   };
   
   const selectedDateKey = format(new Date(), 'yyyy-MM-dd');
@@ -374,6 +369,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
+      <MindsetCategoriesCard />
       <ActivityDistributionCard />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
        <FocusSessionModal
@@ -417,7 +413,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           currentSlot={currentSlot}
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
-          openMindsetTechniquePopup={openMindsetTechniquePopup}
+          openMindsetTechniquePopup={() => {}}
           openHabitDetailPopup={authContext.openHabitDetailPopup}
       />
       <MissedSlotModal 
@@ -507,12 +503,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                         closeTodaysDietPopup();
                         setIsDietPlanModalOpen(true);
                     }}
-                />
-            )}
-            {mindsetTechniquePopup && (
-                <MindsetTechniquePopup
-                    popupState={mindsetTechniquePopup}
-                    onClose={closeMindsetTechniquePopup}
                 />
             )}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
