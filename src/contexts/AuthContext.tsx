@@ -207,6 +207,7 @@ interface AuthContextType {
   createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type']) => ExerciseDefinition | Resource | undefined;
   handleDeleteStopper: (habitId: string, stopperId: string) => void;
   handleDeleteStrength: (habitId: string, strengthId: string) => void;
+  incrementStopperCount: (habitId: string, stopperId: string) => void;
   
   // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
@@ -2364,6 +2365,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setRecentItems]);
 
+  const incrementStopperCount = (habitId: string, stopperId: string) => {
+    setResources(prevResources => {
+        return prevResources.map(resource => {
+            if (resource.id === habitId && (resource.type === 'habit' || resource.type === 'mechanism')) {
+                const updatedUrges = (resource.urges || []).map(stopper =>
+                    stopper.id === stopperId
+                        ? { ...stopper, count: (stopper.count || 0) + 1 }
+                        : stopper
+                );
+                const updatedResistances = (resource.resistances || []).map(stopper =>
+                    stopper.id === stopperId
+                        ? { ...stopper, count: (stopper.count || 0) + 1 }
+                        : stopper
+                );
+                return { ...resource, urges: updatedUrges, resistances: updatedResistances };
+            }
+            return resource;
+        });
+    });
+  };
+  
   const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
     let path: string[];
     let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
@@ -2483,7 +2505,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleDeleteStopper = (habitId: string, stopperId: string) => {
     setResources(prev => prev.map(r => {
         if (r.id === habitId) {
-            return { ...r, urges: (r.urges || []).filter(s => s.id !== stopperId), resistances: (r.resistances || []).filter(s => s.id !== stopperId) };
+            return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
         }
         return r;
     }));
@@ -2709,6 +2731,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
     createResourceWithHierarchy,
     handleDeleteStopper, handleDeleteStrength,
+    incrementStopperCount,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,
@@ -2963,3 +2986,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
