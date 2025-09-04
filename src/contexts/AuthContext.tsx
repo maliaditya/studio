@@ -665,34 +665,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
-    
-    const definitions = [...deepWorkDefinitions, ...upskillDefinitions];
+    const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
 
-    function recurse(d: ExerciseDefinition) {
-        if (visited.has(d.id)) return;
-        visited.add(d.id);
-  
-        const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
-  
+    function recurse(currentDef: ExerciseDefinition) {
+        if (!currentDef || visited.has(currentDef.id)) return;
+        visited.add(currentDef.id);
+
+        const deepWorkChildren = currentDef.linkedDeepWorkIds || [];
+        const upskillChildren = currentDef.linkedUpskillIds || [];
+        const hasChildren = deepWorkChildren.length > 0 || upskillChildren.length > 0;
+
         if (hasChildren) {
-            (d.linkedDeepWorkIds || []).forEach(childId => {
-                const childDef = definitions.find(c => c.id === childId);
+            deepWorkChildren.forEach(childId => {
+                const childDef = allDefsMap.get(childId);
                 if (childDef) recurse(childDef);
             });
-            (d.linkedUpskillIds || []).forEach(childId => {
-                const childDef = definitions.find(c => c.id === childId);
+            upskillChildren.forEach(childId => {
+                const childDef = allDefsMap.get(childId);
                 if (childDef) recurse(childDef);
             });
-        }
-        else {
-            total += d.estimatedDuration || 0;
+        } else {
+            total += currentDef.estimatedDuration || 0;
         }
     }
-  
+
     recurse(def);
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
-
+  
   const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
     const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
     const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
@@ -1068,6 +1068,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Set Main Data
     loadImportedData(mainData, uiState);
+    
+    // Wait for state to apply before allowing saves
+    setTimeout(() => setIsLoadingState(false), 100);
   };
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
@@ -1349,6 +1352,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const loadImportedData = (mainData: any, uiData: any) => {
+    setIsLoadingState(true);
+
     setWeightLogs(mainData.weightLogs || []);
     setGoalWeight(mainData.goalWeight || null);
     setHeight(mainData.height || null);
@@ -1413,6 +1418,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedCompanyId(uiData.selectedCompanyId || null);
     setRecentItems(uiData.recentItems || []);
     setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
+    
+    setTimeout(() => setIsLoadingState(false), 100);
   };
 
 
@@ -2820,3 +2827,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
+
