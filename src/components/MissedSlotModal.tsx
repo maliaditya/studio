@@ -74,7 +74,7 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
     if (incompleteTasks.length > 0) {
       return {
         title: `Review Your Incomplete '${slotName}' Slot`,
-        question: "What happened? Why were these tasks not completed?",
+        question: "What was the main reason these tasks were not completed?",
         taskList: incompleteTasks,
         isDistractionLoggable: true,
         freeTime: remainingMinutes,
