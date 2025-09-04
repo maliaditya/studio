@@ -344,74 +344,92 @@ function MyPlatePageContent() {
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
-    if (!currentUser?.username) return;
-    
-    if (type === 'interrupt' || type === 'distraction') {
-        setInterruptDetails('');
-        setInterruptDuration('');
-        setApplyInterruptToFutureSlots(false);
-        setInterruptModalState({ isOpen: true, slotName, type });
-        return;
-    }
-    
-    if (type === 'essentials') {
-        setEssentialDetails('');
-        setEssentialDuration('');
-        setEssentialLinkedHabitId(null);
-        setEssentialsModalState({ isOpen: true, slotName, activity: null });
-        return;
-    }
-    
-    if (type === 'nutrition') {
-        setCurrentSlotForMeal(slotName);
-        setIsMealModalOpen(true);
-        return;
-    }
+        if (!currentUser?.username) return;
 
-    const SLOT_CAPACITY_MINUTES = 240;
-    
-    const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
-    const currentSlotDuration = (Array.isArray(activitiesInSlot) ? activitiesInSlot : []).reduce((sum, act) => sum + (act.duration || 0), 0);
-
-    let details = '';
-    let newActivityDuration = 0;
-
-    switch (type) {
-      case 'workout': 
-        if (selectedDate) {
-            const { description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-            details = description.split(' for ')[1] || "Workout";
+        if (type === 'interrupt' || type === 'distraction') {
+            setInterruptDetails('');
+            setInterruptDuration('');
+            setApplyInterruptToFutureSlots(false);
+            setInterruptModalState({ isOpen: true, slotName, type });
+            return;
         }
-        newActivityDuration = 90;
-        break;
-      case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
-      case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
-      case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
-      case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
-      case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
-      case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
-      case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
-    }
-    
-    if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
-        toast({ title: "Slot Full", description: `This activity would exceed the 4-hour slot limit.`, variant: "destructive" });
-        return;
-    }
-    
-    const defaultHabitId = settings.defaultHabitLinks?.[type] || null;
 
-    const newActivity: Activity = { 
-      id: `${type}-${Date.now()}-${Math.random()}`, 
-      type, 
-      details, 
-      completed: false,
-      taskIds: [],
-      slot: slotName,
-      habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+        if (type === 'essentials') {
+            setEssentialDetails('');
+            setEssentialDuration('');
+            setEssentialLinkedHabitId(null);
+            setEssentialsModalState({ isOpen: true, slotName, activity: null });
+            return;
+        }
+
+        if (type === 'nutrition') {
+            setCurrentSlotForMeal(slotName);
+            setIsMealModalOpen(true);
+            return;
+        }
+
+        const SLOT_CAPACITY_MINUTES = 240;
+        const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
+        
+        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+        const currentSlotDuration = (Array.isArray(activitiesInSlot) ? activitiesInSlot : []).reduce((sum, act) => {
+            let duration = 0;
+            if (act.completed) {
+                duration = parseDurationToMinutes(activityDurations[act.id]);
+            } else {
+                 if (act.taskIds && act.taskIds.length > 0) {
+                    const mainDef = allDefs.get(act.taskIds[0]);
+                    if (mainDef) duration = calculateTotalEstimate(mainDef);
+                } else if (act.duration) {
+                    duration = act.duration;
+                } else {
+                    // Default estimates for tasks without specific definitions yet
+                    switch(act.type) {
+                        case 'workout': duration = 90; break;
+                        case 'mindset': duration = 15; break;
+                        case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
+                        case 'planning': case 'tracking': duration = 30; break;
+                        case 'lead-generation': duration = 45; break;
+                        default: duration = 0;
+                    }
+                }
+            }
+            return sum + duration;
+        }, 0);
+
+        let details = '';
+        let newActivityDuration = 0;
+
+        switch (type) {
+          case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
+          case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
+          case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
+          case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
+          case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
+          case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
+          case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
+          case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
+        }
+        
+        if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
+            toast({ title: "Slot Full", description: `This activity would exceed the 4-hour slot limit.`, variant: "destructive" });
+            return;
+        }
+        
+        const defaultHabitId = settings.defaultHabitLinks?.[type] || null;
+
+        const newActivity: Activity = { 
+          id: `${type}-${Date.now()}-${Math.random()}`, 
+          type, 
+          details, 
+          completed: false,
+          taskIds: [],
+          slot: slotName,
+          habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+        };
+        
+        setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity] } }));
     };
-    
-    setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity] } }));
-  };
 
   const handleSaveInterrupt = () => {
     const { slotName, type } = interruptModalState;
@@ -1350,6 +1368,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
