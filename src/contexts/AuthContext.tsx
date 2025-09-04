@@ -50,6 +50,7 @@ interface UserSettings {
   carryForwardNutrition: boolean;
   smartLogging: boolean;
   defaultHabitLinks: Record<ActivityType, string | null>;
+  routines?: Activity[];
 }
 
 interface ActiveFocusSession {
@@ -398,6 +399,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     carryForwardNutrition: false,
     smartLogging: false,
     defaultHabitLinks: {},
+    routines: [],
   });
 
   // Health State
@@ -761,7 +763,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 case 'lead-generation': totalMinutes = 45; break;
                 case 'essentials':
                 case 'interrupt':
-                  totalMinutes = activity.duration || 0; break;
+                case 'distraction':
+                   totalMinutes = activity.duration || 0; break;
                 default: totalMinutes = 0;
               }
             }
@@ -1104,69 +1107,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !settings.carryForward) return;
+    if (!currentUser?.username || isLoadingState) return;
 
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const lastRun = localStorage.getItem(lastCarryForwardKey);
-    if (lastRun === todayStr) return;
-    
-    const settingsKey = `lifeos_settings_${currentUser.username}`;
-        const storedSettings = localStorage.getItem(settingsKey);
-        const currentSettings = storedSettings ? JSON.parse(storedSettings) : { carryForward: false, carryForwardEssentials: false, carryForwardNutrition: false };
+    const todaysSchedule = schedule[todayStr];
+    const routines = settings.routines || [];
 
-        if (!currentSettings.carryForward && !currentSettings.carryForwardEssentials && !currentSettings.carryForwardNutrition) {
-          localStorage.setItem(lastCarryForwardKey, todayStr);
-          return;
-        }
-    
-    const yesterday = subDays(new Date(), 1);
-    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
-
-    if (!yesterdaysSchedule) {
-      localStorage.setItem(lastCarryForwardKey, todayStr);
-      return;
-    }
-
-    const carriedOverTasks: Activity[] = [];
-    Object.values(yesterdaysSchedule).flat().forEach(activity => {
-      if (activity && !activity.completed) {
-        if (activity.isRoutine || 
-           (activity.type === 'essentials' && currentSettings.carryForwardEssentials) ||
-           (activity.type === 'nutrition' && currentSettings.carryForwardNutrition) ||
-           currentSettings.carryForward) {
-          
-          let newDetails = activity.details;
-          if (activity.type === 'workout') {
-            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-            newDetails = description.split(' for ')[1] || "Workout";
-          }
-          carriedOverTasks.push({
-            ...activity,
-            id: `${activity.type}-${Date.now()}-${Math.random()}`,
-            completed: false,
-            taskIds: activity.isRoutine ? activity.taskIds : []
-          });
-        }
-      }
-    });
-
-    if (carriedOverTasks.length > 0) {
-      setSchedule(prev => {
-        const newTodaySchedule = { ...(prev[todayStr] || {}) };
-        carriedOverTasks.forEach(task => {
-            const slotActivities = Array.isArray(newTodaySchedule[task.slot]) ? newTodaySchedule[task.slot] as Activity[] : [];
-            if (slotActivities.length < 2) {
-              newTodaySchedule[task.slot] = [...slotActivities, task];
+    // Only populate if today is empty AND there are routines defined
+    if ((!todaysSchedule || Object.keys(todaysSchedule).length === 0) && routines.length > 0) {
+        const newDaySchedule: DailySchedule = {};
+        
+        routines.forEach((task: Activity) => {
+            const slot = task.slot as keyof DailySchedule;
+            if (!newDaySchedule[slot]) {
+                newDaySchedule[slot] = [];
             }
+            (newDaySchedule[slot] as Activity[]).push({
+                ...task,
+                id: `${task.type}-${Date.now()}-${Math.random()}`,
+                completed: false,
+            });
         });
-        return { ...prev, [todayStr]: newTodaySchedule };
-      });
-    }
 
-    localStorage.setItem(lastCarryForwardKey, todayStr);
-  }, [currentUser, isScheduleLoaded, schedule]);
+        if (Object.keys(newDaySchedule).length > 0) {
+            setSchedule(prev => ({
+                ...prev,
+                [todayStr]: newDaySchedule,
+            }));
+        }
+    }
+  }, [currentUser, isLoadingState, settings.routines]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2981,4 +2951,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 

@@ -152,7 +152,9 @@ function MyPlatePageContent() {
   }, [resources]);
 
   useEffect(() => {
-    setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 365));
+    if (selectedDate) {
+      setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 365));
+    }
   }, [selectedDate]);
 
   useEffect(() => {
@@ -177,24 +179,31 @@ function MyPlatePageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const dayScheduleExists = schedule[dateKey] && Object.keys(schedule[dateKey]).length > 0;
   
-    // Only proceed if the day's schedule is empty
-    if (dayScheduleExists) return;
+    // Only proceed if the day's schedule is empty and it's a future date
+    if (dayScheduleExists || isBefore(selectedDate, startOfToday())) {
+        return;
+    }
+
+    const referenceDateKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+    const referenceSchedule = schedule[referenceDateKey];
     
-    // Only proceed if the selected date is today or in the future
-    if (isBefore(selectedDate, startOfToday())) return;
+    // This part of the logic might be redundant if the main context handles it, but good for future planning
+    if (!referenceSchedule) return;
 
     const newDaySchedule: DailySchedule = {};
     
-    settings.routines.forEach((task: Activity) => {
-      const slot = task.slot as keyof DailySchedule;
-      if (!newDaySchedule[slot]) {
-        newDaySchedule[slot] = [];
-      }
-      (newDaySchedule[slot] as Activity[]).push({
-        ...task,
-        id: `${task.type}-${Date.now()}-${Math.random()}`, // Ensure unique ID for each instance
-        completed: false,
-      });
+    Object.values(referenceSchedule).flat().forEach((task) => {
+        if(task && typeof task === 'object' && 'isRoutine' in task && task.isRoutine) {
+            const slot = task.slot as keyof DailySchedule;
+            if (!newDaySchedule[slot]) {
+                newDaySchedule[slot] = [];
+            }
+            (newDaySchedule[slot] as Activity[]).push({
+                ...task,
+                id: `${task.type}-${Date.now()}-${Math.random()}`,
+                completed: false,
+            });
+        }
     });
 
     if (Object.keys(newDaySchedule).length > 0) {
@@ -1369,6 +1378,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
