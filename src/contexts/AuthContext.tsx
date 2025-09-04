@@ -1915,7 +1915,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!resource) return newPopups;
         
         const popupWidth = 512;
-        const popupHeight = 400; // Approximate height for calculation
+        const popupHeight = 400; // Approximate height for centering
         let x, y, level, parentId;
 
         if (parentPopupState && parentRect) {
@@ -2986,4 +2986,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
 

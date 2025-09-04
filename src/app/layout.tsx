@@ -115,6 +115,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setMissedSlotReviews,
     linkedResistancePopup,
     setLinkedResistancePopup,
+    openLinkedResistancePopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);

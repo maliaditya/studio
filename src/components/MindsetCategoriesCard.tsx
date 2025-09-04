@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain, Link as LinkIcon } from 'lucide-react';
+import { Brain, Link as LinkIcon, Workflow } from 'lucide-react';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
@@ -101,16 +101,19 @@ export function MindsetCategoriesCard() {
         >
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                 <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
-                    <CardHeader className="p-0 mb-3">
+                    <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
                             <Brain className="h-5 w-5" />
                             Mindset Techniques
                         </CardTitle>
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => openLinkedResistancePopup('all', e)}>
+                            <Workflow className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                 </div>
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
-                        <Accordion type="single" collapsible className="w-full">
+                         <Accordion type="single" collapsible className="w-full">
                              {Object.entries(techniquesByCategory).map(([category, techniques]) => (
                                 <AccordionItem value={category} key={category}>
                                     <AccordionTrigger className="text-sm font-semibold hover:no-underline">

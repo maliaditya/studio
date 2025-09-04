@@ -52,7 +52,7 @@ const LogicDiagramPopup = ({ popupState, onClose }: { popupState: LogicDiagramPo
         position: 'fixed',
         top: '50%',
         left: '50%',
-        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px, 0)` : 'translate(-50%, -50%)',
+        transform: transform ? `translate3d(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px), 0)` : 'translate(-50%, -50%)',
         zIndex: 110,
     };
 
@@ -178,47 +178,42 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
-    const technique = mindProgrammingDefinitions.find(t => t.id === techniqueId);
+    const isAllView = techniqueId === 'all';
+    const technique = isAllView ? null : mindProgrammingDefinitions.find(t => t.id === techniqueId);
 
     const allLinks = useMemo(() => {
-        if (!techniqueId) return [];
         const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
         
         habitCards.forEach(habit => {
-            (habit.urges || []).forEach(urge => {
-                if (urge.linkedTechniqueId === techniqueId) {
-                    const mechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-                    links.push({
-                        habitId: habit.id,
-                        habitName: habit.name,
-                        stopper: urge,
-                        isUrge: true,
-                        mechanismName: mechanism?.name,
-                    });
-                }
-            });
-            (habit.resistances || []).forEach(resistance => {
-                if (resistance.linkedTechniqueId === techniqueId) {
-                    const mechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-                    links.push({
-                        habitId: habit.id,
-                        habitName: habit.name,
-                        stopper: resistance,
-                        isUrge: false,
-                        mechanismName: mechanism?.name,
-                    });
-                }
-            });
+            const processStoppers = (stoppers: Stopper[] = [], isUrge: boolean) => {
+                stoppers.forEach(stopper => {
+                    const shouldInclude = isAllView ? !!stopper.linkedTechniqueId : stopper.linkedTechniqueId === techniqueId;
+                    if (shouldInclude) {
+                        const mechanism = mechanismCards.find(m => m.id === (isUrge ? habit.response?.resourceId : habit.newResponse?.resourceId));
+                        links.push({
+                            habitId: habit.id,
+                            habitName: habit.name,
+                            stopper: stopper,
+                            isUrge: isUrge,
+                            mechanismName: mechanism?.name,
+                        });
+                    }
+                });
+            };
+            processStoppers(habit.urges, true);
+            processStoppers(habit.resistances, false);
         });
         return links;
-    }, [techniqueId, habitCards, mechanismCards]);
+    }, [techniqueId, isAllView, habitCards, mechanismCards]);
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
             <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
-                        <CardTitle className="text-base">Linked Resistances for "{technique?.name}"</CardTitle>
+                        <CardTitle className="text-base truncate">
+                            {isAllView ? "All Linked Resistances" : `Linked Resistances for "${technique?.name}"`}
+                        </CardTitle>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
                     </div>
                 </CardHeader>
@@ -226,7 +221,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                     <ScrollArea className="h-60 pr-2">
                         {allLinks.length > 0 ? (
                             <ul className="space-y-2">
-                                {allLinks.map((link, index) => (
+                                {allLinks.map((link) => (
                                     <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
                                         <div className="flex justify-between items-start">
                                             <p className="font-semibold flex-grow">{link.stopper.text}</p>
@@ -250,7 +245,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                             </ul>
                         ) : (
                             <p className="text-center text-sm text-muted-foreground py-8">
-                                This technique is not linked to any specific resistance.
+                                {isAllView ? "No urges or resistances are linked to any techniques." : "This technique is not linked to any specific resistance."}
                             </p>
                         )}
                     </ScrollArea>
