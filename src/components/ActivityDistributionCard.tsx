@@ -79,7 +79,7 @@ export function ActivityDistributionCard() {
         const hourMatch = durationStr.match(/(\d+)\s*h/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch, 10);
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
         return totalMinutes;
     };
 
@@ -101,8 +101,8 @@ export function ActivityDistributionCard() {
             const isPastSlot = currentHour >= slot.endHour;
 
             activities.forEach(activity => {
+                const duration = parseDurationToMinutes(activityDurations[activity.id]);
                 if (activity.completed) {
-                    const duration = parseDurationToMinutes(activityDurations[activity.id]);
                     const mappedName = activityNameMap[activity.type];
                     if (mappedName) {
                         totals[mappedName] = (totals[mappedName] || 0) + duration;
@@ -110,17 +110,17 @@ export function ActivityDistributionCard() {
                     loggedInSlot += duration;
                 } else if (!isPastSlot) {
                     // It's a future or current slot, count as scheduled
-                    const estDuration = parseDurationToMinutes(activityDurations[activity.id]);
-                    scheduledInSlot += estDuration;
+                    scheduledInSlot += duration;
                 }
             });
 
             totalLoggedMinutes += loggedInSlot;
-            scheduledTime += scheduledInSlot;
             
             if (isPastSlot) {
                 wastedTime += Math.max(0, 240 - loggedInSlot);
             }
+            
+            scheduledTime += scheduledInSlot;
         });
         
         if (wastedTime > 0) {
@@ -139,9 +139,19 @@ export function ActivityDistributionCard() {
             totals['Free Time'] = freeTime;
         }
 
+        const PREFERRED_ORDER = ['Wasted Time', 'Free Time', 'Scheduled', 'Distractions'];
+
         const newTimeAllocation = Object.entries(totals)
             .map(([name, time]) => ({ name, time }))
-            .sort((a, b) => b.time - a.time);
+            .sort((a, b) => {
+                const aIndex = PREFERRED_ORDER.indexOf(a.name);
+                const bIndex = PREFERRED_ORDER.indexOf(b.name);
+        
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex; // Both are in preferred order
+                if (aIndex !== -1) return -1; // a is preferred, b is not
+                if (bIndex !== -1) return 1; // b is preferred, a is not
+                return b.time - a.time; // Neither are preferred, sort by time
+            });
 
         setTimeAllocation(newTimeAllocation);
         
