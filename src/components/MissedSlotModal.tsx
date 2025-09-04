@@ -108,7 +108,8 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
     };
 
     let newDistraction: Activity | undefined = undefined;
-    if (modalContent.isDistractionLoggable && reason.trim() && modalContent.freeTime > 0) {
+    // Always create a distraction if there's a reason and time available
+    if (reason.trim() && modalContent.freeTime > 0) {
         newDistraction = {
             id: `distraction_${Date.now()}`,
             type: 'distraction',
