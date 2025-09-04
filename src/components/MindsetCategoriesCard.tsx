@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -10,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from './ui/button';
-import type { Stopper } from '@/types/workout';
+import type { Stopper, Resource } from '@/types/workout';
 
 export function MindsetCategoriesCard() {
     const { 
@@ -47,7 +48,11 @@ export function MindsetCategoriesCard() {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        if ((e.target as HTMLElement).closest('button, a')) return;
+        const target = e.target as HTMLElement;
+        // This is the key fix: Check if the click originated from a button or a descendant of a button.
+        if (target.closest('button')) {
+            return;
+        }
         setIsDragging(true);
         setDragStartOffset({
           x: e.clientX - position.x - (transform?.x || 0),
@@ -118,6 +123,69 @@ export function MindsetCategoriesCard() {
         return null;
     }
 
+    const renderContent = () => {
+        if (view === 'all-resistances') {
+            return (
+                <ul className="space-y-2">
+                    {allLinkedResistances.map((link) => (
+                        <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
+                            <div className="flex justify-between items-start">
+                                <p className="font-semibold flex-grow">{link.stopper.text}</p>
+                                <div className="flex items-center flex-shrink-0">
+                                    <span className="text-xs font-bold mr-1">({link.stopper.count || 0})</span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => incrementStopperCount(link.habitId, link.stopper.id)}>
+                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                            </p>
+                            {link.mechanismName && (
+                                <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
+                                    <p>Mechanism: {link.mechanismName}</p>
+                                </div>
+                            )}
+                        </li>
+                    ))}
+                    {allLinkedResistances.length === 0 && (
+                        <p className="text-center text-sm text-muted-foreground py-8">
+                            No urges or resistances are linked to any techniques yet.
+                        </p>
+                    )}
+                </ul>
+            );
+        }
+
+        return (
+            <Accordion type="single" collapsible className="w-full">
+                {Object.entries(techniquesByCategory).map(([category, techniques]) => (
+                   <AccordionItem value={category} key={category}>
+                       <AccordionTrigger className="text-sm font-semibold hover:no-underline">
+                           {category}
+                       </AccordionTrigger>
+                       <AccordionContent>
+                           {techniques.length > 0 ? (
+                               <ul className="text-xs space-y-1 pl-2">
+                                   {techniques.map(tech => (
+                                     <li key={tech.id} className="flex items-center justify-between group">
+                                       <span className="text-muted-foreground">{tech.name}</span>
+                                       <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => openLinkedResistancePopup(tech.id, e)}>
+                                         <LinkIcon className="h-3 w-3 text-primary" />
+                                       </Button>
+                                     </li>
+                                   ))}
+                               </ul>
+                           ) : (
+                               <p className="text-xs text-muted-foreground italic">No techniques defined.</p>
+                           )}
+                       </AccordionContent>
+                   </AccordionItem>
+               ))}
+           </Accordion>
+        );
+    };
+
     return (
         <motion.div
             ref={setNodeRef}
@@ -128,8 +196,11 @@ export function MindsetCategoriesCard() {
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
         >
-            <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+            <Card 
+                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
+                onMouseDown={handleMouseDown}
+            >
+                <div className="cursor-grab active:cursor-grabbing" {...listeners} {...attributes}>
                     <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
                         {view === 'all-resistances' && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
@@ -147,65 +218,11 @@ export function MindsetCategoriesCard() {
                 </div>
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
-                        {view === 'techniques' ? (
-                            <Accordion type="single" collapsible className="w-full">
-                                {Object.entries(techniquesByCategory).map(([category, techniques]) => (
-                                   <AccordionItem value={category} key={category}>
-                                       <AccordionTrigger className="text-sm font-semibold hover:no-underline">
-                                           {category}
-                                       </AccordionTrigger>
-                                       <AccordionContent>
-                                           {techniques.length > 0 ? (
-                                               <ul className="text-xs space-y-1 pl-2">
-                                                   {techniques.map(tech => (
-                                                     <li key={tech.id} className="flex items-center justify-between group">
-                                                       <span className="text-muted-foreground">{tech.name}</span>
-                                                       <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => openLinkedResistancePopup(tech.id, e)}>
-                                                         <LinkIcon className="h-3 w-3 text-primary" />
-                                                       </Button>
-                                                     </li>
-                                                   ))}
-                                               </ul>
-                                           ) : (
-                                               <p className="text-xs text-muted-foreground italic">No techniques defined.</p>
-                                           )}
-                                       </AccordionContent>
-                                   </AccordionItem>
-                               ))}
-                           </Accordion>
-                        ) : (
-                            <ul className="space-y-2">
-                                {allLinkedResistances.map((link) => (
-                                    <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
-                                        <div className="flex justify-between items-start">
-                                            <p className="font-semibold flex-grow">{link.stopper.text}</p>
-                                            <div className="flex items-center flex-shrink-0">
-                                                <span className="text-xs font-bold mr-1">({link.stopper.count || 0})</span>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => incrementStopperCount(link.habitId, link.stopper.id)}>
-                                                    <PlusCircle className="h-4 w-4 text-green-500" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
-                                        </p>
-                                        {link.mechanismName && (
-                                            <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
-                                                <p>Mechanism: {link.mechanismName}</p>
-                                            </div>
-                                        )}
-                                    </li>
-                                ))}
-                                {allLinkedResistances.length === 0 && (
-                                    <p className="text-center text-sm text-muted-foreground py-8">
-                                        No urges or resistances are linked to any techniques yet.
-                                    </p>
-                                )}
-                            </ul>
-                        )}
+                        {renderContent()}
                     </ScrollArea>
                 </CardContent>
             </Card>
         </motion.div>
     );
 }
+
