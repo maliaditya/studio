@@ -269,6 +269,7 @@ export interface Stopper {
     managementStrategy?: string;
     linkedResourceId?: string;
     linkedTechniqueId?: string;
+    count?: number;
 }
 
 export interface Strength {
@@ -602,5 +603,3 @@ export interface MissedSlotReview {
     followedRuleIds: string[];
     snoozedUntil?: number; // timestamp
 }
-
-  

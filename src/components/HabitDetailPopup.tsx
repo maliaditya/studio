@@ -7,13 +7,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle } from 'lucide-react';
 import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState, HabitEquation, LinkedResistancePopupState, MindsetTechniquePopupState } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from './ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -164,7 +164,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
     onClose: () => void;
 }) => {
     const { techniqueId, x, y } = popupState;
-    const { habitCards, mindProgrammingDefinitions, mechanismCards } = useAuth();
+    const { habitCards, mindProgrammingDefinitions, mechanismCards, incrementStopperCount } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `linked-resistance-${techniqueId}` });
 
     const style: React.CSSProperties = {
@@ -180,16 +180,19 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
 
     const technique = mindProgrammingDefinitions.find(t => t.id === techniqueId);
 
-    const linkedResistances = useMemo(() => {
+    const allLinks = useMemo(() => {
         if (!techniqueId) return [];
-        const allLinks: { habitName: string; resistanceText: string; mechanismName?: string; }[] = [];
+        const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
+        
         habitCards.forEach(habit => {
             (habit.urges || []).forEach(urge => {
                 if (urge.linkedTechniqueId === techniqueId) {
                     const mechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-                    allLinks.push({
+                    links.push({
+                        habitId: habit.id,
                         habitName: habit.name,
-                        resistanceText: urge.text,
+                        stopper: urge,
+                        isUrge: true,
                         mechanismName: mechanism?.name,
                     });
                 }
@@ -197,15 +200,17 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
             (habit.resistances || []).forEach(resistance => {
                 if (resistance.linkedTechniqueId === techniqueId) {
                     const mechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-                    allLinks.push({
+                    links.push({
+                        habitId: habit.id,
                         habitName: habit.name,
-                        resistanceText: resistance.text,
+                        stopper: resistance,
+                        isUrge: false,
                         mechanismName: mechanism?.name,
                     });
                 }
             });
         });
-        return allLinks;
+        return links;
     }, [techniqueId, habitCards, mechanismCards]);
 
     return (
@@ -219,12 +224,22 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
                     <ScrollArea className="h-60 pr-2">
-                        {linkedResistances.length > 0 ? (
+                        {allLinks.length > 0 ? (
                             <ul className="space-y-2">
-                                {linkedResistances.map((link, index) => (
-                                    <li key={index} className="text-sm bg-muted/50 p-2 rounded-md">
-                                        <p className="font-semibold">{link.resistanceText}</p>
-                                        <p className="text-xs text-muted-foreground">From habit: {link.habitName}</p>
+                                {allLinks.map((link, index) => (
+                                    <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-semibold flex-grow">{link.stopper.text}</p>
+                                            <div className="flex items-center flex-shrink-0">
+                                                <span className="text-xs font-bold mr-1">{(link.stopper.count || 0)}</span>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => incrementStopperCount(link.habitId, link.stopper.id)}>
+                                                    <PlusCircle className="h-4 w-4 text-green-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                                        </p>
                                         {link.mechanismName && (
                                             <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
                                                 <p>Mechanism: {link.mechanismName}</p>
