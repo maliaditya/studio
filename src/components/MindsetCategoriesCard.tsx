@@ -96,22 +96,24 @@ export function MindsetCategoriesCard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
-            {...attributes}
-            {...listeners}
         >
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                <CardHeader className="p-0 mb-3 cursor-grab active:cursor-grabbing">
-                    <CardTitle className="flex items-center gap-2 text-base text-primary">
-                        <Brain className="h-5 w-5" />
-                        Mindset Techniques
-                    </CardTitle>
-                </CardHeader>
+                <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+                    <CardHeader className="p-0 mb-3">
+                        <CardTitle className="flex items-center gap-2 text-base text-primary">
+                            <Brain className="h-5 w-5" />
+                            Mindset Techniques
+                        </CardTitle>
+                    </CardHeader>
+                </div>
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
                         <Accordion type="multiple" className="w-full">
                             {Object.entries(techniquesByCategory).map(([category, techniques]) => (
                                 <AccordionItem value={category} key={category}>
-                                    <AccordionTrigger className="text-sm font-semibold hover:no-underline">{category}</AccordionTrigger>
+                                    <AccordionTrigger className="text-sm font-semibold hover:no-underline">
+                                        {category}
+                                    </AccordionTrigger>
                                     <AccordionContent>
                                         {techniques.length > 0 ? (
                                             <ul className="text-xs space-y-1 list-disc list-inside pl-2">
