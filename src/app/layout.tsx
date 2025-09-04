@@ -416,7 +416,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           currentSlot={currentSlot}
           activeFocusSession={activeFocusSession}
           lastSessionReview={lastSessionReview}
-          openMindsetTechniquePopup={() => {}}
+          openMindsetTechniquePopup={openMindsetTechniquePopup}
           openHabitDetailPopup={authContext.openHabitDetailPopup}
       />
       <MissedSlotModal 
@@ -579,6 +579,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-  

@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -6,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle } from 'lucide-react';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState, HabitEquation, LinkedResistancePopupState, MindsetTechniquePopupState } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState, HabitEquation, MindsetTechniquePopupState } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import { Separator } from './ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -238,7 +240,6 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
             </div>
     );
 };
-
 
 export const RuleDetailPopupCard = ({ popupState, onClose }: { 
     popupState: RuleDetailPopupState;
@@ -623,7 +624,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
     onClose: () => void;
 }) => {
     const { techniqueId, x, y } = popupState;
-    const { habitCards, mindProgrammingDefinitions, mechanismCards, incrementStopperCount } = useAuth();
+    const { habitCards, mindProgrammingDefinitions, mechanismCards, incrementStopperCount, openMindsetTechniquePopup } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `linked-resistance-${techniqueId}` });
 
     const style: React.CSSProperties = {

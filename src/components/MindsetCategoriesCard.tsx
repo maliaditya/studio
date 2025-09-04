@@ -6,11 +6,11 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle } from 'lucide-react';
+import { Button } from './ui/button';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Button } from './ui/button';
 import type { Stopper, Resource } from '@/types/workout';
 
 export function MindsetCategoriesCard() {
@@ -49,7 +49,6 @@ export function MindsetCategoriesCard() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        // This is the key fix: Check if the click originated from a button or a descendant of a button.
         if (target.closest('button')) {
             return;
         }
@@ -129,15 +128,18 @@ export function MindsetCategoriesCard() {
                 <ul className="space-y-2">
                     {allLinkedResistances.map((link) => (
                         <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
-                            <div className="flex justify-between items-start">
+                            <button
+                                className="flex justify-between items-start w-full text-left"
+                                onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
+                            >
                                 <p className="font-semibold flex-grow">{link.stopper.text}</p>
                                 <div className="flex items-center flex-shrink-0">
                                     <span className="text-xs font-bold mr-1">({link.stopper.count || 0})</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => incrementStopperCount(link.habitId, link.stopper.id)}>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); incrementStopperCount(link.habitId, link.stopper.id); }}>
                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                     </Button>
                                 </div>
-                            </div>
+                            </button>
                             <p className="text-xs text-muted-foreground mt-1">
                                 {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
                             </p>
@@ -225,4 +227,3 @@ export function MindsetCategoriesCard() {
         </motion.div>
     );
 }
-
