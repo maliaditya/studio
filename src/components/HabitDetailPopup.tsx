@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -181,23 +182,31 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
 
     const linkedResistances = useMemo(() => {
         if (!techniqueId) return [];
-        return habitCards.flatMap(habit => {
-            const allStoppers = [...(habit.urges || []), ...(habit.resistances || [])];
-            return allStoppers
-                .filter(stopper => stopper.linkedTechniqueId === techniqueId)
-                .map(stopper => {
-                    const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-                    const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-                    return {
+        const allLinks: { habitName: string; resistanceText: string; mechanismName?: string; }[] = [];
+        habitCards.forEach(habit => {
+            (habit.urges || []).forEach(urge => {
+                if (urge.linkedTechniqueId === techniqueId) {
+                    const mechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+                    allLinks.push({
                         habitName: habit.name,
-                        resistanceText: stopper.text,
-                        positiveMechanismName: positiveMechanism?.name,
-                        negativeMechanismName: negativeMechanism?.name,
-                    };
-                });
+                        resistanceText: urge.text,
+                        mechanismName: mechanism?.name,
+                    });
+                }
+            });
+            (habit.resistances || []).forEach(resistance => {
+                if (resistance.linkedTechniqueId === techniqueId) {
+                    const mechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+                    allLinks.push({
+                        habitName: habit.name,
+                        resistanceText: resistance.text,
+                        mechanismName: mechanism?.name,
+                    });
+                }
+            });
         });
+        return allLinks;
     }, [techniqueId, habitCards, mechanismCards]);
-
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
@@ -216,10 +225,9 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                                     <li key={index} className="text-sm bg-muted/50 p-2 rounded-md">
                                         <p className="font-semibold">{link.resistanceText}</p>
                                         <p className="text-xs text-muted-foreground">From habit: {link.habitName}</p>
-                                        {(link.positiveMechanismName || link.negativeMechanismName) && (
+                                        {link.mechanismName && (
                                             <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
-                                                {link.positiveMechanismName && <p>✅ {link.positiveMechanismName}</p>}
-                                                {link.negativeMechanismName && <p>❌ {link.negativeMechanismName}</p>}
+                                                <p>Mechanism: {link.mechanismName}</p>
                                             </div>
                                         )}
                                     </li>
@@ -697,5 +705,3 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
         </>
     );
 };
-
-    
