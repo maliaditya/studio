@@ -108,7 +108,7 @@ export function MindsetCategoriesCard() {
                 </div>
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
-                        <Accordion type="multiple" className="w-full">
+                        <Accordion type="single" collapsible className="w-full">
                             {Object.entries(techniquesByCategory).map(([category, techniques]) => (
                                 <AccordionItem value={category} key={category}>
                                     <AccordionTrigger className="text-sm font-semibold hover:no-underline">
