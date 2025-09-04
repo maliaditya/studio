@@ -50,11 +50,13 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
   
   const [reason, setReason] = useState('');
   const [followedRuleIds, setFollowedRuleIds] = useState<string[]>([]);
+  const [logAsDistraction, setLogAsDistraction] = useState(true);
 
   useEffect(() => {
     if (!isOpen) {
       setReason('');
       setFollowedRuleIds([]);
+      setLogAsDistraction(true); // Reset on close
     }
   }, [isOpen]);
 
@@ -108,13 +110,12 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
     };
 
     let newDistraction: Activity | undefined = undefined;
-    // Always create a distraction if there's a reason and time available
-    if (reason.trim() && modalContent.freeTime > 0) {
+    if (logAsDistraction && reason.trim() && modalContent.freeTime > 0) {
         newDistraction = {
             id: `distraction_${Date.now()}`,
             type: 'distraction',
             details: reason.trim(),
-            completed: true, // Logged distractions are 'complete' by nature
+            completed: true,
             duration: modalContent.freeTime,
             slot: slotName,
         };
@@ -169,6 +170,18 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
               className="mt-2"
             />
           </div>
+          {modalContent.isDistractionLoggable && modalContent.freeTime > 0 && (
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="log-distraction-check"
+                checked={logAsDistraction}
+                onCheckedChange={(checked) => setLogAsDistraction(!!checked)}
+              />
+              <Label htmlFor="log-distraction-check" className="text-sm font-normal">
+                Log remaining {modalContent.freeTime} minutes as a distraction
+              </Label>
+            </div>
+          )}
           <div>
             <Label className="font-semibold">Which rules did you follow during this time?</Label>
             <ScrollArea className="h-40 border rounded-md p-2 mt-2">
