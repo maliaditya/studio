@@ -1110,33 +1110,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!currentUser?.username || isLoadingState) return;
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const todaysSchedule = schedule[todayStr];
-    const routines = settings.routines || [];
+    const yesterdaysDate = subDays(new Date(), 1);
+    const yesterdayStr = format(yesterdaysDate, 'yyyy-MM-dd');
+    const yesterdaysSchedule = schedule[yesterdayStr];
 
-    // Only populate if today is empty AND there are routines defined
-    if ((!todaysSchedule || Object.keys(todaysSchedule).length === 0) && routines.length > 0) {
-        const newDaySchedule: DailySchedule = {};
+    const todayIsEmpty = !schedule[todayStr] || Object.values(schedule[todayStr]).every(slot => (slot as Activity[]).length === 0);
+
+    if (todayIsEmpty && yesterdaysSchedule) {
+        const routineTasks = Object.values(yesterdaysSchedule).flat().filter(task => (task as Activity).isRoutine);
         
-        routines.forEach((task: Activity) => {
-            const slot = task.slot as keyof DailySchedule;
-            if (!newDaySchedule[slot]) {
-                newDaySchedule[slot] = [];
-            }
-            (newDaySchedule[slot] as Activity[]).push({
-                ...task,
-                id: `${task.type}-${Date.now()}-${Math.random()}`,
-                completed: false,
+        if (routineTasks.length > 0) {
+            const newDaySchedule: DailySchedule = {};
+            routineTasks.forEach((task: Activity) => {
+                const slot = task.slot as keyof DailySchedule;
+                if (!newDaySchedule[slot]) {
+                    newDaySchedule[slot] = [];
+                }
+                (newDaySchedule[slot] as Activity[]).push({
+                    ...task,
+                    id: `${task.type}-${Date.now()}-${Math.random()}`,
+                    completed: false,
+                });
             });
-        });
 
-        if (Object.keys(newDaySchedule).length > 0) {
-            setSchedule(prev => ({
-                ...prev,
-                [todayStr]: newDaySchedule,
-            }));
+            if (Object.keys(newDaySchedule).length > 0) {
+                setSchedule(prev => ({
+                    ...prev,
+                    [todayStr]: newDaySchedule,
+                }));
+            }
         }
     }
-  }, [currentUser, isLoadingState, settings.routines]);
+  }, [currentUser, isLoadingState, schedule]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2951,6 +2956,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

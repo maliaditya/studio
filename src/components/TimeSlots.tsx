@@ -170,6 +170,21 @@ export function TimeSlots({
 
   const { setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
   
+  const handleToggleRoutine = (activity: Activity) => {
+    setSchedule(prev => {
+        const dayKey = format(date, 'yyyy-MM-dd');
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[dayKey] || {}) };
+        daySchedule[activity.slot] = (daySchedule[activity.slot] as Activity[]).map(act => 
+            act.id === activity.id 
+                ? { ...act, isRoutine: !act.isRoutine }
+                : act
+        );
+        newSchedule[dayKey] = daySchedule;
+        return newSchedule;
+    });
+  };
+
   const handleLinkHabit = (activityId: string, habitId: string) => {
     linkHabitFromContext(activityId, habitId, true);
   };
@@ -351,6 +366,9 @@ export function TimeSlots({
                             </div>
                           </div>
                           <div className="flex items-center flex-shrink-0">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleToggleRoutine(activity)}>
+                                <Repeat className={cn("h-4 w-4", activity.isRoutine ? "text-primary" : "text-muted-foreground")} />
+                            </Button>
                              <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">

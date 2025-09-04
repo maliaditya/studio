@@ -186,6 +186,7 @@ export interface Activity {
   completed: boolean;
   taskIds?: string[];
   slot: string;
+  isRoutine?: boolean;
   habitEquationIds?: string[]; // New field to link rule equations
   focusSessionInitialStartTime?: number;
   focusSessionStartTime?: number; // Tracks start of current segment (or initial start)

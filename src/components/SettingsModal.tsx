@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -293,6 +292,44 @@ ${JSON.stringify(finalTemplate, null, 2)}
   
   const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
 
+  const routineTasks = useMemo(() => {
+    const routines: Activity[] = [];
+    const seenDetails = new Set<string>();
+    Object.values(schedule).flat().forEach(day => {
+        Object.values(day).flat().forEach(activity => {
+            if (activity.isRoutine && !seenDetails.has(activity.details)) {
+                routines.push(activity);
+                seenDetails.add(activity.details);
+            }
+        });
+    });
+    return routines;
+  }, [schedule]);
+
+  const handleRemoveRoutine = (activityDetails: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        Object.keys(newSchedule).forEach(date => {
+            const daySchedule = { ...newSchedule[date] };
+            Object.keys(daySchedule).forEach(slot => {
+                const activities = daySchedule[slot] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    daySchedule[slot] = activities.map(act => {
+                        if (act.details === activityDetails) {
+                            return { ...act, isRoutine: false };
+                        }
+                        return act;
+                    });
+                }
+            });
+            newSchedule[date] = daySchedule;
+        });
+        return newSchedule;
+    });
+    toast({ title: 'Routine Task Removed', description: `"${activityDetails}" will no longer be carried forward.` });
+  };
+
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -401,6 +438,32 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
+                   <AccordionItem value="item-2" className="border rounded-lg mt-4">
+                    <AccordionTrigger className="px-4 py-3">
+                        <div className="space-y-0.5 text-left">
+                        <Label className="text-base">Manage Routine Tasks</Label>
+                        <p className="text-sm text-muted-foreground">
+                            View and remove tasks from your daily routine.
+                        </p>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-2 pt-4 border-t">
+                        {routineTasks.length > 0 ? (
+                            routineTasks.map(task => (
+                            <div key={task.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                <span className="text-sm font-medium">{task.details}</span>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveRoutine(task.details)}>
+                                <Trash2 className="h-4 w-4 text-destructive"/>
+                                </Button>
+                            </div>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">No routine tasks defined.</p>
+                        )}
+                        </div>
+                    </AccordionContent>
+                    </AccordionItem>
                 </Accordion>
 
                 <div className="space-y-4 rounded-lg border p-4">
