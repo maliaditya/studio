@@ -13,7 +13,7 @@ import {
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
-import { Checkbox } from './ui/checkbox';
+import { Switch } from './ui/switch';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, MissedSlotReview, HabitEquation } from '@/types/workout';
@@ -172,12 +172,12 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
           </div>
           {modalContent.isDistractionLoggable && modalContent.freeTime > 0 && (
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="log-distraction-check"
+              <Switch
+                id="log-distraction-switch"
                 checked={logAsDistraction}
-                onCheckedChange={(checked) => setLogAsDistraction(!!checked)}
+                onCheckedChange={setLogAsDistraction}
               />
-              <Label htmlFor="log-distraction-check" className="text-sm font-normal">
+              <Label htmlFor="log-distraction-switch" className="text-sm font-normal">
                 Log remaining {modalContent.freeTime} minutes as a distraction
               </Label>
             </div>
@@ -188,7 +188,7 @@ export function MissedSlotModal({ state, onOpenChange, onSave }: MissedSlotModal
               <div className="space-y-2">
                 {allEquations.map(eq => (
                   <div key={eq.id} className="flex items-center space-x-2">
-                    <Checkbox
+                    <Switch
                       id={`rule-${eq.id}`}
                       checked={followedRuleIds.includes(eq.id)}
                       onCheckedChange={(checked) => {
