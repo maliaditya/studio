@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -372,6 +372,10 @@ interface AuthContextType {
   linkedResistancePopup: MindsetTechniquePopupState | null;
   setLinkedResistancePopup: React.Dispatch<React.SetStateAction<MindsetTechniquePopupState | null>>;
   openLinkedResistancePopup: (techniqueId: string, event: React.MouseEvent) => void;
+  
+  // Stopper Progress Popup
+  stopperProgressPopup: StopperProgressPopupState | null;
+  openStopperProgressPopup: (stopper: Stopper, habitName: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -534,6 +538,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Mindset Technique Popup
   const [linkedResistancePopup, setLinkedResistancePopup] = useState<MindsetTechniquePopupState | null>(null);
 
+  // Stopper Progress Popup
+  const [stopperProgressPopup, setStopperProgressPopup] = useState<StopperProgressPopupState | null>(null);
+
+  const openStopperProgressPopup = (stopper: Stopper, habitName: string) => {
+    setStopperProgressPopup({
+        isOpen: true,
+        stopper: stopper,
+        habitName: habitName,
+    });
+  };
+
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
     const popupWidth = 384; // w-96
     const popupHeight = 400; // estimated
@@ -625,7 +640,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActiveFocusSession(prev => prev ? { ...prev, secondsLeft: newSecondsLeft } : null);
       }
     }, 1000);
-    return () => clearInterval(interval);
+    return () => clearInterval(timerInterval);
   }, [activeFocusSession]);
 
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
@@ -2789,7 +2804,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     updateActivitySubtask, deleteActivitySubtask,
     handleLinkHabit,
     missedSlotReviews, setMissedSlotReviews,
-    linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup
+    linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup,
+    stopperProgressPopup, openStopperProgressPopup,
   };
 
   useEffect(() => {
@@ -2988,6 +3004,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
 
 
 

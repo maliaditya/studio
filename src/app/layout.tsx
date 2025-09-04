@@ -43,6 +43,7 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
+import { StopperProgressModal } from '@/components/StopperProgressModal';
 
 
 const slotEndHours: Record<string, number> = {
@@ -116,6 +117,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     linkedResistancePopup,
     setLinkedResistancePopup,
     openLinkedResistancePopup,
+    stopperProgressPopup,
+    setStopperProgressPopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -375,6 +378,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MindsetCategoriesCard />
       <ActivityDistributionCard />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
+      <StopperProgressModal 
+        popupState={stopperProgressPopup}
+        onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
+      />
        <FocusSessionModal
           isOpen={focusSessionModalOpen}
           onOpenChange={setFocusSessionModalOpen}
@@ -579,3 +586,4 @@ export default function RootLayout({
     </html>
   );
 }
+

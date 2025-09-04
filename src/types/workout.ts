@@ -597,6 +597,12 @@ export interface MindsetTechniquePopupState {
   z?: number;
 }
 
+export interface StopperProgressPopupState {
+    isOpen: boolean;
+    stopper: Stopper | null;
+    habitName: string | null;
+}
+
 export interface MissedSlotReview {
     id: string; // composite key: `${date}-${slotName}`
     reason: string;

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -8,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, isBefore, startOfDay, parseISO } from 'date-fns';
 import type { Activity, ActivityType, DatedWorkout, DailySchedule, Resource, Stopper } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle } from 'lucide-react';
+import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle, LineChart as LineChartIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -64,6 +65,7 @@ export function MindsetCategoriesCard() {
         mechanismCards,
         logStopperEncounter,
         openLinkedResistancePopup,
+        openStopperProgressPopup,
     } = useAuth();
     
     const [isClient, setIsClient] = useState(false);
@@ -142,7 +144,7 @@ export function MindsetCategoriesCard() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button')) {
+        if (target.closest('button, [role="button"]')) {
             return;
         }
         setIsDragging(true);
@@ -184,6 +186,7 @@ export function MindsetCategoriesCard() {
         top: position.y,
         left: position.x,
         willChange: 'transform',
+        userSelect: isDragging ? 'none' : 'auto',
     };
 
     const techniquesByCategory = React.useMemo(() => {
@@ -216,24 +219,26 @@ export function MindsetCategoriesCard() {
                         <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", hotResistances.has(link.stopper.id) ? "bg-primary/20" : "bg-muted/50")}>
                             <div
                                 className="flex justify-between items-start w-full text-left"
-                                onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
                             >
-                                <p className="font-semibold flex-grow">{link.stopper.text}</p>
+                                <div 
+                                    className="flex-grow pr-2 cursor-pointer"
+                                    onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
+                                >
+                                    <p className="font-semibold">{link.stopper.text}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                                    </p>
+                                </div>
                                 <div className="flex items-center flex-shrink-0">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
+                                        <LineChartIcon className="h-4 w-4 text-blue-500" />
+                                    </Button>
                                     <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                     </Button>
                                 </div>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
-                            </p>
-                            {link.mechanismName && (
-                                <div className="text-xs text-muted-foreground mt-1 pt-1 border-t">
-                                    <p>Mechanism: {link.mechanismName}</p>
-                                </div>
-                            )}
                         </li>
                     ))}
                     {allLinkedResistances.length === 0 && (
