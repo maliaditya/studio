@@ -1067,79 +1067,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const uiState = uiStateString ? JSON.parse(uiStateString) : {};
     
     // Set Main Data
-    setWeightLogs(mainData.weightLogs || []);
-    setGoalWeight(mainData.goalWeight || null);
-    setHeight(mainData.height || null);
-    setDateOfBirth(mainData.dateOfBirth || null);
-    setGender(mainData.gender || null);
-    setDietPlan(mainData.dietPlan || []);
-    setSchedule(mainData.schedule || {});
-    setDailyPurposes(mainData.dailyPurposes || {});
-    setAllUpskillLogs(mainData.allUpskillLogs || []);
-    setAllDeepWorkLogs(mainData.allDeepWorkLogs || []);
-    setAllWorkoutLogs(mainData.allWorkoutLogs || []);
-    setAllBrandingLogs(mainData.brandingLogs || []);
-    setAllLeadGenLogs(mainData.allLeadGenLogs || []);
-    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
-    setWorkoutMode(mainData.workoutMode || 'two-muscle');
-    setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
-    setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
-    setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
-    setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
-    setUpskillDefinitions(mainData.upskillDefinitions || []);
-    setTopicGoals(mainData.topicGoals || {});
-    setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
-    setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
-    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
-    setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
-    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
-    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
-    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
-    setProductizationPlans(mainData.productizationPlans || {});
-    setOfferizationPlans(mainData.offerizationPlans || {});
-    setResourceFolders(mainData.resourceFolders || []);
-    setResources(mainData.resources || []);
-    
-    setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
-    setMindsetCards(mainData.mindsetCards || []);
-    setPistons(mainData.pistons || {});
-    setSkillDomains(mainData.skillDomains || []);
-    setCoreSkills(mainData.coreSkills || []);
-    setProjects(mainData.projects || []);
-    setCompanies(mainData.companies || []);
-    setPositions(mainData.positions || []);
-    setPurposeData(mainData.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
-    setPatterns(mainData.patterns || []);
-    setMetaRules(mainData.metaRules || []);
-    setPillarEquations(mainData.pillarEquations || {});
-    setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
-    setAutoSuggestions(mainData.autoSuggestions || {});
-    setPathNodes(mainData.pathNodes || []);
-    setMissedSlotReviews(mainData.missedSlotReviews || {});
-    
-    // UI State
-    setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
-    setActiveResourceTabIds(uiState.activeResourceTabIds || []);
-    setSelectedResourceFolderId(uiState.selectedResourceFolderId || null);
-    setLastSelectedHabitFolder(uiState.lastSelectedHabitFolder || null);
-    setSelectedUpskillTask(uiState.selectedUpskillTask || null);
-    setSelectedDeepWorkTask(uiState.selectedDeepWorkTask || null);
-    setSelectedMicroSkill(uiState.selectedMicroSkill || null);
-    setExpandedItems(uiState.expandedItems || []);
-    setSelectedDomainId(uiState.selectedDomainId || null);
-    setSelectedSkillId(uiState.selectedSkillId || null);
-    setSelectedProjectId(uiState.selectedProjectId || null);
-    setSelectedCompanyId(uiState.selectedCompanyId || null);
-    setRecentItems(uiState.recentItems || []);
-    if (uiState.activeFocusSession) {
-        const session = uiState.activeFocusSession;
-        const elapsed = (Date.now() - session.startTime) / 1000;
-        const newSecondsLeft = Math.max(0, session.totalSeconds - elapsed);
-        setActiveFocusSession({ ...session, secondsLeft: newSecondsLeft });
-    } else {
-        setActiveFocusSession(null);
-    }
-    setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
+    loadImportedData(mainData, uiState);
   };
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
@@ -2406,8 +2334,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let path: string[];
     let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
 
-    // NEW: Handle Mind Programming techniques separately
-    if ('category' in parent && defaultMindsetCategories.includes(parent.category as ExerciseCategory)) {
+    // Handle Mind Programming techniques separately
+    if ('category' in parent && mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
         path = ["Mindset Techniques", parent.name];
     } else if ('category' in parent) { // Parent is a standard ExerciseDefinition
         const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
@@ -2496,7 +2424,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     if ('category' in parent) {
-      if (defaultMindsetCategories.includes(parent.category as ExerciseCategory)) {
+      if (mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
         updateParent(setMindProgrammingDefinitions, false, true);
       } else if (upskillDefinitions.some(d => d.id === parent.id)) {
         updateParent(setUpskillDefinitions, false);
@@ -2892,129 +2820,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
-
-    
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
