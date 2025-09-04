@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -6,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle } from 'lucide-react';
+import { BrainCircuit, Edit, Save, Trash2, Check, X, BookOpen, ArrowRight, TrendingUp, Briefcase, HeartPulse, ArrowDown, DollarSign, Shield, Zap, Lightbulb, Brain, HandHeart, Package, Activity, ShoppingBag, Smile, Link as LinkIcon, Pill, Lock, ArrowLeft, ThumbsUp, ThumbsDown, Workflow, PlusCircle, Library } from 'lucide-react';
 import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitDetailPopupState, HabitEquation, MindsetTechniquePopupState } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import { Separator } from './ui/separator';
@@ -239,6 +238,7 @@ const ManageResistancePopup = ({ habit, popupState, onClose }: {
             </div>
     );
 };
+
 
 export const RuleDetailPopupCard = ({ popupState, onClose }: { 
     popupState: RuleDetailPopupState;
@@ -623,7 +623,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
     onClose: () => void;
 }) => {
     const { techniqueId, x, y } = popupState;
-    const { mindProgrammingDefinitions } = useAuth();
+    const { mindProgrammingDefinitions, resources, openGeneralPopup } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `linked-resistance-${techniqueId}` });
 
     const style: React.CSSProperties = {
@@ -638,6 +638,11 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
     }
 
     const technique = mindProgrammingDefinitions.find(t => t.id === techniqueId);
+    const linkedResources = useMemo(() => {
+        return (technique?.linkedResourceIds || [])
+            .map(id => resources.find(r => r.id === id))
+            .filter((r): r is Resource => !!r);
+    }, [technique, resources]);
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
@@ -652,23 +657,50 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
                     <ScrollArea className="h-60 pr-2">
-                        {technique?.decompositionData && technique.decompositionData.length > 0 ? (
-                             <ul className="space-y-2 text-sm text-muted-foreground">
-                                {technique.decompositionData.map(point => (
-                                    <li key={point.id} className="flex items-start gap-2">
-                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                        <span>{point.text}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-center text-sm text-muted-foreground py-8">
-                                No steps defined for this technique.
-                            </p>
-                        )}
+                        <div className="space-y-4">
+                            <div>
+                                <h4 className="font-semibold text-xs mb-1 text-muted-foreground uppercase tracking-wider">Steps</h4>
+                                {technique?.decompositionData && technique.decompositionData.length > 0 ? (
+                                     <ul className="space-y-2 text-sm text-muted-foreground">
+                                        {technique.decompositionData.map(point => (
+                                            <li key={point.id} className="flex items-start gap-2">
+                                                <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                                <span>{point.text}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <p className="text-center text-sm text-muted-foreground py-4">
+                                        No steps defined for this technique.
+                                    </p>
+                                )}
+                            </div>
+
+                            {linkedResources.length > 0 && (
+                                <div className="pt-2 border-t">
+                                    <h4 className="font-semibold text-xs mb-2 text-muted-foreground uppercase tracking-wider">Linked Resources</h4>
+                                    <ul className="space-y-2">
+                                        {linkedResources.map(resource => (
+                                            <li key={resource.id}>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full justify-start h-auto py-1"
+                                                    onClick={(e) => openGeneralPopup(resource.id, e)}
+                                                >
+                                                    <Library className="h-4 w-4 mr-2 text-primary" />
+                                                    <span className="truncate">{resource.name}</span>
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
         </div>
     );
 };
+
