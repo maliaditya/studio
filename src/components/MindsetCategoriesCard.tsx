@@ -9,6 +9,7 @@ import { Brain } from 'lucide-react';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export function MindsetCategoriesCard() {
     const { 
@@ -107,22 +108,24 @@ export function MindsetCategoriesCard() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
-                        <ul className="space-y-3">
+                        <Accordion type="multiple" className="w-full">
                             {Object.entries(techniquesByCategory).map(([category, techniques]) => (
-                                <li key={category}>
-                                    <h4 className="text-sm font-semibold text-foreground mb-1">{category}</h4>
-                                    {techniques.length > 0 ? (
-                                        <ul className="text-xs space-y-1 list-disc list-inside pl-2">
-                                            {techniques.map(tech => (
-                                                <li key={tech.id} className="text-muted-foreground">{tech.name}</li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground italic">No techniques defined.</p>
-                                    )}
-                                </li>
+                                <AccordionItem value={category} key={category}>
+                                    <AccordionTrigger className="text-sm font-semibold hover:no-underline">{category}</AccordionTrigger>
+                                    <AccordionContent>
+                                        {techniques.length > 0 ? (
+                                            <ul className="text-xs space-y-1 list-disc list-inside pl-2">
+                                                {techniques.map(tech => (
+                                                    <li key={tech.id} className="text-muted-foreground">{tech.name}</li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground italic">No techniques defined.</p>
+                                        )}
+                                    </AccordionContent>
+                                </AccordionItem>
                             ))}
-                        </ul>
+                        </Accordion>
                     </ScrollArea>
                 </CardContent>
             </Card>
