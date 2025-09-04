@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -81,7 +82,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             let slotWasModified = false;
             const updatedActivities = activities.map(act => {
               if (act.type === activityType && !act.completed) {
-                const newHabitIds = newHabitId ? [newHabitId] : [];
+                const newHabits = newHabitId ? [newHabitId] : [];
                 if (JSON.stringify(act.habitEquationIds || []) !== JSON.stringify(newHabits)) {
                   slotWasModified = true;
                   return { ...act, habitEquationIds: newHabits };
@@ -293,40 +294,18 @@ ${JSON.stringify(finalTemplate, null, 2)}
   const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
 
   const routineTasks = useMemo(() => {
-    const uniqueRoutines = new Map<string, Activity>();
-    Object.values(schedule).forEach(day => {
-        Object.values(day).flat().forEach(activity => {
-            if (activity && activity.isRoutine) {
-                const key = `${activity.type}-${activity.details}`;
-                if (!uniqueRoutines.has(key)) {
-                    uniqueRoutines.set(key, activity);
-                }
-            }
-        });
-    });
-    return Array.from(uniqueRoutines.values());
-  }, [schedule]);
+    const routines = settings.routines || [];
+    return routines;
+  }, [settings.routines]);
 
   const handleRemoveRoutine = (activityToRemove: Activity) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        for (const date in newSchedule) {
-            for (const slot in newSchedule[date]) {
-                const activities = newSchedule[date][slot] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    newSchedule[date][slot] = activities.map(act => {
-                        if (act.type === activityToRemove.type && act.details === activityToRemove.details) {
-                            return { ...act, isRoutine: false };
-                        }
-                        return act;
-                    });
-                }
-            }
-        }
-        return newSchedule;
-    });
+    const updatedRoutines = (settings.routines || []).filter(
+      (r: Activity) => !(r.type === activityToRemove.type && r.details === activityToRemove.details)
+    );
+    handleSettingChange('routines', updatedRoutines);
+    
     toast({
-        title: "Routine Task Updated",
+        title: "Routine Task Removed",
         description: `"${activityToRemove.details}" will no longer be carried forward daily.`,
     });
   };
