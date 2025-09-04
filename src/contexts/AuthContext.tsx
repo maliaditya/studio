@@ -207,7 +207,7 @@ interface AuthContextType {
   createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type']) => ExerciseDefinition | Resource | undefined;
   handleDeleteStopper: (habitId: string, stopperId: string) => void;
   handleDeleteStrength: (habitId: string, strengthId: string) => void;
-  incrementStopperCount: (habitId: string, stopperId: string) => void;
+  logStopperEncounter: (habitId: string, stopperId: string) => void;
   
   // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
@@ -625,7 +625,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActiveFocusSession(prev => prev ? { ...prev, secondsLeft: newSecondsLeft } : null);
       }
     }, 1000);
-    return () => clearInterval(timerInterval);
+    return () => clearInterval(interval);
   }, [activeFocusSession]);
 
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
@@ -2365,21 +2365,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setRecentItems]);
 
-  const incrementStopperCount = (habitId: string, stopperId: string) => {
+  const logStopperEncounter = (habitId: string, stopperId: string) => {
     setResources(prevResources => {
         return prevResources.map(resource => {
             if (resource.id === habitId && (resource.type === 'habit' || resource.type === 'mechanism')) {
-                const updatedUrges = (resource.urges || []).map(stopper =>
-                    stopper.id === stopperId
-                        ? { ...stopper, count: (stopper.count || 0) + 1 }
-                        : stopper
-                );
-                const updatedResistances = (resource.resistances || []).map(stopper =>
-                    stopper.id === stopperId
-                        ? { ...stopper, count: (stopper.count || 0) + 1 }
-                        : stopper
-                );
-                return { ...resource, urges: updatedUrges, resistances: updatedResistances };
+                const now = Date.now();
+                const updateStoppers = (stoppers: Stopper[] = []) =>
+                    stoppers.map(stopper =>
+                        stopper.id === stopperId
+                            ? { ...stopper, timestamps: [...(stopper.timestamps || []), now] }
+                            : stopper
+                    );
+                
+                return {
+                    ...resource,
+                    urges: updateStoppers(resource.urges),
+                    resistances: updateStoppers(resource.resistances),
+                };
             }
             return resource;
         });
@@ -2731,7 +2733,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
     createResourceWithHierarchy,
     handleDeleteStopper, handleDeleteStrength,
-    incrementStopperCount,
+    logStopperEncounter,
     openPopups, handleOpenNestedPopup, 
     closeAllResourcePopups,
     handlePopupDragEnd,
@@ -2986,5 +2988,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
 
 

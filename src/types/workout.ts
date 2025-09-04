@@ -269,7 +269,7 @@ export interface Stopper {
     managementStrategy?: string;
     linkedResourceId?: string;
     linkedTechniqueId?: string;
-    count?: number;
+    timestamps?: number[];
 }
 
 export interface Strength {

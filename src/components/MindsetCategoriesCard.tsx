@@ -20,7 +20,7 @@ export function MindsetCategoriesCard() {
         openLinkedResistancePopup,
         habitCards,
         mechanismCards,
-        incrementStopperCount,
+        logStopperEncounter,
     } = useAuth();
     
     const [isClient, setIsClient] = useState(false);
@@ -31,31 +31,84 @@ export function MindsetCategoriesCard() {
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
     
     const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
+    const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
 
     useEffect(() => {
       setIsClient(true);
     }, []);
 
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'mindset-categories-popup' });
+    const allLinkedResistances = React.useMemo(() => {
+        const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
+        
+        habitCards.forEach(habit => {
+            const processStoppers = (stoppers: Stopper[] = [], isUrge: boolean) => {
+                stoppers.forEach(stopper => {
+                    if (stopper.linkedTechniqueId) {
+                        const mechanism = mechanismCards.find(m => m.id === (isUrge ? habit.response?.resourceId : habit.newResponse?.resourceId));
+                        links.push({
+                            habitId: habit.id,
+                            habitName: habit.name,
+                            stopper: stopper,
+                            isUrge: isUrge,
+                            mechanismName: mechanism?.name,
+                        });
+                    }
+                });
+            };
+            processStoppers(habit.urges, true);
+            processStoppers(habit.resistances, false);
+        });
+        return links;
+    }, [habitCards, mechanismCards]);
     
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: position.y,
-        left: position.x,
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-        willChange: 'transform',
-        zIndex: 50,
-    };
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const today = new Date(now);
+            const yesterday = new Date(now - 24 * 60 * 60 * 1000);
+            
+            const newHotResistances = new Set<string>();
+
+            allLinkedResistances.forEach(link => {
+                const timestamps = link.stopper.timestamps || [];
+                for (const ts of timestamps) {
+                    const eventDate = new Date(ts);
+                    // Check for recent clicks (last 30 minutes)
+                    if (now - ts < 30 * 60 * 1000) {
+                        newHotResistances.add(link.stopper.id);
+                        break;
+                    }
+                    
+                    // Check for predictive highlighting
+                    if (eventDate.toDateString() === yesterday.toDateString()) {
+                        const eventTimeToday = new Date(today);
+                        eventTimeToday.setHours(eventDate.getHours(), eventDate.getMinutes(), eventDate.getSeconds());
+                        
+                        const fifteenMinutes = 15 * 60 * 1000;
+                        if (Math.abs(now - eventTimeToday.getTime()) <= fifteenMinutes) {
+                            newHotResistances.add(link.stopper.id);
+                            break;
+                        }
+                    }
+                }
+            });
+
+            setHotResistances(newHotResistances);
+        }, 60 * 1000); // Check every minute
+
+        return () => clearInterval(interval);
+    }, [allLinkedResistances]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
+        // This is a more robust way to check if the click originated from a button or its child
         if (target.closest('button')) {
             return;
         }
         setIsDragging(true);
         setDragStartOffset({
-          x: e.clientX - position.x - (transform?.x || 0),
-          y: e.clientY - position.y - (transform?.y || 0),
+          x: e.clientX - position.x,
+          y: e.clientY - position.y,
         });
     };
     
@@ -94,48 +147,35 @@ export function MindsetCategoriesCard() {
         return map;
     }, [mindProgrammingCategories, mindProgrammingDefinitions]);
     
-    const allLinkedResistances = React.useMemo(() => {
-        const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
-        
-        habitCards.forEach(habit => {
-            const processStoppers = (stoppers: Stopper[] = [], isUrge: boolean) => {
-                stoppers.forEach(stopper => {
-                    if (stopper.linkedTechniqueId) {
-                        const mechanism = mechanismCards.find(m => m.id === (isUrge ? habit.response?.resourceId : habit.newResponse?.resourceId));
-                        links.push({
-                            habitId: habit.id,
-                            habitName: habit.name,
-                            stopper: stopper,
-                            isUrge: isUrge,
-                            mechanismName: mechanism?.name,
-                        });
-                    }
-                });
-            };
-            processStoppers(habit.urges, true);
-            processStoppers(habit.resistances, false);
-        });
-        return links;
-    }, [habitCards, mechanismCards]);
-    
     if (!isClient) {
         return null;
     }
+    
+    const sortedResistances = [...allLinkedResistances].sort((a, b) => {
+        const aIsHot = hotResistances.has(a.stopper.id);
+        const bIsHot = hotResistances.has(b.stopper.id);
+        if (aIsHot && !bIsHot) return -1;
+        if (!aIsHot && bIsHot) return 1;
+        // Optional: further sort by other criteria if needed, e.g., timestamp
+        const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
+        const lastTsB = Math.max(0, ...(b.stopper.timestamps || []));
+        return lastTsB - lastTsA;
+    });
 
     const renderContent = () => {
         if (view === 'all-resistances') {
             return (
                 <ul className="space-y-2">
-                    {allLinkedResistances.map((link) => (
-                        <li key={`${link.habitId}-${link.stopper.id}`} className="text-sm bg-muted/50 p-2 rounded-md">
+                    {sortedResistances.map((link) => (
+                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", hotResistances.has(link.stopper.id) ? "bg-primary/20" : "bg-muted/50")}>
                             <button
                                 className="flex justify-between items-start w-full text-left"
                                 onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
                             >
                                 <p className="font-semibold flex-grow">{link.stopper.text}</p>
                                 <div className="flex items-center flex-shrink-0">
-                                    <span className="text-xs font-bold mr-1">({link.stopper.count || 0})</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); incrementStopperCount(link.habitId, link.stopper.id); }}>
+                                    <span className="text-xs font-bold mr-1">({link.stopper.timestamps?.length || 0})</span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                     </Button>
                                 </div>
@@ -190,19 +230,19 @@ export function MindsetCategoriesCard() {
 
     return (
         <motion.div
-            ref={setNodeRef}
             style={style}
             className="fixed w-full max-w-xs"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
+            onMouseDown={handleMouseDown}
         >
             <Card 
+                ref={setNodeRef}
                 className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
-                onMouseDown={handleMouseDown}
             >
-                <div className="cursor-grab active:cursor-grabbing" {...listeners} {...attributes}>
+                <div className="cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
                     <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
                         {view === 'all-resistances' && (
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
