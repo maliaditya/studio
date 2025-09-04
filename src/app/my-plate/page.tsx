@@ -173,67 +173,36 @@ function MyPlatePageContent() {
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
   
-  const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !currentUser, [schedule, currentUser]);
-  
-  const routineTasks = useMemo(() => {
-    const uniqueRoutines = new Map<string, Activity>();
-    Object.values(schedule).forEach(day => {
-        Object.values(day).flat().forEach(activity => {
-            if (activity && activity.isRoutine) {
-                const key = `${activity.type}-${activity.details}`;
-                if (!uniqueRoutines.has(key)) {
-                    uniqueRoutines.set(key, activity);
-                }
-            }
-        });
-    });
-    return Array.from(uniqueRoutines.values());
-  }, [schedule]);
-
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !settings.carryForward) return;
+    if (!currentUser || !settings.routines || settings.routines.length === 0) return;
   
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const todayScheduleExists = !!schedule[todayKey];
+    const todaySchedule = schedule[todayKey];
     
-    if (todayScheduleExists) {
-        return; 
-    }
-
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastRunForToday = localStorage.getItem(lastCarryForwardKey);
-  
-    if (lastRunForToday === todayKey) {
-        return;
-    }
-  
-    const yesterday = subDays(new Date(), 1);
-    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
-
-    if (yesterdaysSchedule) {
-        const routineTasksToCarry = Object.values(yesterdaysSchedule)
-            .flat()
-            .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
-
-        if (routineTasksToCarry.length > 0) {
-            const newDaySchedule: DailySchedule = {};
-            routineTasksToCarry.forEach(task => {
-                const slot = task.slot as keyof DailySchedule;
-                if (!newDaySchedule[slot]) {
-                    newDaySchedule[slot] = [];
-                }
-                (newDaySchedule[slot] as Activity[]).push({
-                    ...task,
-                    id: `${task.type}-${Date.now()}-${Math.random()}`,
-                    completed: false,
-                });
-            });
-            setSchedule(prev => ({ ...prev, [todayKey]: newDaySchedule }));
+    // Check if today's schedule is empty or doesn't exist
+    if (!todaySchedule || Object.keys(todaySchedule).length === 0) {
+      const newDaySchedule: DailySchedule = {};
+      
+      settings.routines.forEach((task: Activity) => {
+        const slot = task.slot as keyof DailySchedule;
+        if (!newDaySchedule[slot]) {
+          newDaySchedule[slot] = [];
         }
+        (newDaySchedule[slot] as Activity[]).push({
+          ...task,
+          id: `${task.type}-${Date.now()}-${Math.random()}`,
+          completed: false,
+        });
+      });
+
+      if (Object.keys(newDaySchedule).length > 0) {
+          setSchedule(prev => ({
+              ...prev,
+              [todayKey]: newDaySchedule,
+          }));
+      }
     }
-    localStorage.setItem(lastCarryForwardKey, todayKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, settings.carryForward]);
+  }, [currentUser, schedule, settings.routines, setSchedule]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -1417,6 +1386,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
