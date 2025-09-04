@@ -11,6 +11,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const activityNameMap: Record<ActivityType, string> = {
     deepwork: 'Deep Work',
@@ -219,7 +220,7 @@ export function MindsetCategoriesCard() {
                             >
                                 <p className="font-semibold flex-grow">{link.stopper.text}</p>
                                 <div className="flex items-center flex-shrink-0">
-                                    <span className="text-xs font-bold mr-1">({link.stopper.timestamps?.length || 0})</span>
+                                    <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                     </Button>
