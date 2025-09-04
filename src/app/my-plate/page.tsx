@@ -1,4 +1,5 @@
 
+      
 
 "use client";
 
@@ -191,33 +192,33 @@ function MyPlatePageContent() {
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
-    
-    const definitions = [...deepWorkDefinitions, ...upskillDefinitions];
+    const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
 
     function recurse(d: ExerciseDefinition) {
         if (visited.has(d.id)) return;
         visited.add(d.id);
+  
+        const deepWorkChildren = d.linkedDeepWorkIds || [];
+        const upskillChildren = d.linkedUpskillIds || [];
 
-        const hasChildren = (d.linkedDeepWorkIds?.length ?? 0) > 0 || (d.linkedUpskillIds?.length ?? 0) > 0;
-
-        if (hasChildren) {
-            (d.linkedDeepWorkIds || []).forEach(childId => {
-                const childDef = definitions.find(c => c.id === childId);
-                if (childDef) recurse(childDef);
-            });
-            (d.linkedUpskillIds || []).forEach(childId => {
-                const childDef = definitions.find(c => c.id === childId);
-                if (childDef) recurse(childDef);
-            });
-        }
-        else {
+        if (deepWorkChildren.length === 0 && upskillChildren.length === 0) {
             total += d.estimatedDuration || 0;
+        } else {
+            deepWorkChildren.forEach(childId => {
+                const childDef = allDefsMap.get(childId);
+                if (childDef) recurse(childDef);
+            });
+            upskillChildren.forEach(childId => {
+                const childDef = allDefsMap.get(childId);
+                if (childDef) recurse(childDef);
+            });
         }
     }
+  
     recurse(def);
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
-
+  
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
@@ -372,18 +373,18 @@ function MyPlatePageContent() {
         const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
         
         const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+        
         const currentSlotDuration = (Array.isArray(activitiesInSlot) ? activitiesInSlot : []).reduce((sum, act) => {
             let duration = 0;
             if (act.completed) {
                 duration = parseDurationToMinutes(activityDurations[act.id]);
             } else {
-                 if (act.taskIds && act.taskIds.length > 0) {
+                if (act.taskIds && act.taskIds.length > 0) {
                     const mainDef = allDefs.get(act.taskIds[0]);
                     if (mainDef) duration = calculateTotalEstimate(mainDef);
                 } else if (act.duration) {
                     duration = act.duration;
                 } else {
-                    // Default estimates for tasks without specific definitions yet
                     switch(act.type) {
                         case 'workout': duration = 90; break;
                         case 'mindset': duration = 15; break;
@@ -1379,3 +1380,6 @@ export default function MyPlatePage() {
 
 
 
+
+
+    
