@@ -106,7 +106,7 @@ export function MindsetCategoriesCard() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-48 pr-3">
+                    <ScrollArea className="h-96 pr-3">
                         <ul className="space-y-3">
                             {Object.entries(techniquesByCategory).map(([category, techniques]) => (
                                 <li key={category}>
@@ -129,4 +129,3 @@ export function MindsetCategoriesCard() {
         </motion.div>
     );
 }
-
