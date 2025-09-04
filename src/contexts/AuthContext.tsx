@@ -2405,8 +2405,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
     let path: string[];
     let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
-    
-    if ('category' in parent) { // Parent is an ExerciseDefinition
+
+    // NEW: Handle Mind Programming techniques separately
+    if ('category' in parent && defaultMindsetCategories.includes(parent.category as ExerciseCategory)) {
+        path = ["Mindset Techniques", parent.name];
+    } else if ('category' in parent) { // Parent is a standard ExerciseDefinition
         const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
         if (!microSkill) {
             toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
@@ -2465,37 +2468,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     let updatedParent: ExerciseDefinition | Resource | undefined;
     
-    const updateParentDefinitions = (
+    const updateParent = (
       setDefs: React.Dispatch<React.SetStateAction<any[]>>,
-      isPointConversion: boolean
+      isPointConversion: boolean,
+      isMindset: boolean = false
     ) => {
       setDefs(prev => prev.map(def => {
         if (def.id === parent.id) {
-          let updatedPoints = def.points || [];
-          if (isPointConversion) {
-            updatedPoints = updatedPoints.map((p: any) =>
-              p.id === pointToConvert!.id
-                ? { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }
-                : p
-            );
-          } else {
-            updatedPoints.push({ id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id });
-          }
-          updatedParent = { ...def, linkedResourceIds: [...(def.linkedResourceIds || []), newResource.id], points: updatedPoints };
-          return updatedParent;
+            const linkKey = isMindset ? 'linkedResourceIds' : 'linkedResourceIds'; // Future-proofing if mindsets link differently
+            let updatedPoints = def.points || def.decompositionData || [];
+            if (isPointConversion) {
+                updatedPoints = updatedPoints.map((p: any) =>
+                p.id === pointToConvert!.id
+                    ? { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }
+                    : p
+                );
+            }
+            updatedParent = { 
+                ...def, 
+                [linkKey]: [...(def[linkKey] || []), newResource.id],
+                ...(isMindset ? { decompositionData: updatedPoints } : { points: updatedPoints })
+            };
+            return updatedParent;
         }
         return def;
       }));
     };
 
     if ('category' in parent) {
-      if (upskillDefinitions.some(d => d.id === parent.id)) {
-        updateParentDefinitions(setUpskillDefinitions, false); // can't convert points from task cards
+      if (defaultMindsetCategories.includes(parent.category as ExerciseCategory)) {
+        updateParent(setMindProgrammingDefinitions, false, true);
+      } else if (upskillDefinitions.some(d => d.id === parent.id)) {
+        updateParent(setUpskillDefinitions, false);
       } else if (deepWorkDefinitions.some(d => d.id === parent.id)) {
-        updateParentDefinitions(setDeepWorkDefinitions, false);
+        updateParent(setDeepWorkDefinitions, false);
       }
     } else {
-        updateParentDefinitions(setResources, !!pointToConvert);
+        updateParent(setResources, !!pointToConvert);
     }
   
     toast({ title: 'Resource Created', description: `A new resource card has been created and linked.` });
@@ -3003,6 +3012,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
 
 
 
