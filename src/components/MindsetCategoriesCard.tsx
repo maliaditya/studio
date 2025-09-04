@@ -214,7 +214,7 @@ export function MindsetCategoriesCard() {
                 <ul className="space-y-2">
                     {sortedResistances.map((link) => (
                         <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", hotResistances.has(link.stopper.id) ? "bg-primary/20" : "bg-muted/50")}>
-                            <button
+                            <div
                                 className="flex justify-between items-start w-full text-left"
                                 onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
                             >
@@ -225,7 +225,7 @@ export function MindsetCategoriesCard() {
                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                     </Button>
                                 </div>
-                            </button>
+                            </div>
                             <p className="text-xs text-muted-foreground mt-1">
                                 {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
                             </p>
