@@ -5,18 +5,25 @@ import React, { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ChartContainer } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { ChartContainer, ChartConfig } from '@/components/ui/chart';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { format, parseISO } from 'date-fns';
 import type { StopperProgressPopupState } from '@/types/workout';
 
 interface StopperProgressModalProps {
-    popupState: StopperProgressPopupState | null; // Changed to allow null
+    popupState: StopperProgressPopupState | null;
     onOpenChange: (isOpen: boolean) => void;
 }
 
+const chartConfig = {
+  count: {
+    label: "Encounters",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
+
 export function StopperProgressModal({ popupState, onOpenChange }: StopperProgressModalProps) {
-    // Add this check at the beginning of the component
     if (!popupState) {
         return null;
     }
@@ -59,13 +66,13 @@ export function StopperProgressModal({ popupState, onOpenChange }: StopperProgre
                 </DialogHeader>
                 <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0 py-4">
                     <div className="flex flex-col">
-                        <h4 className="font-semibold text-center mb-2">Daily Encounters</h4>
+                        <h4 className="font-semibold text-center mb-2">Daily Encounters Trend</h4>
                         <div className="flex-grow min-h-[200px]">
-                           {chartData.length > 0 ? (
-                                <ChartContainer config={{}} className="h-full w-full">
+                           {chartData.length > 1 ? (
+                                <ChartContainer config={chartConfig} className="h-full w-full">
                                     <ResponsiveContainer>
-                                        <BarChart data={chartData}>
-                                            <CartesianGrid vertical={false} />
+                                        <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
                                             <YAxis allowDecimals={false} />
                                             <RechartsTooltip
@@ -83,11 +90,11 @@ export function StopperProgressModal({ popupState, onOpenChange }: StopperProgre
                                                     return null;
                                                 }}
                                             />
-                                            <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                                        </BarChart>
+                                            <Line type="monotone" dataKey="count" stroke="var(--color-count)" strokeWidth={2} dot={{r: 4}}/>
+                                        </LineChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
-                            ) : <p className="text-center text-muted-foreground pt-10">No data to display.</p>}
+                            ) : <p className="text-center text-muted-foreground pt-10">{chartData.length > 0 ? 'Need at least two days of data for a trend line.' : 'No data to display.'}</p>}
                         </div>
                     </div>
                     <div className="flex flex-col">
