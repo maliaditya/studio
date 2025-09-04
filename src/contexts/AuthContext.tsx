@@ -375,6 +375,7 @@ interface AuthContextType {
   
   // Stopper Progress Popup
   stopperProgressPopup: StopperProgressPopupState | null;
+  setStopperProgressPopup: React.Dispatch<React.SetStateAction<StopperProgressPopupState | null>>;
   openStopperProgressPopup: (stopper: Stopper, habitName: string) => void;
 }
 
@@ -1139,8 +1140,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActiveFocusSession(null);
     }
     setIsAgendaDocked(uiState.isAgendaDocked === undefined ? true : uiState.isAgendaDocked);
-    
-    setTimeout(() => setIsLoadingState(false), 100); 
   };
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
@@ -2805,7 +2804,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleLinkHabit,
     missedSlotReviews, setMissedSlotReviews,
     linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup,
-    stopperProgressPopup, openStopperProgressPopup,
+    stopperProgressPopup, openStopperProgressPopup, setStopperProgressPopup,
   };
 
   useEffect(() => {
@@ -3004,6 +3003,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
   
+
 
 
 
