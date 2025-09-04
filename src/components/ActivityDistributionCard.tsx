@@ -39,6 +39,7 @@ const activityColorMapping: Record<string, string> = {
     'Distractions': 'bg-amber-600',
     'Nutrition': 'bg-lime-500',
     'Wasted Time': 'bg-orange-600',
+    'Scheduled': 'bg-sky-500',
     'Free Time': 'bg-gray-400',
 };
 
@@ -64,108 +65,75 @@ export function ActivityDistributionCard() {
     const { 
         schedule, 
         currentSlot,
-        allDeepWorkLogs, 
-        allUpskillLogs,
-        allWorkoutLogs,
-        brandingLogs,
-        allLeadGenLogs,
         activityDurations
     } = useAuth();
     
     const [timeAllocation, setTimeAllocation] = useState<{ name: string; time: number }[]>([]);
 
-    useEffect(() => {
-        const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (!activity.completed) return 0;
-          
-            const activityTaskIds = new Set(activity.taskIds || []);
-            
-            let logs: DatedWorkout[] = [];
-            let durationField: 'reps' | 'weight' | null = null;
-            let isWorkout = false;
-          
-            switch (activity.type) {
-              case 'upskill':
-                logs = allUpskillLogs;
-                durationField = 'weight';
-                break;
-              case 'deepwork':
-              case 'branding':
-              case 'lead-generation':
-                logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
-                durationField = 'weight'; 
-                break;
-              case 'workout':
-                logs = allWorkoutLogs;
-                isWorkout = true;
-                break;
-              default:
-                return activity.duration || 0;
-            }
-          
-            if (activityTaskIds.size === 0) {
-              return activity.duration || 0;
-            }
-        
-            const logForDay = logs.find(l => l.date === dateKey);
-            if (!logForDay) return 0;
-          
-            return logForDay.exercises
-              .filter(ex => activityTaskIds.has(ex.id))
-              .reduce((sum, ex) => {
-                return sum + (ex.loggedSets || []).reduce((setSum, set) => {
-                  if (isWorkout) {
-                    return setSum + 15;
-                  }
-                  return setSum + (set[durationField!] || 0);
-                }, 0);
-              }, 0);
-          };
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr || typeof durationStr !== 'string') return 0;
+        if (/^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+        if (minMatch) totalMinutes += parseInt(minMatch, 10);
+        return totalMinutes;
+    };
 
+    useEffect(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const dailySchedule = schedule[todayKey] || {};
         const totals: Record<string, number> = {};
         let wastedTime = 0;
-        let scheduledButNotCompletedTime = 0;
+        let scheduledTime = 0;
+        let totalLoggedMinutes = 0;
 
         const now = new Date();
         const currentHour = now.getHours();
-        const currentMinute = now.getMinutes();
         
         slotOrder.forEach(slot => {
             const activities = (dailySchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
             let loggedInSlot = 0;
+            let scheduledInSlot = 0;
+            const isPastSlot = currentHour >= slot.endHour;
 
             activities.forEach(activity => {
-                const duration = getLoggedMinutes(activity, todayKey);
-                if (activity.completed && duration > 0) {
+                if (activity.completed) {
+                    const duration = parseDurationToMinutes(activityDurations[activity.id]);
                     const mappedName = activityNameMap[activity.type];
                     if (mappedName) {
                         totals[mappedName] = (totals[mappedName] || 0) + duration;
                     }
                     loggedInSlot += duration;
-                } else if (!activity.completed) {
-                   const estDurationStr = activityDurations[activity.id];
-                   const estDuration = estDurationStr ? parseInt(estDurationStr.replace(/[a-zA-Z\s]/g, '')) || 0 : 0;
-                   scheduledButNotCompletedTime += estDuration;
+                } else if (!isPastSlot) {
+                    // It's a future or current slot, count as scheduled
+                    const estDuration = parseDurationToMinutes(activityDurations[activity.id]);
+                    scheduledInSlot += estDuration;
                 }
             });
 
-            if (currentHour >= slot.endHour) {
+            totalLoggedMinutes += loggedInSlot;
+            scheduledTime += scheduledInSlot;
+            
+            if (isPastSlot) {
                 wastedTime += Math.max(0, 240 - loggedInSlot);
-            } else if (currentSlot === slot.name) {
-                const minutesElapsedInSlot = (currentHour - slot.startHour) * 60 + currentMinute;
-                wastedTime += Math.max(0, minutesElapsedInSlot - loggedInSlot);
             }
         });
         
         if (wastedTime > 0) {
           totals['Wasted Time'] = wastedTime;
         }
+
+        if (scheduledTime > 0) {
+            totals['Scheduled'] = scheduledTime;
+        }
         
-        const totalLoggedAndWasted = Object.values(totals).reduce((sum, t) => sum + t, 0);
+        const totalAccountedForTime = totalLoggedMinutes + wastedTime + scheduledTime;
         const totalMinutesInDay = 24 * 60;
-        const freeTime = totalMinutesInDay - totalLoggedAndWasted - scheduledButNotCompletedTime;
+        const freeTime = totalMinutesInDay - totalAccountedForTime;
 
         if (freeTime > 0) {
             totals['Free Time'] = freeTime;
@@ -177,7 +145,7 @@ export function ActivityDistributionCard() {
 
         setTimeAllocation(newTimeAllocation);
         
-    }, [schedule, currentSlot, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, activityDurations]);
+    }, [schedule, currentSlot, activityDurations]);
 
 
     if (timeAllocation.length === 0) {
