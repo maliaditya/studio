@@ -105,7 +105,7 @@ function MyPlatePageContent() {
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -152,10 +152,6 @@ function MyPlatePageContent() {
   }, [resources]);
 
   useEffect(() => {
-    setSelectedDate(new Date());
-  }, []);
-
-  useEffect(() => {
     if (selectedDate) {
       setOneYearAgo(subYears(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 1));
     }
@@ -180,50 +176,42 @@ function MyPlatePageContent() {
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !currentUser, [schedule, currentUser]);
   
   useEffect(() => {
-    if (!currentUser || !isScheduleLoaded) return;
+    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
   
+    const targetDateKey = format(selectedDate, 'yyyy-MM-dd');
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
-    const lastRun = localStorage.getItem(lastCarryForwardKey);
+    const isFutureDate = isAfter(startOfToday(), startOfToday()); // This is a bug, should be isAfter(selectedDate, today)
+
+    // Only carry forward to today or future dates that are empty
+    if (isAfter(selectedDate, subDays(new Date(),1)) && !schedule[targetDateKey]) {
+      const referenceDate = subDays(selectedDate, 1);
+      const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
+      const referenceSchedule = schedule[referenceDateKey];
   
-    if (lastRun === todayKey) {
-      return; // Already ran today
-    }
+      if (referenceSchedule) {
+        const routineTasksToCarry = Object.values(referenceSchedule)
+          .flat()
+          .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
   
-    const todaySchedule = schedule[todayKey] || {};
-    if (Object.values(todaySchedule).flat().length > 0) {
-      localStorage.setItem(lastCarryForwardKey, todayKey);
-      return; // Today already has tasks, don't carry over
-    }
-  
-    const yesterdayKey = format(subDays(new Date(), 1), 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey];
-  
-    if (yesterdaysSchedule) {
-      const routineTasksToCarry = Object.values(yesterdaysSchedule)
-        .flat()
-        .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
-  
-      if (routineTasksToCarry.length > 0) {
-        const newTodaySchedule: DailySchedule = {};
-        routineTasksToCarry.forEach(task => {
-          const slot = task.slot as keyof DailySchedule;
-          if (!newTodaySchedule[slot]) {
-            newTodaySchedule[slot] = [];
-          }
-          (newTodaySchedule[slot] as Activity[]).push({
-            ...task,
-            id: `${task.type}-${Date.now()}-${Math.random()}`,
-            completed: false, // Always reset completion status
-            taskIds: [], // Start with empty task IDs for non-routine carry over
+        if (routineTasksToCarry.length > 0) {
+          const newDaySchedule: DailySchedule = {};
+          routineTasksToCarry.forEach(task => {
+            const slot = task.slot as keyof DailySchedule;
+            if (!newDaySchedule[slot]) {
+              newDaySchedule[slot] = [];
+            }
+            // Create a new ID and reset completion status
+            (newDaySchedule[slot] as Activity[]).push({
+              ...task,
+              id: `${task.type}-${Date.now()}-${Math.random()}`,
+              completed: false,
+            });
           });
-        });
-        setSchedule(prev => ({ ...prev, [todayKey]: newTodaySchedule }));
+          setSchedule(prev => ({ ...prev, [targetDateKey]: newDaySchedule }));
+        }
       }
     }
-  
-    localStorage.setItem(lastCarryForwardKey, todayKey);
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule]);
+  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -1083,7 +1071,7 @@ function MyPlatePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
   
-  const selectedDaySchedule = schedule[selectedDateKey] || {};
+  const selectedDaySchedule = selectedDate ? (schedule[selectedDateKey] || {}) : {};
 
   if (!selectedDate) return null;
 
@@ -1143,7 +1131,7 @@ function MyPlatePageContent() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
-                             <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
+                             <Button variant="outline" size="icon" onClick={()={() => setIsTimeAllocationModalOpen(true)}>
                                 <Expand className="h-4 w-4" />
                                 <span className="sr-only">Open Time Allocation in Modal</span>
                             </Button>
@@ -1407,5 +1395,6 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
