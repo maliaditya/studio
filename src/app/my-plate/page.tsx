@@ -52,6 +52,20 @@ const slotEndHours: Record<string, number> = {
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr) return 0;
+    if (/^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+)\s*h/);
+    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    return totalMinutes;
+};
+
+
 function MyPlatePageContent() {
   const { 
     currentUser, 
@@ -179,15 +193,13 @@ function MyPlatePageContent() {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
     const dayScheduleExists = schedule[dateKey] && Object.keys(schedule[dateKey]).length > 0;
   
-    // Only proceed if the day's schedule is empty and it's a future date
-    if (dayScheduleExists || isBefore(selectedDate, startOfToday())) {
+    if (dayScheduleExists) {
         return;
     }
 
     const referenceDateKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
     const referenceSchedule = schedule[referenceDateKey];
     
-    // This part of the logic might be redundant if the main context handles it, but good for future planning
     if (!referenceSchedule) return;
 
     const newDaySchedule: DailySchedule = {};
@@ -356,8 +368,8 @@ function MyPlatePageContent() {
         const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
         
         activities.forEach(activity => {
-            const durationStr = activityDurations[activity.id] || '0';
-            const activityMinutes = parseInt(durationStr.replace(/[a-zA-Z\s]/g, '')) || 0;
+            const durationStr = activityDurations[activity.id] || '0m';
+            const activityMinutes = parseDurationToMinutes(durationStr);
             
             if (activity.completed) {
               loggedTime += activityMinutes;
@@ -989,7 +1001,7 @@ function MyPlatePageContent() {
                 if (!totals[mappedName]) {
                     totals[mappedName] = { time: 0, activities: [] };
                 }
-                const duration = activity.duration || 0;
+                const duration = parseDurationToMinutes(activityDurations[activity.id]);
                 totals[mappedName].time += duration;
                 totals[mappedName].activities.push({ name: activity.details, duration });
             }
@@ -997,7 +1009,7 @@ function MyPlatePageContent() {
     });
 
     return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-  }, [schedule, selectedDateKey]);
+  }, [schedule, selectedDateKey, activityDurations]);
   
   const dashboardStats = useMemo(() => {
     const {
@@ -1378,6 +1390,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
