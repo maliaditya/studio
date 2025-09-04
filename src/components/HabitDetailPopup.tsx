@@ -182,12 +182,14 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
 
     const linkedResistances = useMemo(() => {
         if (!techniqueId) return [];
-        return habitCards.flatMap(habit => 
-            (habit.urges || [])
-                .filter(urge => urge.linkedTechniqueId === techniqueId)
-                .map(urge => ({ habitName: habit.name, resistanceText: urge.text }))
-        );
+        return habitCards.flatMap(habit => {
+            const allStoppers = [...(habit.urges || []), ...(habit.resistances || [])];
+            return allStoppers
+                .filter(stopper => stopper.linkedTechniqueId === techniqueId)
+                .map(stopper => ({ habitName: habit.name, resistanceText: stopper.text }));
+        });
     }, [techniqueId, habitCards]);
+
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
@@ -681,5 +683,3 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
         </>
     );
 };
-
-  
