@@ -1,14 +1,19 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { format } from 'date-fns';
+import { format, isBefore, startOfDay, parseISO } from 'date-fns';
 import type { Activity, ActivityType, DatedWorkout, DailySchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { PieChart as PieChartIcon } from 'lucide-react';
+import { PieChart as PieChartIcon, X } from 'lucide-react';
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { cn } from '@/lib/utils';
+import { Button } from './ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+
 
 const activityNameMap: Record<ActivityType, string> = {
     deepwork: 'Deep Work',
@@ -61,6 +66,62 @@ const slotOrder: { name: string; endHour: number, startHour: number }[] = [
     { name: 'Night', endHour: 24, startHour: 20 }
 ];
 
+interface ActivityDetailPopupState {
+    category: string;
+    tasks: { name: string; duration: number }[];
+    x: number;
+    y: number;
+}
+
+const ActivityDetailPopup = ({ popupState, onClose }: {
+    popupState: ActivityDetailPopupState;
+    onClose: () => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'activity-detail-popup' });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        willChange: 'transform',
+        zIndex: 100,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
+                <CardHeader className="p-3 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between" {...listeners}>
+                    <CardTitle className="text-base">{popupState.category} Details</CardTitle>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} onPointerDown={(e) => e.stopPropagation()}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardHeader>
+                <CardContent className="p-3">
+                    <ScrollArea className="h-48 pr-3">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Task</TableHead>
+                                    <TableHead className="text-right">Duration</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {popupState.tasks.map((task, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium truncate" title={task.name}>{task.name}</TableCell>
+                                        <TableCell className="text-right">{formatMinutes(task.duration)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
 export function ActivityDistributionCard() {
     const { 
         schedule, 
@@ -68,7 +129,12 @@ export function ActivityDistributionCard() {
         activityDurations
     } = useAuth();
     
-    const [timeAllocation, setTimeAllocation] = useState<{ name: string; time: number }[]>([]);
+    const [isClient, setIsClient] = useState(false);
+    const [detailPopupState, setDetailPopupState] = useState<ActivityDetailPopupState | null>(null);
+
+    useEffect(() => {
+      setIsClient(true);
+    }, []);
 
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
@@ -83,10 +149,11 @@ export function ActivityDistributionCard() {
         return totalMinutes;
     };
 
-    useEffect(() => {
+    const timeAllocation = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const dailySchedule = schedule[todayKey] || {};
-        const totals: Record<string, number> = {};
+        const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+        
         let wastedTime = 0;
         let scheduledTime = 0;
         let totalLoggedMinutes = 0;
@@ -105,11 +172,14 @@ export function ActivityDistributionCard() {
                 if (activity.completed) {
                     const mappedName = activityNameMap[activity.type];
                     if (mappedName) {
-                        totals[mappedName] = (totals[mappedName] || 0) + duration;
+                        if (!totals[mappedName]) {
+                            totals[mappedName] = { time: 0, activities: [] };
+                        }
+                        totals[mappedName].time += duration;
+                        totals[mappedName].activities.push({ name: activity.details, duration });
                     }
                     loggedInSlot += duration;
                 } else if (!isPastSlot) {
-                    // It's a future or current slot, count as scheduled
                     scheduledInSlot += duration;
                 }
             });
@@ -124,11 +194,13 @@ export function ActivityDistributionCard() {
         });
         
         if (wastedTime > 0) {
-          totals['Wasted Time'] = wastedTime;
+          if (!totals['Wasted Time']) totals['Wasted Time'] = { time: 0, activities: [] };
+          totals['Wasted Time'].time = wastedTime;
         }
 
         if (scheduledTime > 0) {
-            totals['Scheduled'] = scheduledTime;
+            if (!totals['Scheduled']) totals['Scheduled'] = { time: 0, activities: [] };
+            totals['Scheduled'].time = scheduledTime;
         }
         
         const totalAccountedForTime = totalLoggedMinutes + wastedTime + scheduledTime;
@@ -136,65 +208,95 @@ export function ActivityDistributionCard() {
         const freeTime = totalMinutesInDay - totalAccountedForTime;
 
         if (freeTime > 0) {
-            totals['Free Time'] = freeTime;
+             if (!totals['Free Time']) totals['Free Time'] = { time: 0, activities: [] };
+            totals['Free Time'].time = freeTime;
         }
 
         const PREFERRED_ORDER = ['Wasted Time', 'Free Time', 'Scheduled', 'Distractions'];
 
-        const newTimeAllocation = Object.entries(totals)
-            .map(([name, time]) => ({ name, time }))
+        return Object.entries(totals)
+            .map(([name, data]) => ({ name, ...data }))
             .sort((a, b) => {
                 const aIndex = PREFERRED_ORDER.indexOf(a.name);
                 const bIndex = PREFERRED_ORDER.indexOf(b.name);
         
-                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex; // Both are in preferred order
-                if (aIndex !== -1) return -1; // a is preferred, b is not
-                if (bIndex !== -1) return 1; // b is preferred, a is not
-                return b.time - a.time; // Neither are preferred, sort by time
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+                return b.time - a.time;
             });
-
-        setTimeAllocation(newTimeAllocation);
         
     }, [schedule, currentSlot, activityDurations]);
 
+    const handleItemClick = (item: { name: string, activities: {name: string, duration: number}[] }, event: React.MouseEvent) => {
+        if (item.name === 'Wasted Time' || item.name === 'Free Time' || item.name === 'Scheduled') return;
+        setDetailPopupState({
+            category: item.name,
+            tasks: item.activities,
+            x: event.clientX + 20,
+            y: event.clientY - 100,
+        });
+    };
 
-    if (timeAllocation.length === 0) {
+    const handleDragEnd = (event: DragEndEvent) => {
+        if (detailPopupState) {
+            setDetailPopupState(prev => prev ? {
+                ...prev,
+                x: prev.x + event.delta.x,
+                y: prev.y + event.delta.y,
+            } : null);
+        }
+    };
+    
+    if (!isClient || timeAllocation.length === 0) {
         return null;
     }
 
     return (
-        <motion.div
-            className="fixed bottom-20 left-4 z-50 w-full max-w-xs"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-        >
-            <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                <CardHeader className="p-0 mb-3">
-                    <CardTitle className="flex items-center gap-2 text-base text-primary">
-                        <PieChartIcon className="h-5 w-5" />
-                        Activity Distribution
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-48 pr-3">
-                        <ul className="space-y-2">
-                            {timeAllocation.map(item => (
-                                <li key={item.name}>
-                                    <div className="flex justify-between items-center text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-3 h-3 rounded-full ${activityColorMapping[item.name] || 'bg-gray-400'}`}></div>
-                                            <span className="font-medium text-foreground">{item.name}</span>
-                                        </div>
-                                        <span className="font-semibold text-muted-foreground">{formatMinutes(item.time)}</span>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </motion.div>
+        <DndContext onDragEnd={handleDragEnd}>
+            <motion.div
+                className="fixed bottom-20 left-4 z-50 w-full max-w-xs"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.3 }}
+            >
+                <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
+                    <CardHeader className="p-0 mb-3">
+                        <CardTitle className="flex items-center gap-2 text-base text-primary">
+                            <PieChartIcon className="h-5 w-5" />
+                            Activity Distribution
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-48 pr-3">
+                            <ul className="space-y-2">
+                                {timeAllocation.map(item => (
+                                    <li key={item.name}>
+                                        <button
+                                            className="flex justify-between items-center text-sm w-full text-left"
+                                            onClick={(e) => handleItemClick(item, e)}
+                                            disabled={item.name === 'Wasted Time' || item.name === 'Free Time' || item.name === 'Scheduled'}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-3 h-3 rounded-full ${activityColorMapping[item.name] || 'bg-gray-400'}`}></div>
+                                                <span className="font-medium text-foreground">{item.name}</span>
+                                            </div>
+                                            <span className="font-semibold text-muted-foreground">{formatMinutes(item.time)}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </motion.div>
+            {detailPopupState && (
+                <ActivityDetailPopup
+                    popupState={detailPopupState}
+                    onClose={() => setDetailPopupState(null)}
+                />
+            )}
+        </DndContext>
     );
 }
