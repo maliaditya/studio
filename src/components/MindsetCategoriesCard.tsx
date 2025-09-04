@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { Brain } from 'lucide-react';
+import { Brain, Link as LinkIcon } from 'lucide-react';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
@@ -14,7 +14,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 export function MindsetCategoriesCard() {
     const { 
         mindProgrammingCategories,
-        mindProgrammingDefinitions
+        mindProgrammingDefinitions,
+        openLinkedResistancePopup,
     } = useAuth();
     
     const [isClient, setIsClient] = useState(false);
@@ -109,16 +110,21 @@ export function MindsetCategoriesCard() {
                 <CardContent className="p-0">
                     <ScrollArea className="h-96 pr-3">
                         <Accordion type="single" collapsible className="w-full">
-                            {Object.entries(techniquesByCategory).map(([category, techniques]) => (
+                             {Object.entries(techniquesByCategory).map(([category, techniques]) => (
                                 <AccordionItem value={category} key={category}>
                                     <AccordionTrigger className="text-sm font-semibold hover:no-underline">
                                         {category}
                                     </AccordionTrigger>
                                     <AccordionContent>
                                         {techniques.length > 0 ? (
-                                            <ul className="text-xs space-y-1 list-disc list-inside pl-2">
+                                            <ul className="text-xs space-y-1 pl-2">
                                                 {techniques.map(tech => (
-                                                    <li key={tech.id} className="text-muted-foreground">{tech.name}</li>
+                                                  <li key={tech.id} className="flex items-center justify-between group">
+                                                    <span className="text-muted-foreground">{tech.name}</span>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => openLinkedResistancePopup(tech.id, e)}>
+                                                      <LinkIcon className="h-3 w-3 text-primary" />
+                                                    </Button>
+                                                  </li>
                                                 ))}
                                             </ul>
                                         ) : (
