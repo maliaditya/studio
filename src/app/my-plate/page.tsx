@@ -175,43 +175,90 @@ function MyPlatePageContent() {
   
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !currentUser, [schedule, currentUser]);
   
-  useEffect(() => {
-    if (!currentUser || !isScheduleLoaded || !selectedDate) return;
-  
-    const targetDateKey = format(selectedDate, 'yyyy-MM-dd');
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const isFutureDate = isAfter(startOfToday(), startOfToday()); // This is a bug, should be isAfter(selectedDate, today)
+useEffect(() => {
+  if (!currentUser || !isScheduleLoaded || !selectedDate || !settings.carryForward) return;
 
-    // Only carry forward to today or future dates that are empty
-    if (isAfter(selectedDate, subDays(new Date(),1)) && !schedule[targetDateKey]) {
-      const referenceDate = subDays(selectedDate, 1);
-      const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
-      const referenceSchedule = schedule[referenceDateKey];
-  
-      if (referenceSchedule) {
-        const routineTasksToCarry = Object.values(referenceSchedule)
-          .flat()
-          .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
-  
-        if (routineTasksToCarry.length > 0) {
-          const newDaySchedule: DailySchedule = {};
-          routineTasksToCarry.forEach(task => {
-            const slot = task.slot as keyof DailySchedule;
-            if (!newDaySchedule[slot]) {
-              newDaySchedule[slot] = [];
-            }
-            // Create a new ID and reset completion status
-            (newDaySchedule[slot] as Activity[]).push({
-              ...task,
-              id: `${task.type}-${Date.now()}-${Math.random()}`,
-              completed: false,
-            });
-          });
-          setSchedule(prev => ({ ...prev, [targetDateKey]: newDaySchedule }));
-        }
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const lastCarryForwardKey = `lifeos_last_carry_forward_${currentUser.username}`;
+  const lastRunForToday = localStorage.getItem(lastCarryForwardKey);
+
+  // Only run carry-forward for today, and only once per day.
+  if (!isSameDay(selectedDate, new Date()) || lastRunForToday === todayKey) {
+      return;
+  }
+
+  const todayScheduleIsEmpty = !schedule[todayKey] || Object.values(schedule[todayKey]).flat().length === 0;
+
+  if (todayScheduleIsEmpty) {
+      const yesterday = subDays(new Date(), 1);
+      const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
+      const yesterdaysSchedule = schedule[yesterdayKey];
+      
+      if (yesterdaysSchedule) {
+          const routineTasksToCarry = Object.values(yesterdaysSchedule)
+              .flat()
+              .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
+
+          if (routineTasksToCarry.length > 0) {
+              const newDaySchedule: DailySchedule = {};
+              routineTasksToCarry.forEach(task => {
+                  const slot = task.slot as keyof DailySchedule;
+                  if (!newDaySchedule[slot]) {
+                      newDaySchedule[slot] = [];
+                  }
+                  // Create a new ID and reset completion status
+                  (newDaySchedule[slot] as Activity[]).push({
+                      ...task,
+                      id: `${task.type}-${Date.now()}-${Math.random()}`,
+                      completed: false,
+                  });
+              });
+              setSchedule(prev => ({ ...prev, [todayKey]: newDaySchedule }));
+              toast({
+                  title: "Routine Tasks Carried Over",
+                  description: `${routineTasksToCarry.length} routine task(s) from yesterday have been added to your schedule.`,
+              });
+          }
       }
+      localStorage.setItem(lastCarryForwardKey, todayKey);
+  }
+}, [currentUser, isScheduleLoaded, schedule, setSchedule, settings.carryForward, toast]);
+
+// For future dates
+useEffect(() => {
+    if (!selectedDate || !settings.carryForward) return;
+
+    const today = startOfToday();
+    const isFutureDate = isAfter(selectedDate, today);
+
+    if (isFutureDate && (!schedule[selectedDateKey] || Object.values(schedule[selectedDateKey]).flat().length === 0)) {
+        const referenceDate = subDays(selectedDate, 1);
+        const referenceDateKey = format(referenceDate, 'yyyy-MM-dd');
+        const referenceSchedule = schedule[referenceDateKey];
+
+        if (referenceSchedule) {
+            const routineTasksToCarry = Object.values(referenceSchedule)
+                .flat()
+                .filter((activity): activity is Activity => !!(activity && activity.isRoutine));
+            
+            if (routineTasksToCarry.length > 0) {
+                const newDaySchedule: DailySchedule = {};
+                routineTasksToCarry.forEach(task => {
+                    const slot = task.slot as keyof DailySchedule;
+                    if (!newDaySchedule[slot]) {
+                        newDaySchedule[slot] = [];
+                    }
+                    (newDaySchedule[slot] as Activity[]).push({
+                        ...task,
+                        id: `${task.type}-${Date.now()}-${Math.random()}`,
+                        completed: false,
+                    });
+                });
+                setSchedule(prev => ({ ...prev, [selectedDateKey]: newDaySchedule }));
+            }
+        }
     }
-  }, [currentUser, isScheduleLoaded, schedule, setSchedule, selectedDate]);
+}, [selectedDate, schedule, settings.carryForward, setSchedule, selectedDateKey]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -1131,7 +1178,7 @@ function MyPlatePageContent() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
-                             <Button variant="outline" size="icon" onClick={()={() => setIsTimeAllocationModalOpen(true)}>
+                             <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
                                 <Expand className="h-4 w-4" />
                                 <span className="sr-only">Open Time Allocation in Modal</span>
                             </Button>
@@ -1395,6 +1442,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
