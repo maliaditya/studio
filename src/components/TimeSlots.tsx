@@ -170,36 +170,6 @@ export function TimeSlots({
 
   const { setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
   
-  const slots = [
-    { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
-    { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
-    { name: 'Morning', time: '8am - 12pm', endHour: 12, icon: <Sun className="h-5 w-5 text-yellow-400" /> },
-    { name: 'Afternoon', time: '12pm - 4pm', endHour: 16, icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
-    { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
-    { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
-  ];
-
-  const handleToggleRoutine = (slotName: string, activityId: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = newSchedule[dateKey] ? { ...newSchedule[dateKey] } : {};
-        
-        if (daySchedule[slotName] && Array.isArray(daySchedule[slotName])) {
-            const activities = daySchedule[slotName] as Activity[];
-            const updatedActivities = activities.map(act => {
-                if (act.id === activityId) {
-                    return { ...act, isRoutine: !act.isRoutine };
-                }
-                return act;
-            });
-            daySchedule[slotName] = updatedActivities;
-            newSchedule[dateKey] = daySchedule;
-        }
-        return newSchedule;
-    });
-};
-
   const handleLinkHabit = (activityId: string, habitId: string) => {
     linkHabitFromContext(activityId, habitId, true);
   };
@@ -267,6 +237,14 @@ export function TimeSlots({
 
   const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
+  const slots = [
+    { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
+    { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
+    { name: 'Morning', time: '8am - 12pm', endHour: 12, icon: <Sun className="h-5 w-5 text-yellow-400" /> },
+    { name: 'Afternoon', time: '12pm - 4pm', endHour: 16, icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
+    { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
+    { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
+  ];
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
@@ -383,7 +361,6 @@ export function TimeSlots({
                                   <DropdownMenuItem onClick={() => handleAddSubTask(slot.name, activity.id)}>
                                     <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleToggleRoutine(slot.name, activity.id)}>{activity.isRoutine ? "Unmark as Routine" : "Mark as Routine"}</DropdownMenuItem>
                                   {activity.type !== 'interrupt' && (
                                     <DropdownMenuSub>
                                       <DropdownMenuSubTrigger>

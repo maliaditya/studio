@@ -53,16 +53,16 @@ const slotEndHours: Record<string, number> = {
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-    return totalMinutes;
+  if (!durationStr) return 0;
+  if (/^\d+$/.test(durationStr.trim())) {
+      return parseInt(durationStr.trim(), 10);
+  }
+  let totalMinutes = 0;
+  const hourMatch = durationStr.match(/(\d+)\s*h/);
+  if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+  const minMatch = durationStr.match(/(\d+)\s*m/);
+  if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+  return totalMinutes;
 };
 
 
@@ -167,7 +167,7 @@ function MyPlatePageContent() {
 
   useEffect(() => {
     if (selectedDate) {
-      setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 365));
+      setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 1));
     }
   }, [selectedDate]);
 
@@ -186,45 +186,6 @@ function MyPlatePageContent() {
     }, 1000);
     return () => clearInterval(timerInterval);
   }, [currentSlot]);
-  
-  useEffect(() => {
-    if (!currentUser || !settings.routines || settings.routines.length === 0) return;
-  
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const dayScheduleExists = schedule[dateKey] && Object.keys(schedule[dateKey]).length > 0;
-  
-    if (dayScheduleExists) {
-        return;
-    }
-
-    const referenceDateKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
-    const referenceSchedule = schedule[referenceDateKey];
-    
-    if (!referenceSchedule) return;
-
-    const newDaySchedule: DailySchedule = {};
-    
-    Object.values(referenceSchedule).flat().forEach((task) => {
-        if(task && typeof task === 'object' && 'isRoutine' in task && task.isRoutine) {
-            const slot = task.slot as keyof DailySchedule;
-            if (!newDaySchedule[slot]) {
-                newDaySchedule[slot] = [];
-            }
-            (newDaySchedule[slot] as Activity[]).push({
-                ...task,
-                id: `${task.type}-${Date.now()}-${Math.random()}`,
-                completed: false,
-            });
-        }
-    });
-
-    if (Object.keys(newDaySchedule).length > 0) {
-        setSchedule(prev => ({
-            ...prev,
-            [dateKey]: newDaySchedule,
-        }));
-    }
-  }, [currentUser, schedule, settings.routines, selectedDate, setSchedule]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -368,13 +329,12 @@ function MyPlatePageContent() {
         const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
         
         activities.forEach(activity => {
-            const durationStr = activityDurations[activity.id] || '0m';
-            const activityMinutes = parseDurationToMinutes(durationStr);
+            const durationMinutes = parseDurationToMinutes(activityDurations[activity.id]);
             
             if (activity.completed) {
-              loggedTime += activityMinutes;
+              loggedTime += durationMinutes;
             }
-            totalTime += activityMinutes;
+            totalTime += durationMinutes;
         });
 
         durations[slotName] = { logged: loggedTime, total: totalTime };
@@ -1390,6 +1350,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 

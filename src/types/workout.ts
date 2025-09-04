@@ -194,7 +194,6 @@ export interface Activity {
   focusSessionInitialDuration?: number; // The originally intended duration
   postSessionReview?: PostSessionReview;
   duration?: number; // For interruptions
-  isRoutine?: boolean; // New field for daily routine tasks
   subTasks?: SubTask[]; // Added for sub-task functionality
 };
 

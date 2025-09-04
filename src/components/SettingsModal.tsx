@@ -293,24 +293,6 @@ ${JSON.stringify(finalTemplate, null, 2)}
   
   const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
 
-  const routineTasks = useMemo(() => {
-    const routines = settings.routines || [];
-    return routines;
-  }, [settings.routines]);
-
-  const handleRemoveRoutine = (activityToRemove: Activity) => {
-    const updatedRoutines = (settings.routines || []).filter(
-      (r: Activity) => !(r.type === activityToRemove.type && r.details === activityToRemove.details)
-    );
-    handleSettingChange('routines', updatedRoutines);
-    
-    toast({
-        title: "Routine Task Removed",
-        description: `"${activityToRemove.details}" will no longer be carried forward daily.`,
-    });
-  };
-
-
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -419,35 +401,6 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
-                  <AccordionItem value="item-2" className="border rounded-lg mt-6">
-                    <AccordionTrigger className="px-4 py-3">
-                       <div className="space-y-0.5 text-left">
-                        <Label className="text-base">Manage Routine Tasks</Label>
-                        <p className="text-sm text-muted-foreground">
-                          View and remove tasks that are set to repeat daily.
-                        </p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                        <div className="space-y-2 pt-4 border-t">
-                            {routineTasks.length === 0 ? (
-                                <p className="text-center text-sm text-muted-foreground py-4">No tasks are marked as routine.</p>
-                            ) : (
-                                routineTasks.map(task => (
-                                    <div key={task.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                                        <div>
-                                            <p className="font-medium text-sm">{task.details}</p>
-                                            <p className="text-xs text-muted-foreground capitalize">{task.type}</p>
-                                        </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemoveRoutine(task)}>
-                                            <Trash2 className="h-4 w-4 text-destructive"/>
-                                        </Button>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </AccordionContent>
-                  </AccordionItem>
                 </Accordion>
 
                 <div className="space-y-4 rounded-lg border p-4">
@@ -466,36 +419,6 @@ ${JSON.stringify(finalTemplate, null, 2)}
                     <Label htmlFor="smart-logging" className="font-normal">
                       Enable Smart Logging Prompts
                     </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="carry-forward"
-                      checked={settings.carryForward}
-                      onCheckedChange={(checked) => handleSettingChange('carryForward', checked)}
-                    />
-                    <Label htmlFor="carry-forward" className="font-normal">
-                      Carry-forward yesterday's incomplete tasks.
-                    </Label>
-                  </div>
-                   <div className="flex items-center space-x-2">
-                    <Switch
-                      id="carry-forward-essentials"
-                      checked={settings.carryForwardEssentials}
-                      onCheckedChange={(checked) => handleSettingChange('carryForwardEssentials', checked)}
-                    />
-                    <Label htmlFor="carry-forward-essentials" className="font-normal">
-                      Carry-forward daily essentials.
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                      <Switch
-                          id="carry-forward-nutrition"
-                          checked={settings.carryForwardNutrition}
-                          onCheckedChange={(checked) => handleSettingChange('carryForwardNutrition', checked)}
-                      />
-                      <Label htmlFor="carry-forward-nutrition" className="font-normal">
-                          Carry-forward Nutrition tasks.
-                      </Label>
                   </div>
                    <div className="flex items-center justify-between">
                     <Label htmlFor="reset-landing" className="font-normal">

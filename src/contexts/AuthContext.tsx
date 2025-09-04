@@ -1077,7 +1077,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPathNodes(mainData.pathNodes || []);
     setMissedSlotReviews(mainData.missedSlotReviews || {});
     
-    // Set UI State
+    // UI State
     setPinnedFolderIds(new Set(uiState.pinnedFolderIds || []));
     setActiveResourceTabIds(uiState.activeResourceTabIds || []);
     setSelectedResourceFolderId(uiState.selectedResourceFolderId || null);
@@ -1480,7 +1480,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...activity,
         id: `${activity.type}-${Date.now()}-${Math.random()}`,
         completed: false,
-        taskIds: activity.isRoutine ? activity.taskIds : []
+        taskIds: activity.taskIds || []
     };
     
     setSchedule(prev => {
@@ -2951,5 +2951,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
