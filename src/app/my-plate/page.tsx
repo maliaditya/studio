@@ -105,7 +105,7 @@ function MyPlatePageContent() {
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -145,16 +145,14 @@ function MyPlatePageContent() {
   // State for productivity stats
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   
-  const selectedDateKey = useMemo(() => selectedDate ? format(selectedDate, 'yyyy-MM-dd') : '', [selectedDate]);
+  const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   
   const habitResources = useMemo(() => {
     return resources.filter(r => r.type === 'habit');
   }, [resources]);
 
   useEffect(() => {
-    if (selectedDate) {
-      setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 365));
-    }
+    setOneYearAgo(subDays(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()), 365));
   }, [selectedDate]);
 
   useEffect(() => {
@@ -176,33 +174,36 @@ function MyPlatePageContent() {
   useEffect(() => {
     if (!currentUser || !settings.routines || settings.routines.length === 0) return;
   
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const todaySchedule = schedule[todayKey];
+    const dateKey = format(selectedDate, 'yyyy-MM-dd');
+    const dayScheduleExists = schedule[dateKey] && Object.keys(schedule[dateKey]).length > 0;
+  
+    // Only proceed if the day's schedule is empty
+    if (dayScheduleExists) return;
     
-    // Check if today's schedule is empty or doesn't exist
-    if (!todaySchedule || Object.keys(todaySchedule).length === 0) {
-      const newDaySchedule: DailySchedule = {};
-      
-      settings.routines.forEach((task: Activity) => {
-        const slot = task.slot as keyof DailySchedule;
-        if (!newDaySchedule[slot]) {
-          newDaySchedule[slot] = [];
-        }
-        (newDaySchedule[slot] as Activity[]).push({
-          ...task,
-          id: `${task.type}-${Date.now()}-${Math.random()}`,
-          completed: false,
-        });
-      });
+    // Only proceed if the selected date is today or in the future
+    if (isBefore(selectedDate, startOfToday())) return;
 
-      if (Object.keys(newDaySchedule).length > 0) {
-          setSchedule(prev => ({
-              ...prev,
-              [todayKey]: newDaySchedule,
-          }));
+    const newDaySchedule: DailySchedule = {};
+    
+    settings.routines.forEach((task: Activity) => {
+      const slot = task.slot as keyof DailySchedule;
+      if (!newDaySchedule[slot]) {
+        newDaySchedule[slot] = [];
       }
+      (newDaySchedule[slot] as Activity[]).push({
+        ...task,
+        id: `${task.type}-${Date.now()}-${Math.random()}`, // Ensure unique ID for each instance
+        completed: false,
+      });
+    });
+
+    if (Object.keys(newDaySchedule).length > 0) {
+        setSchedule(prev => ({
+            ...prev,
+            [dateKey]: newDaySchedule,
+        }));
     }
-  }, [currentUser, schedule, settings.routines, setSchedule]);
+  }, [currentUser, schedule, settings.routines, selectedDate, setSchedule]);
 
 
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -336,10 +337,7 @@ function MyPlatePageContent() {
   
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
-    if (!schedule || !selectedDate) return durations;
-
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const daySchedule = schedule[dateKey];
+    const daySchedule = schedule[selectedDateKey];
     if (!daySchedule) return durations;
 
     for (const slotName of slotOrder) {
@@ -361,11 +359,11 @@ function MyPlatePageContent() {
         durations[slotName] = { logged: loggedTime, total: totalTime };
     }
     return durations;
-  }, [schedule, selectedDate, activityDurations]);
+  }, [schedule, selectedDateKey, activityDurations]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType) => {
-    if (!currentUser?.username || !selectedDateKey) return;
+    if (!currentUser?.username) return;
     
     if (type === 'interrupt' || type === 'distraction') {
         setInterruptDetails('');
@@ -547,7 +545,7 @@ function MyPlatePageContent() {
   const handleSelectMeal = (mealType: 'meal1' | 'meal2' | 'meal3' | 'supplements') => {
     if (!currentSlotForMeal) return;
 
-    const dayName = selectedDate ? format(selectedDate, 'EEEE') : '';
+    const dayName = format(selectedDate, 'EEEE');
     const dayPlan = dietPlan.find(p => p.day === dayName);
     
     let mealDetails = `Nutrition: ${mealType.replace('meal', 'Meal ')}`;
@@ -587,7 +585,6 @@ function MyPlatePageContent() {
 
 
   const handleRemoveActivity = (slotName: string, activityId: string) => {
-    if (!selectedDateKey) return;
     setSchedule(prev => {
       const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
       const activities = Array.isArray(newTodaySchedule[slotName]) ? newTodaySchedule[slotName] as Activity[] : [];
@@ -598,14 +595,12 @@ function MyPlatePageContent() {
   };
 
   const getTodaysWorkout = () => {
-    if(!selectedDate) return { exercises: [], description: ""};
     const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
     const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
     return { exercises, muscleGroups };
   };
 
   const handleStartWorkoutLog = (activity: Activity) => {
-    if(!selectedDate) return;
     const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
     setTodaysExercises(exercises);
     setTodaysMuscleGroups(muscleGroups);
@@ -624,7 +619,7 @@ function MyPlatePageContent() {
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (!activity || activity.completed || !selectedDate) return;
+    if (!activity || activity.completed) return;
   
     if (activity.type === 'workout') {
       const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
@@ -748,16 +743,6 @@ function MyPlatePageContent() {
   }, []);
 
   const productivityStats = useMemo(() => {
-    if(!selectedDate) return {
-      todayUpskillHours: 0,
-      upskillChange: 0,
-      todayDeepWorkHours: 0,
-      deepWorkChange: 0,
-      totalProductiveHours: 0,
-      avgProductiveHoursChange: 0,
-      learningStats: {},
-    };
-    
     const yesterday = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
 
     const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, selectedDateKey, 'upskill');
@@ -1062,9 +1047,7 @@ function MyPlatePageContent() {
     toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
   };
   
-  const selectedDaySchedule = selectedDate ? (schedule[selectedDateKey] || {}) : {};
-
-  if (!selectedDate) return null;
+  const selectedDaySchedule = schedule[selectedDateKey] || {};
 
   return (
     <>
@@ -1078,7 +1061,7 @@ function MyPlatePageContent() {
                   <PopoverTrigger asChild>
                   <Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}>
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "MMM d") : <span>Pick a date</span>}
+                      {format(selectedDate, "MMM d")}
                   </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -1386,6 +1369,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
