@@ -131,6 +131,7 @@ export function ActivityDistributionCard() {
     
     const [isClient, setIsClient] = useState(false);
     const [detailPopupState, setDetailPopupState] = useState<ActivityDetailPopupState | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
       setIsClient(true);
@@ -229,12 +230,14 @@ export function ActivityDistributionCard() {
     }, [schedule, currentSlot, activityDurations]);
 
     const handleItemClick = (item: { name: string, activities: {name: string, duration: number}[] }, event: React.MouseEvent) => {
+        if (!containerRef.current) return;
         if (item.name === 'Wasted Time' || item.name === 'Free Time' || item.name === 'Scheduled') return;
+        const cardRect = containerRef.current.getBoundingClientRect();
         setDetailPopupState({
             category: item.name,
             tasks: item.activities,
-            x: event.clientX + 20,
-            y: event.clientY - 100,
+            x: cardRect.right + 20,
+            y: cardRect.top,
         });
     };
 
@@ -255,6 +258,7 @@ export function ActivityDistributionCard() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <motion.div
+                ref={containerRef}
                 className="fixed bottom-20 left-4 z-50 w-full max-w-xs"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
