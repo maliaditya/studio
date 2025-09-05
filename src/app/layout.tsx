@@ -44,6 +44,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
+import { FavoriteCards } from '@/components/FavoriteCards';
 
 
 const slotEndHours: Record<string, number> = {
@@ -377,6 +378,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <FloatingVideoPlayer />
       <MindsetCategoriesCard />
       <ActivityDistributionCard />
+      <FavoriteCards />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       <StopperProgressModal 
         popupState={stopperProgressPopup}

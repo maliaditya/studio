@@ -284,6 +284,7 @@ export interface Resource {
   folderId: string;
   type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d';
   createdAt: string;
+  isFavorite?: boolean;
 
   // For 'link' type
   link?: string;
