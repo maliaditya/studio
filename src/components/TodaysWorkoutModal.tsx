@@ -101,9 +101,24 @@ export function TodaysWorkoutModal({
     }
   };
 
-  const handleSwapWorkout = (newCategory: ExerciseCategory) => {
-    swapWorkoutForDay(dateForWorkout, [newCategory]);
+  const handleSwapWorkout = (newCategories: ExerciseCategory[]) => {
+    swapWorkoutForDay(dateForWorkout, newCategories);
   };
+
+  const workoutOptions = useMemo(() => {
+    if (workoutMode === 'one-muscle') {
+      return ["Chest", "Triceps", "Back", "Biceps", "Shoulders", "Legs"].map(cat => ({
+        label: cat,
+        value: [cat as ExerciseCategory]
+      }));
+    } else { // two-muscle
+      return [
+        { label: "Chest & Triceps", value: ["Chest", "Triceps"] as ExerciseCategory[] },
+        { label: "Back & Biceps", value: ["Back", "Biceps"] as ExerciseCategory[] },
+        { label: "Shoulders & Legs", value: ["Shoulders", "Legs"] as ExerciseCategory[] },
+      ];
+    }
+  }, [workoutMode]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -124,9 +139,9 @@ export function TodaysWorkoutModal({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              {exerciseDefinitions.map(def => def.category).filter((value, index, self) => self.indexOf(value) === index).map(category => (
-                <DropdownMenuItem key={category} onSelect={() => handleSwapWorkout(category)}>
-                  {category}
+              {workoutOptions.map(option => (
+                <DropdownMenuItem key={option.label} onSelect={() => handleSwapWorkout(option.value)}>
+                  {option.label}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -172,7 +187,7 @@ export function TodaysWorkoutModal({
             )}
           </ScrollArea>
         </div>
-        <DialogFooter className="flex-shrink-0 pt-4">
+        <DialogFooter className="flex-shrink-0 pt-4 border-t">
             <Button onClick={handleCompleteWorkout}>
                 Mark as Complete & Close
             </Button>
