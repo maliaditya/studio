@@ -152,7 +152,7 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'quick-access' | 'rule-
 );
 
 const QuickAccessView = () => {
-    const { resources, resourceFolders, setResources, openGeneralPopup } = useAuth();
+    const { resources, resourceFolders, setResources, openGeneralPopup, setPinnedFolderIds } = useAuth();
     const { toast } = useToast();
     const [editingCardId, setEditingCardId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
