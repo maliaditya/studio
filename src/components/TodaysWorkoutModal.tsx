@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useMemo } from 'react';
@@ -12,14 +11,15 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet, DatedWorkout } from '@/types/workout';
-import { Dumbbell, CheckCircle2 } from 'lucide-react';
+import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
+import { Dumbbell, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { WorkoutExerciseCard } from './WorkoutExerciseCard';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
 
 interface TodaysWorkoutModalProps {
   isOpen: boolean;
@@ -46,7 +46,7 @@ export function TodaysWorkoutModal({
   removeExerciseFromWorkout,
   swapWorkoutExercise,
 }: TodaysWorkoutModalProps) {
-  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans } = useAuth();
+  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans, swapWorkoutForDay } = useAuth();
   const { toast } = useToast();
 
   const currentWorkoutLog = useMemo(() => {
@@ -101,16 +101,36 @@ export function TodaysWorkoutModal({
     }
   };
 
+  const handleSwapWorkout = (newCategory: ExerciseCategory) => {
+    swapWorkoutForDay(dateForWorkout, [newCategory]);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle>
-            Log Workout: {Array.isArray(muscleGroupsForDay) && muscleGroupsForDay.length > 0 ? muscleGroupsForDay.join(' & ') : 'Rest Day'}
-          </DialogTitle>
-          <DialogDescription>
-            Log your sets for each exercise. You can swap exercises if needed.
-          </DialogDescription>
+        <DialogHeader className="flex-shrink-0 flex-row items-center justify-between">
+          <div>
+            <DialogTitle>
+              Log Workout: {Array.isArray(muscleGroupsForDay) && muscleGroupsForDay.length > 0 ? muscleGroupsForDay.join(' & ') : 'Rest Day'}
+            </DialogTitle>
+            <DialogDescription>
+              Log your sets for each exercise. You can swap exercises if needed.
+            </DialogDescription>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <RefreshCw className="mr-2 h-4 w-4" /> Change Workout
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {exerciseDefinitions.map(def => def.category).filter((value, index, self) => self.indexOf(value) === index).map(category => (
+                <DropdownMenuItem key={category} onSelect={() => handleSwapWorkout(category)}>
+                  {category}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </DialogHeader>
         <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
@@ -161,4 +181,3 @@ export function TodaysWorkoutModal({
     </Dialog>
   );
 }
-

@@ -264,6 +264,7 @@ interface AuthContextType {
   deleteWorkoutSet: (date: Date, exerciseId: string, setId: string) => void;
   removeExerciseFromWorkout: (date: Date, exerciseId: string) => void;
   swapWorkoutExercise: (date: Date, oldExerciseId: string, newExerciseDefinition: ExerciseDefinition) => void;
+  swapWorkoutForDay: (date: Date, newCategories: ExerciseCategory[]) => void;
   
   // Canvas
   canvasLayout: CanvasLayout;
@@ -1728,6 +1729,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Exercise Swapped!", description: `Replaced "${oldExerciseName}" with "${newWorkoutExercise.name}".` });
   };
   
+  const swapWorkoutForDay = (date: Date, newCategories: ExerciseCategory[]) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const { exercises, description } = getExercisesForDay(
+      date,
+      workoutMode,
+      workoutPlans,
+      exerciseDefinitions,
+      workoutPlanRotation,
+      'day-of-week', // Force day-of-week for override
+      allWorkoutLogs,
+      undefined,
+      newCategories
+    );
+    
+    if (exercises.length === 0) {
+      toast({ title: 'No Exercises', description: `No exercises found for ${newCategories.join(' & ')}.`, variant: 'destructive' });
+      return;
+    }
+
+    const updatedLog: DatedWorkout = { id: dateKey, date: dateKey, exercises };
+
+    setAllWorkoutLogs(prevLogs => {
+      const existingLogIndex = prevLogs.findIndex(log => log.id === dateKey);
+      if (existingLogIndex > -1) {
+        const newLogs = [...prevLogs];
+        newLogs[existingLogIndex] = updatedLog;
+        return newLogs;
+      }
+      return [...prevLogs, updatedLog];
+    });
+
+    toast({ title: "Workout Changed", description: `Switched to ${newCategories.join(' & ')} for today.` });
+  };
+  
   const openPistonsFor = (initialState: PistonsInitialState) => {
     setPistonsInitialState(initialState);
     setIsPistonsHeadOpen(true);
@@ -2677,6 +2712,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     todaysDietPopup, openTodaysDietPopup, closeTodaysDietPopup, handleTodaysDietPopupDragEnd, swapMealInSchedule,
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
+    swapWorkoutForDay,
     canvasLayout, setCanvasLayout,
     mindsetCards, setMindsetCards,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
@@ -2797,6 +2833,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-    
-
     
