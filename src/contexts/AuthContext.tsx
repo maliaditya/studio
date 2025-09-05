@@ -705,7 +705,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
   
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
@@ -1297,23 +1297,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               throw new Error("File content is not readable.");
             }
             const importedData = JSON.parse(text);
-            const username = currentUser!.username;
             
             // Handle both old and new backup formats
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
 
-            // Map old keys to new keys for backward compatibility
-            const dataToLoad = {
-              ...mainData,
-              allWorkoutLogs: mainData.allWorkoutLogs || mainData.workoutLogs || [],
-              allUpskillLogs: mainData.allUpskillLogs || mainData.upskillLogs || [],
-              allDeepWorkLogs: mainData.allDeepWorkLogs || mainData.deepWorkLogs || [],
-              topicGoals: mainData.topicGoals || mainData.upskillTopicGoals || {},
-            };
-  
             // Apply imported data to state immediately
-            loadImportedData(dataToLoad, uiData);
+            loadImportedData(mainData, uiData);
   
             toast({ title: "Import Successful", description: "Your data has been loaded into the application." });
   
@@ -1340,9 +1330,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDietPlan(mainData.dietPlan || []);
     setSchedule(mainData.schedule || {});
     setDailyPurposes(mainData.dailyPurposes || {});
-    setAllUpskillLogs(mainData.allUpskillLogs || []);
-    setAllDeepWorkLogs(mainData.allDeepWorkLogs || []);
-    setAllWorkoutLogs(mainData.allWorkoutLogs || []);
+    setAllUpskillLogs(mainData.allUpskillLogs || mainData.upskillLogs || []);
+    setAllDeepWorkLogs(mainData.allDeepWorkLogs || mainData.deepWorkLogs || []);
+    setAllWorkoutLogs(mainData.allWorkoutLogs || mainData.workoutLogs || []);
     setAllBrandingLogs(mainData.brandingLogs || []);
     setAllLeadGenLogs(mainData.allLeadGenLogs || []);
     setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
@@ -1352,7 +1342,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
     setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
     setUpskillDefinitions(mainData.upskillDefinitions || []);
-    setTopicGoals(mainData.topicGoals || {});
+    setTopicGoals(mainData.topicGoals || mainData.upskillTopicGoals || {});
     setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
     setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
     setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
@@ -2410,7 +2400,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if ('category' in parent) {
       if (mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
-        updateParent(setMindProgrammingDefinitions, false, true);
+        updateParent(setMindProgrammingDefinitions, !!pointToConvert, true);
       } else if (upskillDefinitions.some(d => d.id === parent.id)) {
         updateParent(setUpskillDefinitions, !!pointToConvert);
       } else if (deepWorkDefinitions.some(d => d.id === parent.id)) {
@@ -2633,7 +2623,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         z: 100,
     });
   };
-
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
