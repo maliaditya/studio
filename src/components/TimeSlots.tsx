@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -20,7 +19,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
@@ -191,7 +190,7 @@ export function TimeSlots({
     if (!activity) return;
 
     const isAlreadyLinked = (activity.habitEquationIds || []).includes(habitId);
-    linkHabitFromContext(activityId, habitId, !isAlreadyLinked);
+    linkHabitFromContext(activityId, habitId);
   };
 
   const handleAddSubTask = (slotName: string, activityId: string) => {
@@ -538,3 +537,6 @@ export function TimeSlots({
   );
 }
 
+
+
+    
