@@ -119,7 +119,7 @@ export function WorkoutExerciseCard({
   onCreateAndLinkResource,
   onUnlinkResource,
 }: WorkoutExerciseCardProps) {
-  const { resources, mindProgrammingDefinitions, setMindProgrammingDefinitions } = useAuth();
+  const { resources, mindProgrammingDefinitions, setMindProgrammingDefinitions, strengthTrainingMode } = useAuth();
   const [reps, setReps] = useState('');
   const [weight, setWeight] = useState('');
   const [duration, setDuration] = useState('');
@@ -157,7 +157,8 @@ export function WorkoutExerciseCard({
     e.preventDefault();
     if (pageType === 'workout') {
       const numReps = parseInt(reps);
-      const numWeight = parseFloat(weight);
+      // For calisthenics, weight is not required and can be treated as 0
+      const numWeight = strengthTrainingMode === 'calisthenics' ? 0 : parseFloat(weight);
       if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
         onLogSet(exercise.id, numReps, numWeight);
         setReps('');
@@ -197,7 +198,7 @@ export function WorkoutExerciseCard({
     if (editingSet) {
       if (pageType === 'workout') {
         const numReps = parseInt(editReps);
-        const numWeight = parseFloat(editWeight);
+        const numWeight = strengthTrainingMode === 'calisthenics' ? 0 : parseFloat(editWeight);
         if (!isNaN(numReps) && !isNaN(numWeight) && numReps > 0) {
           onUpdateSet(exercise.id, editingSet.id, numReps, numWeight);
           setEditingSet(null);
@@ -263,6 +264,9 @@ export function WorkoutExerciseCard({
 
   const getLoggedSetText = (set: LoggedSet, index: number) => {
     if (pageType === 'workout') {
+      if (strengthTrainingMode === 'calisthenics') {
+          return `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong> reps`;
+      }
       return `Set ${exercise.loggedSets.length - index}: <strong>${set.reps}</strong>r @ <strong>${set.weight}</strong>kg/lb`;
     }
     if (pageType === 'upskill' && definitionGoal?.goalType) {
@@ -478,10 +482,12 @@ export function WorkoutExerciseCard({
                     <label htmlFor={`reps-${exercise.id}`} className="sr-only">Reps</label>
                     <Input id={`reps-${exercise.id}`} type="number" placeholder="Reps" value={reps} onChange={(e) => setReps(e.target.value)} className="h-9" min="1" required />
                     </div>
-                    <div className="flex-1">
-                    <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
-                    <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
-                    </div>
+                    {strengthTrainingMode === 'resistance' && (
+                        <div className="flex-1">
+                            <label htmlFor={`weight-${exercise.id}`} className="sr-only">Weight (kg/lb)</label>
+                            <Input id={`weight-${exercise.id}`} type="number" placeholder="Weight" value={weight} onChange={(e) => setWeight(e.target.value)} className="h-9" min="0" step="0.1" required />
+                        </div>
+                    )}
                 </>
                 ) : pageType === 'upskill' ? (
                     <>
@@ -526,7 +532,9 @@ export function WorkoutExerciseCard({
                         {pageType === 'workout' ? (
                         <>
                             <Input type="number" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-14 h-7 mr-1 text-xs" /> reps
-                            <Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb
+                             {strengthTrainingMode === 'resistance' && (
+                                <><Input type="number" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} className="w-16 h-7 mx-1 text-xs" /> kg/lb</>
+                             )}
                         </>
                         ) : pageType === 'upskill' ? (
                         <>
