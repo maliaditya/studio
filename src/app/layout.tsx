@@ -45,6 +45,7 @@ import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { FavoriteCards } from '@/components/FavoriteCards';
+import { RuleEquationsCard } from '@/components/RuleEquationsCard';
 
 
 const slotEndHours: Record<string, number> = {
@@ -379,6 +380,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MindsetCategoriesCard />
       <ActivityDistributionCard />
       <FavoriteCards />
+      <RuleEquationsCard />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       <StopperProgressModal 
         popupState={stopperProgressPopup}
@@ -588,4 +590,5 @@ export default function RootLayout({
     </html>
   );
 }
+
 
