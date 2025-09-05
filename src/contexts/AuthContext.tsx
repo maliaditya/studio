@@ -375,8 +375,8 @@ interface AuthContextType {
   
   // Stopper Progress Popup
   stopperProgressPopup: StopperProgressPopupState | null;
-  setStopperProgressPopup: React.Dispatch<React.SetStateAction<StopperProgressPopupState | null>>;
   openStopperProgressPopup: (stopper: Stopper, habitName: string) => void;
+  setStopperProgressPopup: React.Dispatch<React.SetStateAction<StopperProgressPopupState | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -2340,38 +2340,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
     let path: string[];
     let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
-
-    // Handle Mind Programming techniques separately
+  
+    // Check if the parent is a mind programming technique
     if ('category' in parent && mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
         path = ["Mindset Techniques", parent.name];
     } else if ('category' in parent) { // Parent is a standard ExerciseDefinition
-        const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
-        if (!microSkill) {
-            toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
-            return undefined;
-        }
-        const microSkillInfo = microSkill[1];
-        const { coreSkillName, skillAreaName } = microSkillInfo;
-        const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
-        if (!coreSkill) return undefined;
-        const domain = skillDomains.find(d => d.id === coreSkill.domainId);
-        if (!domain) return undefined;
-        path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
+      const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
+      if (!microSkill) {
+        toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
+        return undefined;
+      }
+      const microSkillInfo = microSkill[1];
+      const { coreSkillName, skillAreaName } = microSkillInfo;
+      const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
+      if (!coreSkill) return undefined;
+      const domain = skillDomains.find(d => d.id === coreSkill.domainId);
+      if (!domain) return undefined;
+      path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
     } else { // Parent is a Resource
-        const folderPath: string[] = [];
-        let currentFolderId: string | null = parent.folderId;
-        while(currentFolderId) {
-            const folder = resourceFolders.find(f => f.id === currentFolderId);
-            if (folder) {
-                folderPath.unshift(folder.name);
-                currentFolderId = folder.parentId;
-            } else {
-                currentFolderId = null;
-            }
+      const folderPath: string[] = [];
+      let currentFolderId: string | null = parent.folderId;
+      while(currentFolderId) {
+        const folder = resourceFolders.find(f => f.id === currentFolderId);
+        if (folder) {
+          folderPath.unshift(folder.name);
+          currentFolderId = folder.parentId;
+        } else {
+          currentFolderId = null;
         }
-        path = [...folderPath, parent.name];
+      }
+      path = [...folderPath, parent.name];
     }
-  
+
     let parentFolderId: string | null = null;
     let finalFolders = [...resourceFolders];
   
@@ -2607,12 +2607,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string, link: boolean) => {
+  const handleLinkHabit = (activityId: string, habitId: string) => {
     setSchedule(prev => {
       const newSchedule = { ...prev };
       let targetDateKey: string | null = null;
       let targetSlotName: string | null = null;
       let targetActivityType: ActivityType | null = null;
+      let isAlreadyLinked = false;
 
       // First, find the activity to get its date, slot, and type
       for (const dateKey in newSchedule) {
@@ -2624,13 +2625,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               targetDateKey = dateKey;
               targetSlotName = slotName;
               targetActivityType = foundActivity.type;
+              isAlreadyLinked = (foundActivity.habitEquationIds || []).includes(habitId);
               break;
             }
           }
         }
         if (targetDateKey) break;
       }
-
+      
       // If found, update all activities of the same type in that specific slot
       if (targetDateKey && targetSlotName && targetActivityType) {
         const daySchedule = { ...newSchedule[targetDateKey] };
@@ -2638,9 +2640,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         daySchedule[targetSlotName] = slotActivities.map(act => {
           if (act.type === targetActivityType) {
             const currentHabits = act.habitEquationIds || [];
-            const newHabits = link
-              ? [...new Set([...currentHabits, habitId])]
-              : currentHabits.filter(id => id !== habitId);
+            const newHabits = isAlreadyLinked
+              ? currentHabits.filter(id => id !== habitId)
+              : [...new Set([...currentHabits, habitId])];
             return { ...act, habitEquationIds: newHabits };
           }
           return act;
@@ -2827,4 +2829,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
+
 

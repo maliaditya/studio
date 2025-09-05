@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -186,7 +187,11 @@ export function TimeSlots({
   };
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
-    linkHabitFromContext(activityId, habitId, true);
+    const activity = Object.values(schedule).flat().find(act => (act as Activity).id === activityId);
+    if (!activity) return;
+
+    const isAlreadyLinked = (activity.habitEquationIds || []).includes(habitId);
+    linkHabitFromContext(activityId, habitId, !isAlreadyLinked);
   };
 
   const handleAddSubTask = (slotName: string, activityId: string) => {
@@ -376,7 +381,7 @@ export function TimeSlots({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleAddSubTask(slot.name, activity.id)}>
+                                  <DropdownMenuItem onClick={() => handleAddSubTask(slot.name as string, activity.id)}>
                                     <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
                                   </DropdownMenuItem>
                                   {activity.type !== 'interrupt' && (
@@ -389,10 +394,14 @@ export function TimeSlots({
                                          <DropdownMenuSubContent>
                                           <ScrollArea className="h-48">
                                             {habitCards.map(habit => (
-                                                <DropdownMenuItem key={habit.id} onSelect={() => handleLinkHabit(activity.id, habit.id)}>
-                                                    <Checkbox className="mr-2" checked={(activity.habitEquationIds || []).includes(habit.id)} />
+                                                <DropdownMenuCheckboxItem
+                                                  key={habit.id}
+                                                  checked={(activity.habitEquationIds || []).includes(habit.id)}
+                                                  onCheckedChange={() => handleLinkHabit(activity.id, habit.id)}
+                                                  onSelect={e => e.preventDefault()}
+                                                >
                                                     {habit.name}
-                                                </DropdownMenuItem>
+                                                </DropdownMenuCheckboxItem>
                                             ))}
                                             {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
                                           </ScrollArea>
@@ -401,7 +410,7 @@ export function TimeSlots({
                                     </DropdownMenuSub>
                                   )}
                                   <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => onRemoveActivity(slot.name, activity.id)} className="text-destructive">
+                                  <DropdownMenuItem onClick={() => onRemoveActivity(slot.name as string, activity.id)} className="text-destructive">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     <span>Delete</span>
                                   </DropdownMenuItem>
@@ -528,3 +537,4 @@ export function TimeSlots({
     </div>
   );
 }
+
