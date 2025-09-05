@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -51,6 +50,7 @@ interface UserSettings {
   smartLogging: boolean;
   defaultHabitLinks: Record<ActivityType, string | null>;
   routines?: Activity[];
+  workoutScheduling?: WorkoutSchedulingMode;
 }
 
 interface ActiveFocusSession {
@@ -364,7 +364,7 @@ interface AuthContextType {
 
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
-  handleLinkHabit: (activityId: string, habitId: string, link: boolean) => void;
+  handleLinkHabit: (activityId: string, habitId: string) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
   
@@ -406,6 +406,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     smartLogging: false,
     defaultHabitLinks: {},
     routines: [],
+    workoutScheduling: 'day-of-week',
   });
 
   // Health State
@@ -548,29 +549,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         stopper: stopper,
         habitName: habitName,
     });
-  };
-
-  const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
-    const popupWidth = 384; // w-96
-    const popupHeight = 400; // estimated
-    const targetRect = (event.target as HTMLElement).getBoundingClientRect();
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
-    let x, y;
-
-    if (targetRect.right + popupWidth < screenWidth) {
-      x = targetRect.right + 10;
-    } else {
-      x = targetRect.left - popupWidth - 10;
-    }
-    y = targetRect.top;
-
-    if (x < 10) x = 10;
-    if (x + popupWidth > screenWidth - 10) x = screenWidth - popupWidth - 10;
-    if (y < 10) y = 10;
-    if (y + popupHeight > screenHeight - 10) y = screenHeight - popupHeight - 10;
-    
-    setLinkedResistancePopup({ techniqueId, x, y, level: 0, z: 100 });
   };
 
   const setTheme = (newTheme: string) => {
@@ -727,7 +705,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
   
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, d]));
   
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
@@ -1726,7 +1704,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
-      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
+      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling);
       const newLog = { id: dateKey, date: dateKey, exercises };
       setAllWorkoutLogs(prev => [...prev, newLog]);
       workoutLog = newLog;
@@ -2434,9 +2412,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
         updateParent(setMindProgrammingDefinitions, false, true);
       } else if (upskillDefinitions.some(d => d.id === parent.id)) {
-        updateParent(setUpskillDefinitions, false);
+        updateParent(setUpskillDefinitions, !!pointToConvert);
       } else if (deepWorkDefinitions.some(d => d.id === parent.id)) {
-        updateParent(setDeepWorkDefinitions, false);
+        updateParent(setDeepWorkDefinitions, !!pointToConvert);
       }
     } else {
         updateParent(setResources, !!pointToConvert);
@@ -2609,48 +2587,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
     setSchedule(prev => {
-      const newSchedule = { ...prev };
-      let targetDateKey: string | null = null;
-      let targetSlotName: string | null = null;
-      let targetActivityType: ActivityType | null = null;
-      let isAlreadyLinked = false;
-
-      // First, find the activity to get its date, slot, and type
-      for (const dateKey in newSchedule) {
-        for (const slotName in newSchedule[dateKey]) {
-          const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-          if (Array.isArray(activities)) {
-            const foundActivity = activities.find(act => act.id === activityId);
-            if (foundActivity) {
-              targetDateKey = dateKey;
-              targetSlotName = slotName;
-              targetActivityType = foundActivity.type;
-              isAlreadyLinked = (foundActivity.habitEquationIds || []).includes(habitId);
-              break;
+        const newSchedule = { ...prev };
+        for (const dateKey in newSchedule) {
+            for (const slotName in newSchedule[dateKey]) {
+                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                if (Array.isArray(activities)) {
+                    const activityIndex = activities.findIndex(act => act.id === activityId);
+                    if (activityIndex > -1) {
+                        const currentHabits = activities[activityIndex].habitEquationIds || [];
+                        const isAlreadyLinked = currentHabits.includes(habitId);
+                        const newHabits = isAlreadyLinked 
+                            ? currentHabits.filter(id => id !== habitId)
+                            : [...new Set([...currentHabits, habitId])];
+                        
+                        activities[activityIndex] = { ...activities[activityIndex], habitEquationIds: newHabits };
+                        break; 
+                    }
+                }
             }
-          }
         }
-        if (targetDateKey) break;
-      }
-      
-      // If found, update all activities of the same type in that specific slot
-      if (targetDateKey && targetSlotName && targetActivityType) {
-        const daySchedule = { ...newSchedule[targetDateKey] };
-        const slotActivities = [...(daySchedule[targetSlotName] as Activity[])];
-        daySchedule[targetSlotName] = slotActivities.map(act => {
-          if (act.type === targetActivityType) {
-            const currentHabits = act.habitEquationIds || [];
-            const newHabits = isAlreadyLinked
-              ? currentHabits.filter(id => id !== habitId)
-              : [...new Set([...currentHabits, habitId])];
-            return { ...act, habitEquationIds: newHabits };
-          }
-          return act;
-        });
-        newSchedule[targetDateKey] = daySchedule;
-      }
-      
-      return newSchedule;
+        return newSchedule;
+    });
+};
+  
+  const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
+    const popupWidth = 384; // w-96
+    const popupHeight = 400; // Estimated height
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    
+    let x = rect.right + 10;
+    let y = rect.top;
+
+    if (x + popupWidth > window.innerWidth) {
+      x = rect.left - popupWidth - 10;
+    }
+    if (y + popupHeight > window.innerHeight) {
+      y = window.innerHeight - popupHeight - 10;
+    }
+    
+    setLinkedResistancePopup({
+        techniqueId,
+        x: Math.max(10, x),
+        y: Math.max(10, y),
+        level: 0,
+        z: 100,
     });
   };
 
@@ -2830,4 +2810,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 }
     
 
-
+    

@@ -19,7 +19,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Trash2 } from 'lucide-react';
-import type { Activity, ActivityType } from '@/types/workout';
+import type { Activity, ActivityType, WorkoutSchedulingMode } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -403,7 +403,37 @@ ${JSON.stringify(finalTemplate, null, 2)}
                 </div>
 
                 <Accordion type="multiple" className="w-full">
-                  <AccordionItem value="item-1" className="border rounded-lg">
+                  <AccordionItem value="item-workout" className="border rounded-lg">
+                    <AccordionTrigger className="px-4 py-3">
+                        <div className="space-y-0.5 text-left">
+                          <Label className="text-base">Workout Scheduling</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Choose how your weekly workout plan is scheduled.
+                          </p>
+                        </div>
+                    </AccordionTrigger>
+                     <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-3 pt-4 border-t">
+                            <RadioGroup
+                                value={settings.workoutScheduling || 'day-of-week'}
+                                onValueChange={(value) => handleSettingChange('workoutScheduling', value as WorkoutSchedulingMode)}
+                            >
+                                <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="day-of-week" id="r-dow" />
+                                <Label htmlFor="r-dow" className="font-normal">Day-of-Week (Rigid)</Label>
+                                </div>
+                                <p className="text-xs text-muted-foreground pl-6">Workouts are tied to specific days (e.g., Monday is always Chest).</p>
+                                
+                                <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="sequential" id="r-seq" />
+                                <Label htmlFor="r-seq" className="font-normal">Sequential (Flexible)</Label>
+                                </div>
+                                <p className="text-xs text-muted-foreground pl-6">Workouts follow a sequence. If you miss a day, the next workout waits for you.</p>
+                            </RadioGroup>
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="item-habits" className="border rounded-lg mt-4">
                     <AccordionTrigger className="px-4 py-3">
                       <div className="space-y-0.5 text-left">
                         <Label className="text-base">Default Habit Links</Label>
@@ -438,7 +468,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
-                   <AccordionItem value="item-2" className="border rounded-lg mt-4">
+                   <AccordionItem value="item-routines" className="border rounded-lg mt-4">
                     <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
                         <Label className="text-base">Manage Routine Tasks</Label>
