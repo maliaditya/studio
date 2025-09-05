@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { WorkoutExercise, Activity, ExerciseDefinition, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories } from '@/types/workout';
+import type { WorkoutExercise, Activity, ExerciseDefinition, DatedWorkout, ExerciseCategory } from '@/types/workout';
 import { Dumbbell, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Button } from './ui/button';
 import { format } from 'date-fns';
@@ -46,7 +46,7 @@ export function TodaysWorkoutModal({
   removeExerciseFromWorkout,
   swapWorkoutExercise,
 }: TodaysWorkoutModalProps) {
-  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans, swapWorkoutForDay } = useAuth();
+  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans, swapWorkoutForDay, workoutPlanRotation, settings } = useAuth();
   const { toast } = useToast();
 
   const currentWorkoutLog = useMemo(() => {
@@ -65,11 +65,11 @@ export function TodaysWorkoutModal({
       }
 
       // If no log for today, generate the workout plan
-      const { exercises, description } = getExercisesForDay(dateForWorkout, workoutMode, workoutPlans, exerciseDefinitions);
+      const { exercises, description } = getExercisesForDay(dateForWorkout, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
       const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
       return { exercises, muscleGroupsForDay: muscleGroups };
       
-  }, [isOpen, dateForWorkout, currentWorkoutLog, workoutMode, workoutPlans, exerciseDefinitions]);
+  }, [isOpen, dateForWorkout, currentWorkoutLog, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
 
   const exercisesInLog = currentWorkoutLog?.exercises || todaysExercises;
 

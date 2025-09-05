@@ -41,6 +41,7 @@ const oneMuscleSequence: (ExerciseCategory | null)[] = ["Chest", "Triceps", "Bac
  * @param schedulingMode The workout scheduling mode ('day-of-week' or 'sequential').
  * @param allWorkoutLogs The complete log of all workouts, used for sequential mode.
  * @param findLastPerformance Optional function to get previous performance data for an exercise.
+ * @param overrideCategories Optional array of muscle groups to force for a specific day.
  * @returns An object containing the list of exercises and a description of the generated workout.
  */
 export const getExercisesForDay = (
@@ -51,13 +52,17 @@ export const getExercisesForDay = (
     rotationEnabled: boolean,
     schedulingMode: WorkoutSchedulingMode = 'day-of-week',
     allWorkoutLogs?: DatedWorkout[],
-    findLastPerformance?: (exerciseDefinitionId: string) => { reps: number; weight: number } | null
+    findLastPerformance?: (exerciseDefinitionId: string) => { reps: number; weight: number } | null,
+    overrideCategories?: ExerciseCategory[]
 ): { exercises: WorkoutExercise[], description: string } => {
     let muscleGroups: ExerciseCategory[] | null = [];
     let planKey: keyof AllWorkoutPlans | null = null;
     let exercisesPerGroup = 0;
 
-    if (schedulingMode === 'sequential' && allWorkoutLogs) {
+    if (overrideCategories) {
+        muscleGroups = overrideCategories;
+        exercisesPerGroup = mode === 'one-muscle' ? 6 : 4;
+    } else if (schedulingMode === 'sequential' && allWorkoutLogs) {
         const sortedLogs = allWorkoutLogs
             .filter(log => log.exercises.length > 0)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
