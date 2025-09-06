@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -40,18 +39,6 @@ import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 
 interface ResourcePopupProps {
   popupState: PopupState;
-}
-
-interface UserSettings {
-  carryForward: boolean;
-  autoPush: boolean;
-  autoPushLimit: number;
-  carryForwardEssentials: boolean;
-  carryForwardNutrition: boolean;
-  smartLogging: boolean;
-  defaultHabitLinks: Record<ActivityType, string | null>;
-  routines?: Activity[];
-  workoutScheduling?: WorkoutSchedulingMode;
 }
 
 interface ActiveFocusSession {
@@ -366,7 +353,8 @@ interface AuthContextType {
 
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
-  handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
+  handleLinkHabit: (activityId: string, habitId: string) => void;
+  toggleRoutine: (activity: Activity) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
   
@@ -1055,42 +1043,78 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
 
-  useEffect(() => {
-    if (!currentUser?.username || isLoadingState) return;
-
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const yesterdaysDate = subDays(new Date(), 1);
-    const yesterdayStr = format(yesterdaysDate, 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayStr];
-
-    const todayIsEmpty = !schedule[todayStr] || Object.values(schedule[todayStr]).every(slot => (slot as Activity[]).length === 0);
-
-    if (todayIsEmpty && yesterdaysSchedule) {
-        const routineTasks = Object.values(yesterdaysSchedule).flat().filter(task => (task as Activity).isRoutine);
+  const toggleRoutine = (activity: Activity) => {
+    setSettings(prevSettings => {
+        const currentRoutines = prevSettings.routines || [];
+        const isRoutine = currentRoutines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
         
-        if (routineTasks.length > 0) {
-            const newDaySchedule: DailySchedule = {};
-            routineTasks.forEach((task: Activity) => {
-                const slot = task.slot as keyof DailySchedule;
-                if (!newDaySchedule[slot]) {
-                    newDaySchedule[slot] = [];
-                }
-                (newDaySchedule[slot] as Activity[]).push({
-                    ...task,
-                    id: `${task.type}-${Date.now()}-${Math.random()}`,
-                    completed: false,
-                });
-            });
-
-            if (Object.keys(newDaySchedule).length > 0) {
-                setSchedule(prev => ({
-                    ...prev,
-                    [todayStr]: newDaySchedule,
-                }));
-            }
+        let newRoutines: Activity[];
+        if (isRoutine) {
+            newRoutines = currentRoutines.filter(r => !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot));
+            toast({ title: 'Removed from Routine', description: `"${activity.details}" will no longer auto-populate.` });
+        } else {
+            // Add only essential properties for the routine template
+            const routineTemplate: Activity = {
+                id: activity.id, // ID will be regenerated, but keep for reference
+                type: activity.type,
+                details: activity.details,
+                slot: activity.slot,
+                duration: activity.duration,
+                taskIds: activity.taskIds,
+                habitEquationIds: activity.habitEquationIds,
+                completed: false, // Always start as not completed
+                isRoutine: true,
+            };
+            newRoutines = [...currentRoutines, routineTemplate];
+            toast({ title: 'Added to Routine', description: `"${activity.details}" will now appear daily.` });
         }
+        
+        return { ...prevSettings, routines: newRoutines };
+    });
+  };
+
+  useEffect(() => {
+    if (!currentUser?.username || isLoadingState || !settings.routines || !isScheduleLoaded) return;
+  
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const todayIsEmptyOrPartial = !schedule[todayStr] || Object.values(schedule[todayStr]).flat().length < settings.routines.length;
+  
+    if (todayIsEmptyOrPartial) {
+      setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const todaysActivities = new Map<string, Activity>();
+
+        // First, get all activities already on the schedule for today to avoid duplicates
+        if (newSchedule[todayStr]) {
+            Object.values(newSchedule[todayStr]).flat().forEach(act => todaysActivities.set(act.details + act.type, act));
+        }
+
+        // Now, add any missing routines
+        settings.routines.forEach((routine: Activity) => {
+          if (!todaysActivities.has(routine.details + routine.type)) {
+            const newActivity = {
+              ...routine,
+              id: `${routine.type}-${Date.now()}-${Math.random()}`,
+              completed: false,
+            };
+            todaysActivities.set(newActivity.details + newActivity.type, newActivity);
+          }
+        });
+        
+        const newDaySchedule: DailySchedule = {};
+        todaysActivities.forEach(activity => {
+            const slot = activity.slot as keyof DailySchedule;
+            if (!newDaySchedule[slot]) {
+                newDaySchedule[slot] = [];
+            }
+            (newDaySchedule[slot] as Activity[]).push(activity);
+        });
+
+        newSchedule[todayStr] = newDaySchedule;
+        return newSchedule;
+      });
     }
-  }, [currentUser, isLoadingState, schedule]);
+  }, [currentUser, isLoadingState, schedule, settings.routines, isScheduleLoaded, setSchedule]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -1389,10 +1413,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setRecentItems(uiData.recentItems || []);
     setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
     
+    // Load settings last, with defaults
+    const defaultSettings: UserSettings = { 
+        carryForward: true, autoPush: false, autoPushLimit: 100, 
+        carryForwardEssentials: true, carryForwardNutrition: false,
+        smartLogging: false, defaultHabitLinks: {}, routines: [],
+        workoutScheduling: 'day-of-week'
+    };
+    setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
+
+
     setTimeout(() => setIsLoadingState(false), 100);
   };
-
-
+  
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
@@ -2611,38 +2644,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
-    if (!date || !isValid(date)) {
-        console.error("handleLinkHabit received an invalid date for activity:", activityId);
-        return;
-    }
-    const dateKey = format(date, 'yyyy-MM-dd');
+  const handleLinkHabit = (activityId: string, habitId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prevSchedule => {
-        const newSchedule = { ...prevSchedule };
-        if (newSchedule[dateKey]) {
-            const daySchedule = { ...newSchedule[dateKey] };
-            let activityUpdated = false;
-            Object.keys(daySchedule).forEach(slotName => {
-                const activities = (daySchedule[slotName] as Activity[]) || [];
-                const activityIndex = activities.findIndex(act => act.id === activityId);
-                if (activityIndex > -1) {
-                    const activityToUpdate = { ...activities[activityIndex] };
-                    const currentHabits = activityToUpdate.habitEquationIds || [];
-                    const isAlreadyLinked = currentHabits.includes(habitId);
-                    activityToUpdate.habitEquationIds = isAlreadyLinked
-                        ? currentHabits.filter(id => id !== habitId)
-                        : [...currentHabits, habitId];
-                    const updatedActivities = [...activities];
-                    updatedActivities[activityIndex] = activityToUpdate;
-                    daySchedule[slotName] = updatedActivities;
-                    activityUpdated = true;
-                }
-            });
-            if (activityUpdated) {
-                newSchedule[dateKey] = daySchedule;
-            }
+      const newSchedule = { ...prevSchedule };
+      if (!newSchedule[todayKey]) return prevSchedule;
+  
+      const daySchedule = { ...newSchedule[todayKey] };
+      let activityUpdated = false;
+  
+      Object.keys(daySchedule).forEach(slotName => {
+        const activities = (daySchedule[slotName] as Activity[]) || [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+        
+        if (activityIndex > -1) {
+          const activityToUpdate = { ...activities[activityIndex] };
+          const currentHabits = activityToUpdate.habitEquationIds || [];
+          const isAlreadyLinked = currentHabits.includes(habitId);
+          
+          activityToUpdate.habitEquationIds = isAlreadyLinked
+            ? currentHabits.filter(id => id !== habitId)
+            : [...currentHabits, habitId];
+            
+          const updatedActivities = [...activities];
+          updatedActivities[activityIndex] = activityToUpdate;
+          daySchedule[slotName] = updatedActivities;
+          activityUpdated = true;
         }
-        return newSchedule;
+      });
+  
+      if (activityUpdated) {
+        newSchedule[todayKey] = daySchedule;
+      }
+      return newSchedule;
     });
   };
   
@@ -2764,6 +2798,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activeProjectIds,
     updateActivitySubtask, deleteActivitySubtask,
     handleLinkHabit,
+    toggleRoutine,
     missedSlotReviews, setMissedSlotReviews,
     linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup,
     stopperProgressPopup, openStopperProgressPopup, setStopperProgressPopup,
@@ -2845,6 +2880,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
-
-
-
