@@ -189,7 +189,6 @@ export function TimeSlots({
     const activity = Object.values(schedule).flat().find(act => (act as Activity).id === activityId);
     if (!activity) return;
 
-    const isAlreadyLinked = (activity.habitEquationIds || []).includes(habitId);
     linkHabitFromContext(activityId, habitId);
   };
 
