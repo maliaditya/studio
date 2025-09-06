@@ -234,12 +234,13 @@ export function TimeSlots({
                 {activities && activities.length > 0 ? (
                   activities.map((activity) => {
                     const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
+                    const isRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
 
                     return (
                       <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
                         <div className="flex items-start justify-between gap-3">
                           <div
-                            className="flex items-start gap-3 flex-grow min-w-0"
+                            className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && "cursor-pointer")}
                             onClick={(e) => !activity.completed && onActivityClick(slot.name as string, activity, e)}
                           >
                             <button
@@ -275,7 +276,7 @@ export function TimeSlots({
                           </div>
                           <div className="flex items-center flex-shrink-0">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleRoutine(activity)}>
-                                <Repeat className={cn("h-4 w-4", settings.routines?.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot) ? "text-primary" : "text-muted-foreground")} />
+                                <Repeat className={cn("h-4 w-4", isRoutine ? "text-primary" : "text-muted-foreground")} />
                             </Button>
                              <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -413,15 +414,6 @@ export function TimeSlots({
                             Add Lead Gen
                         </Button>
                         <Separator className="my-1" />
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'planning')}>
-                            <ClipboardList className="h-4 w-4 mr-2" />
-                            Add Planning
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'tracking')}>
-                            <ClipboardCheck className="h-4 w-4 mr-2" />
-                            Add Tracking
-                        </Button>
-                        <Separator className="my-1" />
                         <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name as string, 'interrupt')}>
                             <AlertCircle className="h-4 w-4 mr-2" />
                             Add Interrupt
@@ -445,3 +437,4 @@ export function TimeSlots({
 
     
     
+

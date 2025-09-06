@@ -1042,32 +1042,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const populatedSchedule = useMemo(() => {
-    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy to avoid mutation
+    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
     
     if (!settings.routines || settings.routines.length === 0) {
-      return schedule; // Return original if no routines
+      return schedule;
     }
   
-    // Create a set of dates that are already in the schedule to avoid re-populating them
-    const existingDates = new Set(Object.keys(newSchedule));
-  
-    // Determine the range of dates to populate
-    const today = startOfDay(new Date());
-    let startDate = today;
-    if (Object.keys(schedule).length > 0) {
-      const earliestDate = new Date(Math.min(...Object.keys(schedule).map(d => parseISO(d).getTime())));
-      if (isBefore(earliestDate, startDate)) {
-        startDate = earliestDate;
-      }
-    }
-  
-    // Iterate from the earliest known date to today
-    for (let d = startDate; isBefore(d, addDays(today, 1)); d = addDays(d, 1)) {
-      const dateKey = format(d, 'yyyy-MM-dd');
-      
+    const datesToProcess = new Set(Object.keys(newSchedule));
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    datesToProcess.add(todayKey);
+
+    datesToProcess.forEach(dateKey => {
       const daySchedule = newSchedule[dateKey] || {};
       const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
-      
+
       settings.routines.forEach((routine: Activity) => {
         const routineKey = `${routine.details}_${routine.type}`;
         if (!activitiesInDay.has(routineKey)) {
@@ -1075,7 +1063,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!daySchedule[slot]) {
             daySchedule[slot] = [];
           }
-          const newActivity = {
+          const newActivity: Activity = {
             ...routine,
             id: `${routine.type}-${Date.now()}-${Math.random()}`,
             completed: false, // Always start as not completed
@@ -1084,8 +1072,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       });
       newSchedule[dateKey] = daySchedule;
-    }
-  
+    });
+
     return newSchedule;
   }, [schedule, settings.routines]);
   
