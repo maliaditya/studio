@@ -12,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isValid } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -2612,39 +2612,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
-    setSchedule(prevSchedule => {
-      const dateKey = format(date, 'yyyy-MM-dd');
-      if (!prevSchedule[dateKey]) return prevSchedule;
+    if (!isValid(date)) {
+        console.error("handleLinkHabit received an invalid date for activity:", activityId);
+        return;
+    }
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = newSchedule[dateKey];
+        if (!daySchedule) return prev;
+        let activityUpdated = false;
 
-      const newSchedule = { ...prevSchedule };
-      const daySchedule = { ...newSchedule[dateKey] };
-      let activityUpdated = false;
+        Object.keys(daySchedule).forEach(slotName => {
+            if (activityUpdated) return;
+            const activities = (daySchedule[slotName] as Activity[]) || [];
+            const activityIndex = activities.findIndex(act => act.id === activityId);
+            if (activityIndex > -1) {
+                const updatedActivities = [...activities];
+                const activityToUpdate = { ...updatedActivities[activityIndex] };
+                const currentHabits = activityToUpdate.habitEquationIds || [];
+                const isAlreadyLinked = currentHabits.includes(habitId);
 
-      Object.keys(daySchedule).forEach(slotName => {
-        if (activityUpdated) return;
+                activityToUpdate.habitEquationIds = isAlreadyLinked
+                    ? currentHabits.filter(id => id !== habitId)
+                    : [...currentHabits, habitId];
 
-        const activities = daySchedule[slotName] as Activity[] | undefined;
-        if (Array.isArray(activities)) {
-          const activityIndex = activities.findIndex(act => act.id === activityId);
-          if (activityIndex > -1) {
-            const updatedActivity = { ...activities[activityIndex] };
-            const currentHabits = updatedActivity.habitEquationIds || [];
-            const isAlreadyLinked = currentHabits.includes(habitId);
-
-            updatedActivity.habitEquationIds = isAlreadyLinked
-              ? currentHabits.filter(id => id !== habitId)
-              : [...currentHabits, habitId];
-            
-            const updatedActivities = [...activities];
-            updatedActivities[activityIndex] = updatedActivity;
-            
-            daySchedule[slotName] = updatedActivities;
+                updatedActivities[activityIndex] = activityToUpdate;
+                daySchedule[slotName] = updatedActivities;
+                activityUpdated = true;
+            }
+        });
+        if (activityUpdated) {
             newSchedule[dateKey] = daySchedule;
-            activityUpdated = true;
-          }
         }
-      });
-      return newSchedule;
+        return newSchedule;
     });
   };
   
@@ -2847,4 +2848,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
+
 

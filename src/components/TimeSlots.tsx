@@ -1,4 +1,6 @@
 
+
+      
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -185,7 +187,7 @@ export function TimeSlots({
   };
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
-    linkHabitFromContext(activityId, habitId);
+    linkHabitFromContext(activityId, habitId, date);
   };
 
   const handleAddSubTask = (slotName: string, activityId: string) => {
@@ -391,9 +393,7 @@ export function TimeSlots({
                                                 <DropdownMenuCheckboxItem
                                                   key={habit.id}
                                                   checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                                  onCheckedChange={(checked) => {
-                                                    linkHabitFromContext(activity.id, habit.id)
-                                                  }}
+                                                  onCheckedChange={() => handleLinkHabit(activity.id, habit.id)}
                                                 >
                                                     {habit.name}
                                                 </DropdownMenuCheckboxItem>
@@ -532,3 +532,4 @@ export function TimeSlots({
     </div>
   );
 }
+
