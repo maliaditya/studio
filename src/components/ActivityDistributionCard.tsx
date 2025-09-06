@@ -83,7 +83,7 @@ const ActivityDetailPopup = ({ popupState, onClose }: {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        transform: transform ? `translate3d(${'${transform.x}'}px, ${'${transform.y}'}px, 0)` : undefined,
         willChange: 'transform',
         zIndex: 100,
     };
@@ -133,7 +133,7 @@ export function ActivityDistributionCard() {
     const [detailPopupState, setDetailPopupState] = useState<ActivityDetailPopupState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const [position, setPosition] = useState({ x: 20, y: 890 });
+    const [position, setPosition] = useState({ x: 20, y: 870 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
