@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -391,6 +392,7 @@ export function TimeSlots({
                                                   key={habit.id}
                                                   checked={(activity.habitEquationIds || []).includes(habit.id)}
                                                   onCheckedChange={() => handleLinkHabit(activity.id, habit.id)}
+                                                  onClick={(e) => e.preventDefault()}
                                                 >
                                                     {habit.name}
                                                 </DropdownMenuCheckboxItem>
