@@ -19,7 +19,7 @@ import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Checkbox } from './ui/checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 
@@ -391,8 +391,9 @@ export function TimeSlots({
                                                 <DropdownMenuCheckboxItem
                                                   key={habit.id}
                                                   checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                                  onCheckedChange={() => handleLinkHabit(activity.id, habit.id)}
-                                                  onClick={(e) => e.preventDefault()}
+                                                  onCheckedChange={(checked) => {
+                                                    linkHabitFromContext(activity.id, habit.id)
+                                                  }}
                                                 >
                                                     {habit.name}
                                                 </DropdownMenuCheckboxItem>
