@@ -11,7 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isValid } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -353,7 +353,7 @@ interface AuthContextType {
 
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
-  handleLinkHabit: (activityId: string, habitId: string) => void;
+  handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
   toggleRoutine: (activity: Activity) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
@@ -1040,81 +1040,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Wait for state to apply before allowing saves
     setTimeout(() => setIsLoadingState(false), 100);
   };
-
-  const isScheduleLoaded = useMemo(() => Object.keys(schedule).length > 0 || !loading, [schedule, loading]);
-
-  const toggleRoutine = (activity: Activity) => {
-    setSettings(prevSettings => {
-        const currentRoutines = prevSettings.routines || [];
-        const isRoutine = currentRoutines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
-        
-        let newRoutines: Activity[];
-        if (isRoutine) {
-            newRoutines = currentRoutines.filter(r => !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot));
-            toast({ title: 'Removed from Routine', description: `"${activity.details}" will no longer auto-populate.` });
-        } else {
-            // Add only essential properties for the routine template
-            const routineTemplate: Activity = {
-                id: activity.id, // ID will be regenerated, but keep for reference
-                type: activity.type,
-                details: activity.details,
-                slot: activity.slot,
-                duration: activity.duration,
-                taskIds: activity.taskIds,
-                habitEquationIds: activity.habitEquationIds,
-                completed: false, // Always start as not completed
-                isRoutine: true,
-            };
-            newRoutines = [...currentRoutines, routineTemplate];
-            toast({ title: 'Added to Routine', description: `"${activity.details}" will now appear daily.` });
-        }
-        
-        return { ...prevSettings, routines: newRoutines };
-    });
-  };
-
-  useEffect(() => {
-    if (!currentUser?.username || isLoadingState || !settings.routines || !isScheduleLoaded) return;
   
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const todayIsEmptyOrPartial = !schedule[todayStr] || Object.values(schedule[todayStr]).flat().length < settings.routines.length;
-  
-    if (todayIsEmptyOrPartial) {
-      setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const todaysActivities = new Map<string, Activity>();
+  const routinePopulationNeeded = useRef(true);
 
-        // First, get all activities already on the schedule for today to avoid duplicates
-        if (newSchedule[todayStr]) {
-            Object.values(newSchedule[todayStr]).flat().forEach(act => todaysActivities.set(act.details + act.type, act));
-        }
-
-        // Now, add any missing routines
-        settings.routines.forEach((routine: Activity) => {
-          if (!todaysActivities.has(routine.details + routine.type)) {
-            const newActivity = {
-              ...routine,
-              id: `${routine.type}-${Date.now()}-${Math.random()}`,
-              completed: false,
-            };
-            todaysActivities.set(newActivity.details + newActivity.type, newActivity);
-          }
-        });
-        
-        const newDaySchedule: DailySchedule = {};
-        todaysActivities.forEach(activity => {
-            const slot = activity.slot as keyof DailySchedule;
-            if (!newDaySchedule[slot]) {
-                newDaySchedule[slot] = [];
-            }
-            (newDaySchedule[slot] as Activity[]).push(activity);
-        });
-
-        newSchedule[todayStr] = newDaySchedule;
-        return newSchedule;
-      });
+  const populatedSchedule = useMemo(() => {
+    if (!settings.routines || settings.routines.length === 0) {
+      return schedule;
     }
-  }, [currentUser, isLoadingState, schedule, settings.routines, isScheduleLoaded, setSchedule]);
+    
+    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
+
+    Object.keys(newSchedule).forEach(dateKey => {
+        const daySchedule = newSchedule[dateKey] as DailySchedule;
+        const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
+
+        settings.routines.forEach((routine: Activity) => {
+            if (!activitiesInDay.has(`${routine.details}_${routine.type}`)) {
+                const slot = routine.slot as keyof DailySchedule;
+                if (!daySchedule[slot]) {
+                    daySchedule[slot] = [];
+                }
+                const newActivity = {
+                    ...routine,
+                    id: `${routine.type}-${Date.now()}-${Math.random()}`,
+                    completed: false, // Always start as not completed
+                };
+                (daySchedule[slot] as Activity[]).push(newActivity);
+            }
+        });
+    });
+
+    return newSchedule;
+
+  }, [schedule, settings.routines]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -2577,7 +2535,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const activeProjectIds = useMemo(() => {
     const activeIds = new Set<string>();
-    const today = startOfToday();
+    const today = startOfDay(new Date());
 
     (projects || []).forEach(project => {
         // Check productization plans
@@ -2644,13 +2602,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
-      if (!newSchedule[todayKey]) return prevSchedule;
+      if (!newSchedule[dateKey]) return prevSchedule;
   
-      const daySchedule = { ...newSchedule[todayKey] };
+      const daySchedule = { ...newSchedule[dateKey] };
       let activityUpdated = false;
   
       Object.keys(daySchedule).forEach(slotName => {
@@ -2674,10 +2632,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   
       if (activityUpdated) {
-        newSchedule[todayKey] = daySchedule;
+        newSchedule[dateKey] = daySchedule;
       }
       return newSchedule;
     });
+  };
+  
+  const toggleRoutine = (activity: Activity) => {
+    const isCurrentlyRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
+
+    const newRoutines = isCurrentlyRoutine
+        ? settings.routines.filter(r => !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot))
+        : [...settings.routines, {
+            id: `routine_${activity.details.replace(/\s/g, '')}`, // Create a stable ID
+            type: activity.type,
+            details: activity.details,
+            slot: activity.slot,
+            duration: activity.duration,
+            taskIds: activity.taskIds,
+            habitEquationIds: activity.habitEquationIds,
+            completed: false,
+            isRoutine: true,
+        }];
+    
+    handleSettingChange('routines', newRoutines);
   };
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
@@ -2715,7 +2693,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     globalVolume, setGlobalVolume,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
+    schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,

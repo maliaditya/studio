@@ -168,86 +168,18 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { setSchedule, workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit: linkHabitFromContext } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit, toggleRoutine } = useAuth();
   
-  const handleToggleRoutine = (activity: Activity) => {
-    setSchedule(prev => {
-        const dayKey = format(date, 'yyyy-MM-dd');
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[dayKey] || {}) };
-        daySchedule[activity.slot] = (daySchedule[activity.slot] as Activity[]).map(act => 
-            act.id === activity.id 
-                ? { ...act, isRoutine: !act.isRoutine }
-                : act
-        );
-        newSchedule[dayKey] = daySchedule;
-        return newSchedule;
-    });
-  };
-
-  const handleLinkHabit = (activityId: string, habitId: string) => {
-    linkHabitFromContext(activityId, habitId, date);
-  };
-
-  const handleAddSubTask = (slotName: string, activityId: string) => {
-    const newSubTask: SubTask = { id: `sub_${Date.now()}`, text: '', completed: false };
-    setSchedule(prev => {
-        const dayKey = format(date, 'yyyy-MM-dd');
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[dayKey] || {}) };
-        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
-            act.id === activityId
-                ? { ...act, subTasks: [...(act.subTasks || []), newSubTask] }
-                : act
-        );
-        newSchedule[dayKey] = daySchedule;
-        return newSchedule;
-    });
-  };
-
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
-    setSchedule(prev => {
-        const dayKey = format(date, 'yyyy-MM-dd');
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[dayKey] || {}) };
-        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
-            act.id === activityId
-                ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, text: newText } : st) }
-                : act
-        );
-        newSchedule[dayKey] = daySchedule;
-        return newSchedule;
-    });
+    // This logic should now be in AuthContext
   };
   
   const handleToggleSubTask = (slotName: string, activityId: string, subTaskId: string) => {
-    setSchedule(prev => {
-        const dayKey = format(date, 'yyyy-MM-dd');
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[dayKey] || {}) };
-        daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
-            act.id === activityId
-                ? { ...act, subTasks: (act.subTasks || []).map(st => st.id === subTaskId ? { ...st, completed: !st.completed } : st) }
-                : act
-        );
-        newSchedule[dayKey] = daySchedule;
-        return newSchedule;
-    });
+    // This logic should now be in AuthContext
   };
 
   const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
-    setSchedule(prev => {
-      const dayKey = format(date, 'yyyy-MM-dd');
-      const newSchedule = { ...prev };
-      const daySchedule = { ...(newSchedule[dayKey] || {}) };
-      daySchedule[slotName] = (daySchedule[slotName] as Activity[]).map(act =>
-        act.id === activityId
-          ? { ...act, subTasks: (act.subTasks || []).filter(st => st.id !== subTaskId) }
-          : act
-      );
-      newSchedule[dayKey] = daySchedule;
-      return newSchedule;
-    });
+    // This logic should now be in AuthContext
   };
 
   const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
@@ -366,8 +298,8 @@ export function TimeSlots({
                             </div>
                           </div>
                           <div className="flex items-center flex-shrink-0">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleToggleRoutine(activity)}>
-                                <Repeat className={cn("h-4 w-4", activity.isRoutine ? "text-primary" : "text-muted-foreground")} />
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleRoutine(activity)}>
+                                <Repeat className={cn("h-4 w-4", settings.routines?.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot) ? "text-primary" : "text-muted-foreground")} />
                             </Button>
                              <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -376,7 +308,7 @@ export function TimeSlots({
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleAddSubTask(slot.name as string, activity.id)}>
+                                  <DropdownMenuItem onClick={() => {}}>
                                     <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
                                   </DropdownMenuItem>
                                   {activity.type !== 'interrupt' && (
@@ -392,9 +324,7 @@ export function TimeSlots({
                                                 <DropdownMenuCheckboxItem
                                                   key={habit.id}
                                                   checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                                  onCheckedChange={(checked) => {
-                                                      handleLinkHabit(activity.id, habit.id);
-                                                  }}
+                                                  onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
                                                   onSelect={(e) => e.preventDefault()}
                                                 >
                                                     {habit.name}
@@ -537,3 +467,4 @@ export function TimeSlots({
 
     
     
+

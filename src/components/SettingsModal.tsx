@@ -292,41 +292,12 @@ ${JSON.stringify(finalTemplate, null, 2)}
   
   const activityTypesForHabitLinking: ActivityType[] = ['workout', 'upskill', 'deepwork', 'planning', 'tracking', 'branding', 'lead-generation', 'mindset', 'nutrition'];
 
-  const routineTasks = useMemo(() => {
-    const routines: Activity[] = [];
-    const seenDetails = new Set<string>();
-    Object.values(schedule).flat().forEach(day => {
-        Object.values(day).flat().forEach(activity => {
-            if (activity.isRoutine && !seenDetails.has(activity.details)) {
-                routines.push(activity);
-                seenDetails.add(activity.details);
-            }
-        });
-    });
-    return routines;
-  }, [schedule]);
-
-  const handleRemoveRoutine = (activityDetails: string) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        Object.keys(newSchedule).forEach(date => {
-            const daySchedule = { ...newSchedule[date] };
-            Object.keys(daySchedule).forEach(slot => {
-                const activities = daySchedule[slot] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    daySchedule[slot] = activities.map(act => {
-                        if (act.details === activityDetails) {
-                            return { ...act, isRoutine: false };
-                        }
-                        return act;
-                    });
-                }
-            });
-            newSchedule[date] = daySchedule;
-        });
-        return newSchedule;
-    });
-    toast({ title: 'Routine Task Removed', description: `"${activityDetails}" will no longer be carried forward.` });
+  const handleRemoveRoutine = (routineToRemove: Activity) => {
+    const newRoutines = (settings.routines || []).filter(r => 
+        !(r.details === routineToRemove.details && r.type === routineToRemove.type && r.slot === routineToRemove.slot)
+    );
+    handleSettingChange('routines', newRoutines);
+    toast({ title: 'Routine Task Removed', description: `"${routineToRemove.details}" will no longer be carried forward.` });
   };
 
 
@@ -479,11 +450,11 @@ ${JSON.stringify(finalTemplate, null, 2)}
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4">
                         <div className="space-y-2 pt-4 border-t">
-                        {routineTasks.length > 0 ? (
-                            routineTasks.map(task => (
-                            <div key={task.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                                <span className="text-sm font-medium">{task.details}</span>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveRoutine(task.details)}>
+                        {(settings.routines || []).length > 0 ? (
+                            (settings.routines || []).map((task, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                                <span className="text-sm font-medium">{task.details} ({task.slot})</span>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveRoutine(task)}>
                                 <Trash2 className="h-4 w-4 text-destructive"/>
                                 </Button>
                             </div>
