@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -2611,29 +2612,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(act => act.id === activityId);
-                    if (activityIndex > -1) {
-                        const currentHabits = activities[activityIndex].habitEquationIds || [];
-                        const isAlreadyLinked = currentHabits.includes(habitId);
-                        const newHabits = isAlreadyLinked 
-                            ? currentHabits.filter(id => id !== habitId)
-                            : [...new Set([...currentHabits, habitId])];
-                        
-                        activities[activityIndex] = { ...activities[activityIndex], habitEquationIds: newHabits };
-                        break; 
-                    }
-                }
-            }
-        }
-        return newSchedule;
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let activityUpdated = false;
+
+      Object.keys(newSchedule).forEach(dateKey => {
+        if (activityUpdated) return; 
+
+        Object.keys(newSchedule[dateKey]).forEach(slotName => {
+          if (activityUpdated) return;
+
+          const activities = newSchedule[dateKey][slotName] as Activity[];
+          const activityIndex = activities.findIndex(act => act.id === activityId);
+
+          if (activityIndex > -1) {
+            const updatedActivity = { ...activities[activityIndex] };
+            const currentHabits = updatedActivity.habitEquationIds || [];
+            const isAlreadyLinked = currentHabits.includes(habitId);
+            
+            updatedActivity.habitEquationIds = isAlreadyLinked
+              ? currentHabits.filter(id => id !== habitId)
+              : [...currentHabits, habitId];
+
+            const updatedActivities = [...activities];
+            updatedActivities[activityIndex] = updatedActivity;
+            
+            newSchedule[dateKey][slotName] = updatedActivities;
+            activityUpdated = true;
+          }
+        });
+      });
+
+      return newSchedule;
     });
-};
+  };
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
     const popupWidth = 384; // w-96
