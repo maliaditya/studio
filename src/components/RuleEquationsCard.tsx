@@ -14,7 +14,7 @@ export function RuleEquationsCard() {
     const { pillarEquations, metaRules } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
-    const [position, setPosition] = useState({ x: 20, y: 860 });
+    const [position, setPosition] = useState({ x: 20, y: 590 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 

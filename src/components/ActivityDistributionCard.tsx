@@ -133,7 +133,7 @@ export function ActivityDistributionCard() {
     const [detailPopupState, setDetailPopupState] = useState<ActivityDetailPopupState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const [position, setPosition] = useState({ x: 20, y: 590 });
+    const [position, setPosition] = useState({ x: 20, y: 860 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
