@@ -80,7 +80,7 @@ export function ActivityHeatmap({ schedule, onDateSelect }: ActivityHeatmapProps
                         if (!value || value.count === 0) {
                            return (
                                 <Tooltip key={index}>
-                                    <TooltipTrigger asChild onClick={() => onDateSelect(date)}>
+                                    <TooltipTrigger asChild>
                                       {React.cloneElement(element, { 'aria-label': `Schedule tasks for ${format(parseISO(date), 'PPP')}`})}
                                     </TooltipTrigger>
                                     <TooltipContent>
