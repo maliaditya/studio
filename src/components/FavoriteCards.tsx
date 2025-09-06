@@ -15,7 +15,7 @@ export function FavoriteCards() {
     const [isClient, setIsClient] = useState(false);
     const [isExpanded, setIsExpanded] = useState(true);
 
-    const [position, setPosition] = useState({ x: 20, y: 350 });
+    const [position, setPosition] = useState({ x: 20, y: 50 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
@@ -99,7 +99,7 @@ export function FavoriteCards() {
                 </div>
                 {isExpanded && (
                     <CardContent className="p-0">
-                        <ScrollArea className="h-60 pr-3">
+                        <ScrollArea className="h-48 pr-3">
                             <ul className="space-y-2">
                                 {favoriteCards.map(card => (
                                     <li key={card.id}>

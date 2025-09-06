@@ -133,6 +133,10 @@ export function ActivityDistributionCard() {
     const [detailPopupState, setDetailPopupState] = useState<ActivityDetailPopupState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    const [position, setPosition] = useState({ x: 20, y: 590 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
+
     useEffect(() => {
       setIsClient(true);
     }, []);
@@ -146,7 +150,7 @@ export function ActivityDistributionCard() {
         const hourMatch = durationStr.match(/(\d+)\s*h/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
         return totalMinutes;
     };
 
@@ -250,8 +254,59 @@ export function ActivityDistributionCard() {
             } : null);
         }
     };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, [role="button"]')) {
+            return;
+        }
+        setIsDragging(true);
+        setDragStartOffset({
+          x: e.clientX - position.x,
+          y: e.clientY - position.y,
+        });
+    };
     
-    if (!isClient || timeAllocation.length === 0) {
+    const handleMouseMove = (e: MouseEvent) => {
+        if (isDragging) {
+            setPosition({
+            x: e.clientX - dragStartOffset.x,
+            y: e.clientY - dragStartOffset.y,
+            });
+        }
+    };
+    
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    useEffect(() => {
+        if (isDragging) {
+          window.addEventListener('mousemove', handleMouseMove);
+          window.addEventListener('mouseup', handleMouseUp);
+        } else {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragging, dragStartOffset]);
+    
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: position.y,
+        left: position.x,
+        willChange: 'transform',
+        userSelect: isDragging ? 'none' : 'auto',
+    };
+    
+    if (!isClient) {
+        return null;
+    }
+    
+    if (timeAllocation.length === 0) {
         return null;
     }
 
@@ -259,14 +314,16 @@ export function ActivityDistributionCard() {
         <DndContext onDragEnd={handleDragEnd}>
             <motion.div
                 ref={containerRef}
-                className="fixed bottom-20 left-4 z-50 w-full max-w-xs"
+                style={style}
+                className="fixed w-full max-w-xs z-50"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.3 }}
+                onMouseDown={handleMouseDown}
             >
                 <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                    <CardHeader className="p-0 mb-3">
+                    <CardHeader className="p-0 mb-3 cursor-grab active:cursor-grabbing">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
                             <PieChartIcon className="h-5 w-5" />
                             Activity Distribution

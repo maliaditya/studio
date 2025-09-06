@@ -14,7 +14,7 @@ export function RuleEquationsCard() {
     const { pillarEquations, metaRules } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
-    const [position, setPosition] = useState({ x: 20, y: 550 });
+    const [position, setPosition] = useState({ x: 20, y: 860 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
@@ -103,7 +103,7 @@ export function RuleEquationsCard() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-60 pr-3">
+                    <ScrollArea className="h-48 pr-3">
                         <ul className="space-y-2">
                             {allEquations.map(equation => (
                                 <li key={equation.id} className="p-2 rounded-md border bg-muted/30">

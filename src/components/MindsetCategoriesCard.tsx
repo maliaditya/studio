@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -72,7 +71,7 @@ export function MindsetCategoriesCard() {
     const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
 
-    const [position, setPosition] = useState({ x: 20, y: 150 });
+    const [position, setPosition] = useState({ x: 20, y: 320 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
@@ -282,7 +281,7 @@ export function MindsetCategoriesCard() {
     return (
         <motion.div
             style={style}
-            className="fixed w-full max-w-xs"
+            className="fixed w-full max-w-xs z-50"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
@@ -309,7 +308,7 @@ export function MindsetCategoriesCard() {
                     </CardHeader>
                 </div>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-96 pr-3">
+                    <ScrollArea className="h-48 pr-3">
                         {renderContent()}
                     </ScrollArea>
                 </CardContent>
