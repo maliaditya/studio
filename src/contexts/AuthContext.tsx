@@ -2612,38 +2612,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
-    if (!isValid(date)) {
+    if (!date || !isValid(date)) {
         console.error("handleLinkHabit received an invalid date for activity:", activityId);
         return;
     }
     const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = newSchedule[dateKey];
-        if (!daySchedule) return prev;
-        let activityUpdated = false;
-
-        Object.keys(daySchedule).forEach(slotName => {
-            if (activityUpdated) return;
-            const activities = (daySchedule[slotName] as Activity[]) || [];
-            const activityIndex = activities.findIndex(act => act.id === activityId);
-            if (activityIndex > -1) {
-                const updatedActivities = [...activities];
-                const activityToUpdate = { ...updatedActivities[activityIndex] };
-                const currentHabits = activityToUpdate.habitEquationIds || [];
-                const isAlreadyLinked = currentHabits.includes(habitId);
-
-                activityToUpdate.habitEquationIds = isAlreadyLinked
-                    ? currentHabits.filter(id => id !== habitId)
-                    : [...currentHabits, habitId];
-
-                updatedActivities[activityIndex] = activityToUpdate;
-                daySchedule[slotName] = updatedActivities;
-                activityUpdated = true;
+    setSchedule(prevSchedule => {
+        const newSchedule = { ...prevSchedule };
+        if (newSchedule[dateKey]) {
+            const daySchedule = { ...newSchedule[dateKey] };
+            let activityUpdated = false;
+            Object.keys(daySchedule).forEach(slotName => {
+                const activities = (daySchedule[slotName] as Activity[]) || [];
+                const activityIndex = activities.findIndex(act => act.id === activityId);
+                if (activityIndex > -1) {
+                    const activityToUpdate = { ...activities[activityIndex] };
+                    const currentHabits = activityToUpdate.habitEquationIds || [];
+                    const isAlreadyLinked = currentHabits.includes(habitId);
+                    activityToUpdate.habitEquationIds = isAlreadyLinked
+                        ? currentHabits.filter(id => id !== habitId)
+                        : [...currentHabits, habitId];
+                    const updatedActivities = [...activities];
+                    updatedActivities[activityIndex] = activityToUpdate;
+                    daySchedule[slotName] = updatedActivities;
+                    activityUpdated = true;
+                }
+            });
+            if (activityUpdated) {
+                newSchedule[dateKey] = daySchedule;
             }
-        });
-        if (activityUpdated) {
-            newSchedule[dateKey] = daySchedule;
         }
         return newSchedule;
     });
@@ -2848,5 +2845,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
+
 
 
