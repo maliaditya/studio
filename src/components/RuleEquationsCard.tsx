@@ -8,8 +8,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
 import { Workflow, ArrowRight } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
-import { cn } from '@/lib/utils';
 import type { HabitEquation, MetaRule } from '@/types/workout';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export function RuleEquationsCard() {
     const { pillarEquations, metaRules } = useAuth();
@@ -29,7 +29,7 @@ export function RuleEquationsCard() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, [role="button"]')) {
+        if (target.closest('button, [role="button"]') || target.closest('[data-radix-accordion-trigger]')) {
             return;
         }
         setIsDragging(true);
@@ -105,22 +105,29 @@ export function RuleEquationsCard() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <ScrollArea className="h-48 pr-3">
-                        <ul className="space-y-2">
+                        <Accordion type="single" collapsible className="w-full">
                             {allEquations.map(equation => (
-                                <li key={equation.id} className="p-2 rounded-md border bg-muted/30">
-                                    <div className="space-y-1">
-                                        {(equation.metaRuleIds || []).map(ruleId => {
-                                            const rule = metaRules.find(r => r.id === ruleId);
-                                            return rule ? <p key={ruleId} className="text-xs text-muted-foreground">IF: {rule.text}</p> : null;
-                                        })}
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1 pt-1 border-t">
-                                        <ArrowRight className="h-4 w-4 text-primary" />
-                                        <p className="text-sm font-semibold">{equation.outcome}</p>
-                                    </div>
-                                </li>
+                                <AccordionItem value={equation.id} key={equation.id} className="border-none">
+                                    <AccordionTrigger className="p-2 text-sm font-semibold hover:no-underline rounded-md hover:bg-muted/50 text-left">
+                                        <div className="flex items-center gap-2">
+                                            <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
+                                            <span className="flex-grow">{equation.outcome}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pb-2 pl-6 pr-2">
+                                        <div className="space-y-1 p-2 rounded-md border bg-muted/30">
+                                            {(equation.metaRuleIds || []).map(ruleId => {
+                                                const rule = metaRules.find(r => r.id === ruleId);
+                                                return rule ? <p key={ruleId} className="text-xs text-muted-foreground">IF: {rule.text}</p> : null;
+                                            })}
+                                            {(equation.metaRuleIds || []).length === 0 && (
+                                                <p className="text-xs text-muted-foreground italic">No rules linked.</p>
+                                            )}
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
                             ))}
-                        </ul>
+                        </Accordion>
                     </ScrollArea>
                 </CardContent>
             </Card>
