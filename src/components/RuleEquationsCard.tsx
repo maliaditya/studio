@@ -9,12 +9,13 @@ import { ScrollArea } from './ui/scroll-area';
 import { Workflow, ArrowRight } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import type { HabitEquation, MetaRule } from '@/types/workout';
 
 export function RuleEquationsCard() {
     const { pillarEquations, metaRules } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
-    const [position, setPosition] = useState({ x: 20, y: 598 });
+    const [position, setPosition] = useState({ x: 20, y: 600 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
@@ -37,7 +38,7 @@ export function RuleEquationsCard() {
           y: e.clientY - position.y,
         });
     };
-
+    
     const handleMouseMove = (e: MouseEvent) => {
         if (isDragging) {
             setPosition({
@@ -46,7 +47,7 @@ export function RuleEquationsCard() {
             });
         }
     };
-
+    
     const handleMouseUp = () => {
         setIsDragging(false);
     };
