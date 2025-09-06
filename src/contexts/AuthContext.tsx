@@ -366,7 +366,7 @@ interface AuthContextType {
 
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
-  handleLinkHabit: (activityId: string, habitId: string) => void;
+  handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
   
@@ -2611,38 +2611,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
   };
 
-  const handleLinkHabit = (activityId: string, habitId: string) => {
+  const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
     setSchedule(prevSchedule => {
+      const dateKey = format(date, 'yyyy-MM-dd');
+      if (!prevSchedule[dateKey]) return prevSchedule;
+
       const newSchedule = { ...prevSchedule };
+      const daySchedule = { ...newSchedule[dateKey] };
       let activityUpdated = false;
 
-      Object.keys(newSchedule).forEach(dateKey => {
-        if (activityUpdated) return; 
+      Object.keys(daySchedule).forEach(slotName => {
+        if (activityUpdated) return;
 
-        Object.keys(newSchedule[dateKey]).forEach(slotName => {
-          if (activityUpdated) return;
-
-          const activities = newSchedule[dateKey][slotName] as Activity[];
+        const activities = daySchedule[slotName] as Activity[] | undefined;
+        if (Array.isArray(activities)) {
           const activityIndex = activities.findIndex(act => act.id === activityId);
-
           if (activityIndex > -1) {
             const updatedActivity = { ...activities[activityIndex] };
             const currentHabits = updatedActivity.habitEquationIds || [];
             const isAlreadyLinked = currentHabits.includes(habitId);
-            
+
             updatedActivity.habitEquationIds = isAlreadyLinked
               ? currentHabits.filter(id => id !== habitId)
               : [...currentHabits, habitId];
-
+            
             const updatedActivities = [...activities];
             updatedActivities[activityIndex] = updatedActivity;
             
-            newSchedule[dateKey][slotName] = updatedActivities;
+            daySchedule[slotName] = updatedActivities;
+            newSchedule[dateKey] = daySchedule;
             activityUpdated = true;
           }
-        });
+        }
       });
-
       return newSchedule;
     });
   };
@@ -2846,3 +2847,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
     
+
