@@ -1041,37 +1041,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => setIsLoadingState(false), 100);
   };
   
-  const routinePopulationNeeded = useRef(true);
-
   const populatedSchedule = useMemo(() => {
-    if (!settings.routines || settings.routines.length === 0) {
-      return schedule;
-    }
+    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy to avoid mutation
     
-    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
-
-    Object.keys(newSchedule).forEach(dateKey => {
-        const daySchedule = newSchedule[dateKey] as DailySchedule;
-        const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
-
-        settings.routines.forEach((routine: Activity) => {
-            if (!activitiesInDay.has(`${routine.details}_${routine.type}`)) {
-                const slot = routine.slot as keyof DailySchedule;
-                if (!daySchedule[slot]) {
-                    daySchedule[slot] = [];
-                }
-                const newActivity = {
-                    ...routine,
-                    id: `${routine.type}-${Date.now()}-${Math.random()}`,
-                    completed: false, // Always start as not completed
-                };
-                (daySchedule[slot] as Activity[]).push(newActivity);
-            }
-        });
-    });
-
+    if (!settings.routines || settings.routines.length === 0) {
+      return schedule; // Return original if no routines
+    }
+  
+    // Create a set of dates that are already in the schedule to avoid re-populating them
+    const existingDates = new Set(Object.keys(newSchedule));
+  
+    // Determine the range of dates to populate
+    const today = startOfDay(new Date());
+    let startDate = today;
+    if (Object.keys(schedule).length > 0) {
+      const earliestDate = new Date(Math.min(...Object.keys(schedule).map(d => parseISO(d).getTime())));
+      if (isBefore(earliestDate, startDate)) {
+        startDate = earliestDate;
+      }
+    }
+  
+    // Iterate from the earliest known date to today
+    for (let d = startDate; isBefore(d, addDays(today, 1)); d = addDays(d, 1)) {
+      const dateKey = format(d, 'yyyy-MM-dd');
+      
+      const daySchedule = newSchedule[dateKey] || {};
+      const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
+      
+      settings.routines.forEach((routine: Activity) => {
+        const routineKey = `${routine.details}_${routine.type}`;
+        if (!activitiesInDay.has(routineKey)) {
+          const slot = routine.slot as keyof DailySchedule;
+          if (!daySchedule[slot]) {
+            daySchedule[slot] = [];
+          }
+          const newActivity = {
+            ...routine,
+            id: `${routine.type}-${Date.now()}-${Math.random()}`,
+            completed: false, // Always start as not completed
+          };
+          (daySchedule[slot] as Activity[]).push(newActivity);
+        }
+      });
+      newSchedule[dateKey] = daySchedule;
+    }
+  
     return newSchedule;
-
   }, [schedule, settings.routines]);
   
   const register = async (username: string, password: string) => {
@@ -2655,7 +2670,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isRoutine: true,
         }];
     
-    handleSettingChange('routines', newRoutines);
+    setSettings(prev => ({...prev, routines: newRoutines}));
   };
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {

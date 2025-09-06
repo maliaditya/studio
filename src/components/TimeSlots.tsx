@@ -168,7 +168,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, missedSlotReviews, pillarEquations, handleLinkHabit, toggleRoutine } = useAuth();
+  const { settings, habitCards, toggleRoutine, handleLinkHabit } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -181,8 +181,6 @@ export function TimeSlots({
   const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
     // This logic should now be in AuthContext
   };
-
-  const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -201,22 +199,9 @@ export function TimeSlots({
         const freeTime = 240 - loggedTime;
         const progress = (loggedTime / 240) * 100;
         
-        const reviewKey = `${format(date, 'yyyy-MM-dd')}-${slot.name}`;
-        const review = missedSlotReviews[reviewKey];
-        const isSlotComplete = activities.length > 0 && activities.every(a => a.completed);
-        const allRulesFollowed = review && allEquations.length > 0 && allEquations.every(eq => review.followedRuleIds.includes(eq.id));
-        
-        const isPartiallyComplete = activities.length > 0 && !isSlotComplete && activities.some(a => a.completed);
-        const partialAndRulesNotFollowed = isPartiallyComplete && review && !allRulesFollowed;
-
-        const isSlotFailed = !isSlotComplete && review && !allRulesFollowed;
-        const hasLongDistraction = activities.some(act => act.type === 'distraction' && (act.duration || 0) > 30);
-        
         const now = new Date();
         const todayKey = format(now, 'yyyy-MM-dd');
         const selectedDateKey = format(date, 'yyyy-MM-dd');
-        const isPastDay = isBefore(startOfDay(date), startOfDay(now));
-        const isPastSlot = isPastDay || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
         
         return (
           <Card
@@ -226,10 +211,7 @@ export function TimeSlots({
               "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
               currentSlot === slot.name && selectedDateKey === todayKey
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
-                : 'shadow-md bg-card/60',
-              (isSlotComplete || allRulesFollowed) && 'border-green-500',
-              partialAndRulesNotFollowed && 'border-orange-500',
-              (isSlotFailed && !isPartiallyComplete || hasLongDistraction) && 'border-red-500'
+                : 'shadow-md bg-card/60'
             )}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -251,12 +233,6 @@ export function TimeSlots({
               <div className="flex-grow space-y-2 mb-2">
                 {activities && activities.length > 0 ? (
                   activities.map((activity) => {
-                    let displayDetails = activity.details;
-                    if (activity.type === 'workout') {
-                      const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
-                      displayDetails = description.split(' for ')[1] || "Workout";
-                    }
-
                     const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
 
                     return (
@@ -283,7 +259,7 @@ export function TimeSlots({
                                   "font-semibold text-foreground", 
                                   activity.completed && "line-through"
                               )}>
-                                {displayDetails}
+                                {activity.details}
                               </p>
                               <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
                                 <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
@@ -324,7 +300,9 @@ export function TimeSlots({
                                                 <DropdownMenuCheckboxItem
                                                   key={habit.id}
                                                   checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                                  onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
+                                                  onCheckedChange={(checked) => {
+                                                    handleLinkHabit(activity.id, habit.id, date);
+                                                  }}
                                                   onSelect={(e) => e.preventDefault()}
                                                 >
                                                     {habit.name}
@@ -389,7 +367,7 @@ export function TimeSlots({
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{loggedTime} min logged</span>
-                    <span>{freeTime} min {isPastSlot ? 'wasted' : 'free'}</span>
+                    <span>{freeTime} min free</span>
                 </div>
                 <div className="flex justify-end items-center">
                     <Popover>
@@ -467,4 +445,3 @@ export function TimeSlots({
 
     
     
-
