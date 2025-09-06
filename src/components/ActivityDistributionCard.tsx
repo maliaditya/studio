@@ -325,7 +325,7 @@ export function ActivityDistributionCard() {
                 <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                     <CardHeader className="p-0 mb-3 cursor-grab active:cursor-grabbing">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
-                            <PieChartIcon className="h-5 w-5" />
+                            <PieChartIcon className="h-5 w-5 text-blue-500" />
                             Activity Distribution
                         </CardTitle>
                     </CardHeader>

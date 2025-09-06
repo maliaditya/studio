@@ -299,7 +299,7 @@ export function MindsetCategoriesCard() {
                             </Button>
                         )}
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
-                            <Brain className="h-5 w-5" />
+                            <Brain className="h-5 w-5 text-purple-500" />
                             {view === 'techniques' ? 'Mindset Techniques' : 'All Linked Resistances'}
                         </CardTitle>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView(v => v === 'techniques' ? 'all-resistances' : 'techniques')}>

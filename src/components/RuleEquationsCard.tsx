@@ -99,7 +99,7 @@ export function RuleEquationsCard() {
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                 <CardHeader className="p-0 mb-3 cursor-grab active:cursor-grabbing">
                     <CardTitle className="flex items-center gap-2 text-base text-primary">
-                        <Workflow className="h-5 w-5" />
+                        <Workflow className="h-5 w-5 text-orange-500" />
                         Rule Equations
                     </CardTitle>
                 </CardHeader>
