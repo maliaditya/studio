@@ -19,7 +19,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from './ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { Checkbox } from './ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
@@ -186,9 +186,6 @@ export function TimeSlots({
   };
 
   const handleLinkHabit = (activityId: string, habitId: string) => {
-    const activity = Object.values(schedule).flat().find(act => (act as Activity).id === activityId);
-    if (!activity) return;
-
     linkHabitFromContext(activityId, habitId);
   };
 
@@ -535,7 +532,5 @@ export function TimeSlots({
     </div>
   );
 }
-
-
-
+    
     
