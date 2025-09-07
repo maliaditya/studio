@@ -9,13 +9,13 @@ import { ScrollArea } from './ui/scroll-area';
 import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { BrainHack } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
-import { Textarea } from './ui/textarea';
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
     hack: BrainHack;
@@ -105,18 +105,16 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 ) : (
                     hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
                 )}
-                <div className="flex-grow min-w-0">
-                  <Textarea
-                      ref={textareaRef}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      onBlur={handleBlur}
-                      onKeyDown={handleKeyDown}
-                      className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1"
-                      placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
-                      rows={1}
-                  />
-                </div>
+                <Textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
+                    className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1 flex-grow min-w-0"
+                    placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
+                    rows={1}
+                />
             </div>
             <div className="flex items-center flex-shrink-0">
                 {hack.type !== 'link' && (
