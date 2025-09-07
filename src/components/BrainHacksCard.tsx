@@ -105,16 +105,18 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 ) : (
                     hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
                 )}
-                <Textarea
-                    ref={textareaRef}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onBlur={handleBlur}
-                    onKeyDown={handleKeyDown}
-                    className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1"
-                    placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
-                    rows={1}
-                />
+                <div className="flex-grow min-w-0">
+                  <Textarea
+                      ref={textareaRef}
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      onBlur={handleBlur}
+                      onKeyDown={handleKeyDown}
+                      className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1"
+                      placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
+                      rows={1}
+                  />
+                </div>
             </div>
             <div className="flex items-center flex-shrink-0">
                 {hack.type !== 'link' && (
@@ -426,4 +428,3 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         </>
     );
 }
-
