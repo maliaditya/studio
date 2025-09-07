@@ -619,6 +619,11 @@ export interface Priority {
   deadline?: string; // Stored as ISO string: yyyy-MM-dd
 }
 
+export interface BrainHack {
+  id: string;
+  text: string;
+}
+
 export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
