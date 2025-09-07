@@ -12,7 +12,7 @@ import type { HabitEquation, MetaRule } from '@/types/workout';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 export function RuleEquationsCard() {
-    const { pillarEquations, metaRules } = useAuth();
+    const { pillarEquations, metaRules, openRuleDetailPopup } = useAuth();
     const [isClient, setIsClient] = useState(false);
 
     const [position, setPosition] = useState({ x: 20, y: 600 });
@@ -118,7 +118,16 @@ export function RuleEquationsCard() {
                                         <div className="space-y-1 p-2 rounded-md border bg-muted/30">
                                             {(equation.metaRuleIds || []).map(ruleId => {
                                                 const rule = metaRules.find(r => r.id === ruleId);
-                                                return rule ? <p key={ruleId} className="text-xs text-muted-foreground">IF: {rule.text}</p> : null;
+                                                return rule ? (
+                                                    <Button
+                                                        key={ruleId}
+                                                        variant="link"
+                                                        className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start text-left whitespace-normal"
+                                                        onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                                                    >
+                                                        IF: {rule.text}
+                                                    </Button>
+                                                ) : null;
                                             })}
                                             {(equation.metaRuleIds || []).length === 0 && (
                                                 <p className="text-xs text-muted-foreground italic">No rules linked.</p>
