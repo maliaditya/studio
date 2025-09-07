@@ -10,6 +10,7 @@ import { Workflow, ArrowRight } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import type { HabitEquation, MetaRule } from '@/types/workout';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Button } from './ui/button';
 
 export function RuleEquationsCard() {
     const { pillarEquations, metaRules, openRuleDetailPopup } = useAuth();
