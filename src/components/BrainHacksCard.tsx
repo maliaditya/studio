@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2 } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { BrainHack } from '@/types/workout';
@@ -46,7 +46,7 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onClick }: {
             handleBlur();
             e.preventDefault();
         } else if (e.key === 'Escape') {
-            setText(hack.text);
+            setText(hack.text); // Revert changes
             e.preventDefault();
             (e.target as HTMLInputElement).blur();
         }
@@ -60,10 +60,12 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onClick }: {
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                onClick={onClick}
-                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full cursor-pointer"
+                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
             />
             <div className="flex items-center flex-shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={onClick}>
+                    <GitBranch className="h-3 w-3 text-blue-500" />
+                </Button>
                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
                     <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
@@ -94,6 +96,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             if (savedPosition) {
                 setPosition(JSON.parse(savedPosition));
             } else {
+                // This will only run if there's no saved position.
                 setPosition({ x: window.innerWidth - 340, y: 250 });
             }
         }
