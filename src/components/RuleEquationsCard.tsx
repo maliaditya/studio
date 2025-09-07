@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -28,6 +28,10 @@ export function RuleEquationsCard() {
     }, []);
 
     const handleDragStart = (e: React.PointerEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('button, [role="button"], a')) {
+            return;
+        }
         setIsDragging(true);
     };
 
@@ -70,6 +74,8 @@ export function RuleEquationsCard() {
                     className="cursor-grab active:cursor-grabbing"
                     {...attributes}
                     {...listeners}
+                    onPointerDown={handleDragStart}
+                    onPointerUp={handleDragEnd}
                 >
                     <CardHeader className="p-0 mb-3">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
@@ -90,24 +96,24 @@ export function RuleEquationsCard() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="pb-2 pl-6 pr-2">
-                                        <div className="space-y-1 p-2 rounded-md border bg-muted/30">
+                                        <ul className="list-disc list-inside space-y-1 p-2 rounded-md border bg-muted/30">
                                             {(equation.metaRuleIds || []).map(ruleId => {
                                                 const rule = metaRules.find(r => r.id === ruleId);
                                                 return rule ? (
-                                                    <Button
-                                                        key={ruleId}
-                                                        variant="link"
-                                                        className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start text-left whitespace-normal"
-                                                        onClick={(e) => openRuleDetailPopup(rule.id, e)}
-                                                    >
-                                                        IF: {rule.text}
-                                                    </Button>
+                                                    <li key={ruleId} className="text-xs">
+                                                        <button
+                                                            className="text-left text-muted-foreground hover:text-primary"
+                                                            onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                                                        >
+                                                            {rule.text}
+                                                        </button>
+                                                    </li>
                                                 ) : null;
                                             })}
                                             {(equation.metaRuleIds || []).length === 0 && (
                                                 <p className="text-xs text-muted-foreground italic">No rules linked.</p>
                                             )}
-                                        </div>
+                                        </ul>
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
