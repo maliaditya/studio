@@ -131,7 +131,7 @@ interface ResourceCardComponentProps {
 }
 
 const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: ResourceCardComponentProps) => {
-    const { resources, setFloatingVideoUrl } = useAuth();
+    const { resources, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
@@ -1423,7 +1423,7 @@ function ResourcesPageContent() {
                               } else if (res.type === 'mechanism') {
                                   cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                               } else if(res.type === 'card') {
-                                  cardContent = <ResourceCardComponent resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                  cardContent = <ResourceCardComponent playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                               } else {
                                   const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                   const isGif = isGifUrl(res.link);
@@ -1802,13 +1802,38 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
+    const [isFetchingMeta, setIsFetchingMeta] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (editText.trim() === '') {
             onDelete();
+            return;
+        }
+
+        if (point.type === 'link' && editText.trim() !== point.text) {
+            setIsFetchingMeta(true);
+            try {
+                const response = await fetch('/api/get-link-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: editText.trim() }),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    onUpdate(editText.trim());
+                    // This is tricky because the parent handles the state update.
+                    // A better approach would be to have `onUpdate` handle the whole object.
+                } else {
+                    onUpdate(editText.trim());
+                }
+            } catch (error) {
+                onUpdate(editText.trim());
+            } finally {
+                setIsFetchingMeta(false);
+            }
         } else {
-             onUpdate(editText);
+            onUpdate(editText.trim());
         }
         setIsEditing(false);
     };
@@ -1871,13 +1896,13 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                       )}
                     </div>
                 ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0">
+                     <div className="flex-grow min-w-0 flex items-center gap-1">
                         <span 
                             className="cursor-pointer text-primary hover:underline" 
                             onClick={() => point.text && setFloatingVideoUrl(point.text)}
                             onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
                         >
-                            {point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>}
+                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
                         </span>
                     </div>
                 ) : (
@@ -1885,8 +1910,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                 )}
             </div>
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                 {point.type === 'text' && (
-                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
+                {point.type === 'text' && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
                         <Blocks className="h-3 w-3"/>
                     </Button>
                 )}
@@ -1904,6 +1929,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
