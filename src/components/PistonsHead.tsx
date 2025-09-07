@@ -228,7 +228,7 @@ const QuickAccessView = () => {
                                 )}
                                 <div className="flex items-center">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleFavorite(card.id)}>
-                                        <Star className={cn("h-4 w-4", card.isFavorite ? "text-yellow-400 fill-yellow-400" : "text-muted-foreground")} />
+                                        <Star className={cn("h-4 w-4", card.isFavorite ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
                                     </Button>
                                     <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => setEditingCardId(card.id)}>
                                         <Edit className="h-4 w-4" />
@@ -245,37 +245,46 @@ const QuickAccessView = () => {
 };
 
 const RuleEquationsView = () => {
-    const { pillarEquations, setPillarEquations, metaRules } = useAuth();
-    const [viewEquationState, setViewEquationState] = useState<{ isOpen: boolean; equation?: HabitEquation; pillar?: string }>({ isOpen: false });
+    const { pillarEquations, metaRules, openRuleDetailPopup } = useAuth();
+    const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
 
+    if (allEquations.length === 0) {
+        return (
+            <CardContent className="p-4">
+                <p className="text-center text-sm text-muted-foreground py-8">No rule equations defined. Go to the Purpose page to create them.</p>
+            </CardContent>
+        );
+    }
+    
     return (
-        <CardContent className="p-4">
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold">Rule Equations</h3>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewEquationState({ isOpen: true })}>
-                    <PlusCircle className="h-4 w-4 text-green-500"/>
-                </Button>
-            </div>
-            <ScrollArea className="h-80 pr-2">
-                <Accordion type="multiple" className="w-full space-y-2">
+        <CardContent className="p-0">
+            <ScrollArea className="h-96">
+                <Accordion type="multiple" className="w-full">
                     {Object.entries(pillarEquations).map(([pillar, equations]) => (
                         <React.Fragment key={pillar}>
                             {equations.map(eq => (
-                                <AccordionItem value={eq.id} key={eq.id} className="border-none">
-                                    <AccordionTrigger className="p-2 rounded-md bg-muted/30 hover:no-underline hover:bg-muted/50 text-left">
-                                        <div className="flex items-center gap-2 w-full">
+                                <AccordionItem value={eq.id} key={eq.id} className="border-b">
+                                    <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline text-left">
+                                        <div className="flex items-center gap-2">
                                             <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
-                                            <div className="flex-grow">
-                                                <p className="text-sm font-semibold">{eq.outcome}</p>
-                                                <p className="text-xs text-muted-foreground">{pillar}</p>
-                                            </div>
+                                            <span>{eq.outcome}</span>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="pt-2">
-                                        <div className="pl-4 border-l-2 ml-4">
-                                            <ul className="list-disc list-inside text-xs space-y-1 bg-background p-2 rounded-md border">
-                                                {(eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)?.text).filter(Boolean).map(text => <li key={text}>{text}</li>)}
-                                            </ul>
+                                    <AccordionContent className="px-4 pb-3">
+                                        <div className="pl-6 border-l-2 ml-2 space-y-1">
+                                            {(eq.metaRuleIds || []).map(id => {
+                                                const rule = metaRules.find(r => r.id === id);
+                                                return rule ? (
+                                                    <Button
+                                                        key={id}
+                                                        variant="link"
+                                                        className="p-0 h-auto text-xs text-muted-foreground hover:text-primary justify-start text-left whitespace-normal"
+                                                        onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                                                    >
+                                                        {rule.text}
+                                                    </Button>
+                                                ) : null;
+                                            })}
                                         </div>
                                     </AccordionContent>
                                 </AccordionItem>
@@ -284,16 +293,6 @@ const RuleEquationsView = () => {
                     ))}
                 </Accordion>
             </ScrollArea>
-            
-            <EquationEditor
-                isOpen={viewEquationState.isOpen}
-                onOpenChange={(open) => setViewEquationState({ ...viewEquationState, isOpen: open })}
-                pillarName={viewEquationState.pillar || ''}
-                equation={viewEquationState.equation}
-                onSave={() => {}} // No-op for now, as editing logic is in Purpose page.
-                metaRules={metaRules}
-                viewOnly={true}
-            />
         </CardContent>
     );
 };
