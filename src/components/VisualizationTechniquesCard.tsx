@@ -100,14 +100,14 @@ export function VisualizationTechniquesCard() {
                     <ScrollArea className="h-48 pr-3">
                         <ul className="space-y-2">
                             {mindProgrammingDefinitions.map((technique: ExerciseDefinition) => (
-                                <li key={technique.id}>
-                                    <Button
-                                        variant="secondary"
-                                        className="w-full justify-start h-auto text-left"
+                                <li key={technique.id} className="flex items-start gap-2">
+                                    <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                                    <button
+                                        className="text-left text-sm text-muted-foreground hover:text-foreground"
                                         onClick={(e) => openLinkedResistancePopup(technique.id, e)}
                                     >
                                         {technique.name}
-                                    </Button>
+                                    </button>
                                 </li>
                             ))}
                         </ul>
