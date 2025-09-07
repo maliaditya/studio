@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,11 +11,68 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Priority } from '@/types/workout';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+const EditablePriority = React.memo(({ priority, onUpdate, onDelete }: {
+    priority: Priority;
+    onUpdate: (id: string, newText: string) => void;
+    onDelete: (id: string) => void;
+}) => {
+    const [text, setText] = useState(priority.text);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (priority.text === "New Priority") {
+            inputRef.current?.select();
+        }
+    }, [priority.text]);
+    
+    useEffect(() => {
+        setText(priority.text);
+    }, [priority.text]);
+
+    const handleBlur = () => {
+        const newText = text.trim();
+        if (newText === '') {
+            onDelete(priority.id);
+        } else if (newText !== priority.text) {
+            onUpdate(priority.id, newText);
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleBlur();
+            e.preventDefault();
+        } else if (e.key === 'Escape') {
+            setText(priority.text); // Revert changes
+            e.preventDefault();
+            (e.target as HTMLInputElement).blur();
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+            <Input
+                ref={inputRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
+            />
+            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={() => onDelete(priority.id)}>
+                <Trash2 className="h-4 w-4 text-destructive" />
+            </Button>
+        </div>
+    );
+});
+EditablePriority.displayName = 'EditablePriority';
 
 export function TopPrioritiesCard() {
     const { topPriorities, setTopPriorities } = useAuth();
+    const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
-    const [newPriority, setNewPriority] = useState('');
 
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -27,24 +84,25 @@ export function TopPrioritiesCard() {
         if (savedPosition) {
             setPosition(JSON.parse(savedPosition));
         } else {
-            // Set initial position after mounting on client
             setPosition({ x: window.innerWidth - 340, y: 50 });
         }
     }, []);
 
     const handleAddPriority = () => {
-        if (newPriority.trim()) {
-            const newPriorityItem: Priority = {
-                id: `priority_${Date.now()}`,
-                text: newPriority.trim()
-            };
-            setTopPriorities(prev => [...prev, newPriorityItem]);
-            setNewPriority('');
-        }
+        const newPriorityItem: Priority = {
+            id: `priority_${Date.now()}`,
+            text: "New Priority"
+        };
+        setTopPriorities(prev => [...prev, newPriorityItem]);
     };
 
     const handleDeletePriority = (id: string) => {
         setTopPriorities(prev => prev.filter(p => p.id !== id));
+    };
+
+    const handleUpdatePriority = (id: string, newText: string) => {
+        setTopPriorities(prev => prev.map(p => p.id === id ? { ...p, text: newText } : p));
+        toast({ title: 'Priority updated!' });
     };
     
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -111,34 +169,26 @@ export function TopPrioritiesCard() {
         >
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                 <div className="cursor-grab active:cursor-grabbing">
-                    <CardHeader className="p-0 mb-3">
+                    <CardHeader className="p-0 mb-3 flex flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
                             <Target className="h-5 w-5 text-red-500" />
                             Top Priorities
                         </CardTitle>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleAddPriority}>
+                            <PlusCircle className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                 </div>
                 <CardContent className="p-0">
-                    <div className="flex gap-2 mb-2">
-                        <Input 
-                            placeholder="Add a new priority..." 
-                            value={newPriority} 
-                            onChange={(e) => setNewPriority(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddPriority()}
-                            className="h-8"
-                        />
-                        <Button size="icon" className="h-8 w-8" onClick={handleAddPriority}>
-                            <PlusCircle className="h-4 w-4" />
-                        </Button>
-                    </div>
                     <ScrollArea className="h-48 pr-3">
                         <ul className="space-y-2">
                             {topPriorities.map(priority => (
-                                <li key={priority.id} className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80">
-                                    <span className="text-sm font-medium text-foreground">{priority.text}</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeletePriority(priority.id)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                                <li key={priority.id}>
+                                    <EditablePriority
+                                        priority={priority}
+                                        onUpdate={handleUpdatePriority}
+                                        onDelete={handleDeletePriority}
+                                    />
                                 </li>
                             ))}
                         </ul>
