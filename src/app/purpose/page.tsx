@@ -655,50 +655,43 @@ function PurposePageContent() {
                                             <PlusCircle className="h-4 w-4 text-green-500"/>
                                         </Button>
                                     </div>
+                                    <Accordion type="single" collapsible className="w-full">
                                     <div className="space-y-2">
                                         {equationsForPillar.map(eq => {
                                             const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter((r): r is MetaRule => !!r);
                                             return (
-                                                <div key={eq.id} className="group relative">
-                                                    <div className="p-2 rounded-md border bg-muted/30">
-                                                        <div className="space-y-2">
-                                                            {rulesInEquation.map(rule => {
-                                                                if (!rule) return null;
-                                                                const pattern = patterns.find(p => p.id === rule.patternId);
-                                                                return (
-                                                                    <Card key={rule.id} className="bg-card">
-                                                                        <CardContent className="p-2 text-xs space-y-2">
-                                                                            <p className="font-medium text-primary cursor-pointer hover:underline" onClick={(e) => openRuleDetailPopup(rule.id, e)}>{rule.text}</p>
-                                                                            {pattern && (
-                                                                                <p className="text-muted-foreground italic">
-                                                                                    <FormattedPatternName name={pattern.name} type={pattern.type} />
-                                                                                </p>
-                                                                            )}
-                                                                        </CardContent>
-                                                                    </Card>
-                                                                )
-                                                            })}
-                                                        </div>
-                                                        <p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold">
+                                                <AccordionItem value={eq.id} key={eq.id} className="border p-2 rounded-md bg-muted/30">
+                                                    <AccordionTrigger className="text-sm font-semibold hover:no-underline p-0 flex justify-between w-full">
+                                                        <div className="flex items-center gap-2">
                                                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                                             <span>{eq.outcome}</span>
-                                                        </p>
-                                                    </div>
-                                                     <div className="absolute top-1 right-1 flex opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
-                                                            <Edit className="h-3 w-3" />
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
-                                                            <Trash2 className="h-3 w-3 text-destructive"/>
-                                                        </Button>
-                                                    </div>
-                                                </div>
+                                                        </div>
+                                                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
+                                                                <Edit className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteEquation(pillar.name, eq.id); }}>
+                                                                <Trash2 className="h-3 w-3 text-destructive"/>
+                                                            </Button>
+                                                        </div>
+                                                    </AccordionTrigger>
+                                                    <AccordionContent className="pt-2">
+                                                        <div className="space-y-1 pl-2 border-l-2 ml-2">
+                                                            {rulesInEquation.map(rule => (
+                                                                <button key={rule.id} className="text-left text-xs text-muted-foreground hover:text-primary w-full p-1 rounded" onClick={(e) => openRuleDetailPopup(rule.id, e)}>
+                                                                    {rule.text}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </AccordionContent>
+                                                </AccordionItem>
                                             )
                                         })}
                                         {equationsForPillar.length === 0 && (
                                             <p className="text-xs text-muted-foreground text-center py-4">No equations defined.</p>
                                         )}
                                     </div>
+                                    </Accordion>
                                 </div>
                             </CardContent>
                         </Card>
@@ -933,5 +926,6 @@ export default function PurposePage() {
         </AuthGuard>
     );
 }
+
 
 
