@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Workflow, ArrowRight } from 'lucide-react';
+import { Workflow, ArrowRight, ChevronLeft } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import type { HabitEquation, MetaRule } from '@/types/workout';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -96,13 +96,14 @@ export function RuleEquationsCard() {
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="pb-2 pl-6 pr-2">
-                                        <ul className="list-disc list-inside space-y-1 p-2 rounded-md border bg-muted/30">
+                                        <ul className="space-y-1 p-2 rounded-md border bg-muted/30">
                                             {(equation.metaRuleIds || []).map(ruleId => {
                                                 const rule = metaRules.find(r => r.id === ruleId);
                                                 return rule ? (
-                                                    <li key={ruleId} className="text-xs">
+                                                    <li key={ruleId} className="flex items-start">
+                                                        <span className="mr-2 mt-1">•</span>
                                                         <button
-                                                            className="text-left text-muted-foreground hover:text-primary"
+                                                            className="text-left text-xs text-muted-foreground hover:text-primary w-full rounded"
                                                             onClick={(e) => openRuleDetailPopup(rule.id, e)}
                                                         >
                                                             {rule.text}
