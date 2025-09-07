@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
@@ -24,6 +23,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { EquationEditor } from '@/app/purpose/page';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 const PISTON_ICONS: Record<PistonType, React.ReactNode> = {
@@ -246,7 +246,6 @@ const QuickAccessView = () => {
 
 const RuleEquationsView = () => {
     const { pillarEquations, setPillarEquations, metaRules } = useAuth();
-    const [isAddEquationOpen, setIsAddEquationOpen] = useState(false);
     const [viewEquationState, setViewEquationState] = useState<{ isOpen: boolean; equation?: HabitEquation; pillar?: string }>({ isOpen: false });
 
     return (
@@ -258,31 +257,32 @@ const RuleEquationsView = () => {
                 </Button>
             </div>
             <ScrollArea className="h-80 pr-2">
-                <div className="space-y-4">
+                <Accordion type="multiple" className="w-full space-y-2">
                     {Object.entries(pillarEquations).map(([pillar, equations]) => (
-                        <div key={pillar}>
-                            <h4 className="font-medium text-sm mb-1">{pillar}</h4>
-                            <div className="space-y-2">
-                                {equations.map(eq => (
-                                    <Card key={eq.id} className="bg-muted/30 p-3 group relative">
-                                        <ul className="list-disc list-inside text-xs space-y-1">
-                                            {(eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)?.text).filter(Boolean).map(text => <li key={text}>{text}</li>)}
-                                        </ul>
-                                        <p className="flex items-center gap-1 mt-2 pt-2 border-t text-sm font-semibold">
-                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                            <span>{eq.outcome}</span>
-                                        </p>
-                                        <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setViewEquationState({ isOpen: true, equation: eq, pillar })}>
-                                                <View className="h-4 w-4" />
-                                            </Button>
+                        <React.Fragment key={pillar}>
+                            {equations.map(eq => (
+                                <AccordionItem value={eq.id} key={eq.id} className="border-none">
+                                    <AccordionTrigger className="p-2 rounded-md bg-muted/30 hover:no-underline hover:bg-muted/50 text-left">
+                                        <div className="flex items-center gap-2 w-full">
+                                            <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
+                                            <div className="flex-grow">
+                                                <p className="text-sm font-semibold">{eq.outcome}</p>
+                                                <p className="text-xs text-muted-foreground">{pillar}</p>
+                                            </div>
                                         </div>
-                                    </Card>
-                                ))}
-                            </div>
-                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pt-2">
+                                        <div className="pl-4 border-l-2 ml-4">
+                                            <ul className="list-disc list-inside text-xs space-y-1 bg-background p-2 rounded-md border">
+                                                {(eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)?.text).filter(Boolean).map(text => <li key={text}>{text}</li>)}
+                                            </ul>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </React.Fragment>
                     ))}
-                </div>
+                </Accordion>
             </ScrollArea>
             
             <EquationEditor
