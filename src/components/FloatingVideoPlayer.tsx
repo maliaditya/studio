@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export function FloatingVideoPlayer() {
-  const { floatingVideoUrl, setFloatingVideoUrl } = useAuth();
+  const { floatingVideoUrl, setFloatingVideoUrl, floatingVideoPlaylist, setFloatingVideoPlaylist } = useAuth();
   
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -26,10 +26,12 @@ export function FloatingVideoPlayer() {
     if (!url) return false;
     return /youtube\.com|youtu\.be/.test(url);
   };
+  
+  const currentUrl = floatingVideoPlaylist.length > 0 ? floatingVideoPlaylist[0] : floatingVideoUrl;
 
   useEffect(() => {
-    if (floatingVideoUrl) {
-      const isVideo = isYoutubeUrl(floatingVideoUrl);
+    if (currentUrl) {
+      const isVideo = isYoutubeUrl(currentUrl);
       const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 448 : 600);
       const initialHeight = initialWidth * (isVideo ? 9/16 : 4/3);
       
@@ -39,7 +41,7 @@ export function FloatingVideoPlayer() {
       setSize({ width: initialWidth, height: initialHeight });
       setPosition({ x: initialX, y: initialY });
     }
-  }, [floatingVideoUrl]);
+  }, [currentUrl]);
 
   const handleDragMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, a')) return;
@@ -74,7 +76,7 @@ export function FloatingVideoPlayer() {
       
       const newWidth = Math.max(320, resizeStart.width + dx);
       // For videos, maintain aspect ratio. For other content, allow free resize.
-      const newHeight = isYoutubeUrl(floatingVideoUrl) 
+      const newHeight = isYoutubeUrl(currentUrl) 
         ? newWidth * (9 / 16) 
         : Math.max(200, resizeStart.height + dy);
       
@@ -89,6 +91,15 @@ export function FloatingVideoPlayer() {
     setIsDragging(false);
     setIsResizing(false);
   };
+  
+  const handleVideoEnded = () => {
+    if (floatingVideoPlaylist.length > 1) {
+      setFloatingVideoPlaylist(prev => prev.slice(1));
+    } else {
+      setFloatingVideoUrl(null);
+      setFloatingVideoPlaylist([]);
+    }
+  };
 
   useEffect(() => {
     if (isDragging || isResizing) {
@@ -102,19 +113,20 @@ export function FloatingVideoPlayer() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, isResizing, dragStartOffset, resizeStart, floatingVideoUrl]);
+  }, [isDragging, isResizing, dragStartOffset, resizeStart, currentUrl]);
 
   const renderContent = () => {
-    if (!floatingVideoUrl) return null;
+    if (!currentUrl) return null;
 
-    if (isYoutubeUrl(floatingVideoUrl)) {
+    if (isYoutubeUrl(currentUrl)) {
       return (
         <ReactPlayer
-          url={floatingVideoUrl}
+          url={currentUrl}
           width="100%"
           height="100%"
           playing={true}
           controls={true}
+          onEnded={handleVideoEnded}
           config={{
             youtube: {
               playerVars: {
@@ -131,7 +143,7 @@ export function FloatingVideoPlayer() {
     // Fallback for any other URL (like Obsidian notes)
     return (
         <iframe
-            src={floatingVideoUrl}
+            src={currentUrl}
             className="w-full h-full border-0 bg-background"
             title="Floating Content"
             sandbox="allow-scripts allow-same-origin allow-forms"
@@ -141,7 +153,7 @@ export function FloatingVideoPlayer() {
 
   return (
     <AnimatePresence>
-      {floatingVideoUrl && (
+      {currentUrl && (
         <motion.div
           className="fixed z-[99]"
           style={{
@@ -157,12 +169,12 @@ export function FloatingVideoPlayer() {
         >
           <Card className={cn(
               "shadow-2xl overflow-hidden rounded-xl w-full h-full relative",
-              isYoutubeUrl(floatingVideoUrl) ? "bg-black/80" : "bg-card border"
+              isYoutubeUrl(currentUrl) ? "bg-black/80" : "bg-card border"
             )}>
             <div
               className={cn(
                   "absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-black/60 to-transparent p-1.5 flex items-start justify-between z-10",
-                   !isYoutubeUrl(floatingVideoUrl) && "cursor-grab active:cursor-grabbing"
+                   !isYoutubeUrl(currentUrl) && "cursor-grab active:cursor-grabbing"
                 )}
               onMouseDown={handleDragMouseDown}
             >
@@ -174,10 +186,10 @@ export function FloatingVideoPlayer() {
                     size="icon"
                     className={cn(
                         "h-7 w-7",
-                        isYoutubeUrl(floatingVideoUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
+                        isYoutubeUrl(currentUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
                     )}
                 >
-                    <a href={floatingVideoUrl} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                    <a href={currentUrl} target="_blank" rel="noopener noreferrer" title="Open in new tab">
                         <ExternalLink className="h-4 w-4" />
                         <span className="sr-only">Open in new tab</span>
                     </a>
@@ -187,23 +199,23 @@ export function FloatingVideoPlayer() {
                     size="icon"
                     className={cn(
                         "h-7 w-7",
-                        isYoutubeUrl(floatingVideoUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
+                        isYoutubeUrl(currentUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
                     )}
-                    onClick={() => setFloatingVideoUrl(null)}
+                    onClick={() => { setFloatingVideoUrl(null); setFloatingVideoPlaylist([]); }}
                 >
                     <X className="h-4 w-4" />
                     <span className="sr-only">Close Player</span>
                 </Button>
               </div>
             </div>
-            <CardContent className={cn("p-0 w-full h-full", isYoutubeUrl(floatingVideoUrl) ? "bg-black" : "bg-background")}>
+            <CardContent className={cn("p-0 w-full h-full", isYoutubeUrl(currentUrl) ? "bg-black" : "bg-background")}>
               {renderContent()}
             </CardContent>
              <div
                 onMouseDown={handleResizeMouseDown}
                 className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-10"
                 style={{
-                    borderBottom: `8px solid hsl(var(${isYoutubeUrl(floatingVideoUrl) ? "--border" : "--accent"}) / 0.5)`,
+                    borderBottom: `8px solid hsl(var(${isYoutubeUrl(currentUrl) ? "--border" : "--accent"}) / 0.5)`,
                     borderLeft: '8px solid transparent',
                 }}
             />

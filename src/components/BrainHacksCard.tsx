@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { BrainHack } from '@/types/workout';
@@ -121,7 +121,7 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 EditableBrainHack.displayName = 'EditableBrainHack';
 
 export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?: string | null, initialPosition?: { x: number, y: number } }) {
-    const { brainHacks, setBrainHacks, setFloatingVideoUrl } = useAuth();
+    const { brainHacks, setBrainHacks, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
@@ -155,6 +155,25 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     const currentHacks = React.useMemo(() => {
         return brainHacks.filter(h => h.parentId === parentId);
     }, [brainHacks, parentId]);
+    
+    const youtubeLinks = React.useMemo(() => {
+        return currentHacks
+            .filter(h => h.type === 'link' && h.link && /youtube\.com|youtu\.be/.test(h.link))
+            .map(h => h.link!);
+    }, [currentHacks]);
+
+    const handlePlayAll = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (youtubeLinks.length > 0) {
+            setFloatingVideoPlaylist(youtubeLinks);
+        } else {
+            toast({
+                title: "No Videos",
+                description: "There are no YouTube videos in this list to play.",
+            });
+        }
+    };
+
 
     const handleAddHack = (type: 'hack' | 'link' = 'hack') => {
         const newHack: BrainHack = {
@@ -216,7 +235,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         toast({ title: 'Brain Hack updated!' });
     };
 
-    const handleOpenNestedPopup = (hack: BrainHack, event: React.MouseEvent) => {
+    const handleHackClick = (hack: BrainHack, event: React.MouseEvent) => {
         event.stopPropagation();
         if (openChildPopups[hack.id]) {
              setOpenChildPopups(prev => {
@@ -329,6 +348,11 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                 {parentHack ? parentHack.text : 'Brain Hacks'}
                             </CardTitle>
                             <div className="flex items-center">
+                                {youtubeLinks.length > 0 && (
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handlePlayAll}>
+                                        <Play className="h-4 w-4 text-green-500" />
+                                    </Button>
+                                )}
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAddHack('link')}>
                                     <LinkIcon className="h-4 w-4 text-blue-500" />
                                 </Button>
@@ -347,7 +371,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                             hack={hack}
                                             onUpdate={handleUpdateHack}
                                             onDelete={handleDeleteHack}
-                                            onOpenNested={handleOpenNestedPopup}
+                                            onOpenNested={handleHackClick}
                                             onOpenLink={handleOpenLink}
                                             onEditLinkText={handleEditLinkText}
                                         />

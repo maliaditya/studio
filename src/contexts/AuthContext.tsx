@@ -73,6 +73,8 @@ interface AuthContextType {
   setTheme: React.Dispatch<React.SetStateAction<string>>;
   floatingVideoUrl: string | null;
   setFloatingVideoUrl: React.Dispatch<React.SetStateAction<string | null>>;
+  floatingVideoPlaylist: string[];
+  setFloatingVideoPlaylist: React.Dispatch<React.SetStateAction<string[]>>;
   isAudioPlaying: boolean;
   setIsAudioPlaying: React.Dispatch<React.SetStateAction<boolean>>;
   globalVolume: number;
@@ -384,6 +386,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
   const [theme, setThemeState] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
+  const [floatingVideoPlaylist, setFloatingVideoPlaylist] = useState<string[]>([]);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [globalVolume, setGlobalVolume] = useState(0.2);
   const router = useRouter();
@@ -2707,6 +2710,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken,
     theme, setTheme,
     floatingVideoUrl, setFloatingVideoUrl,
+    floatingVideoPlaylist, setFloatingVideoPlaylist,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
     settings, setSettings,

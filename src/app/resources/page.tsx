@@ -406,8 +406,9 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
                 point={point}
                 onUpdate={onUpdate}
                 onDelete={onDelete}
-                onEditLinkText={onEditLinkText}
+                onOpenNestedPopup={onOpenNestedPopup}
                 onOpenMarkdownModal={onOpenMarkdownModal}
+                onEditLinkText={onEditLinkText}
                 onConvertToCard={onConvertToCard}
                 dragHandle={{ attributes, listeners }}
             />
@@ -1770,12 +1771,17 @@ function ResourcesPageContent() {
         <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit Link Display Text</DialogTitle>
+                    <DialogTitle>Edit Link Text</DialogTitle>
+                    <DialogDescription>
+                        Change the display text for this link. The original URL will be preserved.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                     <Label htmlFor="display-text">Display Text</Label>
                     <Input id="display-text" value={currentDisplayText} onChange={(e) => setCurrentDisplayText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveLinkText()} autoFocus />
-                    <p className="text-xs text-muted-foreground mt-2">Original URL: {linkTextDialog?.point.text}</p>
+                    <p className="text-xs text-muted-foreground mt-2 truncate">
+                        URL: {linkTextDialog?.point.text}
+                    </p>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
@@ -1790,7 +1796,7 @@ function ResourcesPageContent() {
 
 const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
-    onUpdate: (updatedText: string) => void, 
+    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenMarkdownModal: () => void;
@@ -1821,19 +1827,17 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                 });
                 const result = await response.json();
                 if (response.ok) {
-                    onUpdate(editText.trim());
-                    // This is tricky because the parent handles the state update.
-                    // A better approach would be to have `onUpdate` handle the whole object.
+                    onUpdate(point.id, { text: editText.trim(), displayText: result.title || editText.trim() });
                 } else {
-                    onUpdate(editText.trim());
+                     onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
                 }
             } catch (error) {
-                onUpdate(editText.trim());
+                onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
             } finally {
                 setIsFetchingMeta(false);
             }
         } else {
-            onUpdate(editText.trim());
+            onUpdate(point.id, { text: editText.trim() });
         }
         setIsEditing(false);
     };
@@ -1929,6 +1933,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
