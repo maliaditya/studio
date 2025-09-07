@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
     hack: BrainHack;
@@ -25,19 +26,26 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
     onEditLinkText: (hack: BrainHack) => void;
 }) => {
     const [text, setText] = useState(hack.text);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [isFetching, setIsFetching] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
         if (hack.text === "New Brain Hack" || hack.text === "https://example.com") {
-            inputRef.current?.select();
+            textareaRef.current?.select();
         }
     }, [hack.text]);
     
     useEffect(() => {
         setText(hack.type === 'link' ? (hack.link || '') : hack.text);
     }, [hack.type, hack.text, hack.link]);
+    
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [text]);
 
     const handleBlur = async () => {
         const newText = text.trim();
@@ -55,14 +63,14 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
         }
     };
     
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter') {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
             handleBlur();
             e.preventDefault();
         } else if (e.key === 'Escape') {
             setText(hack.type === 'link' ? (hack.link || '') : hack.text);
             e.preventDefault();
-            (e.target as HTMLInputElement).blur();
+            (e.target as HTMLTextAreaElement).blur();
         }
     };
 
@@ -91,20 +99,23 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 
     return (
         <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
-            {isFetching ? (
-                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-                hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 mr-2" /> : null
-            )}
-            <Input
-                ref={inputRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
-                placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
-            />
+            <div className="flex items-center gap-2 flex-grow min-w-0">
+                {isFetching ? (
+                     <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                ) : (
+                    hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
+                )}
+                <Textarea
+                    ref={textareaRef}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    onBlur={handleBlur}
+                    onKeyDown={handleKeyDown}
+                    className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden"
+                    placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
+                    rows={1}
+                />
+            </div>
             <div className="flex items-center flex-shrink-0">
                 {hack.type !== 'link' && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
@@ -262,7 +273,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, input, [role="button"]')) {
+        if (target.closest('button, input, textarea, [role="button"]')) {
             return;
         }
         setIsDragging(true);
@@ -415,3 +426,4 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         </>
     );
 }
+
