@@ -13,11 +13,11 @@ import { BrainHack } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onClick }: {
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested }: {
     hack: BrainHack;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
-    onClick: (e: React.MouseEvent) => void;
+    onOpenNested: (hack: BrainHack, event: React.MouseEvent) => void;
 }) => {
     const [text, setText] = useState(hack.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +63,7 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onClick }: {
                 className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
             />
             <div className="flex items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={onClick}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
                     <GitBranch className="h-3 w-3 text-blue-500" />
                 </Button>
                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
@@ -94,7 +94,8 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             if (savedPosition) {
                 setPosition(JSON.parse(savedPosition));
             } else {
-                setPosition({ x: window.innerWidth - 340, y: 250 });
+                const x = typeof window !== 'undefined' ? window.innerWidth - 340 : 1000;
+                setPosition({ x, y: 250 });
             }
         }
     }, [parentId, initialPosition]);
@@ -136,7 +137,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         toast({ title: 'Brain Hack updated!' });
     };
 
-    const handleHackClick = (hack: BrainHack, event: React.MouseEvent) => {
+    const handleOpenNestedPopup = (hack: BrainHack, event: React.MouseEvent) => {
         event.stopPropagation();
         if (openChildPopups[hack.id]) {
              setOpenChildPopups(prev => {
@@ -249,7 +250,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                             hack={hack}
                                             onUpdate={handleUpdateHack}
                                             onDelete={handleDeleteHack}
-                                            onClick={(e) => handleHackClick(hack, e)}
+                                            onOpenNested={handleOpenNestedPopup}
                                         />
                                     </li>
                                 ))}
