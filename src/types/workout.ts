@@ -628,6 +628,12 @@ export interface BrainHack {
   displayText?: string;
 }
 
+export interface PipState {
+    isOpen: boolean;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+}
+
 export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;

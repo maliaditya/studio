@@ -11,13 +11,17 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export function FloatingVideoPlayer() {
-  const { floatingVideoUrl, setFloatingVideoUrl, floatingVideoPlaylist, setFloatingVideoPlaylist } = useAuth();
+  const { 
+    floatingVideoUrl, 
+    setFloatingVideoUrl, 
+    floatingVideoPlaylist, 
+    setFloatingVideoPlaylist,
+    pipState,
+    setPipState,
+  } = useAuth();
   
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  
-  const [position, setPosition] = useState({ x: 20, y: 80 });
-  const [size, setSize] = useState({ width: 448, height: 252 });
   
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
@@ -30,7 +34,7 @@ export function FloatingVideoPlayer() {
   const currentUrl = floatingVideoPlaylist.length > 0 ? floatingVideoPlaylist[0] : floatingVideoUrl;
 
   useEffect(() => {
-    if (currentUrl) {
+    if (currentUrl && !pipState.isOpen) {
       const isVideo = isYoutubeUrl(currentUrl);
       const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 448 : 600);
       const initialHeight = initialWidth * (isVideo ? 9/16 : 4/3);
@@ -38,17 +42,22 @@ export function FloatingVideoPlayer() {
       const initialX = window.innerWidth - initialWidth - 20;
       const initialY = window.innerHeight - initialHeight - 80;
       
-      setSize({ width: initialWidth, height: initialHeight });
-      setPosition({ x: initialX, y: initialY });
+      setPipState({
+        isOpen: true,
+        size: { width: initialWidth, height: initialHeight },
+        position: { x: initialX, y: initialY },
+      });
+    } else if (currentUrl) {
+      setPipState(prev => ({...prev, isOpen: true}));
     }
-  }, [currentUrl]);
+  }, [currentUrl, pipState.isOpen, setPipState]);
 
   const handleDragMouseDown = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button, a')) return;
     setIsDragging(true);
     setDragStartOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
+      x: e.clientX - pipState.position.x,
+      y: e.clientY - pipState.position.y,
     });
   };
   
@@ -58,32 +67,36 @@ export function FloatingVideoPlayer() {
     setResizeStart({
         x: e.clientX,
         y: e.clientY,
-        width: size.width,
-        height: size.height,
+        width: pipState.size.width,
+        height: pipState.size.height,
     });
   };
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStartOffset.x,
-        y: e.clientY - dragStartOffset.y,
-      });
+        setPipState(prev => ({
+            ...prev,
+            position: {
+                x: e.clientX - dragStartOffset.x,
+                y: e.clientY - dragStartOffset.y,
+            }
+        }));
     }
     if (isResizing) {
       const dx = e.clientX - resizeStart.x;
-      const dy = e.clientY - resizeStart.y;
       
       const newWidth = Math.max(320, resizeStart.width + dx);
-      // For videos, maintain aspect ratio. For other content, allow free resize.
       const newHeight = isYoutubeUrl(currentUrl) 
         ? newWidth * (9 / 16) 
-        : Math.max(200, resizeStart.height + dy);
+        : Math.max(200, resizeStart.height);
       
-      setSize({
-        width: newWidth,
-        height: newHeight,
-      });
+      setPipState(prev => ({
+          ...prev,
+          size: {
+            width: newWidth,
+            height: newHeight,
+          }
+      }));
     }
   };
 
@@ -98,6 +111,7 @@ export function FloatingVideoPlayer() {
     } else {
       setFloatingVideoUrl(null);
       setFloatingVideoPlaylist([]);
+      setPipState(prev => ({...prev, isOpen: false}));
     }
   };
 
@@ -113,7 +127,7 @@ export function FloatingVideoPlayer() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDragging, isResizing, dragStartOffset, resizeStart, currentUrl]);
+  }, [isDragging, isResizing, dragStartOffset, resizeStart, currentUrl, setPipState]);
 
   const renderContent = () => {
     if (!currentUrl) return null;
@@ -140,7 +154,6 @@ export function FloatingVideoPlayer() {
       );
     }
 
-    // Fallback for any other URL (like Obsidian notes)
     return (
         <iframe
             src={currentUrl}
@@ -153,14 +166,14 @@ export function FloatingVideoPlayer() {
 
   return (
     <AnimatePresence>
-      {currentUrl && (
+      {pipState.isOpen && currentUrl && (
         <motion.div
           className="fixed z-[99]"
           style={{
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            width: `${size.width}px`,
-            height: `${size.height}px`,
+            left: `${pipState.position.x}px`,
+            top: `${pipState.position.y}px`,
+            width: `${pipState.size.width}px`,
+            height: `${pipState.size.height}px`,
             userSelect: isDragging || isResizing ? 'none' : 'auto',
           }}
           initial={{ opacity: 0, scale: 0.9 }}
@@ -201,7 +214,7 @@ export function FloatingVideoPlayer() {
                         "h-7 w-7",
                         isYoutubeUrl(currentUrl) ? "text-white/80 hover:bg-white/20 hover:text-white" : "hover:bg-accent"
                     )}
-                    onClick={() => { setFloatingVideoUrl(null); setFloatingVideoPlaylist([]); }}
+                    onClick={() => { setFloatingVideoUrl(null); setFloatingVideoPlaylist([]); setPipState(prev => ({...prev, isOpen: false})); }}
                 >
                     <X className="h-4 w-4" />
                     <span className="sr-only">Close Player</span>
