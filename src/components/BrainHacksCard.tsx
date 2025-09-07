@@ -13,13 +13,16 @@ import { BrainHack } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 
-const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink }: {
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
     hack: BrainHack;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
     onOpenNested: (hack: BrainHack, event: React.MouseEvent) => void;
     onOpenLink: (url: string) => void;
+    onEditLinkText: (hack: BrainHack) => void;
 }) => {
     const [text, setText] = useState(hack.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -70,6 +73,10 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 <button 
                     className="text-sm font-medium w-full text-left truncate text-primary hover:underline"
                     onClick={() => onOpenLink(hack.link!)}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        onEditLinkText(hack);
+                    }}
                 >
                     {hack.displayText || hack.link}
                 </button>
@@ -123,6 +130,9 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
     const [openChildPopups, setOpenChildPopups] = useState<Record<string, {x: number, y: number}>>({});
     
+    const [linkTextDialog, setLinkTextDialog] = useState<{hack: BrainHack} | null>(null);
+    const [currentDisplayText, setCurrentDisplayText] = useState('');
+
     const cardRef = useRef<HTMLDivElement>(null);
     
     const parentHack = parentId ? brainHacks.find(h => h.id === parentId) : null;
@@ -272,6 +282,20 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
           window.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isDragging, dragStartOffset, parentId, position]);
+
+    const handleEditLinkText = (hack: BrainHack) => {
+        setCurrentDisplayText(hack.displayText || hack.link || '');
+        setLinkTextDialog({ hack });
+    };
+
+    const handleSaveLinkText = () => {
+        if (!linkTextDialog) return;
+        setBrainHacks(prev => prev.map(h => 
+            h.id === linkTextDialog.hack.id ? { ...h, displayText: currentDisplayText.trim() } : h
+        ));
+        setLinkTextDialog(null);
+        setCurrentDisplayText('');
+    };
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -325,6 +349,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                             onDelete={handleDeleteHack}
                                             onOpenNested={handleOpenNestedPopup}
                                             onOpenLink={handleOpenLink}
+                                            onEditLinkText={handleEditLinkText}
                                         />
                                     </li>
                                 ))}
@@ -336,6 +361,33 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             {Object.entries(openChildPopups).map(([hackId, pos]) => (
                 <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
             ))}
+            <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Edit Link Text</DialogTitle>
+                        <DialogDescription>
+                            Change the display text for this link. The original URL will be preserved.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label htmlFor="display-text">Display Text</Label>
+                        <Input 
+                            id="display-text" 
+                            value={currentDisplayText}
+                            onChange={(e) => setCurrentDisplayText(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSaveLinkText()}
+                            autoFocus
+                        />
+                        <p className="text-xs text-muted-foreground mt-2 truncate">
+                            URL: {linkTextDialog?.hack.link}
+                        </p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                        <Button onClick={handleSaveLinkText}>Save</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }
