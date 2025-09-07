@@ -623,6 +623,9 @@ export interface BrainHack {
   id: string;
   text: string;
   parentId?: string | null;
+  type?: 'hack' | 'link';
+  link?: string;
+  displayText?: string;
 }
 
 export interface UserSettings {

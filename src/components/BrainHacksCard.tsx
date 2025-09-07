@@ -6,37 +6,48 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { BrainHack } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
-const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested }: {
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink }: {
     hack: BrainHack;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
     onOpenNested: (hack: BrainHack, event: React.MouseEvent) => void;
+    onOpenLink: (url: string) => void;
 }) => {
     const [text, setText] = useState(hack.text);
     const inputRef = useRef<HTMLInputElement>(null);
+    const [isFetching, setIsFetching] = useState(false);
+    const { toast } = useToast();
 
     useEffect(() => {
-        if (hack.text === "New Brain Hack") {
+        if (hack.text === "New Brain Hack" || hack.text === "https://example.com") {
             inputRef.current?.select();
         }
     }, [hack.text]);
     
     useEffect(() => {
-        setText(hack.text);
-    }, [hack.text]);
+        setText(hack.type === 'link' ? (hack.link || '') : hack.text);
+    }, [hack.type, hack.text, hack.link]);
 
-    const handleBlur = () => {
+    const handleBlur = async () => {
         const newText = text.trim();
         if (newText === '') {
             onDelete(hack.id);
-        } else if (newText !== hack.text) {
+            return;
+        }
+
+        if (hack.type === 'link' && newText !== hack.link) {
+            setIsFetching(true);
+            onUpdate(hack.id, newText);
+            setIsFetching(false);
+        } else if (hack.type === 'hack' && newText !== hack.text) {
             onUpdate(hack.id, newText);
         }
     };
@@ -46,14 +57,38 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested }
             handleBlur();
             e.preventDefault();
         } else if (e.key === 'Escape') {
-            setText(hack.text); // Revert changes
+            setText(hack.type === 'link' ? (hack.link || '') : hack.text);
             e.preventDefault();
             (e.target as HTMLInputElement).blur();
         }
     };
 
+    if (hack.type === 'link' && !isFetching && hack.displayText) {
+        return (
+             <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+                <Globe className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
+                <button 
+                    className="text-sm font-medium w-full text-left truncate text-primary hover:underline"
+                    onClick={() => onOpenLink(hack.link!)}
+                >
+                    {hack.displayText || hack.link}
+                </button>
+                <div className="flex items-center flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+            {isFetching ? (
+                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+                hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 mr-2" /> : null
+            )}
             <Input
                 ref={inputRef}
                 value={text}
@@ -61,11 +96,14 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested }
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
                 className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
+                placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
             />
             <div className="flex items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
-                    <GitBranch className="h-3 w-3 text-blue-500" />
-                </Button>
+                {hack.type !== 'link' && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
+                        <GitBranch className="h-3 w-3 text-blue-500" />
+                    </Button>
+                )}
                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
                     <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
@@ -76,7 +114,7 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested }
 EditableBrainHack.displayName = 'EditableBrainHack';
 
 export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?: string | null, initialPosition?: { x: number, y: number } }) {
-    const { brainHacks, setBrainHacks } = useAuth();
+    const { brainHacks, setBrainHacks, setFloatingVideoUrl } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
@@ -108,11 +146,13 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         return brainHacks.filter(h => h.parentId === parentId);
     }, [brainHacks, parentId]);
 
-    const handleAddHack = () => {
+    const handleAddHack = (type: 'hack' | 'link' = 'hack') => {
         const newHack: BrainHack = {
             id: `hack_${Date.now()}`,
-            text: "New Brain Hack",
+            text: type === 'link' ? "https://example.com" : "New Brain Hack",
+            type: type,
             parentId: parentId,
+            link: type === 'link' ? 'https://example.com' : undefined,
         };
         setBrainHacks(prev => [...prev, newHack]);
     };
@@ -136,8 +176,33 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         });
     };
 
-    const handleUpdateHack = (id: string, newText: string) => {
-        setBrainHacks(prev => prev.map(p => p.id === id ? { ...p, text: newText } : p));
+    const handleUpdateHack = async (id: string, newText: string) => {
+        const hackToUpdate = brainHacks.find(h => h.id === id);
+        if (!hackToUpdate) return;
+    
+        let updatedHack: BrainHack = { ...hackToUpdate, text: newText.trim() };
+    
+        if (hackToUpdate.type === 'link') {
+            updatedHack.link = newText.trim();
+            try {
+                const response = await fetch('/api/get-link-metadata', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: newText.trim() }),
+                });
+                const data = await response.json();
+                if (response.ok && data.title) {
+                    updatedHack.displayText = data.title;
+                } else {
+                    updatedHack.displayText = newText.trim();
+                }
+            } catch (error) {
+                console.error("Failed to fetch link metadata", error);
+                updatedHack.displayText = newText.trim();
+            }
+        }
+    
+        setBrainHacks(prev => prev.map(h => (h.id === id ? updatedHack : h)));
         toast({ title: 'Brain Hack updated!' });
     };
 
@@ -160,6 +225,10 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             ...prev,
             [hack.id]: {x: initialX, y: initialY}
         }));
+    };
+
+    const handleOpenLink = (url: string) => {
+        setFloatingVideoUrl(url);
     };
     
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -235,9 +304,14 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                 <Brain className="h-5 w-5 text-purple-500" />
                                 {parentHack ? parentHack.text : 'Brain Hacks'}
                             </CardTitle>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleAddHack}>
-                                <PlusCircle className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center">
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAddHack('link')}>
+                                    <LinkIcon className="h-4 w-4 text-blue-500" />
+                                </Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAddHack('hack')}>
+                                    <PlusCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                            </div>
                         </CardHeader>
                     </div>
                     <CardContent className="p-0">
@@ -250,6 +324,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                             onUpdate={handleUpdateHack}
                                             onDelete={handleDeleteHack}
                                             onOpenNested={handleOpenNestedPopup}
+                                            onOpenLink={handleOpenLink}
                                         />
                                     </li>
                                 ))}
