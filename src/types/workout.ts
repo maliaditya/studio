@@ -615,6 +615,7 @@ export interface MissedSlotReview {
 export interface Priority {
   id: string;
   text: string;
+  completed: boolean;
 }
 
 export interface UserSettings {

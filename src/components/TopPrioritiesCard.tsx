@@ -1,8 +1,9 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -12,11 +13,13 @@ import { Input } from './ui/input';
 import { Priority } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from './ui/checkbox';
 
-const EditablePriority = React.memo(({ priority, onUpdate, onDelete }: {
+const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle }: {
     priority: Priority;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
+    onToggle: (id: string) => void;
 }) => {
     const [text, setText] = useState(priority.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -53,13 +56,19 @@ const EditablePriority = React.memo(({ priority, onUpdate, onDelete }: {
 
     return (
         <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+            <Checkbox
+                checked={priority.completed}
+                onCheckedChange={() => onToggle(priority.id)}
+                className="mr-2"
+                aria-label={`Mark priority ${priority.text} as ${priority.completed ? 'not completed' : 'completed'}`}
+            />
             <Input
                 ref={inputRef}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
+                className={cn("h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full", priority.completed && "line-through text-muted-foreground")}
             />
             <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={() => onDelete(priority.id)}>
                 <Trash2 className="h-4 w-4 text-destructive" />
@@ -91,7 +100,8 @@ export function TopPrioritiesCard() {
     const handleAddPriority = () => {
         const newPriorityItem: Priority = {
             id: `priority_${Date.now()}`,
-            text: "New Priority"
+            text: "New Priority",
+            completed: false,
         };
         setTopPriorities(prev => [...prev, newPriorityItem]);
     };
@@ -104,10 +114,14 @@ export function TopPrioritiesCard() {
         setTopPriorities(prev => prev.map(p => p.id === id ? { ...p, text: newText } : p));
         toast({ title: 'Priority updated!' });
     };
+
+    const handleTogglePriority = (id: string) => {
+        setTopPriorities(prev => prev.map(p => p.id === id ? { ...p, completed: !p.completed } : p));
+    };
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, input')) {
+        if (target.closest('button, input, [role="checkbox"]')) {
             return;
         }
         setIsDragging(true);
@@ -188,6 +202,7 @@ export function TopPrioritiesCard() {
                                         priority={priority}
                                         onUpdate={handleUpdatePriority}
                                         onDelete={handleDeletePriority}
+                                        onToggle={handleTogglePriority}
                                     />
                                 </li>
                             ))}
