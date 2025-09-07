@@ -18,7 +18,7 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format, parseISO, isBefore, startOfToday, isAfter } from 'date-fns';
+import { format, parseISO, isAfter } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -655,17 +655,19 @@ function PurposePageContent() {
                                             <PlusCircle className="h-4 w-4 text-green-500"/>
                                         </Button>
                                     </div>
-                                    <Accordion type="single" collapsible className="w-full">
+                                    <Accordion type="multiple" className="w-full">
                                     <div className="space-y-2">
                                         {equationsForPillar.map(eq => {
                                             const rulesInEquation = (eq.metaRuleIds || []).map(id => metaRules.find(r => r.id === id)).filter((r): r is MetaRule => !!r);
                                             return (
                                                 <AccordionItem value={eq.id} key={eq.id} className="border p-2 rounded-md bg-muted/30">
-                                                    <AccordionTrigger className="text-sm font-semibold hover:no-underline p-0 flex justify-between w-full">
-                                                        <div className="flex items-center gap-2">
-                                                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                                                            <span>{eq.outcome}</span>
-                                                        </div>
+                                                    <div className="flex items-center group">
+                                                        <AccordionTrigger className="text-sm font-semibold hover:no-underline p-0 flex-grow text-left">
+                                                            <div className="flex items-center gap-2">
+                                                                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                                                                <span>{eq.outcome}</span>
+                                                            </div>
+                                                        </AccordionTrigger>
                                                         <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleOpenEquationPopup(pillar.name, eq); }}>
                                                                 <Edit className="h-3 w-3" />
@@ -674,7 +676,7 @@ function PurposePageContent() {
                                                                 <Trash2 className="h-3 w-3 text-destructive"/>
                                                             </Button>
                                                         </div>
-                                                    </AccordionTrigger>
+                                                    </div>
                                                     <AccordionContent className="pt-2">
                                                         <div className="space-y-1 pl-2 border-l-2 ml-2">
                                                             {rulesInEquation.map(rule => (
@@ -929,3 +931,6 @@ export default function PurposePage() {
 
 
 
+
+
+    
