@@ -86,6 +86,8 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     const [openChildPopups, setOpenChildPopups] = useState<Record<string, {x: number, y: number}>>({});
     
     const cardRef = useRef<HTMLDivElement>(null);
+    
+    const parentHack = parentId ? brainHacks.find(h => h.id === parentId) : null;
 
     useEffect(() => {
         setIsClient(true);
@@ -94,7 +96,6 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             if (savedPosition) {
                 setPosition(JSON.parse(savedPosition));
             } else {
-                // Check if window is defined before using it
                 if (typeof window !== 'undefined') {
                     const x = window.innerWidth - 340;
                     setPosition({ x, y: 250 });
@@ -214,12 +215,6 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     if (!isClient) {
         return null;
     }
-    
-    if (parentId !== null && currentHacks.length === 0 && Object.keys(openChildPopups).length === 0) {
-       // This logic prevents empty popups from lingering, but might be too aggressive.
-       // It could be removed if you want empty popups to stay open.
-    }
-
 
     return (
         <>
@@ -238,7 +233,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                         <CardHeader className="p-0 mb-3 flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base text-primary">
                                 <Brain className="h-5 w-5 text-purple-500" />
-                                Brain Hacks
+                                {parentHack ? parentHack.text : 'Brain Hacks'}
                             </CardTitle>
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleAddHack}>
                                 <PlusCircle className="h-4 w-4" />
