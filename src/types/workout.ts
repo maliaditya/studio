@@ -622,6 +622,7 @@ export interface Priority {
 export interface BrainHack {
   id: string;
   text: string;
+  parentId?: string | null;
 }
 
 export interface UserSettings {

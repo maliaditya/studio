@@ -1,9 +1,8 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -14,10 +13,11 @@ import { BrainHack } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
-const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete }: {
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onClick }: {
     hack: BrainHack;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
+    onClick: (e: React.MouseEvent) => void;
 }) => {
     const [text, setText] = useState(hack.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -60,10 +60,11 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete }: {
                 onChange={(e) => setText(e.target.value)}
                 onBlur={handleBlur}
                 onKeyDown={handleKeyDown}
-                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full"
+                onClick={onClick}
+                className="h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full cursor-pointer"
             />
             <div className="flex items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => onDelete(hack.id)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
                     <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
             </div>
@@ -72,40 +73,83 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete }: {
 });
 EditableBrainHack.displayName = 'EditableBrainHack';
 
-export function BrainHacksCard() {
+export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?: string | null, initialPosition?: { x: number, y: number } }) {
     const { brainHacks, setBrainHacks } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
-    const [position, setPosition] = useState({ x: 0, y: 0 });
+    // Initialize position with a safe default or the passed prop.
+    const [position, setPosition] = useState(initialPosition || { x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
+    const [openChildPopups, setOpenChildPopups] = useState<Record<string, {x: number, y: number}>>({});
+    
+    const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setIsClient(true);
-        const savedPosition = localStorage.getItem('brain_hacks_position');
-        if (savedPosition) {
-            setPosition(JSON.parse(savedPosition));
-        } else {
-            setPosition({ x: window.innerWidth - 340, y: 250 });
+        // Only set the default position from window if it's the root card and no initial position was provided.
+        if (parentId === null && !initialPosition) {
+            const savedPosition = localStorage.getItem('brain_hacks_position');
+            if (savedPosition) {
+                setPosition(JSON.parse(savedPosition));
+            } else {
+                setPosition({ x: window.innerWidth - 340, y: 250 });
+            }
         }
-    }, []);
+    }, [parentId, initialPosition]);
+    
+    const currentHacks = React.useMemo(() => {
+        return brainHacks.filter(h => h.parentId === parentId);
+    }, [brainHacks, parentId]);
 
     const handleAddHack = () => {
         const newHack: BrainHack = {
             id: `hack_${Date.now()}`,
             text: "New Brain Hack",
+            parentId: parentId,
         };
         setBrainHacks(prev => [...prev, newHack]);
     };
 
     const handleDeleteHack = (id: string) => {
-        setBrainHacks(prev => prev.filter(p => p.id !== id));
+        // Recursively find all children to delete
+        const idsToDelete = new Set<string>();
+        const queue = [id];
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (!idsToDelete.has(currentId)) {
+                idsToDelete.add(currentId);
+                const children = brainHacks.filter(h => h.parentId === currentId);
+                children.forEach(child => queue.push(child.id));
+            }
+        }
+        setBrainHacks(prev => prev.filter(p => !idsToDelete.has(p.id)));
+        setOpenChildPopups(prev => {
+            const newPopups = {...prev};
+            idsToDelete.forEach(deletedId => delete newPopups[deletedId]);
+            return newPopups;
+        });
     };
 
     const handleUpdateHack = (id: string, newText: string) => {
         setBrainHacks(prev => prev.map(p => p.id === id ? { ...p, text: newText } : p));
         toast({ title: 'Brain Hack updated!' });
+    };
+
+    const handleHackClick = (hack: BrainHack, event: React.MouseEvent) => {
+        if (openChildPopups[hack.id]) {
+            return;
+        }
+
+        const parentRect = cardRef.current?.getBoundingClientRect();
+        const initialX = parentRect ? parentRect.right + 20 : event.clientX + 20;
+        const initialY = parentRect ? parentRect.top : event.clientY;
+
+        setOpenChildPopups(prev => ({
+            ...prev,
+            [hack.id]: {x: initialX, y: initialY}
+        }));
     };
     
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -131,7 +175,9 @@ export function BrainHacksCard() {
     
     const handleMouseUp = () => {
         setIsDragging(false);
-        localStorage.setItem('brain_hacks_position', JSON.stringify(position));
+        if (parentId === null) {
+            localStorage.setItem('brain_hacks_position', JSON.stringify(position));
+        }
     };
 
     useEffect(() => {
@@ -146,7 +192,7 @@ export function BrainHacksCard() {
           window.removeEventListener('mousemove', handleMouseMove);
           window.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDragging, dragStartOffset]);
+    }, [isDragging, dragStartOffset, parentId, position]);
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -159,45 +205,59 @@ export function BrainHacksCard() {
     if (!isClient) {
         return null;
     }
+    
+    if (parentId !== null && currentHacks.length === 0) {
+       // Hide empty child popups to prevent them from becoming permanent orphans
+       // A more robust solution might involve a close button
+       return null;
+    }
+
 
     return (
-        <motion.div
-            style={style}
-            className="fixed w-full max-w-xs z-50"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            onMouseDown={handleMouseDown}
-        >
-            <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                <div className="cursor-grab active:cursor-grabbing">
-                    <CardHeader className="p-0 mb-3 flex flex-row items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-base text-primary">
-                            <Brain className="h-5 w-5 text-purple-500" />
-                            Brain Hacks
-                        </CardTitle>
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleAddHack}>
-                            <PlusCircle className="h-4 w-4" />
-                        </Button>
-                    </CardHeader>
-                </div>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-48 pr-3">
-                        <ul className="space-y-2">
-                            {brainHacks.map(hack => (
-                                <li key={hack.id}>
-                                    <EditableBrainHack
-                                        hack={hack}
-                                        onUpdate={handleUpdateHack}
-                                        onDelete={handleDeleteHack}
-                                    />
-                                </li>
-                            ))}
-                        </ul>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </motion.div>
+        <>
+            <motion.div
+                ref={cardRef}
+                style={style}
+                className="fixed w-full max-w-xs z-50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.3 }}
+                onMouseDown={handleMouseDown}
+            >
+                <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
+                    <div className="cursor-grab active:cursor-grabbing">
+                        <CardHeader className="p-0 mb-3 flex flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base text-primary">
+                                <Brain className="h-5 w-5 text-purple-500" />
+                                Brain Hacks
+                            </CardTitle>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleAddHack}>
+                                <PlusCircle className="h-4 w-4" />
+                            </Button>
+                        </CardHeader>
+                    </div>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-48 pr-3">
+                            <ul className="space-y-2">
+                                {currentHacks.map(hack => (
+                                    <li key={hack.id}>
+                                        <EditableBrainHack
+                                            hack={hack}
+                                            onUpdate={handleUpdateHack}
+                                            onDelete={handleDeleteHack}
+                                            onClick={(e) => handleHackClick(hack, e)}
+                                        />
+                                    </li>
+                                ))}
+                            </ul>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </motion.div>
+            {Object.entries(openChildPopups).map(([hackId, pos]) => (
+                <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
+            ))}
+        </>
     );
 }
