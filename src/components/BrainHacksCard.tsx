@@ -80,7 +80,6 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
-    // Initialize position with a safe default or the passed prop.
     const [position, setPosition] = useState(initialPosition || { x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
@@ -90,13 +89,11 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
 
     useEffect(() => {
         setIsClient(true);
-        // Only set the default position from window if it's the root card and no initial position was provided.
         if (parentId === null && !initialPosition) {
             const savedPosition = localStorage.getItem('brain_hacks_position');
             if (savedPosition) {
                 setPosition(JSON.parse(savedPosition));
             } else {
-                // This will only run if there's no saved position.
                 setPosition({ x: window.innerWidth - 340, y: 250 });
             }
         }
@@ -116,7 +113,6 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     };
 
     const handleDeleteHack = (id: string) => {
-        // Recursively find all children to delete
         const idsToDelete = new Set<string>();
         const queue = [id];
         while(queue.length > 0) {
@@ -141,7 +137,13 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     };
 
     const handleHackClick = (hack: BrainHack, event: React.MouseEvent) => {
+        event.stopPropagation();
         if (openChildPopups[hack.id]) {
+             setOpenChildPopups(prev => {
+                const newPopups = {...prev};
+                delete newPopups[hack.id];
+                return newPopups;
+            });
             return;
         }
 
@@ -157,7 +159,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, input')) {
+        if (target.closest('button, input, [role="button"]')) {
             return;
         }
         setIsDragging(true);
@@ -209,9 +211,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         return null;
     }
     
-    if (parentId !== null && currentHacks.length === 0) {
-       // Hide empty child popups to prevent them from becoming permanent orphans
-       // A more robust solution might involve a close button
+    if (parentId !== null && currentHacks.length === 0 && Object.keys(openChildPopups).length === 0) {
        return null;
     }
 
