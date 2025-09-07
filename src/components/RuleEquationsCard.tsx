@@ -18,8 +18,7 @@ export function RuleEquationsCard() {
 
     const [position, setPosition] = useState({ x: 20, y: 600 });
     const [isDragging, setIsDragging] = useState(false);
-    const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
-
+    
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'rule-equations-card',
     });
@@ -28,50 +27,22 @@ export function RuleEquationsCard() {
         setIsClient(true);
     }, []);
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('button, [role="button"]') || target.closest('[data-radix-accordion-trigger]')) {
-            return;
-        }
+    const handleDragStart = (e: React.PointerEvent) => {
         setIsDragging(true);
-        setDragStartOffset({
-          x: e.clientX - position.x,
-          y: e.clientY - position.y,
-        });
-    };
-    
-    const handleMouseMove = (e: MouseEvent) => {
-        if (isDragging) {
-            setPosition({
-                x: e.clientX - dragStartOffset.x,
-                y: e.clientY - dragStartOffset.y,
-            });
-        }
-    };
-    
-    const handleMouseUp = () => {
-        setIsDragging(false);
     };
 
-    useEffect(() => {
-        if (isDragging) {
-          window.addEventListener('mousemove', handleMouseMove);
-          window.addEventListener('mouseup', handleMouseUp);
-        } else {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
+    const handleDragEnd = (e: React.PointerEvent) => {
+        setIsDragging(false);
+        if (transform) {
+            setPosition(prev => ({ x: prev.x + transform.x, y: prev.y + transform.y }));
         }
-        return () => {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging, dragStartOffset]);
+    };
     
     const style: React.CSSProperties = {
         position: 'fixed',
         top: position.y,
         left: position.x,
-        transform: transform ? `translate3d(${'${transform.x}'}px, ${'${transform.y}'}px, 0)` : undefined,
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
         userSelect: isDragging ? 'none' : 'auto',
     };
@@ -93,17 +64,20 @@ export function RuleEquationsCard() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.3 }}
-            onMouseDown={handleMouseDown}
-            {...attributes}
-            {...listeners}
         >
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
-                <CardHeader className="p-0 mb-3 cursor-grab active:cursor-grabbing">
-                    <CardTitle className="flex items-center gap-2 text-base text-primary">
-                        <Workflow className="h-5 w-5 text-orange-500" />
-                        Rule Equations
-                    </CardTitle>
-                </CardHeader>
+                <div 
+                    className="cursor-grab active:cursor-grabbing"
+                    {...attributes}
+                    {...listeners}
+                >
+                    <CardHeader className="p-0 mb-3">
+                        <CardTitle className="flex items-center gap-2 text-base text-primary">
+                            <Workflow className="h-5 w-5 text-orange-500" />
+                            Rule Equations
+                        </CardTitle>
+                    </CardHeader>
+                </div>
                 <CardContent className="p-0">
                     <ScrollArea className="h-48 pr-3">
                         <Accordion type="single" collapsible className="w-full">
