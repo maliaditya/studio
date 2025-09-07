@@ -7,19 +7,24 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Target, PlusCircle, Trash2 } from 'lucide-react';
+import { Target, PlusCircle, Trash2, MoreVertical, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Priority } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from './ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Calendar } from './ui/calendar';
+import { format, differenceInDays, startOfToday, parseISO } from 'date-fns';
 
-const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle }: {
+const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle, onSetDeadline }: {
     priority: Priority;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
     onToggle: (id: string) => void;
+    onSetDeadline: (id: string, deadline: Date | undefined) => void;
 }) => {
     const [text, setText] = useState(priority.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +59,8 @@ const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle }:
         }
     };
 
+    const daysLeft = priority.deadline ? differenceInDays(parseISO(priority.deadline), startOfToday()) : null;
+
     return (
         <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
             <Checkbox
@@ -70,9 +77,47 @@ const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle }:
                 onKeyDown={handleKeyDown}
                 className={cn("h-7 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full", priority.completed && "line-through text-muted-foreground")}
             />
-            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={() => onDelete(priority.id)}>
-                <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
+            <div className="flex items-center flex-shrink-0">
+                {daysLeft !== null && (
+                    <span className={cn(
+                        "text-xs font-semibold mr-2",
+                        daysLeft < 0 && "text-destructive",
+                        daysLeft >= 0 && daysLeft <= 3 && "text-orange-500",
+                        daysLeft > 3 && "text-muted-foreground"
+                    )}>
+                        {daysLeft < 0 ? `Overdue` : `${daysLeft}d`}
+                    </span>
+                )}
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                         <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" className="w-full justify-start font-normal h-8 px-2">
+                                    <CalendarIcon className="mr-2 h-4 w-4"/>
+                                    Set Deadline
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={priority.deadline ? parseISO(priority.deadline) : undefined}
+                                    onSelect={(date) => onSetDeadline(priority.id, date)}
+                                    initialFocus
+                                />
+                            </PopoverContent>
+                        </Popover>
+                        <DropdownMenuItem onSelect={() => onDelete(priority.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4"/>
+                            Delete
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </div>
     );
 });
@@ -119,9 +164,13 @@ export function TopPrioritiesCard() {
         setTopPriorities(prev => prev.map(p => p.id === id ? { ...p, completed: !p.completed } : p));
     };
     
+    const handleSetDeadline = (id: string, deadline: Date | undefined) => {
+        setTopPriorities(prev => prev.map(p => p.id === id ? { ...p, deadline: deadline ? format(deadline, 'yyyy-MM-dd') : undefined } : p));
+    };
+    
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, input, [role="checkbox"]')) {
+        if (target.closest('button, input, [role="checkbox"], [role="menuitem"], [role="dialog"]')) {
             return;
         }
         setIsDragging(true);
@@ -203,6 +252,7 @@ export function TopPrioritiesCard() {
                                         onUpdate={handleUpdatePriority}
                                         onDelete={handleDeletePriority}
                                         onToggle={handleTogglePriority}
+                                        onSetDeadline={handleSetDeadline}
                                     />
                                 </li>
                             ))}

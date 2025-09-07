@@ -616,6 +616,7 @@ export interface Priority {
   id: string;
   text: string;
   completed: boolean;
+  deadline?: string; // Stored as ISO string: yyyy-MM-dd
 }
 
 export interface UserSettings {
