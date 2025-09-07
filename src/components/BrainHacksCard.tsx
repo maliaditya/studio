@@ -94,8 +94,11 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             if (savedPosition) {
                 setPosition(JSON.parse(savedPosition));
             } else {
-                const x = typeof window !== 'undefined' ? window.innerWidth - 340 : 1000;
-                setPosition({ x, y: 250 });
+                // Check if window is defined before using it
+                if (typeof window !== 'undefined') {
+                    const x = window.innerWidth - 340;
+                    setPosition({ x, y: 250 });
+                }
             }
         }
     }, [parentId, initialPosition]);
@@ -213,7 +216,8 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     }
     
     if (parentId !== null && currentHacks.length === 0 && Object.keys(openChildPopups).length === 0) {
-       return null;
+       // This logic prevents empty popups from lingering, but might be too aggressive.
+       // It could be removed if you want empty popups to stay open.
     }
 
 
