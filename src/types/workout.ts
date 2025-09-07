@@ -611,3 +611,20 @@ export interface MissedSlotReview {
     followedRuleIds: string[];
     snoozedUntil?: number; // timestamp
 }
+
+export interface Priority {
+  id: string;
+  text: string;
+}
+
+export interface UserSettings {
+  carryForward: boolean;
+  autoPush: boolean;
+  autoPushLimit: number;
+  carryForwardEssentials: boolean;
+  carryForwardNutrition: boolean;
+  smartLogging: boolean;
+  defaultHabitLinks: Partial<Record<ActivityType, string | null>>;
+  routines: Activity[];
+  workoutScheduling: WorkoutSchedulingMode;
+}

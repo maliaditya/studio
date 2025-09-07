@@ -47,6 +47,7 @@ import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { FavoriteCards } from '@/components/FavoriteCards';
 import { RuleEquationsCard } from '@/components/RuleEquationsCard';
 import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
+import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
 
 
 const slotEndHours: Record<string, number> = {
@@ -381,6 +382,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MindsetCategoriesCard />
       <ActivityDistributionCard />
       <FavoriteCards />
+      <TopPrioritiesCard />
       <RuleEquationsCard />
       <VisualizationTechniquesCard />
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
@@ -592,6 +594,7 @@ export default function RootLayout({
     </html>
   );
 }
+
 
 
 
