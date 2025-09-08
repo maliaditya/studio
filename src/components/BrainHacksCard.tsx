@@ -26,26 +26,21 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
     onEditLinkText: (hack: BrainHack) => void;
 }) => {
     const [text, setText] = useState(hack.text);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
     const [isFetching, setIsFetching] = useState(false);
     const { toast } = useToast();
 
+    const isMultiLine = text.includes('\n') || text.length > 50;
+
     useEffect(() => {
         if (hack.text === "New Brain Hack" || hack.text === "https://example.com") {
-            textareaRef.current?.select();
+            inputRef.current?.select();
         }
     }, [hack.text]);
     
     useEffect(() => {
         setText(hack.type === 'link' ? (hack.link || '') : hack.text);
     }, [hack.type, hack.text, hack.link]);
-    
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [text]);
 
     const handleBlur = async () => {
         const newText = text.trim();
@@ -63,14 +58,14 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
         }
     };
     
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             handleBlur();
             e.preventDefault();
         } else if (e.key === 'Escape') {
             setText(hack.type === 'link' ? (hack.link || '') : hack.text);
             e.preventDefault();
-            (e.target as HTMLTextAreaElement).blur();
+            (e.target as HTMLElement).blur();
         }
     };
 
@@ -97,6 +92,15 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
         )
     }
 
+    const commonProps = {
+        value: text,
+        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setText(e.target.value),
+        onBlur: handleBlur,
+        onKeyDown: handleKeyDown,
+        className: "h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1 flex-grow min-w-0",
+        placeholder: hack.type === 'link' ? 'https://...' : 'New hack...',
+    };
+
     return (
         <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
             <div className="flex items-center gap-2 flex-grow min-w-0">
@@ -105,16 +109,11 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 ) : (
                     hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
                 )}
-                <Textarea
-                    ref={textareaRef}
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    onBlur={handleBlur}
-                    onKeyDown={handleKeyDown}
-                    className="h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1 flex-grow min-w-0"
-                    placeholder={hack.type === 'link' ? 'https://...' : 'New hack...'}
-                    rows={1}
-                />
+                {isMultiLine ? (
+                    <Textarea {...commonProps} rows={1} autoFocus />
+                ) : (
+                    <Input {...commonProps} ref={inputRef} />
+                )}
             </div>
             <div className="flex items-center flex-shrink-0">
                 {hack.type !== 'link' && (
