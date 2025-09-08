@@ -479,8 +479,8 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
                   <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="truncate" title={resource.name}>
-                                {resource.name.length > 25 ? `${resource.name.substring(0, 25)}...` : resource.name}
+                            <span className="truncate" title={resource.name || ''}>
+                                {resource.name && resource.name.length > 25 ? `${resource.name.substring(0, 25)}...` : resource.name}
                             </span>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -545,7 +545,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
                     <div className="p-3">
                         <div className="flex items-center gap-2">
                             <Youtube className="h-5 w-5 flex-shrink-0 text-red-500" />
-                            <p className="text-sm font-bold truncate" title={resource.name}>{resource.name}</p>
+                            <p className="text-sm font-bold truncate" title={resource.name || ''}>{resource.name}</p>
                         </div>
                     </div>
                 </>
@@ -553,7 +553,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
                 <div className="p-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                     {resource.iconUrl ? <Image src={resource.iconUrl} alt="" width={16} height={16} className="h-4 w-4 rounded-sm flex-shrink-0" unoptimized /> : <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-                    <span className="truncate" title={resource.name}>{resource.name}</span>
+                    <span className="truncate" title={resource.name || ''}>{resource.name}</span>
                     </CardTitle>
                     <CardDescription className="text-xs mt-1 truncate">{resource.link}</CardDescription>
                 </div>
@@ -2443,6 +2443,7 @@ export default function DeepWorkPage() {
 
 
     
+
 
 
 
