@@ -18,6 +18,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
+
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
     hack: BrainHack;
@@ -372,36 +374,58 @@ export function MindsetCategoriesCard() {
         return lastTsB - lastTsA;
     });
 
+    const getResistanceHighlightClass = (stopper: Stopper) => {
+        const todayStart = startOfDay(new Date());
+        const todayTimestamps = (stopper.timestamps || []).filter(ts => ts >= todayStart.getTime());
+        const count = todayTimestamps.length;
+
+        const sevenDaysAgo = subDays(todayStart, 7);
+        const lastTimestamp = Math.max(0, ...(stopper.timestamps || []));
+        
+        const isDormant = lastTimestamp > 0 && isBefore(new Date(lastTimestamp), sevenDaysAgo);
+
+        let highlightClass = 'bg-muted/50';
+        if (count === 1) highlightClass = 'bg-yellow-500/20';
+        else if (count === 2) highlightClass = 'bg-orange-500/20';
+        else if (count >= 3) highlightClass = 'bg-red-500/20';
+        else if (count === 0 && !isDormant) highlightClass = 'bg-green-500/10';
+
+        return { className: highlightClass, dormant: isDormant };
+    };
+
     const renderContent = () => {
         if (view === 'all-resistances') {
             return (
                 <ul className="space-y-2">
-                    {sortedResistances.map((link) => (
-                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", hotResistances.has(link.stopper.id) ? "bg-primary/20" : "bg-muted/50")}>
-                            <div
-                                className="flex justify-between items-start w-full text-left"
-                            >
-                                <div 
-                                    className="flex-grow pr-2 cursor-pointer"
-                                    onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
+                    {sortedResistances.map((link) => {
+                        const { className: highlightClass, dormant } = getResistanceHighlightClass(link.stopper);
+                        return (
+                            <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", highlightClass)}>
+                                <div
+                                    className="flex justify-between items-start w-full text-left"
                                 >
-                                    <p className="font-semibold">{link.stopper.text}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
-                                    </p>
+                                    <div 
+                                        className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
+                                        onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
+                                    >
+                                        <p className="font-semibold">{link.stopper.text}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center flex-shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
+                                            <LineChart className="h-4 w-4 text-blue-500" />
+                                        </Button>
+                                        <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
+                                            <PlusCircle className="h-4 w-4 text-green-500" />
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center flex-shrink-0">
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
-                                        <LineChart className="h-4 w-4 text-blue-500" />
-                                    </Button>
-                                    <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
-                                        <PlusCircle className="h-4 w-4 text-green-500" />
-                                    </Button>
-                                </div>
-                            </div>
-                        </li>
-                    ))}
+                            </li>
+                        );
+                    })}
                     {allLinkedResistances.length === 0 && (
                         <p className="text-center text-sm text-muted-foreground py-8">
                             No urges or resistances are linked to any techniques yet.
