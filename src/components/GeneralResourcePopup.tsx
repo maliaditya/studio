@@ -13,7 +13,7 @@ import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -243,9 +243,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] relative group">
-                <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
-                    
-                </div>
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
@@ -267,8 +264,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0">
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0 cursor-grab active:cursor-grabbing" {...listeners}>
                     <div className="flex items-center gap-2">
+                        <GripVertical className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
                         {getIcon()}
                         {editingTitle ? (
                              <Input 
