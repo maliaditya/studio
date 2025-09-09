@@ -252,12 +252,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     <div className="flex items-center justify-center gap-2">
                         {getIcon()}
                         {editingTitle ? (
-                            <Input 
+                             <Input 
                                 value={resource.name || ''}
                                 onChange={(e) => handleTitleChange(e.target.value)} 
                                 onBlur={() => setEditingTitle(false)} 
                                 onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base"
+                                className="h-8 text-base font-semibold border-0 shadow-none focus-visible:ring-0 p-0"
                                 autoFocus
                             />
                         ) : (
