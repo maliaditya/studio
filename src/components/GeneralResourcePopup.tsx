@@ -257,7 +257,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onChange={(e) => handleTitleChange(e.target.value)} 
                                 onBlur={() => setEditingTitle(false)} 
                                 onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base font-semibold border-0 shadow-none focus-visible:ring-0 p-0"
+                                className="h-8 text-base font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 p-0"
                                 autoFocus
                             />
                         ) : (
