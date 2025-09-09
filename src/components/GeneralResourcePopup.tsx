@@ -264,9 +264,14 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 cursor-grab active:cursor-grabbing" {...listeners}>
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0">
+                    <div
+                        className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
+                        {...listeners}
+                    >
+                        <GripVertical className="h-5 w-5 text-muted-foreground/30" />
+                    </div>
                     <div className="flex items-center gap-2">
-                        <GripVertical className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
                         {getIcon()}
                         {editingTitle ? (
                              <Input 
@@ -421,3 +426,4 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
+
