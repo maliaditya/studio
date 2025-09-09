@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -19,6 +20,7 @@ import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Badge } from './ui/badge';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Accordion, AccordionTrigger, AccordionContent, AccordionItem } from './ui/accordion';
 
 
 interface LogicDiagramPopupState {
@@ -618,13 +620,15 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
     );
 };
 
+
 export const LinkedResistancePopup = ({ popupState, onClose }: {
     popupState: MindsetTechniquePopupState;
     onClose: () => void;
 }) => {
     const { techniqueId, x, y } = popupState;
-    const { mindProgrammingDefinitions, resources, openGeneralPopup } = useAuth();
+    const { mindProgrammingDefinitions, resources, openGeneralPopup, handleHabitDetailPopupDragEnd, setResources } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `linked-resistance-${techniqueId}` });
+    const cardRef = useRef<HTMLDivElement>(null);
 
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -638,19 +642,29 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
     }
 
     const technique = mindProgrammingDefinitions.find(t => t.id === techniqueId);
-    const linkedResources = useMemo(() => {
-        return (technique?.linkedResourceIds || [])
-            .map(id => resources.find(r => r.id === id))
-            .filter((r): r is Resource => !!r);
+    
+    const linkedResistances = useMemo(() => {
+        if (!technique) return [];
+        return resources
+            .filter(res => res.type === 'habit')
+            .flatMap(habit => 
+                (habit.stoppers || []).map(stopper => ({
+                    habit,
+                    stopper
+                }))
+            )
+            .filter(({ stopper }) => stopper.linkedTechniqueId === technique.id);
     }, [technique, resources]);
+
+    if (!technique) return null;
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
+            <Card ref={cardRef} className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
                 <CardHeader className="p-3 relative cursor-grab" {...listeners}>
                     <div className="flex justify-between items-center">
                         <CardTitle className="text-base truncate">
-                            {technique ? `Technique: ${technique.name}` : 'Technique Details'}
+                            {`Technique: ${technique.name}`}
                         </CardTitle>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
                     </div>
@@ -660,7 +674,7 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                         <div className="space-y-4">
                             <div>
                                 <h4 className="font-semibold text-xs mb-1 text-muted-foreground uppercase tracking-wider">Steps</h4>
-                                {technique?.decompositionData && technique.decompositionData.length > 0 ? (
+                                {(technique.decompositionData && technique.decompositionData.length > 0) ? (
                                      <ul className="space-y-2 text-sm text-muted-foreground">
                                         {technique.decompositionData.map(point => (
                                             <li key={point.id} className="flex items-start gap-2">
@@ -676,25 +690,33 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                                 )}
                             </div>
 
-                            {linkedResources.length > 0 && (
-                                <div className="pt-2 border-t">
-                                    <h4 className="font-semibold text-xs mb-2 text-muted-foreground uppercase tracking-wider">Linked Resources</h4>
-                                    <ul className="space-y-2">
-                                        {linkedResources.map(resource => (
-                                            <li key={resource.id}>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="w-full justify-start h-auto py-1"
-                                                    onClick={(e) => openGeneralPopup(resource.id, e)}
-                                                >
-                                                    <Library className="h-4 w-4 mr-2 text-primary" />
-                                                    <span className="truncate">{resource.name}</span>
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                            {linkedResistances.length > 0 && (
+                                <Accordion type="single" collapsible defaultValue="linked-resistances" className="w-full">
+                                    <AccordionItem value="linked-resistances" className="border-b-0">
+                                        <AccordionTrigger className="text-xs font-semibold text-muted-foreground uppercase tracking-wider py-2">
+                                            Linked Resistances
+                                        </AccordionTrigger>
+                                        <AccordionContent>
+                                            <ul className="space-y-2">
+                                                {linkedResistances.map(({ habit, stopper }) => (
+                                                    <li key={stopper.id}>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="w-full justify-start h-auto py-1 text-left"
+                                                            onClick={(e) => openGeneralPopup(habit.id, e, undefined, cardRef.current?.getBoundingClientRect())}
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold text-foreground">{stopper.text}</span>
+                                                                <span className="text-xs text-muted-foreground">From: {habit.name}</span>
+                                                            </div>
+                                                        </Button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                </Accordion>
                             )}
                         </div>
                     </ScrollArea>
@@ -703,4 +725,3 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
         </div>
     );
 };
-
