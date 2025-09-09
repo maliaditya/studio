@@ -5,124 +5,131 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { format } from 'date-fns';
-import type { Activity, ActivityType, DatedWorkout, DailySchedule, Resource, Stopper } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle, LineChart as LineChartIcon, History } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart } from 'lucide-react';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { BrainHack, Stopper } from '@/types/workout';
 import { cn } from '@/lib/utils';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
+import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 
-
-const activityNameMap: Record<ActivityType, string> = {
-    deepwork: 'Deep Work',
-    upskill: 'Learning',
-    workout: 'Workout',
-    mindset: 'Mindset',
-    branding: 'Branding',
-    essentials: 'Essentials',
-    planning: 'Planning',
-    tracking: 'Tracking',
-    'lead-generation': 'Lead Gen',
-    interrupt: 'Interrupts',
-    distraction: 'Distractions',
-    nutrition: 'Nutrition',
-};
-
-const activityColorMapping: Record<string, string> = {
-    'Deep Work': 'bg-green-500',
-    'Learning': 'bg-blue-500',
-    'Workout': 'bg-red-500',
-    'Mindset': 'bg-purple-500',
-    'Branding': 'bg-pink-500',
-    'Lead Gen': 'bg-yellow-500',
-    'Essentials': 'bg-gray-400',
-    'Planning': 'bg-teal-500',
-    'Tracking': 'bg-indigo-500',
-    'Interrupts': 'bg-orange-600',
-    'Distractions': 'bg-amber-600',
-    'Nutrition': 'bg-lime-500',
-    'Wasted Time': 'bg-orange-600',
-    'Scheduled': 'bg-sky-500',
-    'Free Time': 'bg-gray-400',
-};
-
-const formatMinutes = (minutes: number) => {
-    if (minutes < 1) return "0m";
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
-    if (hours > 0) return `${hours}h`;
-    return `${mins}m`;
-};
-
-const slotOrder: { name: string; endHour: number, startHour: number }[] = [
-    { name: 'Late Night', endHour: 4, startHour: 0 },
-    { name: 'Dawn', endHour: 8, startHour: 4 },
-    { name: 'Morning', endHour: 12, startHour: 8 },
-    { name: 'Afternoon', endHour: 16, startHour: 12 },
-    { name: 'Evening', endHour: 20, startHour: 16 },
-    { name: 'Night', endHour: 24, startHour: 20 }
-];
-
-interface ActivityDetailPopupState {
-    category: string;
-    tasks: { name: string; duration: number }[];
-    x: number;
-    y: number;
-}
-
-const ActivityDetailPopup = ({ popupState, onClose }: {
-    popupState: ActivityDetailPopupState;
-    onClose: () => void;
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
+    hack: BrainHack;
+    onUpdate: (id: string, newText: string) => void;
+    onDelete: (id: string) => void;
+    onOpenNested: (hack: BrainHack, event: React.MouseEvent) => void;
+    onOpenLink: (url: string) => void;
+    onEditLinkText: (hack: BrainHack) => void;
 }) => {
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'activity-detail-popup' });
+    const [text, setText] = useState(hack.text);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [isFetching, setIsFetching] = useState(false);
+    const { toast } = useToast();
 
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
-        transform: transform ? `translate3d(${'${transform.x}'}px, ${'${transform.y}'}px, 0)` : undefined,
-        willChange: 'transform',
-        zIndex: 100,
+    const isMultiLine = text.includes('\n') || text.length > 50;
+
+    useEffect(() => {
+        if (hack.text === "New Brain Hack" || hack.text === "https://example.com") {
+            inputRef.current?.select();
+        }
+    }, [hack.text]);
+    
+    useEffect(() => {
+        setText(hack.type === 'link' ? (hack.link || '') : hack.text);
+    }, [hack.type, hack.text, hack.link]);
+
+    const handleBlur = async () => {
+        const newText = text.trim();
+        if (newText === '') {
+            onDelete(hack.id);
+            return;
+        }
+
+        if (hack.type === 'link' && newText !== hack.link) {
+            setIsFetching(true);
+            onUpdate(hack.id, newText);
+            setIsFetching(false);
+        } else if (hack.type === 'hack' && newText !== hack.text) {
+            onUpdate(hack.id, newText);
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            handleBlur();
+            e.preventDefault();
+        } else if (e.key === 'Escape') {
+            setText(hack.type === 'link' ? (hack.link || '') : hack.text);
+            e.preventDefault();
+            (e.target as HTMLElement).blur();
+        }
+    };
+
+    if (hack.type === 'link' && !isFetching && hack.displayText) {
+        return (
+             <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+                <Globe className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
+                <button 
+                    className="text-sm font-medium w-full text-left truncate text-primary hover:underline"
+                    onClick={() => onOpenLink(hack.link!)}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        onEditLinkText(hack);
+                    }}
+                >
+                    {hack.displayText || hack.link}
+                </button>
+                <div className="flex items-center flex-shrink-0">
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                </div>
+            </div>
+        )
+    }
+
+    const commonProps = {
+        value: text,
+        onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setText(e.target.value),
+        onBlur: handleBlur,
+        onKeyDown: handleKeyDown,
+        className: "h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1 flex-grow min-w-0",
+        placeholder: hack.type === 'link' ? 'https://...' : 'New hack...',
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
-                <CardHeader className="p-3 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between" {...listeners}>
-                    <CardTitle className="text-base">{popupState.category} Details</CardTitle>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} onPointerDown={(e) => e.stopPropagation()}>
-                        <X className="h-4 w-4" />
+        <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+            <div className="flex items-center gap-2 flex-grow min-w-0">
+                {isFetching ? (
+                     <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                ) : (
+                    hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
+                )}
+                {isMultiLine ? (
+                    <Textarea {...commonProps} rows={1} autoFocus />
+                ) : (
+                    <Input {...commonProps} ref={inputRef} />
+                )}
+            </div>
+            <div className="flex items-center flex-shrink-0">
+                {hack.type !== 'link' && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
+                        <GitBranch className="h-3 w-3 text-blue-500" />
                     </Button>
-                </CardHeader>
-                <CardContent className="p-3">
-                    <ScrollArea className="h-48 pr-3">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Task</TableHead>
-                                    <TableHead className="text-right">Duration</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {popupState.tasks.map((task, index) => (
-                                    <TableRow key={index}>
-                                        <TableCell className="font-medium truncate" title={task.name}>{task.name}</TableCell>
-                                        <TableCell className="text-right">{formatMinutes(task.duration)}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+                )}
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+            </div>
         </div>
     );
-};
+});
+EditableBrainHack.displayName = 'EditableBrainHack';
 
 const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances }: { 
     isOpen: boolean; 
@@ -153,7 +160,7 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                 });
             }
         });
-        return log;
+        return log.filter(hour => hour.urges.size > 0 || hour.resistances.size > 0);
     }, [allLinkedResistances]);
 
     return (
@@ -176,7 +183,7 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {hourlyLog.map(({ hour, label, urges, resistances }) => (
+                                {hourlyLog.length > 0 ? hourlyLog.map(({ hour, label, urges, resistances }) => (
                                     <TableRow key={hour}>
                                         <TableCell className="font-medium text-xs">{label}</TableCell>
                                         <TableCell>
@@ -194,7 +201,11 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                                             </ul>
                                         </TableCell>
                                     </TableRow>
-                                ))}
+                                )) : (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="h-24 text-center">No logged urges or resistances found.</TableCell>
+                                    </TableRow>
+                                )}
                             </TableBody>
                         </Table>
                     </ScrollArea>
@@ -203,6 +214,7 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
         </Dialog>
     )
 };
+
 
 export function MindsetCategoriesCard() {
     const { 
@@ -379,7 +391,7 @@ export function MindsetCategoriesCard() {
                                 </div>
                                 <div className="flex items-center flex-shrink-0">
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
-                                        <LineChartIcon className="h-4 w-4 text-blue-500" />
+                                        <LineChart className="h-4 w-4 text-blue-500" />
                                     </Button>
                                     <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
@@ -479,3 +491,4 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
+
