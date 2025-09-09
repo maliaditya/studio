@@ -973,13 +973,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [deepWorkDefinitions, upskillDefinitions, logSubTaskTime, toast, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
   
   const getAllUserData = useCallback(() => {
+    // This is the fix: create a new array of resources without the localAudioUrl property.
+    const sanitizedResources = resources.map(({ localAudioUrl, ...rest }) => rest);
+
     return {
       main: {
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
         workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
         deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs,
-        resources, resourceFolders,
+        resources: sanitizedResources, // Use the sanitized array here
+        resourceFolders,
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
