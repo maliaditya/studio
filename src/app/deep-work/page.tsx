@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -140,6 +139,8 @@ const DraggableSubtaskItem: React.FC<{
     data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName, parentId: parentId },
   });
 
+  const name = childName || "Untitled";
+
   return (
     <div
       ref={setNodeRef}
@@ -150,7 +151,7 @@ const DraggableSubtaskItem: React.FC<{
         isLogged && "line-through text-muted-foreground/70",
         isDragging && "opacity-0"
       )}
-      title={childName}
+      title={name}
     >
       <span>-</span>
       <span
@@ -159,7 +160,7 @@ const DraggableSubtaskItem: React.FC<{
           onClick && "cursor-pointer hover:text-foreground"
         )}
       >
-        {childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}
+        {name.length > 25 ? `${name.substring(0, 25)}...` : name}
       </span>
     </div>
   );
@@ -2065,7 +2066,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
                                             upskillDefinitions={upskillDefinitions}
-                                            projectsInDomain={projects}
+                                            projectsInDomain={[]}
                                             handleCreateAndLinkChild={handleCreateAndLinkChild}
                                             activeProjectIds={activeProjectIds}
                                             currentSlot={currentSlot}
@@ -2426,27 +2427,3 @@ export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
     
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
