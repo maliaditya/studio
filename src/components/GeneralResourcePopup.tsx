@@ -262,7 +262,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             />
                         ) : (
                             <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name}
+                                {resource.name || <span className="text-muted-foreground">[Untitled]</span>}
                             </CardTitle>
                         )}
                     </div>
