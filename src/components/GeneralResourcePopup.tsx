@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2 } from 'lucide-react';
@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
@@ -253,7 +253,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         {getIcon()}
                         {editingTitle ? (
                             <Input 
-                                value={resource.name} 
+                                value={resource.name || ''}
                                 onChange={(e) => handleTitleChange(e.target.value)} 
                                 onBlur={() => setEditingTitle(false)} 
                                 onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
@@ -404,7 +404,3 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
         </li>
     );
 }
-
-    
-
-    
