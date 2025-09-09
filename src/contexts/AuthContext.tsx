@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -41,17 +41,6 @@ import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 interface ResourcePopupProps {
   popupState: PopupState;
 }
-
-interface ActiveFocusSession {
-  activity: Activity;
-  duration: number; // in minutes
-  secondsLeft: number;
-  totalSeconds: number;
-  startTime: number; // Timestamp of when the session (or current work segment) started
-  state: 'running' | 'paused' | 'idle';
-  subTaskStartTime?: number | null;
-}
-
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -321,18 +310,7 @@ interface AuthContextType {
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
   permanentlyLoggedTaskIds: Set<string>;
   getDescendantLeafNodes: (startNodeId: string, type: 'deepwork' | 'upskill') => ExerciseDefinition[];
-
-
-  // New state for selected subtopic/focus area
-  selectedUpskillTask: ExerciseDefinition | null;
-  setSelectedUpskillTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
-  selectedDeepWorkTask: ExerciseDefinition | null;
-  setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
-  selectedMicroSkill: MicroSkill | null;
-  setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
-
-
-  // Sidebar persistence
+  calculateTotalEstimate: (def: ExerciseDefinition) => number;
   expandedItems: string[];
   setExpandedItems: React.Dispatch<React.SetStateAction<string[]>>;
   handleExpansionChange: (value: string[]) => void;
@@ -344,18 +322,12 @@ interface AuthContextType {
   setSelectedProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedCompanyId: string | null;
   setSelectedCompanyId: React.Dispatch<React.SetStateAction<string | null>>;
-
-  // Auto Suggestion
   autoSuggestions: Record<string, AutoSuggestionEntry[]>;
   setAutoSuggestions: React.Dispatch<React.SetStateAction<Record<string, AutoSuggestionEntry[]>>>;
-  
-  // Recents
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
   addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
-
   currentSlot: string;
   activeProjectIds: Set<string>;
-
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
   handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
@@ -382,6 +354,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper hook to get the previous value of a state or prop
+const usePrevious = <T,>(value: T) => {
+  const ref = useRef<T>();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -401,8 +382,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [localChangeCount, setLocalChangeCount] = useState(0);
   const [currentSlot, setCurrentSlot] = useState('');
 
-  const prevUser = usePrevious(currentUser);
-  
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [settings, setSettings] = useState<UserSettings>({ 
     carryForward: true,
@@ -553,7 +532,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Top Priorities
   const [topPriorities, setTopPriorities] = useState<Priority[]>([]);
   const [brainHacks, setBrainHacks] = useState<BrainHack[]>([]);
-
+  
+  const prevUser = usePrevious(currentUser);
+  
   const openStopperProgressPopup = (stopper: Stopper, habitName: string) => {
     setStopperProgressPopup({
         isOpen: true,
@@ -1040,17 +1021,107 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(handler);
         };
     }
-  }, [localChangeCount, saveState, isLoadingState]);
-
-  useEffect(() => {
-    if (!isLoadingState) {
-        setLocalChangeCount(c => c + 1);
-    }
   }, [
-    isLoadingState, weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState
+    isLoadingState, saveState,
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState
   ]);
 
-  const loadState = (username: string) => {
+  const loadImportedData = useCallback((mainData: any, uiData: any) => {
+    setIsLoadingState(true);
+
+    setWeightLogs(mainData.weightLogs || []);
+    setGoalWeight(mainData.goalWeight || null);
+    setHeight(mainData.height || null);
+    setDateOfBirth(mainData.dateOfBirth || null);
+    setGender(mainData.gender || null);
+    setDietPlan(mainData.dietPlan || []);
+    setSchedule(mainData.schedule || {});
+    setDailyPurposes(mainData.dailyPurposes || {});
+    setAllUpskillLogs(mainData.allUpskillLogs || mainData.upskillLogs || []);
+    setAllDeepWorkLogs(mainData.allDeepWorkLogs || mainData.deepWorkLogs || []);
+    setAllWorkoutLogs(mainData.allWorkoutLogs || mainData.workoutLogs || []);
+    setAllBrandingLogs(mainData.brandingLogs || []);
+    setAllLeadGenLogs(mainData.allLeadGenLogs || []);
+    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
+    setWorkoutMode(mainData.workoutMode || 'two-muscle');
+    setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
+    setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
+    setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
+    setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
+    setUpskillDefinitions(mainData.upskillDefinitions || []);
+    setTopicGoals(mainData.topicGoals || mainData.upskillTopicGoals || {});
+    setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
+    setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
+    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
+    setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
+    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
+    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
+    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
+    setProductizationPlans(mainData.productizationPlans || {});
+    setOfferizationPlans(mainData.offerizationPlans || {});
+    setResourceFolders(mainData.resourceFolders || []);
+    setResources(mainData.resources || []);
+    setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
+    setMindsetCards(mainData.mindsetCards || []);
+    setPistons(mainData.pistons || {});
+    setSkillDomains(mainData.skillDomains || []);
+    setCoreSkills(mainData.coreSkills || []);
+    setProjects(mainData.projects || []);
+    setCompanies(mainData.companies || []);
+    setPositions(mainData.positions || []);
+    setPurposeData(mainData.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
+    setPatterns(mainData.patterns || []);
+    setMetaRules(mainData.metaRules || []);
+    setPillarEquations(mainData.pillarEquations || {});
+    setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
+    setAutoSuggestions(mainData.autoSuggestions || {});
+    setPathNodes(mainData.pathNodes || []);
+    setMissedSlotReviews(mainData.missedSlotReviews || {});
+    setTopPriorities(mainData.topPriorities || []);
+    setBrainHacks(mainData.brainHacks || []);
+    
+    // UI State
+    setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
+    setActiveResourceTabIds(uiData.activeResourceTabIds || []);
+    setSelectedResourceFolderId(uiData.selectedResourceFolderId || null);
+    setLastSelectedHabitFolder(uiData.lastSelectedHabitFolder || null);
+    setSelectedUpskillTask(uiData.selectedUpskillTask || null);
+    setSelectedDeepWorkTask(uiData.selectedDeepWorkTask || null);
+    setSelectedMicroSkill(uiData.selectedMicroSkill || null);
+    setExpandedItems(uiData.expandedItems || []);
+    setSelectedDomainId(uiData.selectedDomainId || null);
+    setSelectedSkillId(uiData.selectedSkillId || null);
+    setSelectedProjectId(uiData.selectedProjectId || null);
+    setSelectedCompanyId(uiData.selectedCompanyId || null);
+    setRecentItems(uiData.recentItems || []);
+    setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
+    setPipState(uiData.pipState || { isOpen: false, position: { x: 0, y: 0 }, size: { width: 448, height: 252 } });
+    
+    if (uiData.activeFocusSession) {
+      const restoredSession: ActiveFocusSession = uiData.activeFocusSession;
+      if (restoredSession.state === 'running') {
+          const timeElapsedSinceSave = (Date.now() - restoredSession.startTime) / 1000;
+          const newSecondsLeft = Math.max(0, restoredSession.totalSeconds - timeElapsedSinceSave);
+          restoredSession.secondsLeft = newSecondsLeft;
+      }
+      setActiveFocusSession(restoredSession);
+    } else {
+        setActiveFocusSession(null);
+    }
+    
+    const defaultSettings: UserSettings = { 
+        carryForward: true, autoPush: false, autoPushLimit: 100, 
+        carryForwardEssentials: true, carryForwardNutrition: false,
+        smartLogging: false, defaultHabitLinks: {}, routines: [],
+        workoutScheduling: 'day-of-week'
+    };
+    setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
+
+
+    setTimeout(() => setIsLoadingState(false), 100);
+  }, []);
+  
+  const loadState = useCallback((username: string) => {
     setIsLoadingState(true);
     const mainDataString = localStorage.getItem(`lifeos_data_${username}`);
     const uiStateString = localStorage.getItem(`lifeos_ui_state_${username}`);
@@ -1058,12 +1129,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const mainData = mainDataString ? JSON.parse(mainDataString) : {};
     const uiState = uiStateString ? JSON.parse(uiStateString) : {};
     
-    // Set Main Data
     loadImportedData(mainData, uiState);
-    
-    // Wait for state to apply before allowing saves
-    setTimeout(() => setIsLoadingState(false), 100);
-  };
+  }, [loadImportedData]);
   
   const populatedSchedule = useMemo(() => {
     const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
@@ -1313,10 +1380,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
 
-            // Apply imported data to state immediately
-            loadImportedData(mainData, uiData);
+            localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(mainData));
+            localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiData));
+
+            toast({ title: "Import Successful", description: "Your data has been saved. Reloading the application..." });
   
-            toast({ title: "Import Successful", description: "Your data has been loaded into the application." });
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
   
           } catch (error) {
             console.error("Import failed:", error);
@@ -1330,90 +1401,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     input.click();
   };
 
-  const loadImportedData = (mainData: any, uiData: any) => {
-    setIsLoadingState(true);
-
-    setWeightLogs(mainData.weightLogs || []);
-    setGoalWeight(mainData.goalWeight || null);
-    setHeight(mainData.height || null);
-    setDateOfBirth(mainData.dateOfBirth || null);
-    setGender(mainData.gender || null);
-    setDietPlan(mainData.dietPlan || []);
-    setSchedule(mainData.schedule || {});
-    setDailyPurposes(mainData.dailyPurposes || {});
-    setAllUpskillLogs(mainData.allUpskillLogs || mainData.upskillLogs || []);
-    setAllDeepWorkLogs(mainData.allDeepWorkLogs || mainData.deepWorkLogs || []);
-    setAllWorkoutLogs(mainData.allWorkoutLogs || mainData.workoutLogs || []);
-    setAllBrandingLogs(mainData.brandingLogs || []);
-    setAllLeadGenLogs(mainData.allLeadGenLogs || []);
-    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
-    setWorkoutMode(mainData.workoutMode || 'two-muscle');
-    setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
-    setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
-    setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
-    setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
-    setUpskillDefinitions(mainData.upskillDefinitions || []);
-    setTopicGoals(mainData.topicGoals || mainData.upskillTopicGoals || {});
-    setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
-    setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
-    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
-    setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
-    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
-    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
-    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
-    setProductizationPlans(mainData.productizationPlans || {});
-    setOfferizationPlans(mainData.offerizationPlans || {});
-    setResourceFolders(mainData.resourceFolders || []);
-    setResources(mainData.resources || []);
-    setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
-    setMindsetCards(mainData.mindsetCards || []);
-    setPistons(mainData.pistons || {});
-    setSkillDomains(mainData.skillDomains || []);
-    setCoreSkills(mainData.coreSkills || []);
-    setProjects(mainData.projects || []);
-    setCompanies(mainData.companies || []);
-    setPositions(mainData.positions || []);
-    setPurposeData(mainData.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
-    setPatterns(mainData.patterns || []);
-    setMetaRules(mainData.metaRules || []);
-    setPillarEquations(mainData.pillarEquations || {});
-    setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
-    setAutoSuggestions(mainData.autoSuggestions || {});
-    setPathNodes(mainData.pathNodes || []);
-    setMissedSlotReviews(mainData.missedSlotReviews || {});
-    setTopPriorities(mainData.topPriorities || []);
-    setBrainHacks(mainData.brainHacks || []);
-    
-    // UI State
-    setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
-    setActiveResourceTabIds(uiData.activeResourceTabIds || []);
-    setSelectedResourceFolderId(uiData.selectedResourceFolderId || null);
-    setLastSelectedHabitFolder(uiData.lastSelectedHabitFolder || null);
-    setSelectedUpskillTask(uiData.selectedUpskillTask || null);
-    setSelectedDeepWorkTask(uiData.selectedDeepWorkTask || null);
-    setSelectedMicroSkill(uiData.selectedMicroSkill || null);
-    setExpandedItems(uiData.expandedItems || []);
-    setSelectedDomainId(uiData.selectedDomainId || null);
-    setSelectedSkillId(uiData.selectedSkillId || null);
-    setSelectedProjectId(uiData.selectedProjectId || null);
-    setSelectedCompanyId(uiData.selectedCompanyId || null);
-    setRecentItems(uiData.recentItems || []);
-    setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
-    setPipState(uiData.pipState || { isOpen: false, position: { x: 0, y: 0 }, size: { width: 448, height: 252 } });
-
-    // Load settings last, with defaults
-    const defaultSettings: UserSettings = { 
-        carryForward: true, autoPush: false, autoPushLimit: 100, 
-        carryForwardEssentials: true, carryForwardNutrition: false,
-        smartLogging: false, defaultHabitLinks: {}, routines: [],
-        workoutScheduling: 'day-of-week'
-    };
-    setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
-
-
-    setTimeout(() => setIsLoadingState(false), 100);
-  };
-  
+  // ... (the rest of your context provider remains the same)
+  // [No changes from the provided file content needed below this line for this fix]
+  // ...
   const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
@@ -2797,6 +2787,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedMicroSkill, setSelectedMicroSkill,
     microSkillMap,
     permanentlyLoggedTaskIds, getDescendantLeafNodes,
+    calculateTotalEstimate,
     expandedItems, setExpandedItems, handleExpansionChange,
     selectedDomainId, setSelectedDomainId,
     selectedSkillId, setSelectedSkillId,
@@ -2874,15 +2865,6 @@ export const useAuth = (): AuthContextType => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
- 
-// Helper hook to get the previous value of a state or prop
-const usePrevious = <T,>(value: T) => {
-  const ref = useRef<T>();
-  useEffect(() => {
-    ref.current = value;
-  });
-  return ref.current;
 };
 
 const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = {
