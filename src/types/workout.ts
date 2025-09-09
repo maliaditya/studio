@@ -297,7 +297,8 @@ export interface Resource {
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
-  audioUrl?: string;
+  audioUrl?: string; // For cloud-hosted URLs (future)
+  localAudioUrl?: string; // For temporary, in-session data URIs
   
   // For 'habit' type
   trigger?: {

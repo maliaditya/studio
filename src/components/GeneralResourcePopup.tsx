@@ -1,4 +1,5 @@
 
+
       "use client";
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -58,18 +59,20 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
     React.useEffect(() => {
         const audioEl = audioRef.current;
-        if (!audioEl || !resource?.audioUrl) return;
+        if (!audioEl || (!resource?.audioUrl && !resource?.localAudioUrl)) return;
+
+        const sourceUrl = resource.localAudioUrl || resource.audioUrl;
     
-        if (playingAudio) {
-          if (audioEl.src !== resource.audioUrl) {
-            audioEl.src = resource.audioUrl;
+        if (playingAudio && sourceUrl) {
+          if (audioEl.src !== sourceUrl) {
+            audioEl.src = sourceUrl;
           }
           audioEl.volume = globalVolume;
           audioEl.play().catch(e => console.error("Audio play failed:", e));
         } else {
           audioEl.pause();
         }
-      }, [playingAudio, resource?.audioUrl, globalVolume]);
+      }, [playingAudio, resource?.audioUrl, resource?.localAudioUrl, globalVolume]);
 
     if (!resource) return null;
 
@@ -119,8 +122,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         if (file) {
             const reader = new FileReader();
             reader.onload = (e) => {
-                const audioUrl = e.target?.result as string;
-                onUpdate({ ...resource, audioUrl });
+                const audioDataUri = e.target?.result as string;
+                // Update the resource with the new local audio URL for immediate playback
+                onUpdate({ ...resource, localAudioUrl: audioDataUri });
             };
             reader.readAsDataURL(file);
         }
@@ -234,7 +238,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                     </TooltipProvider>
-                    {resource.audioUrl ? (
+                    {(resource.audioUrl || resource.localAudioUrl) ? (
                          <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
                             {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                         </Button>
@@ -277,7 +281,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onConvertToCard }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
@@ -405,5 +409,3 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
     );
 }
 
-
-    
