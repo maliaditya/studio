@@ -69,7 +69,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         } else {
           audioEl.pause();
         }
-    }, [playingAudio, resource?.audioUrl, globalVolume]);
+      }, [playingAudio, resource?.audioUrl, globalVolume]);
 
     if (!resource) return null;
 
@@ -114,6 +114,23 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         openContentViewPopup(`content-${point.id}`, resource, point, e);
     };
 
+    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const audioUrl = e.target?.result as string;
+                onUpdate({ ...resource, audioUrl });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+    
+    const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        setPlayingAudio(prev => !prev);
+    };
+
     const renderContent = () => {
         switch (resource.type) {
             case 'card':
@@ -138,7 +155,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
                         <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
                         <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="New Response" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
+                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState}/>
                     </div>
                 );
             case 'mechanism':
@@ -204,7 +221,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-            <audio ref={audioRef} />
+            <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
+            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] relative group">
                 <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
@@ -216,6 +234,15 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                     </TooltipProvider>
+                    {resource.audioUrl ? (
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
+                            {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                        </Button>
+                    ) : (
+                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
+                            <Upload className="h-4 w-4" />
+                        </Button>
+                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -283,7 +310,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
                 if (response.ok) {
                     onUpdate(point.id, { text: editText.trim(), displayText: result.title || editText.trim() });
                 } else {
-                    onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
+                     onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
                 }
             } catch (error) {
                 onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
@@ -377,5 +404,7 @@ const EditableResourcePoint = ({ point, onUpdate, onDelete, onOpenNestedPopup, o
         </li>
     );
 }
+
+    
 
     
