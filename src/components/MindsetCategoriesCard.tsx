@@ -5,13 +5,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, isBefore, startOfDay, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import type { Activity, ActivityType, DatedWorkout, DailySchedule, Resource, Stopper } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle, LineChart as LineChartIcon } from 'lucide-react';
+import { PieChart as PieChartIcon, X, Brain, Link as LinkIcon, Workflow, ChevronLeft, PlusCircle, LineChart as LineChartIcon, History } from 'lucide-react';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+
 
 const activityNameMap: Record<ActivityType, string> = {
     deepwork: 'Deep Work',
@@ -46,6 +50,15 @@ const activityColorMapping: Record<string, string> = {
     'Free Time': 'bg-gray-400',
 };
 
+const formatMinutes = (minutes: number) => {
+    if (minutes < 1) return "0m";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins}m`;
+};
+
 const slotOrder: { name: string; endHour: number, startHour: number }[] = [
     { name: 'Late Night', endHour: 4, startHour: 0 },
     { name: 'Dawn', endHour: 8, startHour: 4 },
@@ -55,6 +68,141 @@ const slotOrder: { name: string; endHour: number, startHour: number }[] = [
     { name: 'Night', endHour: 24, startHour: 20 }
 ];
 
+interface ActivityDetailPopupState {
+    category: string;
+    tasks: { name: string; duration: number }[];
+    x: number;
+    y: number;
+}
+
+const ActivityDetailPopup = ({ popupState, onClose }: {
+    popupState: ActivityDetailPopupState;
+    onClose: () => void;
+}) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: 'activity-detail-popup' });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        transform: transform ? `translate3d(${'${transform.x}'}px, ${'${transform.y}'}px, 0)` : undefined,
+        willChange: 'transform',
+        zIndex: 100,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-96 shadow-2xl border-2 border-primary/50 bg-card">
+                <CardHeader className="p-3 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between" {...listeners}>
+                    <CardTitle className="text-base">{popupState.category} Details</CardTitle>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} onPointerDown={(e) => e.stopPropagation()}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </CardHeader>
+                <CardContent className="p-3">
+                    <ScrollArea className="h-48 pr-3">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Task</TableHead>
+                                    <TableHead className="text-right">Duration</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {popupState.tasks.map((task, index) => (
+                                    <TableRow key={index}>
+                                        <TableCell className="font-medium truncate" title={task.name}>{task.name}</TableCell>
+                                        <TableCell className="text-right">{formatMinutes(task.duration)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
+    );
+};
+
+const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances }: { 
+    isOpen: boolean; 
+    onOpenChange: (isOpen: boolean) => void;
+    allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
+}) => {
+    const hourlyLog = React.useMemo(() => {
+        const log: { hour: number, label: string, urges: Map<string, number>, resistances: Map<string, number> }[] = Array.from({ length: 24 }, (_, i) => {
+            const start = i % 12 === 0 ? 12 : i % 12;
+            const startAmPm = i < 12 ? 'AM' : 'PM';
+            const end = (i + 1) % 12 === 0 ? 12 : (i + 1) % 12;
+            const endAmPm = (i + 1) < 12 || (i + 1) === 24 ? 'AM' : 'PM';
+            
+            return {
+                hour: i,
+                label: `${start} ${startAmPm} - ${end} ${i+1 === 24 ? 'AM' : endAmPm}`,
+                urges: new Map(),
+                resistances: new Map(),
+            };
+        });
+
+        allLinkedResistances.forEach(link => {
+            if (link.stopper.timestamps) {
+                link.stopper.timestamps.forEach(ts => {
+                    const hour = new Date(ts).getHours();
+                    const targetMap = link.isUrge ? log[hour].urges : log[hour].resistances;
+                    targetMap.set(link.stopper.text, (targetMap.get(link.stopper.text) || 0) + 1);
+                });
+            }
+        });
+        return log;
+    }, [allLinkedResistances]);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-4xl max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle>Hourly Resistance Log</DialogTitle>
+                    <DialogDescription>
+                        A historical log of all your urges and resistances, grouped by the hour of the day they were recorded.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    <ScrollArea className="h-full pr-4">
+                        <Table>
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                                <TableRow>
+                                    <TableHead className="w-[120px]">Hour</TableHead>
+                                    <TableHead>Urges</TableHead>
+                                    <TableHead>Resistances</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {hourlyLog.map(({ hour, label, urges, resistances }) => (
+                                    <TableRow key={hour}>
+                                        <TableCell className="font-medium text-xs">{label}</TableCell>
+                                        <TableCell>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {Array.from(urges.entries()).map(([text, count]) => (
+                                                    <li key={text} className="text-xs text-muted-foreground">{text} {count > 1 && <span className="font-bold">({count})</span>}</li>
+                                                ))}
+                                            </ul>
+                                        </TableCell>
+                                        <TableCell>
+                                            <ul className="list-disc list-inside space-y-1">
+                                                {Array.from(resistances.entries()).map(([text, count]) => (
+                                                    <li key={text} className="text-xs text-muted-foreground">{text} {count > 1 && <span className="font-bold">({count})</span>}</li>
+                                                ))}
+                                            </ul>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )
+};
 
 export function MindsetCategoriesCard() {
     const { 
@@ -70,6 +218,7 @@ export function MindsetCategoriesCard() {
     const [isClient, setIsClient] = useState(false);
     const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
+    const [isHourlyLogOpen, setIsHourlyLogOpen] = useState(false);
 
     const [position, setPosition] = useState({ x: 20, y: 320 });
     const [isDragging, setIsDragging] = useState(false);
@@ -279,40 +428,54 @@ export function MindsetCategoriesCard() {
     };
 
     return (
-        <motion.div
-            style={style}
-            className="fixed w-full max-w-xs z-50"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            onMouseDown={handleMouseDown}
-        >
-            <Card 
-                className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
+        <>
+            <motion.div
+                style={style}
+                className="fixed w-full max-w-xs z-50"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.3 }}
+                onMouseDown={handleMouseDown}
             >
-                <div className="cursor-grab active:cursor-grabbing">
-                    <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
-                        {view === 'all-resistances' && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
-                                <ChevronLeft className="h-4 w-4" />
-                            </Button>
-                        )}
-                        <CardTitle className="flex items-center gap-2 text-base text-primary">
-                            <Brain className="h-5 w-5 text-purple-500" />
-                            {view === 'techniques' ? 'Mindset Techniques' : 'All Linked Resistances'}
-                        </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView(v => v === 'techniques' ? 'all-resistances' : 'techniques')}>
-                            <Workflow className="h-4 w-4" />
-                        </Button>
-                    </CardHeader>
-                </div>
-                <CardContent className="p-0">
-                    <ScrollArea className="h-48 pr-3">
-                        {renderContent()}
-                    </ScrollArea>
-                </CardContent>
-            </Card>
-        </motion.div>
+                <Card 
+                    className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
+                >
+                    <div className="cursor-grab active:cursor-grabbing">
+                        <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
+                            {view === 'all-resistances' && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                            )}
+                            <CardTitle className="flex items-center gap-2 text-base text-primary">
+                                <Brain className="h-5 w-5 text-purple-500" />
+                                {view === 'techniques' ? 'Mindset Techniques' : 'All Linked Resistances'}
+                            </CardTitle>
+                            <div className="flex items-center">
+                                {view === 'all-resistances' && (
+                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsHourlyLogOpen(true)}>
+                                        <History className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView(v => v === 'techniques' ? 'all-resistances' : 'techniques')}>
+                                    <Workflow className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </CardHeader>
+                    </div>
+                    <CardContent className="p-0">
+                        <ScrollArea className="h-48 pr-3">
+                            {renderContent()}
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </motion.div>
+            <HourlyResistanceLogDialog 
+                isOpen={isHourlyLogOpen}
+                onOpenChange={setIsHourlyLogOpen}
+                allLinkedResistances={allLinkedResistances}
+            />
+        </>
     );
 }
