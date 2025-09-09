@@ -248,8 +248,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </Button>
                 </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0 text-center">
-                    <div className="flex items-center justify-center gap-2">
+                <CardHeader className="p-3 pt-8 relative flex-shrink-0">
+                    <div className="flex items-center gap-2">
                         {getIcon()}
                         {editingTitle ? (
                              <Input 
