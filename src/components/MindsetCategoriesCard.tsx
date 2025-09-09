@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -139,18 +139,37 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
+    
+    const getResistanceHighlightClass = (timestamps: number[] = []) => {
+        const todayStart = startOfDay(new Date());
+        const todayTimestamps = timestamps.filter(ts => ts >= todayStart.getTime());
+        const count = todayTimestamps.length;
+        
+        const sevenDaysAgo = subDays(todayStart, 7);
+        const lastTimestamp = Math.max(0, ...timestamps);
+        const isDormant = lastTimestamp > 0 && isBefore(new Date(lastTimestamp), sevenDaysAgo);
+
+        let highlightClass = 'bg-muted/50';
+        if (count === 1) highlightClass = 'bg-yellow-500/20';
+        else if (count === 2) highlightClass = 'bg-orange-500/20';
+        else if (count >= 3) highlightClass = 'bg-red-500/20';
+        else if (count === 0 && !isDormant) highlightClass = 'bg-green-500/10';
+
+        return { className: highlightClass, dormant: isDormant };
+    };
+
     const hourlyLog = React.useMemo(() => {
-        const log: { hour: number, label: string, urges: Map<string, number>, resistances: Map<string, number> }[] = Array.from({ length: 24 }, (_, i) => {
+        const log = Array.from({ length: 24 }, (_, i) => {
             const start = i % 12 === 0 ? 12 : i % 12;
             const startAmPm = i < 12 ? 'AM' : 'PM';
             const end = (i + 1) % 12 === 0 ? 12 : (i + 1) % 12;
-            const endAmPm = (i + 1) < 12 || (i + 1) === 24 ? 'AM' : 'PM';
+            const endAmPm = (i + 1) === 24 ? 'AM' : i + 1 < 12 ? 'AM' : 'PM';
             
             return {
                 hour: i,
-                label: `${start} ${startAmPm} - ${end} ${i+1 === 24 ? 'AM' : endAmPm}`,
-                urges: new Map(),
-                resistances: new Map(),
+                label: `${start} ${startAmPm} - ${end} ${endAmPm}`,
+                urges: new Map<string, { count: number, timestamps: number[] }>(),
+                resistances: new Map<string, { count: number, timestamps: number[] }>(),
             };
         });
 
@@ -159,7 +178,10 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                 link.stopper.timestamps.forEach(ts => {
                     const hour = new Date(ts).getHours();
                     const targetMap = link.isUrge ? log[hour].urges : log[hour].resistances;
-                    targetMap.set(link.stopper.text, (targetMap.get(link.stopper.text) || 0) + 1);
+                    const entry = targetMap.get(link.stopper.text) || { count: 0, timestamps: [] };
+                    entry.count++;
+                    entry.timestamps.push(ts);
+                    targetMap.set(link.stopper.text, entry);
                 });
             }
         });
@@ -190,17 +212,27 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                                     <TableRow key={hour}>
                                         <TableCell className="font-medium text-xs">{label}</TableCell>
                                         <TableCell>
-                                            <ul className="list-disc list-inside space-y-1">
-                                                {Array.from(urges.entries()).map(([text, count]) => (
-                                                    <li key={text} className="text-xs text-muted-foreground">{text} {count > 1 && <span className="font-bold">({count})</span>}</li>
-                                                ))}
+                                            <ul className="space-y-1">
+                                                {Array.from(urges.entries()).map(([text, data]) => {
+                                                    const { className, dormant } = getResistanceHighlightClass(data.timestamps);
+                                                    return (
+                                                        <li key={text} className={cn("text-xs p-1 rounded-md", className)}>
+                                                            <span className={cn(dormant && "line-through")}>{text}</span> {data.count > 1 && <span className="font-bold">({data.count})</span>}
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         </TableCell>
                                         <TableCell>
-                                            <ul className="list-disc list-inside space-y-1">
-                                                {Array.from(resistances.entries()).map(([text, count]) => (
-                                                    <li key={text} className="text-xs text-muted-foreground">{text} {count > 1 && <span className="font-bold">({count})</span>}</li>
-                                                ))}
+                                            <ul className="space-y-1">
+                                                {Array.from(resistances.entries()).map(([text, data]) => {
+                                                    const { className, dormant } = getResistanceHighlightClass(data.timestamps);
+                                                    return (
+                                                        <li key={text} className={cn("text-xs p-1 rounded-md", className)}>
+                                                            <span className={cn(dormant && "line-through")}>{text}</span> {data.count > 1 && <span className="font-bold">({data.count})</span>}
+                                                        </li>
+                                                    );
+                                                })}
                                             </ul>
                                         </TableCell>
                                     </TableRow>
@@ -516,3 +548,5 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
+
+    
