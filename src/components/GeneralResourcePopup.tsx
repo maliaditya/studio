@@ -22,6 +22,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { storeAudio, getAudio, deleteAudio } from '@/lib/audioDB';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -57,22 +58,36 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
-    React.useEffect(() => {
-        const audioEl = audioRef.current;
-        if (!audioEl || (!resource?.audioUrl && !resource?.localAudioUrl)) return;
-
-        const sourceUrl = resource.localAudioUrl || resource.audioUrl;
+    useEffect(() => {
+      const audioEl = audioRef.current;
+      if (!audioEl) return;
     
-        if (playingAudio && sourceUrl) {
-          if (audioEl.src !== sourceUrl) {
-            audioEl.src = sourceUrl;
+      const loadAndPlayAudio = async () => {
+        if (playingAudio && resource) {
+          const audioBlob = await getAudio(resource.id);
+          if (audioBlob) {
+            const audioUrl = URL.createObjectURL(audioBlob);
+            audioEl.src = audioUrl;
+            audioEl.volume = globalVolume;
+            audioEl.play().catch(e => console.error("Audio play failed:", e));
+          } else {
+            setPlayingAudio(false); // Can't find audio to play
           }
-          audioEl.volume = globalVolume;
-          audioEl.play().catch(e => console.error("Audio play failed:", e));
         } else {
           audioEl.pause();
         }
-      }, [playingAudio, resource?.audioUrl, resource?.localAudioUrl, globalVolume]);
+      };
+    
+      loadAndPlayAudio();
+    
+      // Cleanup object URL
+      return () => {
+        if (audioEl && !audioEl.paused) {
+          audioEl.pause();
+          URL.revokeObjectURL(audioEl.src);
+        }
+      };
+    }, [playingAudio, resource, globalVolume]);
 
     if (!resource) return null;
 
@@ -117,17 +132,17 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         openContentViewPopup(`content-${point.id}`, resource, point, e);
     };
 
-    const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const audioDataUri = e.target?.result as string;
-                // Update the resource with the new local audio URL for immediate playback
-                onUpdate({ ...resource, localAudioUrl: audioDataUri });
-            };
-            reader.readAsDataURL(file);
+    const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        try {
+          await storeAudio(resource.id, file);
+          // Set a flag on the resource to indicate local audio is available
+          onUpdate({ ...resource, hasLocalAudio: true });
+        } catch (error) {
+          console.error("Failed to store audio in IndexedDB", error);
         }
+      }
     };
     
     const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
@@ -229,7 +244,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] relative group">
                 <div className="absolute top-2 left-2 z-20 p-1 cursor-grab active:cursor-grabbing" {...listeners}>
-                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                    
                 </div>
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
@@ -238,7 +253,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                     </TooltipProvider>
-                    {(resource.audioUrl || resource.localAudioUrl) ? (
+                    {resource.hasLocalAudio ? (
                          <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
                             {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
                         </Button>
@@ -409,3 +424,102 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     );
 }
 
+```
+  <change>
+    <file>src/lib/audioDB.ts</file>
+    <content><![CDATA[
+"use client";
+
+const DB_NAME = 'LifeOSAudioDB';
+const STORE_NAME = 'audioStore';
+const DB_VERSION = 1;
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function getDB(): Promise<IDBDatabase> {
+  if (dbPromise) {
+    return dbPromise;
+  }
+
+  dbPromise = new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB is not supported in this browser.'));
+      return;
+    }
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+
+    request.onsuccess = (event) => {
+      resolve((event.target as IDBOpenDBRequest).result);
+    };
+
+    request.onerror = (event) => {
+      console.error('IndexedDB error:', (event.target as IDBOpenDBRequest).error);
+      reject(new Error('IndexedDB error'));
+      dbPromise = null; // Reset promise on error
+    };
+
+    request.onblocked = () => {
+        // This event is fired when the database is blocked by an old connection.
+        console.warn('IndexedDB connection is blocked. Please close other tabs with this app open.');
+        reject(new Error('IndexedDB connection blocked.'));
+        dbPromise = null;
+    };
+  });
+  
+  return dbPromise;
+}
+
+export async function storeAudio(key: string, audioBlob: Blob): Promise<void> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(audioBlob, key);
+
+    request.onsuccess = () => resolve();
+    request.onerror = (event) => {
+        console.error('Error storing audio:', (event.target as IDBRequest).error);
+        reject(new Error('Failed to store audio.'));
+    };
+  });
+}
+
+export async function getAudio(key: string): Promise<Blob | null> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(key);
+
+    request.onsuccess = () => {
+      resolve(request.result || null);
+    };
+    request.onerror = (event) => {
+      console.error('Error fetching audio:', (event.target as IDBRequest).error);
+      reject(new Error('Failed to retrieve audio.'));
+    };
+  });
+}
+
+export async function deleteAudio(key: string): Promise<void> {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.delete(key);
+  
+      request.onsuccess = () => resolve();
+      request.onerror = (event) => {
+        console.error('Error deleting audio:', (event.target as IDBRequest).error);
+        reject(new Error('Failed to delete audio.'));
+      };
+    });
+}

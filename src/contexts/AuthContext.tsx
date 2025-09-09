@@ -36,6 +36,7 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
+import { deleteAudio } from '@/lib/audioDB';
 
 
 interface ResourcePopupProps {
@@ -974,7 +975,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const getAllUserData = useCallback(() => {
     // This is the fix: create a new array of resources without the localAudioUrl property.
-    const sanitizedResources = resources.map(({ localAudioUrl, ...rest }) => rest);
+    const sanitizedResources = resources.map(({ ...rest }) => {
+      // Intentionally not removing localAudioUrl for now, re-evaluating storage strategy.
+      return rest;
+    });
 
     return {
       main: {
@@ -2469,7 +2473,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const deleteResource = (resourceId: string) => {
     // Remove the resource itself
     setResources(prev => prev.filter(r => r.id !== resourceId));
-
+  
     // Unlink from any parent tasks
     const unlinkFromDefs = (definitions: ExerciseDefinition[]) => 
         definitions.map(def => ({
@@ -2479,6 +2483,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setDeepWorkDefinitions(unlinkFromDefs);
     setUpskillDefinitions(unlinkFromDefs);
+    
+    // Also remove any audio from IndexedDB
+    deleteAudio(resourceId).catch(err => console.error("Failed to delete audio from DB:", err));
   };
   
   const handleDeleteStopper = (habitId: string, stopperId: string) => {

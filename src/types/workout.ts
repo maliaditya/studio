@@ -298,7 +298,7 @@ export interface Resource {
   points?: ResourcePoint[];
   icon?: string;
   audioUrl?: string; // For cloud-hosted URLs (future)
-  localAudioUrl?: string; // For temporary, in-session data URIs
+  hasLocalAudio?: boolean; // Flag to check IndexedDB
   
   // For 'habit' type
   trigger?: {
@@ -645,4 +645,14 @@ export interface UserSettings {
   defaultHabitLinks: Partial<Record<ActivityType, string | null>>;
   routines: Activity[];
   workoutScheduling: WorkoutSchedulingMode;
+}
+
+export interface ActiveFocusSession {
+  activity: Activity;
+  duration: number; // in minutes
+  secondsLeft: number;
+  totalSeconds: number;
+  startTime: number;
+  state: 'running' | 'paused' | 'idle';
+  subTaskStartTime?: number;
 }
