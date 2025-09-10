@@ -975,7 +975,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const getAllUserData = useCallback(() => {
     // This is the fix: create a new array of resources without the localAudioUrl property.
-    const sanitizedResources = resources.map(({ ...rest }) => {
+    const sanitizedResources = resources.map(({ localAudioUrl, ...rest }) => {
       // Intentionally not removing localAudioUrl for now, re-evaluating storage strategy.
       return rest;
     });
@@ -2008,17 +2008,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const handleUpdateMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string, name: string) => {
-    setCoreSkills(prev => prev.map(s => {
+    let oldName = '';
+    const updatedCoreSkills = coreSkills.map(s => {
         if (s.id === coreSkillId) {
-            return { ...s, skillAreas: s.skillAreas.map(area => {
+            const updatedSkillAreas = s.skillAreas.map(area => {
                 if (area.id === areaId) {
-                    return { ...area, microSkills: area.microSkills.map(ms => ms.id === microSkillId ? {...ms, name} : ms) };
+                    const microSkill = area.microSkills.find(ms => ms.id === microSkillId);
+                    if (microSkill) {
+                        oldName = microSkill.name;
+                    }
+                    return {
+                        ...area,
+                        microSkills: area.microSkills.map(ms =>
+                            ms.id === microSkillId ? { ...ms, name } : ms
+                        )
+                    };
                 }
                 return area;
-            }) };
+            });
+            return { ...s, skillAreas: updatedSkillAreas };
         }
         return s;
-    }));
+    });
+
+    setCoreSkills(updatedCoreSkills);
+
+    if (oldName && oldName !== name) {
+        const updateCategory = (defs: ExerciseDefinition[]) => 
+            defs.map(def => def.category === oldName ? { ...def, category: name as ExerciseCategory } : def);
+            
+        setUpskillDefinitions(prev => updateCategory(prev));
+        setDeepWorkDefinitions(prev => updateCategory(prev));
+    }
   };
   
   const handleDeleteMicroSkill = (coreSkillId: string, areaId: string, microSkillId: string) => {
