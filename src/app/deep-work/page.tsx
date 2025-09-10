@@ -255,7 +255,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     activeProjectIds,
     currentSlot,
 }, ref) => {
-    const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
+    const { getDescendantLeafNodes } = useAuth();
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `card-deepwork-${deepworkDef.id}`,
@@ -642,7 +642,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     currentSlot,
 }, ref) => {
 
-    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
+    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes } = useAuth();
     
     const getDomainForCategory = useCallback((category: string) => {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -818,11 +818,13 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     
-                    const nodeType = getUpskillNodeType(def);
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                    const isComplete = leafNodes.length > 0 
-                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
-                        : ((def.loggedDuration || 0) > 0);
+                    let isComplete;
+                    if (leafNodes.length > 0) {
+                        isComplete = leafNodes.every(n => (n.loggedDuration || 0) > 0);
+                    } else {
+                        isComplete = (def.loggedDuration || 0) > 0;
+                    }
 
                     return (
                         <LinkedUpskillCard 
@@ -832,7 +834,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                             isComplete={isComplete}
                             calculatedEstimate={calculateTotalEstimate(def)}
-                            handleAddTaskToSession={handleAddTaskToSession}
+                            handleAddTaskToSession={scheduleTaskFromMindMap}
                             handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
                             handleUnlinkItem={handleUnlinkItem}
@@ -2057,9 +2059,12 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                                    const isComplete = leafNodes.length > 0 
-                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
-                                      : ((def.loggedDuration || 0) > 0);
+                                    let isComplete;
+                                    if (leafNodes.length > 0) {
+                                      isComplete = leafNodes.every(n => (n.loggedDuration || 0) > 0);
+                                    } else {
+                                      isComplete = (def.loggedDuration || 0) > 0;
+                                    }
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2069,7 +2074,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             isComplete={isComplete}
                                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                             calculatedEstimate={calculateTotalEstimate(def)}
-                                            handleAddTaskToSession={(defId, type, slot) => scheduleTaskFromMindMap(defId, type, slot, calculateTotalEstimate(def))}
+                                            handleAddTaskToSession={scheduleTaskFromMindMap}
                                             handleCardClick={handleCardClick}
                                             handleDeleteSubtopic={handleDeleteFocusArea}
                                             handleUnlinkItem={handleUnlinkItem}
@@ -2404,7 +2409,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                          <LinkedUpskillCard 
                             upskillDef={activeDragItem as ExerciseDefinition}
                             getUpskillNodeType={getUpskillNodeType}
-                            isComplete={permanentlyLoggedTaskIds.has(activeDragItem.id)}
+                            isComplete={(activeDragItem as ExerciseDefinition).loggedDuration! > 0}
                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                             calculatedEstimate={calculateTotalEstimate(activeDragItem as ExerciseDefinition)}
                             handleAddTaskToSession={scheduleTaskFromMindMap}
