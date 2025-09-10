@@ -24,6 +24,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
