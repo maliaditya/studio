@@ -298,14 +298,14 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
-             return permanentlyLoggedTaskIds.has(deepworkDef.id);
+             return (deepworkDef.loggedDuration || 0) > 0;
         }
         // An objective with a single leaf node (itself) is complete if logged.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0;
         }
         return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id, deepworkDef.loggedDuration]);
+    }, [leafNodes, completedCount, deepworkDef.id, deepworkDef.loggedDuration]);
     
     const parentIntention = useMemo(() => {
         if (nodeType !== 'Objective') return null;
@@ -335,7 +335,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
+    const isComplete = isActionable ? (deepworkDef.loggedDuration || 0) > 0 : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -839,7 +839,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
@@ -2074,8 +2073,6 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
                                             onEdit={setEditingFocusArea}
-                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                                            onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
                                             upskillDefinitions={upskillDefinitions}
@@ -2412,8 +2409,6 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={setEditingFocusArea}
-                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                            onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
                             upskillDefinitions={upskillDefinitions}
