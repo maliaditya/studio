@@ -277,19 +277,14 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
     const leafNodes = useMemo(() => {
-        if (nodeType === 'Intention' || nodeType === 'Objective') {
-            const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
-            // If an Objective has no children, it is its own leaf node for progress tracking.
-            if (descendants.length === 0 && nodeType === 'Objective') {
-                return [deepworkDef];
-            }
-            return descendants;
+        const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
+        if (nodeType === 'Objective' && descendants.length === 0) {
+            return [deepworkDef];
         }
-        return [];
+        return descendants;
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        // If an objective is its own leaf node, check if it has been logged itself.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
@@ -300,12 +295,11 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         if (leafNodes.length === 0) {
              return (deepworkDef.loggedDuration || 0) > 0;
         }
-        // An objective with a single leaf node (itself) is complete if logged.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0;
         }
         return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, deepworkDef.id, deepworkDef.loggedDuration]);
+    }, [leafNodes, completedCount, deepworkDef]);
     
     const parentIntention = useMemo(() => {
         if (nodeType !== 'Objective') return null;
@@ -823,7 +817,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                    const isComplete = leafNodes.length > 0 && leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id));
+                    const isComplete = leafNodes.length > 0 
+                        ? leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id))
+                        : (def.loggedDuration || 0) > 0;
 
                     return (
                         <LinkedUpskillCard 
@@ -833,12 +829,13 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                             isComplete={isComplete}
                             calculatedEstimate={calculateTotalEstimate(def)}
-                            handleAddTaskToSession={scheduleTaskFromMindMap}
+                            handleAddTaskToSession={(defId, type, slot) => handleAddTaskToSession({id: defId, type, category: def.category, name: def.name}, slot)}
                             handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
+                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
@@ -1757,7 +1754,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
   };
 
   const handleCreateResource = (parentTask: ExerciseDefinition) => {
-    const updatedTask = createResourceWithHierarchy(parentTask, 'card');
+    const updatedTask = createResourceWithHierarchy(parentTask, undefined, 'card');
     if (updatedTask) {
         const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
         setNavigationStack(prev => prev.map(item =>
@@ -2057,7 +2054,9 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                                    const isComplete = leafNodes.length > 0 && leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id));
+                                    const isComplete = leafNodes.length > 0 
+                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
+                                      : (def.loggedDuration || 0) > 0;
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2073,6 +2072,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
                                             onEdit={setEditingFocusArea}
+                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                            onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
                                             upskillDefinitions={upskillDefinitions}
@@ -2409,6 +2410,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={setEditingFocusArea}
+                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
                             upskillDefinitions={upskillDefinitions}
