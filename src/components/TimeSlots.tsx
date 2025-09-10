@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -15,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, parseISO, isBefore, startOfDay } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -51,7 +50,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, setSchedule } = useAuth();
+  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, setSchedule, openRuleDetailPopup } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -145,9 +144,13 @@ export function TimeSlots({
                  {linkedRules.length > 0 && (
                     <div className="mb-2 space-y-1">
                         {linkedRules.map(rule => (
-                            <p key={rule.id} className="text-xs text-muted-foreground italic pl-2 border-l-2 border-primary/50">
+                            <button 
+                                key={rule.id} 
+                                className="text-xs text-left w-full text-muted-foreground italic pl-2 border-l-2 border-primary/50 hover:text-primary transition-colors"
+                                onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                            >
                                 {rule.text}
-                            </p>
+                            </button>
                         ))}
                     </div>
                  )}
