@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -702,11 +701,11 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => onOpenMindMap(currentTask.id)}><GitMerge className="h-4 w-4"/></Button>
-                    </TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip></TooltipProvider>
+                    </TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></TooltipProvider>
                     
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(currentTask, currentTask.type)}><TrendingUp className="h-4 w-4"/></Button>
-                    </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></Tooltip></TooltipProvider>
+                    </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></TooltipProvider>
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -741,7 +740,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                                     <DropdownMenuCheckboxItem
                                         key={task.id}
                                         checked={(currentTask.linkedUpskillIds || []).includes(task.id)}
-                                        onCheckedChange={() => handleLinkToggle(task.id, 'upskill')}
+                                        onCheckedChange={()={() => handleLinkToggle(task.id, 'upskill')}
                                     >
                                         {task.name}
                                     </DropdownMenuCheckboxItem>
@@ -750,7 +749,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
+                    <Button size="sm" variant="outline" onClick={()={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
 
@@ -2053,9 +2052,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                                    let isComplete = leafNodes.length > 0
-                                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
-                                        : (def.loggedDuration || 0) > 0;
+                                    const allChildrenCompleted = leafNodes.length > 0 && leafNodes.every(n => (n.loggedDuration || 0) > 0);
+                                    const isComplete = leafNodes.length === 0 ? (def.loggedDuration || 0) > 0 : allChildrenCompleted;
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2070,8 +2068,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleDeleteSubtopic={handleDeleteFocusArea}
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
-                                            onEdit={onEdit}
-                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                            onEdit={setEditingFocusArea}
                                             onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
