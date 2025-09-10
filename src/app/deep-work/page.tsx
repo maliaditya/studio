@@ -291,8 +291,8 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
-        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id) || (node.loggedDuration || 0) > 0).length;
-    }, [leafNodes, permanentlyLoggedTaskIds, deepworkDef]);
+        return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
+    }, [leafNodes, deepworkDef]);
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
@@ -412,13 +412,13 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                             const childDef = deepWorkDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            const isChildLogged = permanentlyLoggedTaskIds.has(childId) || (childDef.loggedDuration || 0) > 0;
+                            const isChildLogged = (childDef.loggedDuration || 0) > 0;
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="deepwork" />;
                         })}
                         {(deepworkDef.linkedUpskillIds || []).map(childId => {
                             const childDef = upskillDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            const isChildLogged = permanentlyLoggedTaskIds.has(childId) || (childDef.loggedDuration || 0) > 0;
+                            const isChildLogged = (childDef.loggedDuration || 0) > 0;
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="upskill" />;
                         })}
                         {(deepworkDef.linkedResourceIds || []).map(childId => {
@@ -818,10 +818,11 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     
+                    const nodeType = getUpskillNodeType(def);
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                     const isComplete = leafNodes.length > 0 
-                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(n.id))
-                        : ((def.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(def.id));
+                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
+                        : ((def.loggedDuration || 0) > 0);
 
                     return (
                         <LinkedUpskillCard 
@@ -2057,8 +2058,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                                     const isComplete = leafNodes.length > 0 
-                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(n.id))
-                                      : ((def.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(def.id));
+                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
+                                      : ((def.loggedDuration || 0) > 0);
                                     
                                     return (
                                         <LinkedUpskillCard 
