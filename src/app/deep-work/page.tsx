@@ -279,7 +279,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 
     const leafNodes = useMemo(() => {
         const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
-        // If it's a parent but has no children, it acts as its own leaf node for progress.
         if ((nodeType === 'Objective' || nodeType === 'Intention') && descendants.length === 0) {
             return [deepworkDef];
         }
@@ -287,7 +286,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        // If the objective is its own leaf, check its own status based on logged time.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
@@ -819,12 +817,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                    let isComplete;
-                    if (leafNodes.length > 0) {
-                        isComplete = leafNodes.every(n => (n.loggedDuration || 0) > 0);
-                    } else {
-                        isComplete = (def.loggedDuration || 0) > 0;
-                    }
+                    const allChildrenCompleted = leafNodes.length > 0 && leafNodes.every(n => (n.loggedDuration || 0) > 0);
+                    const isComplete = leafNodes.length > 0 ? allChildrenCompleted : (def.loggedDuration || 0) > 0;
 
                     return (
                         <LinkedUpskillCard 
@@ -840,7 +834,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
@@ -2059,12 +2053,9 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                                    let isComplete;
-                                    if (leafNodes.length > 0) {
-                                      isComplete = leafNodes.every(n => (n.loggedDuration || 0) > 0);
-                                    } else {
-                                      isComplete = (def.loggedDuration || 0) > 0;
-                                    }
+                                    let isComplete = leafNodes.length > 0
+                                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
+                                        : (def.loggedDuration || 0) > 0;
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2080,7 +2071,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
                                             onEdit={setEditingFocusArea}
-                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                                             onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
@@ -2419,6 +2410,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                             handleViewProgress={handleViewProgress}
                             onEdit={setEditingFocusArea}
                             onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
                             upskillDefinitions={upskillDefinitions}
@@ -2447,3 +2439,4 @@ export default function DeepWorkPage() {
     
 
     
+
