@@ -37,7 +37,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     onDelete: (cardId: string) => void;
     onSpecializationClick: (specId: string) => void;
 }) => {
-    const { specializations, allEquations, projects } = useAuth();
+    const { specializations, allEquations, projects, offerizationPlans } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [editedCardData, setEditedCardData] = useState<PillarCardData>(cardData);
 
@@ -50,20 +50,42 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     };
 
     const handleLinkToggle = (type: 'practice' | 'applicationSpecialization' | 'applicationProject', id: string) => {
-        const keyMap = {
-            'practice': 'practiceEquationIds',
-            'applicationSpecialization': 'applicationSpecializationIds',
-            'applicationProject': 'applicationProjectIds',
+        let newCardData = isEditing ? { ...editedCardData } : { ...cardData };
+    
+        const isUnlinking = (newCardData[`${type}Ids` as keyof PillarCardData] as string[] || []).includes(id);
+    
+        const updateIds = (key: keyof PillarCardData, newId: string) => {
+            const currentIds = (newCardData[key] as string[] || []);
+            const isPresent = currentIds.includes(newId);
+            if (isUnlinking) { // Explicitly unlinking one thing
+                return currentIds.filter(i => i !== newId);
+            }
+            if (!isPresent) { // Linking
+                return [...currentIds, newId];
+            }
+            return currentIds; // No change if already present and not unlinking
         };
-        const key = keyMap[type];
-        
-        const currentIds = editedCardData[key as keyof PillarCardData] as string[] || [];
-        const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
+
+        newCardData[`${type}Ids` as keyof PillarCardData] = updateIds(`${type}Ids` as keyof PillarCardData, id) as any;
+
+        // If we are linking/unlinking a specialization, automatically handle its projects
+        if (type === 'applicationSpecialization') {
+            const specId = id;
+            const offerPlan = offerizationPlans[specId];
+            if (offerPlan && offerPlan.releases) {
+                const projectNamesInPlan = new Set(offerPlan.releases.map(r => r.name));
+                const projectIdsToToggle = projects.filter(p => projectNamesInPlan.has(p.name)).map(p => p.id);
+
+                projectIdsToToggle.forEach(projectId => {
+                    newCardData.applicationProjectIds = updateIds('applicationProjectIds', projectId);
+                });
+            }
+        }
         
         if (isEditing) {
-            setEditedCardData({ ...editedCardData, [key]: newIds });
+            setEditedCardData(newCardData);
         } else {
-             onUpdate({ ...cardData, [key]: newIds });
+            onUpdate(newCardData);
         }
     };
 
@@ -539,12 +561,10 @@ function PurposePageContent() {
 
         const today = startOfToday();
         const activeProjects = projects.filter(project => {
-            // Check productization plans by project ID
-            if (project.productPlan?.releases?.some(release => isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
-                return true;
+            if (productizationPlans && productizationPlans[project.name]?.releases?.some(release => isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
+              return true;
             }
 
-            // Check offerization plans by project NAME
             const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
                 plan.releases?.some(release => {
                     if (release.name !== project.name) return false;
