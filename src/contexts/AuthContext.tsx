@@ -1146,12 +1146,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!settings.routines || settings.routines.length === 0) {
       return schedule;
     }
-  
-    const datesToProcess = new Set(Object.keys(newSchedule));
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    datesToProcess.add(todayKey);
+    
+    // Get all dates that have any activities scheduled
+    const allDatesWithActivities = new Set(Object.keys(newSchedule));
+    // Also ensure today is always processed, even if empty
+    allDatesWithActivities.add(format(new Date(), 'yyyy-MM-dd'));
 
-    datesToProcess.forEach(dateKey => {
+    allDatesWithActivities.forEach(dateKey => {
       const daySchedule = newSchedule[dateKey] || {};
       const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
 
