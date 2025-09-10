@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -620,14 +621,13 @@ export const RuleDetailPopupCard = ({ popupState, onClose }: {
     );
 };
 
-
-export const LinkedResistancePopup = ({ popupState, onClose }: {
+export function MindsetTechniquePopup({ popupState, onClose }: {
     popupState: MindsetTechniquePopupState;
     onClose: () => void;
-}) => {
+}) {
+    const { mindProgrammingDefinitions, resources, openGeneralPopup } = useAuth();
     const { techniqueId, x, y } = popupState;
-    const { mindProgrammingDefinitions, resources, openGeneralPopup, handleHabitDetailPopupDragEnd, setResources } = useAuth();
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `linked-resistance-${techniqueId}` });
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `mindset-technique-${techniqueId}` });
     const cardRef = useRef<HTMLDivElement>(null);
 
     const style: React.CSSProperties = {
@@ -637,25 +637,12 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
         zIndex: 110,
         willChange: 'transform',
     };
-     if (transform) {
+    if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
 
     const technique = mindProgrammingDefinitions.find(t => t.id === techniqueId);
     
-    const linkedResistances = useMemo(() => {
-        if (!technique) return [];
-        return resources
-            .filter(res => res.type === 'habit')
-            .flatMap(habit => 
-                (habit.stoppers || []).map(stopper => ({
-                    habit,
-                    stopper
-                }))
-            )
-            .filter(({ stopper }) => stopper.linkedTechniqueId === technique.id);
-    }, [technique, resources]);
-
     if (!technique) return null;
 
     return (
@@ -666,7 +653,9 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                         <CardTitle className="text-base truncate">
                             {`Technique: ${technique.name}`}
                         </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}><X className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={onClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
@@ -690,33 +679,31 @@ export const LinkedResistancePopup = ({ popupState, onClose }: {
                                 )}
                             </div>
 
-                            {linkedResistances.length > 0 && (
-                                <Accordion type="single" collapsible defaultValue="linked-resistances" className="w-full">
-                                    <AccordionItem value="linked-resistances" className="border-b-0">
-                                        <AccordionTrigger className="text-xs font-semibold text-muted-foreground uppercase tracking-wider py-2">
-                                            Linked Resistances
-                                        </AccordionTrigger>
-                                        <AccordionContent>
-                                            <ul className="space-y-2">
-                                                {linkedResistances.map(({ habit, stopper }) => (
-                                                    <li key={stopper.id}>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="w-full justify-start h-auto py-1 text-left"
-                                                            onClick={(e) => openGeneralPopup(habit.id, e, undefined, cardRef.current?.getBoundingClientRect())}
-                                                        >
-                                                            <div className="flex flex-col">
-                                                                <span className="font-semibold text-foreground">{stopper.text}</span>
-                                                                <span className="text-xs text-muted-foreground">From: {habit.name}</span>
-                                                            </div>
-                                                        </Button>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </AccordionContent>
-                                    </AccordionItem>
-                                </Accordion>
+                            {(technique.linkedResourceIds && technique.linkedResourceIds.length > 0) && (
+                                <div className="pt-2 border-t">
+                                    <h4 className="font-semibold text-xs mb-1 text-muted-foreground uppercase tracking-wider">Linked Resources</h4>
+                                    <ul className="space-y-2">
+                                        {technique.linkedResourceIds.map(id => {
+                                            const resource = resources.find(r => r.id === id);
+                                            return resource ? (
+                                                <li key={id}>
+                                                    <Button
+                                                        variant="outline"
+                                                        className="w-full justify-start h-auto py-1 text-left"
+                                                        onClick={(e) => {
+                                                            if(cardRef.current) {
+                                                                openGeneralPopup(id, e, popupState as any, cardRef.current.getBoundingClientRect());
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Library className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
+                                                        <span className="font-semibold">{resource.name}</span>
+                                                    </Button>
+                                                </li>
+                                            ) : null;
+                                        })}
+                                    </ul>
+                                </div>
                             )}
                         </div>
                     </ScrollArea>

@@ -18,7 +18,7 @@ import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
-import { RuleDetailPopupCard, LinkedResistancePopup } from '@/components/HabitDetailPopup';
+import { RuleDetailPopupCard, MindsetTechniquePopup } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -121,7 +121,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setMissedSlotReviews,
     linkedResistancePopup,
     setLinkedResistancePopup,
-    openLinkedResistancePopup,
     stopperProgressPopup,
     setStopperProgressPopup,
   } = authContext;
@@ -510,7 +509,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 />
             )}
              {linkedResistancePopup && (
-                <LinkedResistancePopup
+                <MindsetTechniquePopup
                     popupState={linkedResistancePopup}
                     onClose={() => setLinkedResistancePopup(null)}
                 />
