@@ -43,7 +43,7 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'bg-orange-600',
     'Distractions': 'bg-amber-600',
     'Nutrition': 'bg-lime-500',
-    'Wasted Time': 'bg-orange-600',
+    'Untracked Time': 'bg-orange-600',
     'Scheduled': 'bg-sky-500',
     'Free Time': 'bg-gray-400',
 };
@@ -159,7 +159,7 @@ export function ActivityDistributionCard() {
         const dailySchedule = schedule[todayKey] || {};
         const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
         
-        let wastedTime = 0;
+        let untrackedTime = 0;
         let scheduledTime = 0;
         let totalLoggedMinutes = 0;
 
@@ -192,15 +192,15 @@ export function ActivityDistributionCard() {
             totalLoggedMinutes += loggedInSlot;
             
             if (isPastSlot) {
-                wastedTime += Math.max(0, 240 - loggedInSlot);
+                untrackedTime += Math.max(0, 240 - loggedInSlot);
             }
             
             scheduledTime += scheduledInSlot;
         });
         
-        if (wastedTime > 0) {
-          if (!totals['Wasted Time']) totals['Wasted Time'] = { time: 0, activities: [] };
-          totals['Wasted Time'].time = wastedTime;
+        if (untrackedTime > 0) {
+          if (!totals['Untracked Time']) totals['Untracked Time'] = { time: 0, activities: [] };
+          totals['Untracked Time'].time = untrackedTime;
         }
 
         if (scheduledTime > 0) {
@@ -208,7 +208,7 @@ export function ActivityDistributionCard() {
             totals['Scheduled'].time = scheduledTime;
         }
         
-        const totalAccountedForTime = totalLoggedMinutes + wastedTime + scheduledTime;
+        const totalAccountedForTime = totalLoggedMinutes + untrackedTime + scheduledTime;
         const totalMinutesInDay = 24 * 60;
         const freeTime = totalMinutesInDay - totalAccountedForTime;
 
@@ -217,7 +217,7 @@ export function ActivityDistributionCard() {
             totals['Free Time'].time = freeTime;
         }
 
-        const PREFERRED_ORDER = ['Wasted Time', 'Free Time', 'Scheduled', 'Distractions'];
+        const PREFERRED_ORDER = ['Untracked Time', 'Free Time', 'Scheduled', 'Distractions'];
 
         return Object.entries(totals)
             .map(([name, data]) => ({ name, ...data }))
@@ -235,7 +235,7 @@ export function ActivityDistributionCard() {
 
     const handleItemClick = (item: { name: string, activities: {name: string, duration: number}[] }, event: React.MouseEvent) => {
         if (!containerRef.current) return;
-        if (item.name === 'Wasted Time' || item.name === 'Free Time' || item.name === 'Scheduled') return;
+        if (item.name === 'Untracked Time' || item.name === 'Free Time' || item.name === 'Scheduled') return;
         const cardRect = containerRef.current.getBoundingClientRect();
         setDetailPopupState({
             category: item.name,
@@ -337,7 +337,7 @@ export function ActivityDistributionCard() {
                                         <button
                                             className="flex justify-between items-center text-sm w-full text-left"
                                             onClick={(e) => handleItemClick(item, e)}
-                                            disabled={item.name === 'Wasted Time' || item.name === 'Free Time' || item.name === 'Scheduled'}
+                                            disabled={item.name === 'Untracked Time' || item.name === 'Free Time' || item.name === 'Scheduled'}
                                         >
                                             <div className="flex items-center gap-2">
                                                 <div className={`w-3 h-3 rounded-full ${activityColorMapping[item.name] || 'bg-gray-400'}`}></div>
