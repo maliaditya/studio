@@ -232,7 +232,7 @@ export function TimeSlots({
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
               <div className="flex-grow min-h-0 mb-2">
-                <ScrollArea className="h-[200px] pr-2">
+                <div className="h-[200px] overflow-y-auto pr-2">
                   <ul className="space-y-2">
                     {activities && activities.length > 0 ? (
                       activities.map((activity) => {
@@ -367,13 +367,13 @@ export function TimeSlots({
                       </div>
                     )}
                   </ul>
-                </ScrollArea>
+                </div>
               </div>
               <div className="flex-shrink-0 mt-2 space-y-2">
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{loggedTime} min logged</span>
-                    <span>{freeTime} min {isPastSlot ? 'wasted' : 'free'}</span>
+                    <span>{freeTime} min {isPastSlot ? 'untracked' : 'free'}</span>
                 </div>
                 <div className="flex justify-end items-center">
                     <Popover>

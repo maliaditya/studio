@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -273,7 +274,7 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange }: { analysis: any, 
                                 <div key={index}>
                                     <h4 className="font-semibold">{item.name} ({item.time})</h4>
                                     <p className="text-sm text-muted-foreground">
-                                        Logged: {item.loggedTime} min | Wasted: {item.wastedTime} min
+                                        Logged: {item.loggedTime} min | Untracked: {item.wastedTime} min
                                     </p>
                                     <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
                                         {item.insight}
@@ -285,7 +286,7 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange }: { analysis: any, 
                                 <div key="summary" className="pt-4 border-t">
                                     <h4 className="font-semibold">Daily Summary</h4>
                                     <p className="text-sm text-muted-foreground">
-                                        Total Logged: {item.totalLogged} min | Total Wasted: {item.totalWasted} min
+                                        Total Logged: {item.totalLogged} min | Total Untracked: {item.totalWasted} min
                                     </p>
                                      <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
                                         {item.insight}
@@ -404,7 +405,7 @@ export function SmartLoggingPrompt({
         } else if (loggedTime === 0) {
           insight = "You let the whole block slip away—4 hours drifted without return.";
         } else if (loggedTime < 180) { // Less than 3 hours
-          insight = `You gained ${loggedHours > 0 ? `${loggedHours} hour${loggedHours > 1 ? 's' : ''} of value` : `${loggedTime} minutes of value`}, but ${wastedHours > 0 ? `${wastedHours} hour${wastedHours > 1 ? 's' : ''}`: `${wastedTime} minutes`} slipped through your fingers.`;
+          insight = `You gained ${loggedHours > 0 ? `${loggedHours} hour${loggedHours > 1 ? 's' : ''} of value` : `${loggedTime} minutes of value`}, but ${wastedHours > 0 ? `${wastedHours} hour${wastedHours > 1 ? 's' : ''}`: `${wastedTime} minutes`} were untracked.`;
         } else if (loggedTime < 240) { // 3-4 hours
           insight = "Strong effort: most of the hours worked for you, only a little escaped.";
         } else { // 4+ hours
@@ -513,7 +514,7 @@ export function SmartLoggingPrompt({
                   </div>
                   <div>
                       <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
-                      <p className="text-xs text-muted-foreground">Minutes Wasted</p>
+                      <p className="text-xs text-muted-foreground">Minutes Untracked</p>
                   </div>
               </div>
               <div>
@@ -541,7 +542,7 @@ export function SmartLoggingPrompt({
                         </div>
                         <div>
                             <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
-                            <p className="text-xs text-muted-foreground">Total Minutes Wasted</p>
+                            <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
                         </div>
                     </div>
                      <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
