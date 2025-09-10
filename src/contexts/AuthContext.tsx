@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1147,15 +1148,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return schedule;
     }
   
-    // Determine the date range for populating routines
-    const today = new Date();
-    const scheduleDates = Object.keys(newSchedule).map(key => parseISO(key));
+    const today = startOfDay(new Date());
+    const scheduleDates = Object.keys(newSchedule)
+        .map(key => parseISO(key))
+        .filter(date => isValid(date)); // Filter out invalid dates
+    
     const earliestDateInSchedule = scheduleDates.length > 0 ? min(scheduleDates) : today;
     const latestDateInSchedule = scheduleDates.length > 0 ? max(scheduleDates) : today;
     
-    // Always start from at least today, or earlier if schedule exists
     const startDate = min([today, earliestDateInSchedule]);
-    // Project 30 days into the future from the latest of today or the last scheduled day
     const endDate = addDays(max([today, latestDateInSchedule]), 30);
   
     const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
@@ -1179,7 +1180,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const newActivity: Activity = {
             ...routine,
             id: `${routine.type}-${dateKey}-${Math.random()}`,
-            completed: false, 
+            completed: false,
           };
           (daySchedule[slot] as Activity[]).push(newActivity);
         }
