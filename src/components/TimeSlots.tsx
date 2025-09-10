@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -229,144 +230,142 @@ export function TimeSlots({
                 )}
               </div>
             </CardHeader>
-            <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem]">
+            <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
               <div className="flex-grow min-h-0 mb-2">
-                <ScrollArea className="max-h-[200px] pr-2">
-                  <div className="space-y-2">
-                    {activities && activities.length > 0 ? (
-                      activities.map((activity) => {
-                        const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
-                        const isRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
+                <div className="h-[200px] overflow-y-auto pr-2 space-y-2">
+                  {activities && activities.length > 0 ? (
+                    activities.map((activity) => {
+                      const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
+                      const isRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
 
-                        return (
-                          <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
-                            <div className="flex items-start justify-between gap-3">
-                              <div
-                                className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && "cursor-pointer")}
-                                onClick={(e) => !activity.completed && onActivityClick(slot.name as string, activity, e)}
+                      return (
+                        <div key={activity.id} className="p-2.5 rounded-md bg-card/70 shadow-sm group">
+                          <div className="flex items-start justify-between gap-3">
+                            <div
+                              className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && "cursor-pointer")}
+                              onClick={(e) => !activity.completed && onActivityClick(slot.name as string, activity, e)}
+                            >
+                              <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onToggleComplete(slot.name as string, activity.id, !activity.completed);
+                                }}
+                                className="pt-0.5"
                               >
-                                <button
-                                  onClick={(e) => {
-                                      e.stopPropagation();
-                                      onToggleComplete(slot.name as string, activity.id, !activity.completed);
-                                  }}
-                                  className="pt-0.5"
-                                >
-                                  {activity.completed 
-                                    ? <CheckSquare className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                    : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
-                                  }
-                                </button>
-                                <div className="flex-grow min-w-0">
-                                  <p className={cn(
-                                      "font-semibold text-foreground", 
-                                      activity.completed && "line-through"
-                                  )}>
-                                    {activity.details}
-                                  </p>
-                                  <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
-                                    <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
-                                  </div>
-                                  {linkedHabit && (
-                                    <div className="min-w-0">
-                                      <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
-                                        Habit: {linkedHabit.name}
-                                      </p>
-                                    </div>
-                                  )}
+                                {activity.completed 
+                                  ? <CheckSquare className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                  : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
+                                }
+                              </button>
+                              <div className="flex-grow min-w-0">
+                                <p className={cn(
+                                    "font-semibold text-foreground", 
+                                    activity.completed && "line-through"
+                                )}>
+                                  {activity.details}
+                                </p>
+                                <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
+                                  <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
                                 </div>
-                              </div>
-                              <div className="flex items-center flex-shrink-0">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleRoutine(activity)}>
-                                    <Repeat className={cn("h-4 w-4", isRoutine ? "text-primary" : "text-muted-foreground")} />
-                                </Button>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                                        <MoreVertical className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => {}}>
-                                        <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
-                                      </DropdownMenuItem>
-                                      {activity.type !== 'interrupt' && (
-                                        <DropdownMenuSub>
-                                          <DropdownMenuSubTrigger>
-                                            <LinkIcon className="mr-2 h-4 w-4" />
-                                            <span>Link Habit</span>
-                                          </DropdownMenuSubTrigger>
-                                          <DropdownMenuPortal>
-                                            <DropdownMenuSubContent>
-                                              <ScrollArea className="h-48">
-                                                {habitCards.map(habit => (
-                                                    <DropdownMenuCheckboxItem
-                                                      key={habit.id}
-                                                      checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                                      onCheckedChange={(checked) => {
-                                                        handleLinkHabit(activity.id, habit.id, date);
-                                                      }}
-                                                      onSelect={(e) => e.preventDefault()}
-                                                    >
-                                                        {habit.name}
-                                                    </DropdownMenuCheckboxItem>
-                                                ))}
-                                                {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
-                                              </ScrollArea>
-                                            </DropdownMenuSubContent>
-                                          </DropdownMenuPortal>
-                                        </DropdownMenuSub>
-                                      )}
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem onClick={() => onRemoveActivity(slot.name as string, activity.id)} className="text-destructive">
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        <span>Delete</span>
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                {linkedHabit && (
+                                  <div className="min-w-0">
+                                    <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                                      Habit: {linkedHabit.name}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                            {activity.subTasks && activity.subTasks.length > 0 && (
-                                <div className="pl-8 pt-2 space-y-2">
-                                    {activity.subTasks.map(st => (
-                                        <div key={st.id} className="flex items-center gap-2 group/subtask">
-                                            <Checkbox 
-                                                id={`subtask-${st.id}`}
-                                                checked={st.completed}
-                                                onCheckedChange={() => handleToggleSubTask(slot.name, activity.id, st.id)}
-                                            />
-                                            <Input
-                                                value={st.text}
-                                                onChange={(e) => handleUpdateSubTask(slot.name, activity.id, st.id, e.target.value)}
-                                                onBlur={(e) => { if (e.target.value.trim() === '') handleDeleteSubTask(slot.name, activity.id, st.id) }}
-                                                className={cn("h-7 text-xs border-0 bg-transparent px-1 focus-visible:ring-1 focus-visible:ring-ring", st.completed && "line-through text-muted-foreground")}
-                                                placeholder="New sub-task..."
-                                            />
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/subtask:opacity-100" onClick={() => handleDeleteSubTask(slot.name, activity.id, st.id)}>
-                                                <Trash2 className="h-3 w-3 text-destructive"/>
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="flex items-center flex-shrink-0">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => toggleRoutine(activity)}>
+                                  <Repeat className={cn("h-4 w-4", isRoutine ? "text-primary" : "text-muted-foreground")} />
+                              </Button>
+                              <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                                      <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => {}}>
+                                      <PlusCircle className="mr-2 h-4 w-4"/> Add Sub-task
+                                    </DropdownMenuItem>
+                                    {activity.type !== 'interrupt' && (
+                                      <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger>
+                                          <LinkIcon className="mr-2 h-4 w-4" />
+                                          <span>Link Habit</span>
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuPortal>
+                                          <DropdownMenuSubContent>
+                                            <ScrollArea className="h-48">
+                                              {habitCards.map(habit => (
+                                                  <DropdownMenuCheckboxItem
+                                                    key={habit.id}
+                                                    checked={(activity.habitEquationIds || []).includes(habit.id)}
+                                                    onCheckedChange={(checked) => {
+                                                      handleLinkHabit(activity.id, habit.id, date);
+                                                    }}
+                                                    onSelect={(e) => e.preventDefault()}
+                                                  >
+                                                      {habit.name}
+                                                  </DropdownMenuCheckboxItem>
+                                              ))}
+                                              {habitCards.length === 0 && <DropdownMenuItem disabled>No habits found</DropdownMenuItem>}
+                                            </ScrollArea>
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuPortal>
+                                      </DropdownMenuSub>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => onRemoveActivity(slot.name as string, activity.id)} className="text-destructive">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      <span>Delete</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                           </div>
-                        )
-                      })
-                    ) : (
-                      <div className="flex-grow flex items-center justify-center h-full">
-                        {currentSlot === slot.name && selectedDateKey === todayKey ? (
-                          <div className="text-center">
-                            <p className="text-lg text-muted-foreground">Current Focus</p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center px-4">
-                            Plan an activity for this block.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
+                          {activity.subTasks && activity.subTasks.length > 0 && (
+                              <div className="pl-8 pt-2 space-y-2">
+                                  {activity.subTasks.map(st => (
+                                      <div key={st.id} className="flex items-center gap-2 group/subtask">
+                                          <Checkbox 
+                                              id={`subtask-${st.id}`}
+                                              checked={st.completed}
+                                              onCheckedChange={() => handleToggleSubTask(slot.name, activity.id, st.id)}
+                                          />
+                                          <Input
+                                              value={st.text}
+                                              onChange={(e) => handleUpdateSubTask(slot.name, activity.id, st.id, e.target.value)}
+                                              onBlur={(e) => { if (e.target.value.trim() === '') handleDeleteSubTask(slot.name, activity.id, st.id) }}
+                                              className={cn("h-7 text-xs border-0 bg-transparent px-1 focus-visible:ring-1 focus-visible:ring-ring", st.completed && "line-through text-muted-foreground")}
+                                              placeholder="New sub-task..."
+                                          />
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/subtask:opacity-100" onClick={() => handleDeleteSubTask(slot.name, activity.id, st.id)}>
+                                              <Trash2 className="h-3 w-3 text-destructive"/>
+                                          </Button>
+                                      </div>
+                                  ))}
+                              </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="flex-grow flex items-center justify-center h-full">
+                      {currentSlot === slot.name && selectedDateKey === todayKey ? (
+                        <div className="text-center">
+                          <p className="text-lg text-muted-foreground">Current Focus</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground text-center px-4">
+                          Plan an activity for this block.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex-shrink-0 mt-2 space-y-2">
                 <Progress value={progress} className="h-2" />
@@ -444,3 +443,5 @@ export function TimeSlots({
 
 
 
+
+```
