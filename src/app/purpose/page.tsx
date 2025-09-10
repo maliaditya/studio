@@ -621,28 +621,18 @@ function PurposePageContent() {
                                             {skillsForPillar.length > 0 ? (
                                                 skillsForPillar.map(skill => (
                                                     <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                        <span>{skill.name}</span>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                                <Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                {pillars.map(p => (
-                                                                    <DropdownMenuGroup key={p.name}>
-                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>
-                                                                            {p.name}
-                                                                        </DropdownMenuItem>
-                                                                        {p.attributes.map(attr => (
-                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">
-                                                                                {attr}
-                                                                            </DropdownMenuItem>
-                                                                        ))}
-                                                                    </DropdownMenuGroup>
-                                                                ))}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                        <span className="truncate">{skill.name}</span>
+                                                        <div className="flex items-center opacity-0 group-hover:opacity-100">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Badge className="capitalize">{skill.purposePillar?.[0] || '?'}</Badge></Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    {pillars.map(p => ( <DropdownMenuGroup key={p.name}> <DropdownMenuItem onSelect={() => handleUpdatePillar(skill.id, p.name, 'specialization')}>{p.name}</DropdownMenuItem> {p.attributes.map(attr => (<DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(skill.id, attr, 'specialization')} className="pl-6">{attr}</DropdownMenuItem>))} </DropdownMenuGroup>))}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                            <button onClick={() => handleUpdatePillar(skill.id, '', 'specialization')} className="p-1 rounded-full hover:bg-destructive/20 text-destructive"><Unlink className="h-3 w-3" /></button>
+                                                        </div>
                                                     </div>
                                                 ))
                                             ) : (
@@ -657,28 +647,18 @@ function PurposePageContent() {
                                             {projectsForPillar.length > 0 ? (
                                                 projectsForPillar.map(project => (
                                                     <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
-                                                        <span>{project.name}</span>
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                                                                <Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent>
-                                                                {pillars.map(p => (
-                                                                    <DropdownMenuGroup key={p.name}>
-                                                                        <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>
-                                                                            {p.name}
-                                                                        </DropdownMenuItem>
-                                                                        {p.attributes.map(attr => (
-                                                                            <DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">
-                                                                                {attr}
-                                                                            </DropdownMenuItem>
-                                                                        ))}
-                                                                    </DropdownMenuGroup>
-                                                                ))}
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                        <span className="truncate">{project.name}</span>
+                                                        <div className="flex items-center opacity-0 group-hover:opacity-100">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7"><Badge className="capitalize">{project.purposePillar?.[0] || '?'}</Badge></Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent>
+                                                                    {pillars.map(p => ( <DropdownMenuGroup key={p.name}> <DropdownMenuItem onSelect={() => handleUpdatePillar(project.id, p.name, 'project')}>{p.name}</DropdownMenuItem> {p.attributes.map(attr => (<DropdownMenuItem key={attr} onSelect={() => handleUpdatePillar(project.id, attr, 'project')} className="pl-6">{attr}</DropdownMenuItem>))} </DropdownMenuGroup>))}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                            <button onClick={() => handleUpdatePillar(project.id, '', 'project')} className="p-1 rounded-full hover:bg-destructive/20 text-destructive"><Unlink className="h-3 w-3" /></button>
+                                                        </div>
                                                     </div>
                                                 ))
                                             ) : (
@@ -974,4 +954,5 @@ export default function PurposePage() {
 
 
     
+
 
