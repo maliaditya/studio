@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -37,6 +38,13 @@ interface TimeSlotsProps {
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
   slotDurations: Record<string, { logged: number; total: number }>;
 }
+
+const pillars = [
+    { name: 'Mind', attributes: ['Focus', 'Learning', 'Creativity'] },
+    { name: 'Body', attributes: ['Health', 'Strength', 'Energy'] },
+    { name: 'Heart', attributes: ['Relationships', 'Emotional Health'] },
+    { name: 'Spirit', attributes: ['Meaning', 'Contribution', 'Legacy'] },
+];
 
 export function TimeSlots({
   date,
@@ -106,6 +114,14 @@ export function TimeSlots({
         const linkedRules = metaRules.filter(rule => 
             settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)
         );
+
+        const getPillarName = (purposePillar?: string) => {
+            if (!purposePillar) return null;
+            const mainPillar = pillars.find(p => p.name === purposePillar || p.attributes.includes(purposePillar));
+            return mainPillar?.name || null;
+        };
+
+        const pillarName = linkedRules.length > 0 ? getPillarName(linkedRules[0].purposePillar) : null;
 
         return (
           <Card
@@ -296,87 +312,92 @@ export function TimeSlots({
                     <span>{loggedTime} min logged</span>
                     <span>{freeTime} min {isPastSlot ? 'untracked' : 'free'}</span>
                 </div>
-                <div className="flex justify-end items-center">
-                     <Popover>
+                <div className="flex justify-between items-center">
+                    {pillarName && (
+                        <Badge variant="outline">{pillarName}</Badge>
+                    )}
+                    <div className={cn("flex-grow flex justify-end items-center", !pillarName && "w-full")}>
+                         <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                                    <Brain className="h-4 w-4" />
+                                    <span className="sr-only">Link Rule</span>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-64 p-0">
+                                <ScrollArea className="h-60">
+                                    <div className="p-2 space-y-1">
+                                        {metaRules.map(rule => (
+                                            <div key={rule.id} className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`rule-${slot.name}-${rule.id}`}
+                                                    checked={settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)}
+                                                    onCheckedChange={() => handleLinkRule(slot.name as SlotName, rule.id)}
+                                                />
+                                                <Label htmlFor={`rule-${slot.name}-${rule.id}`} className="text-xs font-normal cursor-pointer">
+                                                    {rule.text}
+                                                </Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </PopoverContent>
+                        </Popover>
+                        <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                                <Brain className="h-4 w-4" />
-                                <span className="sr-only">Link Rule</span>
+                            <PlusCircle className="h-4 w-4" />
+                            <span className="sr-only">Add Activity</span>
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-64 p-0">
-                            <ScrollArea className="h-60">
-                                <div className="p-2 space-y-1">
-                                    {metaRules.map(rule => (
-                                        <div key={rule.id} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`rule-${slot.name}-${rule.id}`}
-                                                checked={settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)}
-                                                onCheckedChange={() => handleLinkRule(slot.name as SlotName, rule.id)}
-                                            />
-                                            <Label htmlFor={`rule-${slot.name}-${rule.id}`} className="text-xs font-normal cursor-pointer">
-                                                {rule.text}
-                                            </Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
+                        <PopoverContent className="w-52 p-2" align="end" side="top">
+                            <div className="grid gap-1">
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'workout')}>
+                                <Dumbbell className="h-4 w-4 mr-2" />
+                                Add Workout
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'mindset')}>
+                                <Brain className="h-4 w-4 mr-2" />
+                                Add Mindset
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'upskill')}>
+                                <BookOpenCheck className="h-4 w-4 mr-2" />
+                                Add Upskill
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'deepwork')}>
+                                <Briefcase className="h-4 w-4 mr-2" />
+                                Add Deep Work
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'essentials')}>
+                                <CheckSquare className="h-4 w-4 mr-2" />
+                                Add Daily Essentials
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'nutrition')}>
+                                <Utensils className="h-4 w-4 mr-2" />
+                                Add Nutrition
+                            </Button>
+                            <Separator className="my-1" />
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'branding')}>
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Add Branding
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'lead-generation')}>
+                                <Magnet className="h-4 w-4 mr-2" />
+                                Add Lead Gen
+                            </Button>
+                            <Separator className="my-1" />
+                            <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name as string, 'interrupt')}>
+                                <AlertCircle className="h-4 w-4 mr-2" />
+                                Add Interrupt
+                            </Button>
+                            <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name as string, 'distraction')}>
+                                <Wind className="h-4 w-4 mr-2" />
+                                Add Distraction
+                            </Button>
+                            </div>
                         </PopoverContent>
-                    </Popover>
-                    <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                        <PlusCircle className="h-4 w-4" />
-                        <span className="sr-only">Add Activity</span>
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-52 p-2" align="end" side="top">
-                        <div className="grid gap-1">
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'workout')}>
-                            <Dumbbell className="h-4 w-4 mr-2" />
-                            Add Workout
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'mindset')}>
-                            <Brain className="h-4 w-4 mr-2" />
-                            Add Mindset
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'upskill')}>
-                            <BookOpenCheck className="h-4 w-4 mr-2" />
-                            Add Upskill
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'deepwork')}>
-                            <Briefcase className="h-4 w-4 mr-2" />
-                            Add Deep Work
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'essentials')}>
-                            <CheckSquare className="h-4 w-4 mr-2" />
-                            Add Daily Essentials
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'nutrition')}>
-                            <Utensils className="h-4 w-4 mr-2" />
-                            Add Nutrition
-                        </Button>
-                        <Separator className="my-1" />
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'branding')}>
-                            <Share2 className="h-4 w-4 mr-2" />
-                            Add Branding
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'lead-generation')}>
-                            <Magnet className="h-4 w-4 mr-2" />
-                            Add Lead Gen
-                        </Button>
-                        <Separator className="my-1" />
-                        <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name as string, 'interrupt')}>
-                            <AlertCircle className="h-4 w-4 mr-2" />
-                            Add Interrupt
-                        </Button>
-                        <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name as string, 'distraction')}>
-                            <Wind className="h-4 w-4 mr-2" />
-                            Add Distraction
-                        </Button>
-                        </div>
-                    </PopoverContent>
-                    </Popover>
+                        </Popover>
+                    </div>
                 </div>
               </div>
             </CardContent>
@@ -386,4 +407,3 @@ export function TimeSlots({
     </div>
   );
 }
-
