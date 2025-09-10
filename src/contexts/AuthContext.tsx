@@ -12,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -1142,20 +1142,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const populatedSchedule = useMemo(() => {
     const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
-    
+  
     if (!settings.routines || settings.routines.length === 0) {
       return schedule;
     }
+  
+    // Determine the date range for populating routines
+    const today = new Date();
+    const scheduleDates = Object.keys(newSchedule).map(parseISO);
+    const earliestDate = scheduleDates.length > 0 ? min(scheduleDates) : today;
+    const latestDate = scheduleDates.length > 0 ? max(scheduleDates) : today;
     
-    // Get all dates that have any activities scheduled
-    const allDatesWithActivities = new Set(Object.keys(newSchedule));
-    // Also ensure today is always processed, even if empty
-    allDatesWithActivities.add(format(new Date(), 'yyyy-MM-dd'));
-
-    allDatesWithActivities.forEach(dateKey => {
+    const startDate = min([today, earliestDate]);
+    const endDate = addDays(max([today, latestDate]), 30); // Project 30 days into the future
+  
+    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+  
+    dateRange.forEach(date => {
+      const dateKey = format(date, 'yyyy-MM-dd');
       const daySchedule = newSchedule[dateKey] || {};
-      const activitiesInDay = new Set(Object.values(daySchedule).flat().map((act: Activity) => `${act.details}_${act.type}`));
-
+      const activitiesInDay = new Set(
+        Object.values(daySchedule)
+              .flat()
+              .map((act: Activity) => `${act.details}_${act.type}`)
+      );
+  
       settings.routines.forEach((routine: Activity) => {
         const routineKey = `${routine.details}_${routine.type}`;
         if (!activitiesInDay.has(routineKey)) {
@@ -1165,7 +1176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           const newActivity: Activity = {
             ...routine,
-            id: `${routine.type}-${Date.now()}-${Math.random()}`,
+            id: `${routine.type}-${dateKey}-${Math.random()}`,
             completed: false, // Always start as not completed
           };
           (daySchedule[slot] as Activity[]).push(newActivity);
@@ -1173,7 +1184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
       newSchedule[dateKey] = daySchedule;
     });
-
+  
     return newSchedule;
   }, [schedule, settings.routines]);
   
