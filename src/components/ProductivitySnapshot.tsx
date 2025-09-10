@@ -167,7 +167,7 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
         <>
             <ChartContainer config={{}} className="h-[250px] w-full cursor-pointer">
                 <ResponsiveContainer>
-                    <RechartsPieChart onClick={(data) => handlePieClick(data.payload)}>
+                    <RechartsPieChart onClick={(data) => data && data.payload && handlePieClick(data.payload.payload)}>
                         <RechartsTooltip
                             cursor={{ fill: "hsl(var(--muted))" }}
                             content={({ active, payload }) => {
@@ -437,7 +437,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
                </div>
                <Separator className="my-2" />
                <div className="relative">
-                  <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Learning Progress</h4>
+                  <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Specialization Progress</h4>
                    {learningItems.length > 0 ? (
                       <Carousel
                           items={learningItems}

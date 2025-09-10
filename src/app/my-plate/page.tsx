@@ -760,32 +760,6 @@ function MyPlatePageContent() {
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
-    const getDescendantsRecursive = (startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
-        const visited = new Set<string>();
-        const queue: string[] = [startNodeId];
-        let leafNodes: ExerciseDefinition[] = [];
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (visited.has(currentId)) continue;
-            visited.add(currentId);
-            const node = definitions.find(d => d.id === currentId);
-            if (!node) continue;
-
-            const children = node[linkKey] || [];
-            if (children.length === 0) { // It's a leaf node
-                leafNodes.push(node);
-            } else {
-                children.forEach(childId => {
-                    if (!visited.has(childId)) {
-                        queue.push(childId);
-                    }
-                });
-            }
-        }
-        return leafNodes;
-    };
-  
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
 
@@ -798,48 +772,36 @@ function MyPlatePageContent() {
             area.microSkills.forEach(ms => microSkillNamesInSpec.add(ms.name));
         });
 
-        const allUpskillDefsForSpec = upskillDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
-        const allDeepWorkDefsForSpec = deepWorkDefinitions.filter(def => microSkillNamesInSpec.has(def.category));
-
-        const allUpskillTaskIds = new Set<string>();
-        allUpskillDefsForSpec.forEach(def => {
-            getDescendantsRecursive(def.id, upskillDefinitions, 'linkedUpskillIds').forEach(d => allUpskillTaskIds.add(d.id));
+        const allDefsForSpec = [...upskillDefinitions, ...deepWorkDefinitions]
+            .filter(def => microSkillNamesInSpec.has(def.category));
+            
+        const leafNodes = new Set<string>();
+        allDefsForSpec.forEach(def => {
+            const type = upskillDefinitions.some(d => d.id === def.id) ? 'upskill' : 'deepwork';
+            getDescendantLeafNodes(def.id, type).forEach(node => leafNodes.add(node.id));
         });
-
-        const allDeepWorkTaskIds = new Set<string>();
-        allDeepWorkDefsForSpec.forEach(def => {
-             getDescendantsRecursive(def.id, deepWorkDefinitions, 'linkedDeepWorkIds').forEach(d => allDeepWorkTaskIds.add(d.id));
-        });
+        
+        const allLeafDefs = [...upskillDefinitions, ...deepWorkDefinitions].filter(d => leafNodes.has(d.id));
+        totalEstimatedMinutes = allLeafDefs.reduce((sum, def) => sum + (def.estimatedDuration || 0), 0);
 
         allUpskillLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (allUpskillTaskIds.has(ex.definitionId)) {
-                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.duration || 0), 0);
+                if(leafNodes.has(ex.definitionId)) {
+                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
                 }
             });
         });
 
         allDeepWorkLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if (allDeepWorkTaskIds.has(ex.definitionId)) {
-                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.duration || 0), 0);
+                 if(leafNodes.has(ex.definitionId)) {
+                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
                 }
             });
         });
-        
-        const allDefsForSpec = [...allUpskillDefsForSpec, ...allDeepWorkDefsForSpec];
-        let totalEstForLeaves = 0;
-        const leafNodes = new Set<string>();
-        
-        const allTaskIds = new Set([...allUpskillTaskIds, ...allDeepWorkTaskIds]);
-        allTaskIds.forEach(id => {
-            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === id);
-            if(def) totalEstForLeaves += def.estimatedDuration || 0;
-        });
 
-
-        if (totalLoggedMinutes > 0 || totalEstForLeaves > 0) {
-            learningStats[spec.name] = { logged: totalLoggedMinutes / 60, estimated: totalEstForLeaves / 60 };
+        if (totalLoggedMinutes > 0 || totalEstimatedMinutes > 0) {
+            learningStats[spec.name] = { logged: totalLoggedMinutes / 60, estimated: totalEstimatedMinutes / 60 };
         }
     });
 
@@ -853,7 +815,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions, deepWorkDefinitions, selectedDate, selectedDateKey]);
+  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, selectedDate, selectedDateKey]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -1370,6 +1332,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
