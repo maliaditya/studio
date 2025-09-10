@@ -147,6 +147,22 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
       return data;
     }, [timeAllocationData, themeColors]);
 
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, payload, index }: any) => {
+        const RADIAN = Math.PI / 180;
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+        const x = cx + (radius + 20) * Math.cos(-midAngle * RADIAN);
+        const y = cy + (radius + 20) * Math.sin(-midAngle * RADIAN);
+        const total = pieData.reduce((sum, entry) => sum + entry.value, 0);
+        
+        if (payload.value / total < 0.05) return null;
+
+        return (
+            <text x={x} y={y} fill="hsl(var(--foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" className="text-xs font-medium">
+                {`${payload.name} (${formatMinutes(payload.value)})`}
+            </text>
+        );
+    };
+
     return (
         <>
             <ChartContainer config={{}} className="h-[250px] w-full cursor-pointer">
@@ -166,8 +182,16 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
                                 return null;
                             }}
                         />
-                        <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={50} labelLine={false}
-                            label={({ name, percent }) => percent > 0.05 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                        <Pie 
+                            data={pieData} 
+                            dataKey="value" 
+                            nameKey="name" 
+                            cx="50%" 
+                            cy="50%" 
+                            outerRadius={80} 
+                            innerRadius={50} 
+                            labelLine={false}
+                            label={renderCustomizedLabel}
                         >
                             {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
                         </Pie>
