@@ -701,11 +701,11 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => onOpenMindMap(currentTask.id)}><GitMerge className="h-4 w-4"/></Button>
-                    </TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></TooltipProvider>
+                    </TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip></TooltipProvider>
                     
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(currentTask, currentTask.type)}><TrendingUp className="h-4 w-4"/></Button>
-                    </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></TooltipProvider>
+                    </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></Tooltip></TooltipProvider>
                     
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -740,7 +740,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                                     <DropdownMenuCheckboxItem
                                         key={task.id}
                                         checked={(currentTask.linkedUpskillIds || []).includes(task.id)}
-                                        onCheckedChange={()={() => handleLinkToggle(task.id, 'upskill')}
+                                        onCheckedChange={() => handleLinkToggle(task.id, 'upskill')}
                                     >
                                         {task.name}
                                     </DropdownMenuCheckboxItem>
@@ -749,7 +749,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <Button size="sm" variant="outline" onClick={()={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
+                    <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
 
@@ -2069,6 +2069,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
                                             onEdit={setEditingFocusArea}
+                                            onOpenLinkProjectModal={()=>{}}
                                             onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
@@ -2436,5 +2437,6 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
