@@ -1,4 +1,5 @@
 
+
       
 
 "use client";
@@ -6,7 +7,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay } from 'date-fns';
+import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -1382,4 +1383,3 @@ export default function MyPlatePage() {
 
 
 
-    

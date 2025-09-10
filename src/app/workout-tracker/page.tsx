@@ -12,7 +12,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { format, parseISO, getDay, getISOWeek, isMonday, getYear, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays, differenceInYears } from 'date-fns';
+import { format, parseISO, getDay, getISOWeek, isMonday, getYear, parse, getISOWeekYear, addWeeks, startOfISOWeek, setISOWeek, differenceInDays, subYears, addDays } from 'date-fns';
 import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, exerciseCategories, WorkoutMode, AllWorkoutPlans, WeightLog, Gender, UserDietPlan, WorkoutPlan, StrengthTrainingMode } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { ExerciseProgressModal } from '@/components/ExerciseProgressModal';
@@ -789,10 +789,10 @@ function WorkoutPageContent() {
                                 <WorkoutExerciseCard 
                                   key={exercise.id} 
                                   exercise={exercise}
-                                  onLogSet={(...args) => logWorkoutSet(selectedDate, ...args)}
-                                  onDeleteSet={(...args) => deleteWorkoutSet(selectedDate, ...args)}
-                                  onUpdateSet={(...args) => updateWorkoutSet(selectedDate, ...args)}
-                                  onRemoveExercise={(exerciseId) => removeExerciseFromWorkout(selectedDate, exerciseId)}
+                                  onLogSet={(...args) => logWorkoutSet(selectedDate, ...args)} 
+                                  onDeleteSet={(...args) => deleteWorkoutSet(selectedDate, ...args)} 
+                                  onUpdateSet={(...args) => updateWorkoutSet(selectedDate, ...args)} 
+                                  onRemoveExercise={(...args) => removeExerciseFromWorkout(selectedDate, ...args)}
                                   onSwapExercise={(newDef) => swapWorkoutExercise(selectedDate, exercise.id, newDef)}
                                   swappableExercises={swappableExercises}
                                   onViewProgress={definition ? () => handleViewProgress(definition) : undefined}
@@ -882,4 +882,3 @@ function WorkoutPageContent() {
 export default function Page() {
   return ( <AuthGuard> <WorkoutPageContent /> </AuthGuard> );
 }
-
