@@ -289,7 +289,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        // If an objective has no leaf nodes, check if it has been logged itself.
+        // If an objective is its own leaf node, check if it has been logged itself.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
@@ -839,7 +839,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
