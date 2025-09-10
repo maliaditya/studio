@@ -834,7 +834,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onOpenLinkProjectModal={onOpenLinkProjectModal}
+                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
@@ -2070,8 +2070,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             handleDeleteSubtopic={handleDeleteFocusArea}
                                             handleUnlinkItem={handleUnlinkItem}
                                             handleViewProgress={handleViewProgress}
-                                            onEdit={setEditingFocusArea}
-                                            onOpenLinkProjectModal={onOpenLinkProjectModal}
+                                            onEdit={onEdit}
+                                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
                                             onOpenMindMap={onOpenMindMap}
                                             onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
@@ -2439,4 +2439,5 @@ export default function DeepWorkPage() {
     
 
     
+
 
