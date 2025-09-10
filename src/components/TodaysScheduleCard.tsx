@@ -23,6 +23,8 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 
+const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
 interface AgendaWidgetItemProps {
   activity: Activity & { slot: keyof DailySchedule };
   duration: string | undefined;
@@ -425,6 +427,8 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
 
     
 
