@@ -19,6 +19,7 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
+import { LinkTechniqueModal } from './LinkTechniqueModal';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -266,6 +267,8 @@ export function MindsetCategoriesCard() {
     const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
     const [isHourlyLogOpen, setIsHourlyLogOpen] = useState(false);
+    const [linkTechniqueModalState, setLinkTechniqueModalState] = useState({ isOpen: false, habitId: '', stopper: {} as Stopper, stage: 2 as 2 | 3 });
+
 
     const [position, setPosition] = useState({ x: 20, y: 320 });
     const [isDragging, setIsDragging] = useState(false);
@@ -281,16 +284,14 @@ export function MindsetCategoriesCard() {
         habitCards.forEach(habit => {
             const processStoppers = (stoppers: Stopper[] = [], isUrge: boolean) => {
                 stoppers.forEach(stopper => {
-                    if (stopper.linkedTechniqueId) {
-                        const mechanism = mechanismCards.find(m => m.id === (isUrge ? habit.response?.resourceId : habit.newResponse?.resourceId));
-                        links.push({
-                            habitId: habit.id,
-                            habitName: habit.name,
-                            stopper: stopper,
-                            isUrge: isUrge,
-                            mechanismName: mechanism?.name,
-                        });
-                    }
+                    const mechanism = mechanismCards.find(m => m.id === (isUrge ? habit.response?.resourceId : habit.newResponse?.resourceId));
+                    links.push({
+                        habitId: habit.id,
+                        habitName: habit.name,
+                        stopper: stopper,
+                        isUrge: isUrge,
+                        mechanismName: mechanism?.name,
+                    });
                 });
             };
             processStoppers(habit.urges, true);
@@ -298,6 +299,33 @@ export function MindsetCategoriesCard() {
         });
         return links;
     }, [habitCards, mechanismCards]);
+    
+    const handleResistanceClick = (e: React.MouseEvent, link: { habitId: string, stopper: Stopper }) => {
+        const { habitId, stopper } = link;
+        const todayStart = startOfDay(new Date());
+        const todayTimestamps = (stopper.timestamps || []).filter(ts => ts >= todayStart.getTime());
+        const todayCount = todayTimestamps.length;
+    
+        if (todayCount === 1) { // Second click today
+            if (!stopper.linkedTechniqueId_stage2) {
+                setLinkTechniqueModalState({ isOpen: true, habitId, stopper, stage: 2 });
+            } else {
+                openLinkedResistancePopup(stopper.linkedTechniqueId_stage2, e);
+            }
+        } else if (todayCount >= 2) { // Third or more clicks today
+            if (!stopper.linkedTechniqueId_stage3) {
+                setLinkTechniqueModalState({ isOpen: true, habitId, stopper, stage: 3 });
+            } else {
+                openLinkedResistancePopup(stopper.linkedTechniqueId_stage3, e);
+            }
+        } else { // First click today
+            if (stopper.linkedTechniqueId) {
+                openLinkedResistancePopup(stopper.linkedTechniqueId, e);
+            } else {
+                 setLinkTechniqueModalState({ isOpen: true, habitId, stopper, stage: 2 });
+            }
+        }
+    };
     
     useEffect(() => {
         const interval = setInterval(() => {
@@ -318,7 +346,7 @@ export function MindsetCategoriesCard() {
                     }
                     
                     // Check for predictive highlighting
-                    if (eventDate.toDateString() === yesterday.toDateString()) {
+                    if (isSameDay(eventDate, yesterday)) {
                         const eventTimeToday = new Date(today);
                         eventTimeToday.setHours(eventDate.getHours(), eventDate.getMinutes(), eventDate.getSeconds());
                         
@@ -438,7 +466,7 @@ export function MindsetCategoriesCard() {
                                 >
                                     <div 
                                         className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
-                                        onClick={(e) => link.stopper.linkedTechniqueId && openLinkedResistancePopup(link.stopper.linkedTechniqueId, e)}
+                                        onClick={(e) => handleResistanceClick(e, link)}
                                     >
                                         <p className="font-semibold">{link.stopper.text}</p>
                                         <p className="text-xs text-muted-foreground mt-1">
@@ -544,6 +572,10 @@ export function MindsetCategoriesCard() {
                 isOpen={isHourlyLogOpen}
                 onOpenChange={setIsHourlyLogOpen}
                 allLinkedResistances={allLinkedResistances}
+            />
+            <LinkTechniqueModal
+                modalState={linkTechniqueModalState}
+                onOpenChange={(isOpen) => setLinkTechniqueModalState(prev => ({ ...prev, isOpen }))}
             />
         </>
     );

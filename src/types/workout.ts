@@ -269,7 +269,9 @@ export interface Stopper {
     status: 'none' | 'manageable' | 'unmanageable';
     managementStrategy?: string;
     linkedResourceId?: string;
-    linkedTechniqueId?: string;
+    linkedTechniqueId?: string; // Default/Stage 1
+    linkedTechniqueId_stage2?: string; // For 2nd encounter of the day
+    linkedTechniqueId_stage3?: string; // For 3rd+ encounter of the day
     timestamps?: number[];
 }
 
@@ -655,4 +657,11 @@ export interface ActiveFocusSession {
   startTime: number;
   state: 'running' | 'paused' | 'idle';
   subTaskStartTime?: number;
+}
+
+export interface LinkTechniqueModalState {
+    isOpen: boolean;
+    habitId: string;
+    stopperId: string;
+    stage: 2 | 3;
 }
