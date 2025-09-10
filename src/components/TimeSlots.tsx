@@ -1,10 +1,11 @@
 
+
       
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
@@ -50,7 +51,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs } = useAuth();
+  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, setSchedule } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -62,6 +63,29 @@ export function TimeSlots({
 
   const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
     // This logic should now be in AuthContext
+  };
+  
+  const handleLinkRule = (slotName: SlotName, ruleId: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const daySchedule = { ...(prev[dateKey] || {}) };
+        const slotRules = daySchedule.slotRules?.[slotName] || [];
+        const isLinked = slotRules.includes(ruleId);
+        
+        const newRules = isLinked
+            ? slotRules.filter(id => id !== ruleId)
+            : [...slotRules, ruleId];
+        
+        const newSlotRules = { ...(daySchedule.slotRules || {}), [slotName]: newRules };
+        
+        return {
+            ...prev,
+            [dateKey]: {
+                ...daySchedule,
+                slotRules: newSlotRules
+            }
+        };
+    });
   };
 
   const slots = [
@@ -86,6 +110,10 @@ export function TimeSlots({
         const selectedDateKey = format(date, 'yyyy-MM-dd');
         const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
         
+        const linkedRules = metaRules.filter(rule => 
+            schedule.slotRules?.[slot.name as SlotName]?.includes(rule.id)
+        );
+
         return (
           <Card
             key={slot.name}
@@ -97,7 +125,7 @@ export function TimeSlots({
                 : 'shadow-md bg-card/60'
             )}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-lg font-medium">{slot.name}</CardTitle>
                 <CardDescription>{slot.time}</CardDescription>
@@ -114,6 +142,15 @@ export function TimeSlots({
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
               <div className="flex-grow min-h-0 mb-2">
+                 {linkedRules.length > 0 && (
+                    <div className="mb-2 space-y-1">
+                        {linkedRules.map(rule => (
+                            <p key={rule.id} className="text-xs text-muted-foreground italic pl-2 border-l-2 border-primary/50">
+                                {rule.text}
+                            </p>
+                        ))}
+                    </div>
+                 )}
                 <div className="h-[200px] overflow-y-auto pr-2">
                   <ul className="space-y-2">
                     {activities && activities.length > 0 ? (
@@ -263,6 +300,32 @@ export function TimeSlots({
                     <span>{freeTime} min {isPastSlot ? 'untracked' : 'free'}</span>
                 </div>
                 <div className="flex justify-end items-center">
+                     <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                                <Brain className="h-4 w-4" />
+                                <span className="sr-only">Link Rule</span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64 p-0">
+                            <ScrollArea className="h-60">
+                                <div className="p-2 space-y-1">
+                                    {metaRules.map(rule => (
+                                        <div key={rule.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`rule-${slot.name}-${rule.id}`}
+                                                checked={schedule.slotRules?.[slot.name as SlotName]?.includes(rule.id)}
+                                                onCheckedChange={() => handleLinkRule(slot.name as SlotName, rule.id)}
+                                            />
+                                            <Label htmlFor={`rule-${slot.name}-${rule.id}`} className="text-xs font-normal cursor-pointer">
+                                                {rule.text}
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
                     <Popover>
                     <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
@@ -326,4 +389,3 @@ export function TimeSlots({
     </div>
   );
 }
-

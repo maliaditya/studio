@@ -205,9 +205,12 @@ export interface Interrupt {
   duration: number; // in minutes
 }
 
+export type SlotName = 'Late Night' | 'Dawn' | 'Morning' | 'Afternoon' | 'Evening' | 'Night';
+
 export interface DailySchedule {
   purpose?: string;
-  [slotName: string]: Activity[] | string | Interrupt[] | undefined;
+  slotRules?: Partial<Record<SlotName, string[]>>;
+  [slotName: string]: Activity[] | string | Interrupt[] | Partial<Record<SlotName, string[]>> | undefined;
 }
 
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
