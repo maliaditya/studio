@@ -563,6 +563,12 @@ export interface HabitDetailPopupState {
   level: number;
 }
 
+export interface PillarPopupState {
+  pillarName: string;
+  x: number;
+  y: number;
+}
+
 
 export interface TaskContextPopupState {
   activityId: string;
@@ -650,7 +656,7 @@ export interface UserSettings {
   defaultHabitLinks: Partial<Record<ActivityType, string | null>>;
   routines: Activity[];
   workoutScheduling: WorkoutSchedulingMode;
-  slotRules?: Partial<Record<SlotName, string[]>>;
+  slotRules: Partial<Record<SlotName, string[]>>;
 }
 
 export interface ActiveFocusSession {

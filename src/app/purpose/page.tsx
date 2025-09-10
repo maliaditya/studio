@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
-import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, PillarCardData, ProjectPlan } from '@/types/workout';
+import type { Resource, DatedWorkout, MetaRule, ExerciseDefinition, CoreSkill, PurposePillar, PopupState, Project, Stopper, Pattern, Strength, RuleDetailPopupState, HabitEquation, SkillAcquisitionPlan, PillarCardData, ProjectPlan, PillarPopupState } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
@@ -50,51 +50,56 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     };
 
     const handleLinkToggle = (type: 'practice' | 'applicationSpecialization' | 'applicationProject', id: string) => {
-        let newCardData = isEditing ? { ...editedCardData } : { ...cardData };
-        const isUnlinking = (newCardData[`${type}Ids` as keyof PillarCardData] as string[] || []).includes(id);
-    
-        const updateIds = (key: keyof PillarCardData, idToUpdate: string) => {
-            const currentIds = (newCardData[key] as string[] || []);
-            const isPresent = currentIds.includes(idToUpdate);
-            if (isUnlinking) {
-                return currentIds.filter(i => i !== idToUpdate);
-            }
-            if (!isPresent) {
-                return [...currentIds, idToUpdate];
-            }
-            return currentIds;
-        };
-    
-        newCardData[`${type}Ids` as keyof PillarCardData] = updateIds(`${type}Ids` as keyof PillarCardData, id) as any;
-    
-        if (type === 'applicationSpecialization') {
-            const specId = id;
-            const offerPlan = offerizationPlans[specId];
-            if (offerPlan && offerPlan.releases) {
-                const today = startOfToday();
-                const activeProjectNames = new Set(
-                    offerPlan.releases
-                        .filter(r => isAfter(parseISO(r.launchDate), today) || format(parseISO(r.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))
-                        .map(r => r.name)
-                );
-    
-                if (activeProjectNames.size > 0) {
-                    const projectIdsToToggle = projects
-                        .filter(p => activeProjectNames.has(p.name))
-                        .map(p => p.id);
-    
-                    projectIdsToToggle.forEach(projectId => {
-                        newCardData.applicationProjectIds = updateIds('applicationProjectIds', projectId);
-                    });
-                }
-            }
-        }
-    
-        if (isEditing) {
-            setEditedCardData(newCardData);
-        } else {
-            onUpdate(newCardData);
-        }
+      let newCardData = isEditing ? { ...editedCardData } : { ...cardData };
+      const isUnlinking = (newCardData[`${type}Ids` as keyof PillarCardData] as string[] || []).includes(id);
+  
+      const updateIds = (key: keyof PillarCardData, idToUpdate: string) => {
+          const currentIds = (newCardData[key] as string[] || []);
+          const isPresent = currentIds.includes(idToUpdate);
+          if (isUnlinking) {
+              return currentIds.filter(i => i !== idToUpdate);
+          }
+          if (!isPresent) {
+              return [...currentIds, idToUpdate];
+          }
+          return currentIds;
+      };
+  
+      newCardData[`${type}Ids` as keyof PillarCardData] = updateIds(`${type}Ids` as keyof PillarCardData, id) as any;
+  
+      if (type === 'applicationSpecialization') {
+          const specId = id;
+          const offerPlan = offerizationPlans[specId];
+          if (offerPlan && offerPlan.releases) {
+              const today = startOfToday();
+              const activeProjectNames = new Set(
+                  offerPlan.releases
+                      .filter(r => {
+                          try {
+                              const launchDate = parseISO(r.launchDate);
+                              return isAfter(launchDate, today) || format(launchDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                          } catch { return false; }
+                      })
+                      .map(r => r.name)
+              );
+  
+              if (activeProjectNames.size > 0) {
+                  const projectIdsToToggle = projects
+                      .filter(p => activeProjectNames.has(p.name))
+                      .map(p => p.id);
+  
+                  projectIdsToToggle.forEach(projectId => {
+                      newCardData.applicationProjectIds = updateIds('applicationProjectIds', projectId);
+                  });
+              }
+          }
+      }
+  
+      if (isEditing) {
+          setEditedCardData(newCardData);
+      } else {
+          onUpdate(newCardData);
+      }
     };
 
     const handleSave = () => {
@@ -563,8 +568,9 @@ function PurposePageContent() {
             });
         });
         
+        const uncategorizedRules = metaRules.filter(r => !r.purposePillar);
+        
         const plannedSpecIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
-        const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
         const uncategorizedSkills = specializations.filter(s => !s.purposePillar && plannedSpecIds.has(s.id));
 
         const today = startOfToday();
@@ -583,7 +589,7 @@ function PurposePageContent() {
             );
             return isOfferedAndActive;
         });
-        const uncategorizedProjects = activeProjects.filter(p => !assignedItemIds.has(p.id));
+        const uncategorizedProjects = activeProjects.filter(p => !p.purposePillar);
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
     }, [metaRules, specializations, projects, pillars, skillAcquisitionPlans, productizationPlans, offerizationPlans]);
@@ -1010,3 +1016,4 @@ export default function PurposePage() {
 
 
     
+
