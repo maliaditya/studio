@@ -230,7 +230,7 @@ export function TimeSlots({
               </div>
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem]">
-              <div className="flex-grow mb-2">
+              <div className="flex-grow min-h-0 mb-2">
                 <ScrollArea className="max-h-[200px] pr-2">
                   <div className="space-y-2">
                     {activities && activities.length > 0 ? (
@@ -441,5 +441,6 @@ export function TimeSlots({
 
     
     
+
 
 
