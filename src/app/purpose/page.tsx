@@ -51,37 +51,45 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
 
     const handleLinkToggle = (type: 'practice' | 'applicationSpecialization' | 'applicationProject', id: string) => {
         let newCardData = isEditing ? { ...editedCardData } : { ...cardData };
-    
         const isUnlinking = (newCardData[`${type}Ids` as keyof PillarCardData] as string[] || []).includes(id);
     
-        const updateIds = (key: keyof PillarCardData, newId: string) => {
+        const updateIds = (key: keyof PillarCardData, idToUpdate: string) => {
             const currentIds = (newCardData[key] as string[] || []);
-            const isPresent = currentIds.includes(newId);
-            if (isUnlinking) { // Explicitly unlinking one thing
-                return currentIds.filter(i => i !== newId);
+            const isPresent = currentIds.includes(idToUpdate);
+            if (isUnlinking) {
+                return currentIds.filter(i => i !== idToUpdate);
             }
-            if (!isPresent) { // Linking
-                return [...currentIds, newId];
+            if (!isPresent) {
+                return [...currentIds, idToUpdate];
             }
-            return currentIds; // No change if already present and not unlinking
+            return currentIds;
         };
-
+    
         newCardData[`${type}Ids` as keyof PillarCardData] = updateIds(`${type}Ids` as keyof PillarCardData, id) as any;
-
-        // If we are linking/unlinking a specialization, automatically handle its projects
+    
         if (type === 'applicationSpecialization') {
             const specId = id;
             const offerPlan = offerizationPlans[specId];
             if (offerPlan && offerPlan.releases) {
-                const projectNamesInPlan = new Set(offerPlan.releases.map(r => r.name));
-                const projectIdsToToggle = projects.filter(p => projectNamesInPlan.has(p.name)).map(p => p.id);
-
-                projectIdsToToggle.forEach(projectId => {
-                    newCardData.applicationProjectIds = updateIds('applicationProjectIds', projectId);
-                });
+                const today = startOfToday();
+                const activeProjectNames = new Set(
+                    offerPlan.releases
+                        .filter(r => isAfter(parseISO(r.launchDate), today) || format(parseISO(r.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))
+                        .map(r => r.name)
+                );
+    
+                if (activeProjectNames.size > 0) {
+                    const projectIdsToToggle = projects
+                        .filter(p => activeProjectNames.has(p.name))
+                        .map(p => p.id);
+    
+                    projectIdsToToggle.forEach(projectId => {
+                        newCardData.applicationProjectIds = updateIds('applicationProjectIds', projectId);
+                    });
+                }
             }
         }
-        
+    
         if (isEditing) {
             setEditedCardData(newCardData);
         } else {
