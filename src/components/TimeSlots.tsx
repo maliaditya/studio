@@ -438,5 +438,3 @@ export function TimeSlots({
     </div>
   );
 }
-
-```
