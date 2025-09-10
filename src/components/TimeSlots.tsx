@@ -26,124 +26,6 @@ import { Progress } from './ui/progress';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-interface AgendaWidgetItemProps {
-  activity: Activity & { slot: keyof DailySchedule };
-  duration: string | undefined;
-  date: Date;
-  onLogLearning: (activity: Activity, progress: number, duration: number) => void;
-  onStartWorkoutLog: (activity: Activity) => void;
-  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  onStartLeadGenLog: (activity: Activity) => void;
-  onOpenFocusModal: (activity: Activity) => boolean;
-  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
-  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-}
-
-function AgendaWidgetItem({ 
-    activity, 
-    duration, 
-    date,
-    onStartWorkoutLog, 
-    onToggleComplete, 
-    onStartLeadGenLog, 
-    onOpenFocusModal, 
-    onOpenTaskContext,
-    onOpenHabitPopup,
-}: AgendaWidgetItemProps) {
-  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
-  const { toast } = useToast();
-  
-  let displayDetails = activity.details;
-  if (activity.type === 'workout') {
-    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
-    displayDetails = description.split(' for ')[1] || "Workout";
-  }
-
-  const linkedHabit = useMemo(() => {
-    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
-      // For simplicity, showing the first linked habit. Can be expanded later.
-      return habitCards.find(h => h.id === activity.habitEquationIds![0]);
-    }
-    return null;
-  }, [activity.habitEquationIds, habitCards]);
-
-  const handleTitleClick = (event: React.MouseEvent) => {
-    if (activity.completed) {
-      onToggleComplete(activity.slot, activity.id, false);
-      return;
-    }
-    
-    if (linkedHabit) {
-        onOpenHabitPopup(linkedHabit.id, event);
-        return;
-    }
-  };
-
-  const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    const shouldOpenModal = onOpenFocusModal(activity);
-    if (!shouldOpenModal) {
-      toast({
-        title: "Objective Already Complete",
-        description: `All sub-tasks for "${activity.details}" are already logged.`,
-      });
-    }
-  };
-  
-  const itemContent = (
-    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
-      <div className="flex items-start gap-3 min-w-0 flex-grow">
-        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
-            {activity.completed 
-              ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-              : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-            }
-        </button>
-        <div 
-          className={cn("flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
-          onClick={handleTitleClick}
-        >
-          <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
-            {displayDetails}
-          </p>
-          {linkedHabit && (
-            <div className="min-w-0">
-                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
-                    Habit: {linkedHabit.name}
-                </p>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex-shrink-0 flex items-center text-right gap-1">
-        {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' ? (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleFocusClick}
-            >
-                <Timer className="h-4 w-4" />
-            </Button>
-        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => onOpenTaskContext(activity.id, e)}
-            >
-                <GitBranch className="h-4 w-4" />
-            </Button>
-        ) : null}
-      </div>
-    </div>
-  );
-  
-  return <li>{itemContent}</li>;
-}
-
-
 interface TimeSlotsProps {
   date: Date;
   schedule: DailySchedule;
@@ -168,7 +50,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { settings, habitCards, toggleRoutine, handleLinkHabit } = useAuth();
+  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -236,6 +118,11 @@ export function TimeSlots({
                   <ul className="space-y-2">
                     {activities && activities.length > 0 ? (
                       activities.map((activity) => {
+                        let displayDetails = activity.details;
+                        if (activity.type === 'workout') {
+                            const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+                            displayDetails = description.split(' for ')[1] || "Workout";
+                        }
                         const linkedHabit = habitCards.find(h => activity.habitEquationIds?.includes(h.id));
                         const isRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
 
@@ -263,7 +150,7 @@ export function TimeSlots({
                                       "font-semibold text-foreground", 
                                       activity.completed && "line-through"
                                   )}>
-                                    {activity.details}
+                                    {displayDetails}
                                   </p>
                                   <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
                                     <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
@@ -439,3 +326,4 @@ export function TimeSlots({
     </div>
   );
 }
+
