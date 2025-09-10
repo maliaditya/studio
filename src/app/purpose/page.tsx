@@ -18,7 +18,7 @@ import { DndContext, useDraggable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { format, parseISO, isAfter } from 'date-fns';
+import { format, parseISO, isAfter, startOfToday } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -57,7 +57,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
         };
         const key = keyMap[type];
         
-        const currentIds = editedCardData[key] || [];
+        const currentIds = editedCardData[key as keyof PillarCardData] as string[] || [];
         const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
         
         if (isEditing) {
@@ -361,6 +361,7 @@ function PurposePageContent() {
         addPillarCard, updatePillarCard, deletePillarCard,
         offerizationPlans,
         skillAcquisitionPlans,
+        productizationPlans,
     } = useAuth();
     const { toast } = useToast();
 
@@ -533,13 +534,31 @@ function PurposePageContent() {
         });
         
         const plannedSpecIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
-
         const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
         const uncategorizedSkills = specializations.filter(s => !s.purposePillar && plannedSpecIds.has(s.id));
-        const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
+
+        const today = startOfToday();
+        const activeProjects = projects.filter(project => {
+            // Check productization plans by project ID
+            if (project.productPlan?.releases?.some(release => isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd'))) {
+                return true;
+            }
+
+            // Check offerization plans by project NAME
+            const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
+                plan.releases?.some(release => {
+                    if (release.name !== project.name) return false;
+                    try {
+                        return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+                    } catch { return false; }
+                })
+            );
+            return isOfferedAndActive;
+        });
+        const uncategorizedProjects = activeProjects.filter(p => !assignedItemIds.has(p.id));
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
-    }, [metaRules, specializations, projects, pillars, skillAcquisitionPlans]);
+    }, [metaRules, specializations, projects, pillars, skillAcquisitionPlans, productizationPlans, offerizationPlans]);
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -776,7 +795,7 @@ function PurposePageContent() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Uncategorized Projects</CardTitle>
-                            <CardDescription>Assign these projects to a pillar using the dropdown menu.</CardDescription>
+                            <CardDescription>Assign these active projects to a pillar using the dropdown menu.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {uncategorizedItems.projects.map(project => (
@@ -960,3 +979,6 @@ export default function PurposePage() {
 
 
 
+
+
+    
