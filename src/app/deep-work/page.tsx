@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -278,7 +277,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
     const leafNodes = useMemo(() => {
-        if (nodeType === 'Objective' || nodeType === 'Intention') {
+        if (nodeType === 'Intention' || nodeType === 'Objective') {
             const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
             // If an Objective has no children, it is its own leaf node for progress tracking.
             if (descendants.length === 0 && nodeType === 'Objective') {
@@ -290,18 +289,23 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        if (leafNodes.length === 0 && nodeType === 'Objective') {
-            return permanentlyLoggedTaskIds.has(deepworkDef.id) ? 1 : 0;
+        // If an objective has no leaf nodes, check if it has been logged itself.
+        if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
+            return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
         return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
-    }, [leafNodes, permanentlyLoggedTaskIds, nodeType, deepworkDef.id]);
+    }, [leafNodes, permanentlyLoggedTaskIds, deepworkDef]);
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
-            return permanentlyLoggedTaskIds.has(deepworkDef.id);
+             return permanentlyLoggedTaskIds.has(deepworkDef.id);
+        }
+        // An objective with a single leaf node (itself) is complete if logged.
+        if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
+            return (deepworkDef.loggedDuration || 0) > 0;
         }
         return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
+    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id, deepworkDef.loggedDuration]);
     
     const parentIntention = useMemo(() => {
         if (nodeType !== 'Objective') return null;
@@ -2435,5 +2439,5 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
-    
 
+    
