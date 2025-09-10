@@ -50,7 +50,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { settings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, setSchedule, openRuleDetailPopup } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -65,26 +65,20 @@ export function TimeSlots({
   };
   
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const daySchedule = { ...(prev[dateKey] || {}) };
-        const slotRules = daySchedule.slotRules?.[slotName] || [];
-        const isLinked = slotRules.includes(ruleId);
+    const currentSlotRules = settings.slotRules?.[slotName] || [];
+    const isLinked = currentSlotRules.includes(ruleId);
+    
+    const newRules = isLinked
+        ? currentSlotRules.filter(id => id !== ruleId)
+        : [...currentSlotRules, ruleId];
         
-        const newRules = isLinked
-            ? slotRules.filter(id => id !== ruleId)
-            : [...slotRules, ruleId];
-        
-        const newSlotRules = { ...(daySchedule.slotRules || {}), [slotName]: newRules };
-        
-        return {
-            ...prev,
-            [dateKey]: {
-                ...daySchedule,
-                slotRules: newSlotRules
-            }
-        };
-    });
+    setSettings(prev => ({
+      ...prev,
+      slotRules: {
+        ...(prev.slotRules || {}),
+        [slotName]: newRules
+      }
+    }));
   };
 
   const slots = [
@@ -110,7 +104,7 @@ export function TimeSlots({
         const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
         
         const linkedRules = metaRules.filter(rule => 
-            schedule.slotRules?.[slot.name as SlotName]?.includes(rule.id)
+            settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)
         );
 
         return (
@@ -317,7 +311,7 @@ export function TimeSlots({
                                         <div key={rule.id} className="flex items-center space-x-2">
                                             <Checkbox
                                                 id={`rule-${slot.name}-${rule.id}`}
-                                                checked={schedule.slotRules?.[slot.name as SlotName]?.includes(rule.id)}
+                                                checked={settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)}
                                                 onCheckedChange={() => handleLinkRule(slot.name as SlotName, rule.id)}
                                             />
                                             <Label htmlFor={`rule-${slot.name}-${rule.id}`} className="text-xs font-normal cursor-pointer">
@@ -392,3 +386,4 @@ export function TimeSlots({
     </div>
   );
 }
+

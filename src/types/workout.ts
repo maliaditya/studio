@@ -209,8 +209,7 @@ export type SlotName = 'Late Night' | 'Dawn' | 'Morning' | 'Afternoon' | 'Evenin
 
 export interface DailySchedule {
   purpose?: string;
-  slotRules?: Partial<Record<SlotName, string[]>>;
-  [slotName: string]: Activity[] | string | Interrupt[] | Partial<Record<SlotName, string[]>> | undefined;
+  [slotName: string]: Activity[] | string | Interrupt[] | undefined;
 }
 
 export type FullSchedule = Record<string, DailySchedule>; // Date key -> DailySchedule
@@ -650,6 +649,7 @@ export interface UserSettings {
   defaultHabitLinks: Partial<Record<ActivityType, string | null>>;
   routines: Activity[];
   workoutScheduling: WorkoutSchedulingMode;
+  slotRules?: Partial<Record<SlotName, string[]>>;
 }
 
 export interface ActiveFocusSession {
