@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -215,6 +215,12 @@ interface AuthContextType {
   openRuleDetailPopup: (ruleId: string, event: React.MouseEvent) => void;
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
+
+  // Pillar Popup
+  pillarPopupState: PillarPopupState | null;
+  openPillarPopup: (pillarName: string) => void;
+  closePillarPopup: () => void;
+  handlePillarPopupDragEnd: (event: DragEndEvent) => void;
 
   // Habit Detail Popup
   habitDetailPopup: HabitDetailPopupState | null;
@@ -456,6 +462,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Meta Rule Popup
   const [ruleDetailPopup, setRuleDetailPopup] = useState<RuleDetailPopupState | null>(null);
 
+  // Pillar Popup
+  const [pillarPopupState, setPillarPopupState] = useState<PillarPopupState | null>(null);
+
   // Habit Detail Popup
   const [habitDetailPopup, setHabitDetailPopup] = useState<HabitDetailPopupState | null>(null);
 
@@ -522,7 +531,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Recents State
   const [recentItems, setRecentItems] = useState<Array<(ExerciseDefinition | Project) & { type: string }>>([]);
 
-  // Path Diagram State
+  // Path Diagram Data
   const [pathNodes, setPathNodes] = useState<PathNode[]>([]);
   
   // Mindset Technique Popup
@@ -2158,6 +2167,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const openPillarPopup = (pillarName: string) => {
+    const screenWidth = window.innerWidth;
+    const screenHeight = window.innerHeight;
+    setPillarPopupState({
+        pillarName,
+        x: (screenWidth - 896) / 2, // 896 is sm:max-w-4xl
+        y: (screenHeight - (screenHeight * 0.8)) / 2, // 80vh
+        level: 0,
+        z: 90
+    });
+  };
+
+  const closePillarPopup = () => {
+    setPillarPopupState(null);
+  };
+
+  const handlePillarPopupDragEnd = (event: DragEndEvent) => {
+      const { active, delta } = event;
+      if (pillarPopupState && active.id === 'pillar-popup') {
+          setPillarPopupState(prev => prev ? { ...prev, x: prev.x + delta.x, y: prev.y + delta.y } : null);
+      }
+  };
+  
   const openHabitDetailPopup = (habitId: string, event: React.MouseEvent) => {
     const popupWidth = 600;
     const popupHeight = 500;
@@ -2579,6 +2611,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       principle: 'New Principle',
       practiceEquationIds: [],
       applicationSpecializationIds: [],
+      applicationProjectIds: [],
       outcome: 'Expected Outcome'
     };
     setPurposeData(prev => ({
@@ -2799,6 +2832,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, openTaskContextPopup, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     contentViewPopups, openContentViewPopup, closeContentViewPopup, handleContentViewPopupDragEnd,
@@ -2921,4 +2955,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
