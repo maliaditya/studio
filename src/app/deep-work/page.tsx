@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -278,7 +279,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 
     const leafNodes = useMemo(() => {
         const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
-        if (nodeType === 'Objective' && descendants.length === 0) {
+        if ((nodeType === 'Objective' || nodeType === 'Intention') && descendants.length === 0) {
             return [deepworkDef];
         }
         return descendants;
@@ -348,7 +349,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     
     return (
         <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-            <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
+            <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isObjectiveComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                     <TooltipProvider>
@@ -391,7 +392,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         ) : (
                             <CardTitle className="text-base">
                                 <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
+                                <span className={cn("truncate", isObjectiveComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
                                     {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
                                 </span>
                                 </TooltipTrigger><TooltipContent><p>{deepworkDef.name}</p></TooltipContent></Tooltip></TooltipProvider>
@@ -818,7 +819,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                     const isComplete = leafNodes.length > 0 
-                        ? leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id))
+                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
                         : (def.loggedDuration || 0) > 0;
 
                     return (
@@ -2055,7 +2056,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                                     const isComplete = leafNodes.length > 0 
-                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
+                                      ? leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id))
                                       : (def.loggedDuration || 0) > 0;
                                     
                                     return (
