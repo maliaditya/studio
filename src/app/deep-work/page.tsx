@@ -279,6 +279,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
 
     const leafNodes = useMemo(() => {
         const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
+        // If it's a parent but has no children, it acts as its own leaf node for progress.
         if ((nodeType === 'Objective' || nodeType === 'Intention') && descendants.length === 0) {
             return [deepworkDef];
         }
@@ -286,18 +287,16 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
+        // If the objective is its own leaf, check its own status based on logged time.
         if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
             return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
         }
-        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id) || (node.loggedDuration || 0) > 0).length;
     }, [leafNodes, permanentlyLoggedTaskIds, deepworkDef]);
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
              return (deepworkDef.loggedDuration || 0) > 0;
-        }
-        if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
-            return (deepworkDef.loggedDuration || 0) > 0;
         }
         return completedCount >= leafNodes.length;
     }, [leafNodes, completedCount, deepworkDef]);
@@ -330,7 +329,6 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isActionable ? (deepworkDef.loggedDuration || 0) > 0 : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -414,12 +412,14 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                             const childDef = deepWorkDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={permanentlyLoggedTaskIds.has(childId)} type="deepwork" />;
+                            const isChildLogged = permanentlyLoggedTaskIds.has(childId) || (childDef.loggedDuration || 0) > 0;
+                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="deepwork" />;
                         })}
                         {(deepworkDef.linkedUpskillIds || []).map(childId => {
                             const childDef = upskillDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={false} type="upskill" />;
+                            const isChildLogged = permanentlyLoggedTaskIds.has(childId) || (childDef.loggedDuration || 0) > 0;
+                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="upskill" />;
                         })}
                         {(deepworkDef.linkedResourceIds || []).map(childId => {
                             const childDef = resources.find(d => d.id === childId);
@@ -817,10 +817,11 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     if (!def) return null;
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
+                    
                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                     const isComplete = leafNodes.length > 0 
-                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0)
-                        : (def.loggedDuration || 0) > 0;
+                        ? leafNodes.every(n => (n.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(n.id))
+                        : ((def.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(def.id));
 
                     return (
                         <LinkedUpskillCard 
@@ -830,7 +831,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                             isComplete={isComplete}
                             calculatedEstimate={calculateTotalEstimate(def)}
-                            handleAddTaskToSession={(defId, type, slot) => handleAddTaskToSession({id: defId, type, category: def.category, name: def.name}, slot)}
+                            handleAddTaskToSession={handleAddTaskToSession}
                             handleCardClick={handleCardClick}
                             handleDeleteSubtopic={handleDeleteFocusArea}
                             handleUnlinkItem={handleUnlinkItem}
@@ -2056,8 +2057,8 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
                                     const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
                                     const isComplete = leafNodes.length > 0 
-                                      ? leafNodes.every(n => permanentlyLoggedTaskIds.has(n.id))
-                                      : (def.loggedDuration || 0) > 0;
+                                      ? leafNodes.every(n => (n.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(n.id))
+                                      : ((def.loggedDuration || 0) > 0 || permanentlyLoggedTaskIds.has(def.id));
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2067,7 +2068,7 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
                                             isComplete={isComplete}
                                             getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                             calculatedEstimate={calculateTotalEstimate(def)}
-                                            handleAddTaskToSession={scheduleTaskFromMindMap}
+                                            handleAddTaskToSession={(defId, type, slot) => scheduleTaskFromMindMap(defId, type, slot, calculateTotalEstimate(def))}
                                             handleCardClick={handleCardClick}
                                             handleDeleteSubtopic={handleDeleteFocusArea}
                                             handleUnlinkItem={handleUnlinkItem}
