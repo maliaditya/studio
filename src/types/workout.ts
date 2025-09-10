@@ -496,6 +496,7 @@ export interface PillarCardData {
   principle: string;
   practiceEquationIds: string[];
   applicationSpecializationIds: string[];
+  applicationProjectIds: string[];
   outcome: string;
 }
 

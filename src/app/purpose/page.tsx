@@ -37,7 +37,7 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     onDelete: (cardId: string) => void;
     onSpecializationClick: (specId: string) => void;
 }) => {
-    const { specializations, allEquations } = useAuth();
+    const { specializations, allEquations, projects } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [editedCardData, setEditedCardData] = useState<PillarCardData>(cardData);
 
@@ -49,16 +49,20 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
         setEditedCardData({ ...editedCardData, [field]: value });
     };
 
-    const handleLinkToggle = (type: 'practice' | 'application', id: string) => {
-        const key = type === 'practice' ? 'practiceEquationIds' : 'applicationSpecializationIds';
+    const handleLinkToggle = (type: 'practice' | 'applicationSpecialization' | 'applicationProject', id: string) => {
+        const keyMap = {
+            'practice': 'practiceEquationIds',
+            'applicationSpecialization': 'applicationSpecializationIds',
+            'applicationProject': 'applicationProjectIds',
+        };
+        const key = keyMap[type];
+        
         const currentIds = editedCardData[key] || [];
         const newIds = currentIds.includes(id) ? currentIds.filter(i => i !== id) : [...currentIds, id];
         
-        // If we're in edit mode, update the local edit state.
         if (isEditing) {
             setEditedCardData({ ...editedCardData, [key]: newIds });
         } else {
-            // If we're in view mode, this must be an unlink action. Update directly.
              onUpdate({ ...cardData, [key]: newIds });
         }
     };
@@ -80,6 +84,11 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     const linkedApplications = (cardData.applicationSpecializationIds || [])
         .map(id => specializations.find(spec => spec.id === id))
         .filter((spec): spec is CoreSkill => !!spec);
+        
+    const linkedProjects = (cardData.applicationProjectIds || [])
+        .map(id => projects.find(p => p.id === id))
+        .filter((p): p is Project => !!p);
+
 
     if (!isEditing) {
         return (
@@ -118,26 +127,41 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
                         <div>
                             <Label className="font-semibold text-sm">Application</Label>
                              <div className="mt-2 flex flex-wrap gap-1">
-                                {linkedApplications.length > 0 ? (
-                                    linkedApplications.map(spec => (
-                                        <div key={spec.id} className="relative group/spec">
-                                            <Badge 
-                                                variant="outline" 
-                                                className="font-normal text-xs cursor-pointer hover:bg-accent pr-7" 
-                                                onClick={() => onSpecializationClick(spec.id)}
-                                            >
-                                                {spec.name}
-                                            </Badge>
-                                            <button 
-                                                onClick={() => handleLinkToggle('application', spec.id)}
-                                                className="absolute top-1/2 right-0.5 -translate-y-1/2 h-5 w-5 rounded-full bg-muted/50 hover:bg-destructive/20 text-destructive opacity-0 group-hover/spec:opacity-100 transition-opacity"
-                                            >
-                                                <Unlink className="h-3 w-3 mx-auto"/>
-                                            </button>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-xs text-muted-foreground">No specializations linked.</p>
+                                {linkedApplications.length > 0 && linkedApplications.map(spec => (
+                                    <div key={spec.id} className="relative group/spec">
+                                        <Badge 
+                                            variant="outline" 
+                                            className="font-normal text-xs cursor-pointer hover:bg-accent pr-7" 
+                                            onClick={() => onSpecializationClick(spec.id)}
+                                        >
+                                            {spec.name}
+                                        </Badge>
+                                        <button 
+                                            onClick={() => handleLinkToggle('applicationSpecialization', spec.id)}
+                                            className="absolute top-1/2 right-0.5 -translate-y-1/2 h-5 w-5 rounded-full bg-muted/50 hover:bg-destructive/20 text-destructive opacity-0 group-hover/spec:opacity-100 transition-opacity"
+                                        >
+                                            <Unlink className="h-3 w-3 mx-auto"/>
+                                        </button>
+                                    </div>
+                                ))}
+                                {linkedProjects.length > 0 && linkedProjects.map(proj => (
+                                     <div key={proj.id} className="relative group/proj">
+                                        <Badge 
+                                            variant="outline" 
+                                            className="font-normal text-xs cursor-pointer hover:bg-accent pr-7 bg-blue-500/10 border-blue-500/50 text-blue-800 dark:text-blue-300"
+                                        >
+                                            {proj.name}
+                                        </Badge>
+                                        <button 
+                                            onClick={() => handleLinkToggle('applicationProject', proj.id)}
+                                            className="absolute top-1/2 right-0.5 -translate-y-1/2 h-5 w-5 rounded-full bg-muted/50 hover:bg-destructive/20 text-destructive opacity-0 group-hover/proj:opacity-100 transition-opacity"
+                                        >
+                                            <Unlink className="h-3 w-3 mx-auto"/>
+                                        </button>
+                                    </div>
+                                ))}
+                                {linkedApplications.length === 0 && linkedProjects.length === 0 && (
+                                    <p className="text-xs text-muted-foreground">No specializations or projects linked.</p>
                                 )}
                             </div>
                         </div>
@@ -161,6 +185,11 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
     const applicationsInEdit = (editedCardData.applicationSpecializationIds || [])
         .map(id => specializations.find(spec => spec.id === id))
         .filter((spec): spec is CoreSkill => !!spec);
+        
+    const projectsInEdit = (editedCardData.applicationProjectIds || [])
+        .map(id => projects.find(p => p.id === id))
+        .filter((p): p is Project => !!p);
+
 
     return (
         <Card className="flex flex-col ring-2 ring-primary">
@@ -213,33 +242,44 @@ const PillarCard = ({ cardData, onUpdate, onDelete, onSpecializationClick }: {
                 <div className="space-y-4">
                     <div>
                         <Label className="font-semibold text-sm">Application</Label>
-                        <div className="space-y-1 mt-1">
+                        <div className="mt-2 flex flex-wrap gap-1">
                             {applicationsInEdit.map(spec => (
-                                <div key={spec.id} className="flex items-center justify-between p-1 rounded-md bg-muted/50">
-                                    <span className="text-xs font-medium pl-1">{spec.name}</span>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleLinkToggle('application', spec.id)}>
-                                        <Unlink className="h-3 w-3 text-destructive"/>
-                                    </Button>
-                                </div>
+                                <Badge key={spec.id} variant="outline" className="font-normal">{spec.name}</Badge>
+                            ))}
+                            {projectsInEdit.map(proj => (
+                                <Badge key={proj.id} variant="outline" className="font-normal bg-blue-500/10 border-blue-500/50 text-blue-800 dark:text-blue-300">{proj.name}</Badge>
                             ))}
                         </div>
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button variant="outline" size="sm" className="w-full mt-1">
-                                    <PlusCircle className="mr-2 h-4 w-4"/> Link Specialization
+                                <Button variant="outline" size="sm" className="w-full mt-2">
+                                    <PlusCircle className="mr-2 h-4 w-4"/> Link Application
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-80">
                                 <ScrollArea className="h-60">
                                     <div className="space-y-2 p-1">
+                                        <h4 className="font-semibold text-xs text-muted-foreground px-1">Specializations</h4>
                                         {specializations.map(spec => (
                                             <div key={spec.id} className="flex items-center space-x-2">
                                                 <Checkbox 
                                                     id={`spec-${cardData.id}-${spec.id}`}
                                                     checked={(editedCardData.applicationSpecializationIds || []).includes(spec.id)}
-                                                    onCheckedChange={() => handleLinkToggle('application', spec.id)}
+                                                    onCheckedChange={() => handleLinkToggle('applicationSpecialization', spec.id)}
                                                 />
                                                 <Label htmlFor={`spec-${cardData.id}-${spec.id}`} className="font-normal w-full cursor-pointer">{spec.name}</Label>
+                                            </div>
+                                        ))}
+                                        <Separator className="my-2" />
+                                        <h4 className="font-semibold text-xs text-muted-foreground px-1">Projects</h4>
+                                        {projects.map(proj => (
+                                            <div key={proj.id} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`proj-${cardData.id}-${proj.id}`}
+                                                    checked={(editedCardData.applicationProjectIds || []).includes(proj.id)}
+                                                    onCheckedChange={() => handleLinkToggle('applicationProject', proj.id)}
+                                                />
+                                                <Label htmlFor={`proj-${cardData.id}-${proj.id}`} className="font-normal w-full cursor-pointer">{proj.name}</Label>
                                             </div>
                                         ))}
                                     </div>
@@ -934,3 +974,4 @@ export default function PurposePage() {
 
 
     
+
