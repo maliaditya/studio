@@ -202,6 +202,7 @@ export function TimeSlots({
         const now = new Date();
         const todayKey = format(now, 'yyyy-MM-dd');
         const selectedDateKey = format(date, 'yyyy-MM-dd');
+        const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
         
         return (
           <Card
@@ -372,7 +373,7 @@ export function TimeSlots({
                 <Progress value={progress} className="h-2" />
                 <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{loggedTime} min logged</span>
-                    <span>{freeTime} min free</span>
+                    <span>{freeTime} min {isPastSlot ? 'wasted' : 'free'}</span>
                 </div>
                 <div className="flex justify-end items-center">
                     <Popover>
