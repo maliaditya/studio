@@ -359,7 +359,8 @@ function PurposePageContent() {
         pillarEquations, setPillarEquations,
         habitCards,
         addPillarCard, updatePillarCard, deletePillarCard,
-        offerizationPlans
+        offerizationPlans,
+        skillAcquisitionPlans,
     } = useAuth();
     const { toast } = useToast();
 
@@ -530,13 +531,15 @@ function PurposePageContent() {
                 }
             });
         });
+        
+        const plannedSpecIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
 
         const uncategorizedRules = metaRules.filter(r => !assignedItemIds.has(r.id));
-        const uncategorizedSkills = specializations.filter(s => !assignedItemIds.has(s.id));
+        const uncategorizedSkills = specializations.filter(s => !s.purposePillar && plannedSpecIds.has(s.id));
         const uncategorizedProjects = projects.filter(p => !assignedItemIds.has(p.id));
 
         return { rules: uncategorizedRules, skills: uncategorizedSkills, projects: uncategorizedProjects };
-    }, [metaRules, specializations, projects, pillars]);
+    }, [metaRules, specializations, projects, pillars, skillAcquisitionPlans]);
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
@@ -620,7 +623,7 @@ function PurposePageContent() {
                                         <div className="space-y-1">
                                             {skillsForPillar.length > 0 ? (
                                                 skillsForPillar.map(skill => (
-                                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                    <div key={skill.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
                                                         <span className="truncate">{skill.name}</span>
                                                         <div className="flex items-center opacity-0 group-hover:opacity-100">
                                                             <DropdownMenu>
@@ -646,7 +649,7 @@ function PurposePageContent() {
                                         <div className="space-y-1">
                                             {projectsForPillar.length > 0 ? (
                                                 projectsForPillar.map(project => (
-                                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group">
+                                                    <div key={project.id} className="text-sm p-2 rounded-md flex justify-between items-center group hover:bg-muted/50">
                                                         <span className="truncate">{project.name}</span>
                                                         <div className="flex items-center opacity-0 group-hover:opacity-100">
                                                             <DropdownMenu>
@@ -737,7 +740,7 @@ function PurposePageContent() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Uncategorized Specializations</CardTitle>
-                            <CardDescription>Assign these skills to a pillar using the dropdown menu.</CardDescription>
+                            <CardDescription>Assign these skills to a pillar. Only planned specializations are shown.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {uncategorizedItems.skills.map(skill => (
@@ -954,5 +957,6 @@ export default function PurposePage() {
 
 
     
+
 
 
