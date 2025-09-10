@@ -174,8 +174,18 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
                                 if (active && payload && payload.length) {
                                     const data = payload[0].payload;
                                     return (
-                                        <div className="grid min-w-[8rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                                        <div className="grid min-w-[12rem] max-w-sm items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                             <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
+                                            {(data.activities && data.activities.length > 0) && (
+                                                <>
+                                                    <Separator />
+                                                    <ul className="space-y-1">
+                                                        {data.activities.map((act: {name: string, duration: number}, index: number) => (
+                                                            <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                        ))}
+                                                    </ul>
+                                                </>
+                                            )}
                                         </div>
                                     );
                                 }

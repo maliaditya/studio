@@ -137,7 +137,7 @@ function TimesheetPageContent() {
         const hourMatch = durationStr.match(/(\d+)\s*h/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
         return totalMinutes;
     };
 
@@ -207,7 +207,7 @@ function TimesheetPageContent() {
 
         const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
         
-        const dailyData: Record<string, { activities: ProcessedActivity[]; pieData: { name: string; value: number }[] }> = {};
+        const dailyData: Record<string, { activities: ProcessedActivity[]; pieData: { name: string; value: number, activities: any[] }[] }> = {};
         
         for (const day of dateRange) {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -229,20 +229,23 @@ function TimesheetPageContent() {
                 }
             });
 
-            const totals: Record<string, number> = {};
+            const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
             const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
             
             processedActivities.forEach(activity => {
                 const mappedName = activityNameMap[activity.type];
                 if (mappedName) {
-                    totals[mappedName] = (totals[mappedName] || 0) + activity.calculatedDuration;
+                    if (!totals[mappedName]) totals[mappedName] = { time: 0, activities: [] };
+                    totals[mappedName].time += activity.calculatedDuration;
+                    totals[mappedName].activities.push({ name: activity.details, duration: activity.calculatedDuration });
                 }
             });
-            const allocatedMinutes = Object.values(totals).reduce((sum, t) => sum + t, 0);
+
+            const allocatedMinutes = Object.values(totals).reduce((sum, t) => sum + t.time, 0);
             const freeTime = (24 * 60) - allocatedMinutes;
             
-            const pieData = Object.entries(totals).map(([name, value]) => ({ name, value }));
-            if (freeTime > 0) pieData.push({ name: 'Free Time', value: freeTime });
+            const pieData = Object.entries(totals).map(([name, data]) => ({ name, value: data.time, activities: data.activities }));
+            if (freeTime > 0) pieData.push({ name: 'Free Time', value: freeTime, activities: [] });
 
 
             dailyData[dateKey] = { activities: processedActivities, pieData };
@@ -311,9 +314,9 @@ function TimesheetPageContent() {
         const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
         const freeTime = totalMinutesInDay - totalAllocatedMinutes;
 
-        const data = timeAllocationData.map(item => ({ name: item.name, value: item.time }));
+        const data = timeAllocationData.map(item => ({ name: item.name, value: item.time, activities: item.activities }));
         if (freeTime > 0) {
-            data.push({ name: 'Free Time', value: freeTime });
+            data.push({ name: 'Free Time', value: freeTime, activities: [] });
         }
         return data;
     }, [timeAllocationData]);
@@ -547,18 +550,15 @@ function TimesheetPageContent() {
                                                                 if (active && payload && payload.length) {
                                                                     const data = payload[0].payload;
                                                                     const categoryName = data.name;
-                                                                    const categoryActivities = activities.filter(act => {
-                                                                        const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
-                                                                        return activityNameMap[act.type] === categoryName;
-                                                                    });
+                                                                    const categoryActivities = data.activities || [];
 
                                                                     return (
                                                                         <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                                                             <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
                                                                             {categoryActivities.length > 0 && <Separator />}
                                                                             <ul className="space-y-1">
-                                                                                {categoryActivities.map((act, index) => (
-                                                                                    <li key={index} className="text-muted-foreground">{act.details} ({formatMinutes(act.calculatedDuration)})</li>
+                                                                                {categoryActivities.map((act: any, index: number) => (
+                                                                                    <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
                                                                                 ))}
                                                                             </ul>
                                                                         </div>
@@ -640,17 +640,14 @@ function TimesheetPageContent() {
                                                                 if (active && payload && payload.length) {
                                                                     const data = payload[0].payload;
                                                                     const categoryName = data.name;
-                                                                    const categoryActivities = activities.filter(act => {
-                                                                        const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
-                                                                        return activityNameMap[act.type] === categoryName;
-                                                                    });
+                                                                    const categoryActivities = data.activities || [];
                                                                     return (
                                                                         <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                                                             <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
                                                                             {categoryActivities.length > 0 && <Separator />}
                                                                             <ul className="space-y-1">
-                                                                                {categoryActivities.map((act, index) => (
-                                                                                    <li key={index} className="text-muted-foreground">{act.details} ({formatMinutes(act.calculatedDuration)})</li>
+                                                                                {categoryActivities.map((act: any, index: number) => (
+                                                                                    <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
                                                                                 ))}
                                                                             </ul>
                                                                         </div>
