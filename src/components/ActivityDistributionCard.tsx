@@ -83,7 +83,7 @@ const ActivityDetailPopup = ({ popupState, onClose }: {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
-        transform: transform ? `translate3d(${'${transform.x}'}px, ${'${transform.y}'}px, 0)` : undefined,
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
         zIndex: 100,
     };
@@ -150,7 +150,7 @@ export function ActivityDistributionCard() {
         const hourMatch = durationStr.match(/(\d+)\s*h/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
         return totalMinutes;
     };
 
