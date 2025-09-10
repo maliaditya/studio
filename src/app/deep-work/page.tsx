@@ -2434,5 +2434,6 @@ const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefini
 export default function DeepWorkPage() {
   return ( <AuthGuard> <DeepWorkPageContent /> </AuthGuard> );
 }
+    
 
     
