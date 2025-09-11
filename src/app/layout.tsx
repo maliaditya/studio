@@ -57,19 +57,27 @@ const slotEndHours: Record<string, number> = {
 };
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr) return 0;
-    
-    // Handle "30" as "30m"
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
-    }
+    if (!durationStr || typeof durationStr !== 'string') return 0;
 
     let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+    const trimmedStr = durationStr.trim();
     
+    // Case 1: "4h", "2h", "1h 30m"
+    const hourMatch = trimmedStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = trimmedStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+        totalMinutes += parseInt(minMatch[1], 10);
+    }
+
+    // Case 2: No units found, treat as minutes. E.g., "240", "30"
+    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
+        totalMinutes += parseInt(trimmedStr, 10);
+    }
+
     return totalMinutes;
 };
 
