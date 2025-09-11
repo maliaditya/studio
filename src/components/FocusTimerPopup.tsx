@@ -427,8 +427,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                     <p className="text-sm font-semibold truncate" title={nowFocusingText}>{nowFocusingText}</p>
-                    {showSubTasks && activeSubTask && 'estimatedDuration' in activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask?.id && (
-                        <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask?.id || null); setSubTaskDurationInput(''); }}>
+                    {showSubTasks && activeSubTask && 'estimatedDuration' in activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask.id && (
+                        <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask.id); setSubTaskDurationInput(''); }}>
                             <Timer className="h-4 w-4" />
                         </button>
                     )}
@@ -544,5 +544,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
-
-    
