@@ -302,28 +302,27 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [nodeType, deepworkDef.id, deepWorkDefinitions]);
 
     const isAddToSessionEnabled = useMemo(() => {
-        const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
-        const nodeLevel = typeLevelMap[nodeType];
-        
-        if (nodeLevel !== schedulingLevel) {
-            return false;
-        }
-
-        if (nodeType === 'Intention') {
-            return (deepworkDef.linkedProjectIds || []).some(id => activeProjectIds.has(id));
-        }
-
-        if (nodeType === 'Objective' && parentIntention) {
-          return (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id));
-        }
-        
-        // Actions and Standalones are enabled if they reach this point (i.e., level matches)
-        if (nodeType === 'Action' || nodeType === 'Standalone') {
-            return true;
-        }
-    
-        return false;
-    }, [nodeType, schedulingLevel, deepworkDef, parentIntention, activeProjectIds]);
+      const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
+      const nodeLevel = typeLevelMap[nodeType];
+  
+      if (nodeLevel !== schedulingLevel) {
+          return false; // Must match scheduling level
+      }
+  
+      // If level matches, check project linkage for higher-level items
+      if (nodeType === 'Intention') {
+          return (deepworkDef.linkedProjectIds || []).some(id => activeProjectIds.has(id));
+      }
+  
+      if (nodeType === 'Objective') {
+          // An Objective is active if its parent Intention is linked to an active project
+          return parentIntention ? (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id)) : false;
+      }
+      
+      // Actions and Standalones at the correct level are always schedulable
+      return true;
+  
+    }, [nodeType, schedulingLevel, deepworkDef.linkedProjectIds, parentIntention, activeProjectIds]);
 
     const getIcon = () => {
       switch (nodeType) {
@@ -845,7 +844,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             handleUnlinkItem={handleUnlinkItem}
                             handleViewProgress={handleViewProgress}
                             onEdit={onEdit}
-                            onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
                             onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
@@ -2435,6 +2434,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
