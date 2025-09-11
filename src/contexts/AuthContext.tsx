@@ -914,8 +914,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
     // For simple tasks without linked definitions or sub-tasks
-    const estDuration = activityDurations[activity.id];
-    let minutes = estDuration ? parseInt(estDuration.replace(/[a-zA-Z\s]/g, '')) || 0 : 45;
+    const estDurationStr = activityDurations[activity.id];
+    let minutes = 0;
+    if (estDurationStr) {
+        const hMatch = estDurationStr.match(/(\d+)h/);
+        const mMatch = estDurationStr.match(/(\d+)m/);
+        const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
+        const m = mMatch ? parseInt(mMatch[1]) : 0;
+        minutes = h + m;
+        if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
+            minutes = parseInt(estDurationStr.trim());
+        }
+    }
     if (isNaN(minutes) || minutes <= 0) minutes = 45;
   
     setFocusDuration(minutes);
@@ -1141,17 +1151,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setTimeout(() => setIsLoadingState(false), 100);
   }, []);
-  
-  const loadState = useCallback((username: string) => {
-    setIsLoadingState(true);
-    const mainDataString = localStorage.getItem(`lifeos_data_${username}`);
-    const uiStateString = localStorage.getItem(`lifeos_ui_state_${username}`);
-    
-    const mainData = mainDataString ? JSON.parse(mainDataString) : {};
-    const uiState = uiStateString ? JSON.parse(uiStateString) : {};
-    
-    loadImportedData(mainData, uiState);
-  }, [loadImportedData]);
   
   const populatedSchedule = useMemo(() => {
     const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
@@ -2954,6 +2953,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 

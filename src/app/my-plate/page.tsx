@@ -57,17 +57,23 @@ const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Af
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
     if (!durationStr || typeof durationStr !== 'string') return 0;
     
-    // Handle cases like "30m", "2h", "1h 30m", or just a number like "240"
-    if (/^\d+$/.test(durationStr.trim())) {
-        return parseInt(durationStr.trim(), 10);
+    let totalMinutes = 0;
+    const trimmedStr = durationStr.trim();
+    
+    const hourMatch = trimmedStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = trimmedStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+        totalMinutes += parseInt(minMatch[1], 10);
     }
 
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+)\s*h/);
-    if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-    if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-    
+    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
+        totalMinutes += parseInt(trimmedStr, 10);
+    }
+
     return totalMinutes;
 };
 
@@ -1336,20 +1342,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
