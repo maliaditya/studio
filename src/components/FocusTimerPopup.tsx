@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -76,6 +75,7 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
   );
 });
 EditableStep.displayName = 'EditableStep';
+
 
 export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
   const { 
@@ -226,6 +226,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       logSubTaskTime(activeSubTask.id, durationMinutes);
       setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
     }
+    setPromptForCompletion(false);
   
     // Find the next task in the original list
     // Crucially, we need to find the next task that is *not yet complete* in this session
@@ -276,14 +277,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (activeFocusSession?.secondsLeft === 0 && activeFocusSession.state === 'running') {
       setActiveFocusSession(prev => prev ? { ...prev, state: 'paused' } : null);
       setIsAudioPlaying(false);
-      
-      if (showSubTasks) {
-          handleSubTaskComplete();
-      } else {
-          setPromptForCompletion(true);
-      }
+      setPromptForCompletion(true);
     }
-  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying, showSubTasks, handleSubTaskComplete]);
+  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying]);
 
   const handleExtendTimer = () => {
     const additionalSeconds = extendMinutes * 60;
@@ -538,6 +534,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         <Button onClick={() => setExtendMinutes(25)} size="sm" variant={extendMinutes === 25 ? 'default' : 'outline'}>25m</Button>
                     </div>
                     <Button onClick={handleExtendTimer} className="w-full">Extend Session</Button>
+                     <Button onClick={showSubTasks ? handleSubTaskComplete : handleStandaloneTaskComplete} variant="secondary" className="w-full">
+                        Complete & Next
+                    </Button>
                 </div>
             )}
             </CardContent>
@@ -545,3 +544,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
+
+    
