@@ -302,27 +302,28 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [nodeType, deepworkDef.id, deepWorkDefinitions]);
 
     const { isEnabled: isAddToSessionEnabled, tooltipContent } = useMemo(() => {
-      const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
-      const nodeLevel = typeLevelMap[nodeType];
-  
-      if (nodeLevel !== schedulingLevel) {
-          return { isEnabled: false, tooltipContent: `Can only schedule at Level ${schedulingLevel}.` };
-      }
-  
-      if (nodeType === 'Intention') {
-          const isLinked = (deepworkDef.linkedProjectIds || []).some(id => activeProjectIds.has(id));
-          return { isEnabled: isLinked, tooltipContent: isLinked ? '' : 'Link to an active project to schedule.' };
-      }
-  
-      if (nodeType === 'Objective') {
-          const isParentLinked = parentIntention ? (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id)) : false;
-          return { isEnabled: isParentLinked, tooltipContent: isParentLinked ? '' : "Parent Intention isn't linked to an active project." };
-      }
-      
-      // Actions and Standalones are always schedulable if level matches
-      return { isEnabled: true, tooltipContent: '' };
-  
-  }, [nodeType, schedulingLevel, deepworkDef.linkedProjectIds, parentIntention, activeProjectIds]);
+        const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
+        const nodeLevel = typeLevelMap[nodeType];
+    
+        if (nodeLevel !== schedulingLevel) {
+            return { isEnabled: false, tooltipContent: `Can only schedule at Level ${schedulingLevel}.` };
+        }
+    
+        if (nodeType === 'Intention') {
+            const isLinked = (deepworkDef.linkedProjectIds || []).some(id => activeProjectIds.has(id));
+            return { isEnabled: isLinked, tooltipContent: isLinked ? '' : 'Link to an active project to schedule.' };
+        }
+    
+        if (nodeType === 'Objective') {
+            if (!parentIntention) return { isEnabled: false, tooltipContent: 'Objective must have a parent Intention.'};
+            const isParentLinked = (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id));
+            return { isEnabled: isParentLinked, tooltipContent: isParentLinked ? '' : "Parent Intention isn't linked to an active project." };
+        }
+        
+        // Actions and Standalones are always schedulable if level matches
+        return { isEnabled: true, tooltipContent: '' };
+    
+    }, [nodeType, schedulingLevel, deepworkDef.linkedProjectIds, parentIntention, activeProjectIds]);
 
     const getIcon = () => {
       switch (nodeType) {
@@ -370,7 +371,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                                     />
                                 </div>
                             </TooltipTrigger>
-                            {!isAddToSessionEnabled && tooltipContent && (
+                            {tooltipContent && (
                                 <TooltipContent>
                                     <p>{tooltipContent}</p>
                                 </TooltipContent>
@@ -2434,6 +2435,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
