@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -254,7 +255,8 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     activeProjectIds,
     currentSlot,
 }, ref) => {
-    const { getDescendantLeafNodes } = useAuth();
+    const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+    const { schedulingLevel = 3 } = settings;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `card-deepwork-${deepworkDef.id}`,
@@ -277,26 +279,22 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     const nodeType = getDeepWorkNodeType(deepworkDef);
 
     const leafNodes = useMemo(() => {
-        const descendants = getDescendantLeafNodes(deepworkDef.id, 'deepwork');
-        if ((nodeType === 'Objective' || nodeType === 'Intention') && descendants.length === 0) {
-            return [deepworkDef];
+        if (nodeType === 'Objective' || nodeType === 'Intention') {
+            return getDescendantLeafNodes(deepworkDef.id, 'deepwork');
         }
-        return descendants;
+        return [];
     }, [deepworkDef, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        if (leafNodes.length === 1 && leafNodes[0].id === deepworkDef.id) {
-            return (deepworkDef.loggedDuration || 0) > 0 ? 1 : 0;
-        }
-        return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
-    }, [leafNodes, deepworkDef]);
+        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+    }, [leafNodes, permanentlyLoggedTaskIds]);
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
-             return (deepworkDef.loggedDuration || 0) > 0;
+             return permanentlyLoggedTaskIds.has(deepworkDef.id);
         }
         return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, deepworkDef]);
+    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
     
     const parentIntention = useMemo(() => {
         if (nodeType !== 'Objective') return null;
@@ -304,15 +302,28 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     }, [nodeType, deepworkDef.id, deepWorkDefinitions]);
 
     const isAddToSessionEnabled = useMemo(() => {
-        const isActionableNode = nodeType === 'Action' || nodeType === 'Standalone';
-        if (isActionableNode) return true;
-    
+        const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
+        const nodeLevel = typeLevelMap[nodeType];
+        
+        if (nodeLevel !== schedulingLevel) {
+            return false;
+        }
+
+        if (nodeType === 'Intention') {
+            return (deepworkDef.linkedProjectIds || []).some(id => activeProjectIds.has(id));
+        }
+
         if (nodeType === 'Objective' && parentIntention) {
           return (parentIntention.linkedProjectIds || []).some(id => activeProjectIds.has(id));
         }
+        
+        // Actions and Standalones are enabled if they reach this point (i.e., level matches)
+        if (nodeType === 'Action' || nodeType === 'Standalone') {
+            return true;
+        }
     
         return false;
-    }, [nodeType, parentIntention, activeProjectIds]);
+    }, [nodeType, schedulingLevel, deepworkDef, parentIntention, activeProjectIds]);
 
     const getIcon = () => {
       switch (nodeType) {
@@ -326,6 +337,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
+    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -344,7 +356,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     
     return (
         <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-            <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isObjectiveComplete && "opacity-70 bg-muted/30")}>
+            <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                     <TooltipProvider>
@@ -361,7 +373,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                             </TooltipTrigger>
                             {!isAddToSessionEnabled && (
                                 <TooltipContent>
-                                    <p>Link parent to an active project to enable.</p>
+                                    <p>Can only schedule at Level {schedulingLevel} or item isn't linked to an active project.</p>
                                 </TooltipContent>
                             )}
                         </Tooltip>
@@ -387,7 +399,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         ) : (
                             <CardTitle className="text-base">
                                 <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <span className={cn("truncate", isObjectiveComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
+                                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
                                     {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
                                 </span>
                                 </TooltipTrigger><TooltipContent><p>{deepworkDef.name}</p></TooltipContent></Tooltip></TooltipProvider>
@@ -1075,35 +1087,21 @@ function DeepWorkPageContent() {
   
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
-    
-    // Check if the task itself is a parent or a leaf
-    const nodeType = getDeepWorkNodeType(definition);
-
-    // If it's a parent node, calculate sum of its descendants' logs
-    if (nodeType === 'Intention' || nodeType === 'Objective') {
-        const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+    const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+    if (leafNodes.length > 0) {
         return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
-    
-    // If it's a leaf node ('Action' or 'Standalone'), return its own log
     return definition.loggedDuration || 0;
-}, [getDeepWorkNodeType, getDescendantLeafNodes]);
+  }, [getDescendantLeafNodes]);
 
 const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
     if (!definition) return 0;
-    
-    // Check if the task itself is a parent or a leaf
-    const nodeType = getUpskillNodeType(definition);
-
-    // If it's a parent node, calculate sum of its descendants' logs
-    if (nodeType === 'Curiosity' || nodeType === 'Objective') {
-        const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+    const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+    if (leafNodes.length > 0) {
         return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
     }
-    
-    // If it's a leaf node ('Visualization' or 'Standalone'), return its own log
     return definition.loggedDuration || 0;
-}, [getUpskillNodeType, getDescendantLeafNodes]);
+}, [getDescendantLeafNodes]);
 
 
   const totalLoggedTime = useMemo(() => {
@@ -2437,6 +2435,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
