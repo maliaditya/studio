@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -57,7 +58,7 @@ export function TodaysLearningModal({
   productizationPlans = {},
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
-  const { microSkillMap, getDeepWorkNodeType, getUpskillNodeType } = useAuth();
+  const { microSkillMap, getDeepWorkNodeType, getUpskillNodeType, settings } = useAuth();
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for branding bundle creation
@@ -74,6 +75,7 @@ export function TodaysLearningModal({
   const [selectedUpskillProject, setSelectedUpskillProject] = useState<Project | null>(null);
   const [selectedUpskillCuriosity, setSelectedUpskillCuriosity] = useState<ExerciseDefinition | null>(null);
 
+  const schedulingLevel = settings.schedulingLevel || 3;
 
   const filteredProjects = useMemo(() => {
     const activeProjectIds = new Set<string>();
@@ -107,12 +109,12 @@ export function TodaysLearningModal({
   useEffect(() => {
     if (isOpen) {
       if (pageType === 'deepwork') {
-        setDeepWorkSelectionStep('project');
+        setDeepWorkSelectionStep(schedulingLevel === 1 ? 'project' : 'project');
         setSelectedDeepWorkProject(null);
         setSelectedDeepWorkIntention(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       } else if (pageType === 'upskill') {
-        setUpskillSelectionStep('project');
+        setUpskillSelectionStep(schedulingLevel === 1 ? 'project' : 'project');
         setSelectedUpskillProject(null);
         setSelectedUpskillCuriosity(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
@@ -121,7 +123,7 @@ export function TodaysLearningModal({
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? initialSelectedIds[0] : null);
       }
     }
-  }, [isOpen, pageType, initialSelectedIds]);
+  }, [isOpen, pageType, initialSelectedIds, schedulingLevel]);
   
   const handleSaveChanges = () => {
     onSave(selectedRadioDefId ? [selectedRadioDefId] : []);
@@ -223,6 +225,12 @@ export function TodaysLearningModal({
     return getObjectivesRecursive(selectedUpskillCuriosity.id);
   }, [selectedUpskillCuriosity, pageType, getObjectivesRecursive]);
 
+  const tasksForUpskill = useMemo(() => {
+    if (schedulingLevel === 1) return curiositiesForProject;
+    if (schedulingLevel === 2) return objectivesForCuriosity;
+    return upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Visualization' || getUpskillNodeType(def) === 'Standalone');
+  }, [schedulingLevel, upskillDefinitions, getUpskillNodeType, curiositiesForProject, objectivesForCuriosity]);
+
 
   // ----- DEEPWORK-SPECIFIC LOGIC -----
   const getObjectivesForIntentionRecursive = useCallback((nodeId: string): ExerciseDefinition[] => {
@@ -261,6 +269,12 @@ export function TodaysLearningModal({
     if (!selectedDeepWorkIntention || pageType !== 'deepwork') return [];
     return getObjectivesForIntentionRecursive(selectedDeepWorkIntention.id);
   }, [selectedDeepWorkIntention, pageType, getObjectivesForIntentionRecursive]);
+  
+  const tasksForDeepWork = useMemo(() => {
+    if (schedulingLevel === 1) return intentionsForProject;
+    if (schedulingLevel === 2) return objectivesForIntention;
+    return deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Action' || getDeepWorkNodeType(def) === 'Standalone');
+  }, [schedulingLevel, deepWorkDefinitions, getDeepWorkNodeType, intentionsForProject, objectivesForIntention]);
 
 
   const pageInfo = {
@@ -322,7 +336,7 @@ export function TodaysLearningModal({
                                 </button>
                             </>
                         )}
-                        {selectedDeepWorkIntention && (
+                        {selectedDeepWorkIntention && schedulingLevel === 3 && (
                             <>
                                 <ChevronRight className="h-4 w-4 mx-1" />
                                 <span className="font-medium text-foreground truncate max-w-[150px]" title={selectedDeepWorkIntention.name}>{selectedDeepWorkIntention.name}</span>
@@ -332,7 +346,7 @@ export function TodaysLearningModal({
                     {deepWorkSelectionStep === 'project' && (
                         <div className="space-y-2">
                             {filteredProjects.map(project => ( 
-                                <button key={project.id} onClick={() => { setSelectedDeepWorkProject(project); setDeepWorkSelectionStep('intention'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                <button key={project.id} onClick={() => { setSelectedDeepWorkProject(project); setDeepWorkSelectionStep(schedulingLevel === 1 ? 'intention' : 'intention'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
@@ -340,34 +354,18 @@ export function TodaysLearningModal({
                         </div>
                     )}
                     {deepWorkSelectionStep === 'intention' && (
-                        <div className="space-y-2">
-                           {intentionsForProject.length > 0 ? intentionsForProject.map(intention => (
-                                <button key={intention.id} onClick={() => { setSelectedDeepWorkIntention(intention); setDeepWorkSelectionStep('action'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <div className='flex items-center gap-2 min-w-0'>
-                                        <Lightbulb className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                        <span className="font-medium truncate">{intention.name}</span>
-                                    </div>
-                                    <ChevronRight className="h-4 w-4" />
-                                </button>
-                            )) : <p className="text-sm text-center text-muted-foreground py-4">No Intentions linked to this project.</p>}
-                        </div>
-                    )}
-                    {deepWorkSelectionStep === 'action' && (
-                         <div className="space-y-2">
-                           {objectivesForIntention.length > 0 ? (
-                                <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {objectivesForIntention.map(objective => (
-                                    <div key={objective.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={objective.id} id={`objective-radio-${objective.id}`} />
-                                        <Label htmlFor={`objective-radio-${objective.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                            <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                            {objective.name}
-                                        </Label>
-                                    </div>
-                                ))}
-                                </RadioGroup>
-                           ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable objectives found for this intention.</p>}
-                        </div>
+                        <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
+                           {tasksForDeepWork.map(task => (
+                                <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                    <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
+                                    <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                        { getDeepWorkNodeType(task) === 'Intention' ? <Lightbulb className="h-4 w-4 text-amber-500"/> : getDeepWorkNodeType(task) === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Bolt className="h-4 w-4 text-blue-500"/> }
+                                        {task.name}
+                                    </Label>
+                                </div>
+                            ))}
+                            {tasksForDeepWork.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No tasks at this level.</p>}
+                        </RadioGroup>
                     )}
                 </div>
             ) : pageType === 'branding' ? (
@@ -467,7 +465,7 @@ export function TodaysLearningModal({
                                 </button>
                             </>
                         )}
-                        {selectedUpskillCuriosity && (
+                        {selectedUpskillCuriosity && schedulingLevel === 3 && (
                             <>
                                 <ChevronRight className="h-4 w-4 mx-1" />
                                 <span className="font-medium text-foreground truncate max-w-[150px]" title={selectedUpskillCuriosity.name}>{selectedUpskillCuriosity.name}</span>
@@ -486,32 +484,18 @@ export function TodaysLearningModal({
                     )}
                     {upskillSelectionStep === 'curiosity' && (
                          <div className="space-y-2">
-                            {curiositiesForProject.length > 0 ? curiositiesForProject.map(curiosity => (
-                                <button key={curiosity.id} onClick={() => { setSelectedUpskillCuriosity(curiosity); setUpskillSelectionStep('visualization'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <div className='flex items-center gap-2 min-w-0'>
-                                        <Flashlight className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                                        <span className="font-medium truncate">{curiosity.name}</span>
-                                    </div>
-                                    <ChevronRight className="h-4 w-4" />
-                                </button>
-                            )) : <p className="text-sm text-center text-muted-foreground py-4">No curiosities found for this project.</p>}
-                        </div>
-                    )}
-                    {upskillSelectionStep === 'visualization' && (
-                        <div className="space-y-2">
-                            {objectivesForCuriosity.length > 0 ? (
-                                <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                                {objectivesForCuriosity.map(objective => (
-                                    <div key={objective.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                        <RadioGroupItem value={objective.id} id={`objective-radio-${objective.id}`} />
-                                        <Label htmlFor={`objective-radio-${objective.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                            <Flag className="h-4 w-4 text-green-500 flex-shrink-0" />
-                                            {objective.name}
+                            <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
+                                {tasksForUpskill.map(task => (
+                                    <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
+                                        <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
+                                        <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
+                                            { getUpskillNodeType(task) === 'Curiosity' ? <Flashlight className="h-4 w-4 text-amber-500"/> : getUpskillNodeType(task) === 'Objective' ? <Flag className="h-4 w-4 text-green-500"/> : <Frame className="h-4 w-4 text-blue-500"/> }
+                                            {task.name}
                                         </Label>
                                     </div>
                                 ))}
-                                </RadioGroup>
-                            ) : <p className="text-sm text-center text-muted-foreground py-4">No actionable objectives found for this curiosity.</p>}
+                                {tasksForUpskill.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No tasks at this level.</p>}
+                            </RadioGroup>
                         </div>
                     )}
                 </div>

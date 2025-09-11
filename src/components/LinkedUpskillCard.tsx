@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -167,7 +168,9 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   activeProjectIds,
   currentSlot,
 }, ref) => {
-  const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
+  const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+  const { schedulingLevel = 3 } = settings;
+
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
       id: `card-upskill-${upskillDef.id}`,
       data: { type: 'card', itemType: 'upskill', definition: upskillDef, id: upskillDef.id }
@@ -212,15 +215,9 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   }, [nodeType, upskillDef.id, upskillDefinitions]);
 
   const isAddToSessionEnabled = useMemo(() => {
-    const isActionableNode = nodeType === 'Visualization' || nodeType === 'Standalone';
-    if (isActionableNode) return true;
-
-    if (nodeType === 'Objective' && parentCuriosity) {
-      return (parentCuriosity.linkedProjectIds || []).some(id => activeProjectIds.has(id));
-    }
-
-    return false;
-  }, [nodeType, parentCuriosity, activeProjectIds]);
+    const typeLevelMap = { 'Curiosity': 1, 'Objective': 2, 'Visualization': 3, 'Standalone': 3 };
+    return typeLevelMap[nodeType as keyof typeof typeLevelMap] === schedulingLevel;
+  }, [nodeType, schedulingLevel]);
   
   const getIcon = () => {
     switch(nodeType) {
@@ -276,7 +273,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
                 </TooltipTrigger>
                 {!isAddToSessionEnabled && (
                   <TooltipContent>
-                    <p>Link parent to an active project to enable.</p>
+                    <p>Can only schedule tasks at Level {schedulingLevel}.</p>
                   </TooltipContent>
                 )}
               </Tooltip>

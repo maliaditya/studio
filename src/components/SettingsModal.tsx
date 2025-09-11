@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -374,35 +375,62 @@ ${JSON.stringify(finalTemplate, null, 2)}
                 </div>
 
                 <Accordion type="multiple" className="w-full">
-                  <AccordionItem value="item-workout" className="border rounded-lg">
-                    <AccordionTrigger className="px-4 py-3">
+                  <AccordionItem value="item-scheduling" className="border rounded-lg">
+                     <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
-                          <Label className="text-base">Workout Scheduling</Label>
+                          <Label className="text-base">Task Scheduling</Label>
                           <p className="text-sm text-muted-foreground">
-                            Choose how your weekly workout plan is scheduled.
+                            Control how and what you schedule.
                           </p>
                         </div>
                     </AccordionTrigger>
                      <AccordionContent className="px-4 pb-4">
-                        <div className="space-y-3 pt-4 border-t">
-                            <RadioGroup
-                                value={settings.workoutScheduling || 'day-of-week'}
-                                onValueChange={(value) => handleSettingChange('workoutScheduling', value as WorkoutSchedulingMode)}
-                            >
-                                <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="day-of-week" id="r-dow" />
-                                <Label htmlFor="r-dow" className="font-normal">Day-of-Week (Rigid)</Label>
-                                </div>
-                                <p className="text-xs text-muted-foreground pl-6">Workouts are tied to specific days (e.g., Monday is always Chest).</p>
-                                
-                                <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="sequential" id="r-seq" />
-                                <Label htmlFor="r-seq" className="font-normal">Sequential (Flexible)</Label>
-                                </div>
-                                <p className="text-xs text-muted-foreground pl-6">Workouts follow a sequence. If you miss a day, the next workout waits for you.</p>
-                            </RadioGroup>
+                        <div className="space-y-6 pt-4 border-t">
+                            <div>
+                               <Label className="font-semibold">Workout Scheduling</Label>
+                                <p className="text-xs text-muted-foreground mb-2">Choose how your weekly workout plan is scheduled.</p>
+                                <RadioGroup
+                                    value={settings.workoutScheduling || 'day-of-week'}
+                                    onValueChange={(value) => handleSettingChange('workoutScheduling', value as WorkoutSchedulingMode)}
+                                >
+                                    <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="day-of-week" id="r-dow" />
+                                    <Label htmlFor="r-dow" className="font-normal">Day-of-Week (Rigid)</Label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground pl-6">Workouts are tied to specific days (e.g., Monday is always Chest).</p>
+                                    
+                                    <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="sequential" id="r-seq" />
+                                    <Label htmlFor="r-seq" className="font-normal">Sequential (Flexible)</Label>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground pl-6">Workouts follow a sequence. If you miss a day, the next workout waits for you.</p>
+                                </RadioGroup>
+                            </div>
+                            <Separator />
+                            <div>
+                               <Label className="font-semibold">Task Scheduling Level</Label>
+                                <p className="text-xs text-muted-foreground mb-2">Choose the granularity for scheduling Deep Work and Upskill tasks.</p>
+                                <RadioGroup
+                                    value={String(settings.schedulingLevel || 3)}
+                                    onValueChange={(value) => handleSettingChange('schedulingLevel', parseInt(value, 10))}
+                                    className="space-y-1"
+                                >
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="1" id="level-1" />
+                                        <Label htmlFor="level-1" className="font-normal">Level 1: Intentions & Curiosities (High-level goals)</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="2" id="level-2" />
+                                        <Label htmlFor="level-2" className="font-normal">Level 2: Objectives (Mid-level milestones)</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <RadioGroupItem value="3" id="level-3" />
+                                        <Label htmlFor="level-3" className="font-normal">Level 3: Actions & Visualizations (Granular tasks)</Label>
+                                    </div>
+                                </RadioGroup>
+                            </div>
                         </div>
-                    </AccordionContent>
+                     </AccordionContent>
                   </AccordionItem>
                   <AccordionItem value="item-habits" className="border rounded-lg mt-4">
                     <AccordionTrigger className="px-4 py-3">

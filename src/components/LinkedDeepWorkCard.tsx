@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -160,13 +160,18 @@ const DraggableSubtaskItem: React.FC<{
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-function AddToSessionPopover({ definition, onSelectSlot }: { definition: ExerciseDefinition; onSelectSlot: (slotName: string) => void; }) {
+function AddToSessionPopover({ definition, onSelectSlot, disabled = false, currentSlot }: { 
+    definition: ExerciseDefinition; 
+    onSelectSlot: (slotName: string) => void; 
+    disabled?: boolean;
+    currentSlot: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm">
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled={disabled}>
           <PlusCircle className="h-4 w-4" />
         </Button>
       </PopoverTrigger>
@@ -177,7 +182,10 @@ function AddToSessionPopover({ definition, onSelectSlot }: { definition: Exercis
             <Button
               key={slotName}
               variant="ghost"
-              className="w-full justify-start h-8"
+              className={cn(
+                "w-full justify-start h-8",
+                slotName === currentSlot && "bg-primary/10 text-primary"
+              )}
               onClick={() => {
                 onSelectSlot(slotName as string);
                 setIsOpen(false);
@@ -212,6 +220,8 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     projects: Project[];
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    activeProjectIds: Set<string>;
+    currentSlot: string;
 }>(({
     deepworkDef,
     getDeepWorkNodeType,
@@ -232,8 +242,11 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     projects,
     handleOpenLinkProjectModal,
     handleCreateAndLinkChild,
+    activeProjectIds,
+    currentSlot,
 }, ref) => {
-    const { permanentlyLoggedTaskIds, getDescendantLeafNodes } = useAuth();
+    const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+    const { schedulingLevel = 3 } = settings;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: `card-deepwork-${deepworkDef.id}`,
@@ -273,6 +286,11 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         return completedCount >= leafNodes.length;
     }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
 
+    const isAddToSessionEnabled = useMemo(() => {
+        const typeLevelMap = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
+        return typeLevelMap[nodeType as keyof typeof typeLevelMap] === schedulingLevel;
+    }, [nodeType, schedulingLevel]);
+
 
     const getIcon = () => {
       switch (nodeType) {
@@ -308,7 +326,25 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
             <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
                  <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
-                    <AddToSessionPopover definition={deepworkDef} onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} />
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div>
+                                    <AddToSessionPopover 
+                                        definition={deepworkDef} 
+                                        onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} 
+                                        disabled={!isAddToSessionEnabled}
+                                        currentSlot={currentSlot}
+                                    />
+                                </div>
+                            </TooltipTrigger>
+                            {!isAddToSessionEnabled && (
+                                <TooltipContent>
+                                    <p>Can only schedule tasks at Level {schedulingLevel}.</p>
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
+                    </TooltipProvider>
                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleCardClick(deepworkDef)}><ArrowRight className="h-4 w-4" /></Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -368,6 +404,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
+                         {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(deepworkDef.id, 'deepwork')}>Add Action</Button>}
                          {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
                          {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                         {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}

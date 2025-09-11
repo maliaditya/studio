@@ -657,6 +657,7 @@ export interface UserSettings {
   routines: Activity[];
   workoutScheduling: WorkoutSchedulingMode;
   slotRules: Partial<Record<SlotName, string[]>>;
+  schedulingLevel?: 1 | 2 | 3;
 }
 
 export interface ActiveFocusSession {
