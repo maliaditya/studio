@@ -182,6 +182,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             duration: durationMins,
             secondsLeft: durationMins * 60,
             totalSeconds: durationMins * 60,
+            startTime: Date.now(), // Reset start time for the new sub-task
             subTaskStartTime: Date.now(),
             state: 'running',
         });
@@ -366,7 +367,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }
 
   const doesSubTaskNeedDuration = (task: any) => {
-      return !('estimatedDuration' in task && task.estimatedDuration && task.estimatedDuration > 0);
+      // Check for simple sub-tasks that always need duration, or exercise-based ones without a pre-set duration.
+      return ('completed' in task) || !('estimatedDuration' in task && task.estimatedDuration && task.estimatedDuration > 0);
   };
 
 
