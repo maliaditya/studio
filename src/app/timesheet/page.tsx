@@ -151,13 +151,13 @@ function TimesheetPageContent() {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
             if (!activity.completed) return 0;
         
-            const activityTaskDefIds = new Set(activity.taskIds || []);
+            const activityTaskInstanceIds = new Set(activity.taskIds || []);
             
             const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
                 const logForDay = logs.find(l => l.date === dateKey);
                 if (!logForDay) return 0;
                 return logForDay.exercises
-                    .filter((ex: any) => activityTaskDefIds.has(ex.definitionId))
+                    .filter((ex: any) => activityTaskInstanceIds.has(ex.id)) // Correctly match instance ID
                     .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
             };
 
@@ -174,7 +174,7 @@ function TimesheetPageContent() {
                      const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
                      if (workoutLog) {
                          return workoutLog.exercises
-                             .filter(ex => activityTaskDefIds.has(ex.definitionId))
+                             .filter(ex => activityTaskInstanceIds.has(ex.id))
                              .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
                      }
                      return 0;
@@ -182,7 +182,7 @@ function TimesheetPageContent() {
                 case 'mindset': {
                     const mindsetLog = allMindProgrammingLogs.find(l => l.date === dateKey);
                     if (mindsetLog) {
-                        return mindsetLog.exercises.filter(ex => activityTaskDefIds.has(ex.definitionId))
+                        return mindsetLog.exercises.filter(ex => activityTaskInstanceIds.has(ex.id))
                                        .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
                     }
                     return 0;
