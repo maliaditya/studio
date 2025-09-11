@@ -59,6 +59,7 @@ const activityColorMapping: Record<string, string> = {
     'Planning': 'hsl(var(--chart-2))',
     'Tracking': 'hsl(var(--chart-3))',
     'Interrupts': 'hsl(var(--destructive))',
+    'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
     'Free Time': 'hsl(var(--muted))',
 };
@@ -121,7 +122,7 @@ const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpe
 
 
 function TimesheetPageContent() {
-    const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations } = useAuth();
+    const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations, allWorkoutLogs, brandingLogs, allLeadGenLogs } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
@@ -130,14 +131,19 @@ function TimesheetPageContent() {
 
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
         if (!durationStr) return 0;
-        if (/^\d+$/.test(durationStr.trim())) {
-            return parseInt(durationStr.trim(), 10);
-        }
-        let totalMinutes = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
-        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+        // Case 1: "4h", "2h", "1h 30m"
+        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+
+        let totalMinutes = 0;
+        if (hourMatch) totalMinutes += parseFloat(hourMatch[1]) * 60;
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+
+        // Case 2: No units found, treat as minutes. E.g., "240", "30"
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+            totalMinutes += parseInt(durationStr.trim(), 10);
+        }
+
         return totalMinutes;
     };
 
@@ -151,39 +157,42 @@ function TimesheetPageContent() {
 
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-             if (activity.completed) {
-                if (activity.type === 'deepwork') {
-                    const dailyLog = allDeepWorkLogs.find(log => log.date === dateKey);
-                    let duration = 0;
-                    if (dailyLog && activity.taskIds) {
-                        activity.taskIds.forEach(taskId => {
-                            const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
-                            if (taskLog) {
-                                duration += taskLog.loggedSets.reduce((sum, set) => sum + set.weight, 0);
-                            }
-                        });
-                    }
-                    return duration;
-                }
-                if (activity.type === 'upskill') {
-                    const dailyLog = allUpskillLogs.find(log => log.date === dateKey);
-                    let duration = 0;
-                    if (dailyLog && activity.taskIds) {
-                        activity.taskIds.forEach(taskId => {
-                            const taskLog = dailyLog.exercises.find(ex => ex.id === taskId);
-                            if (taskLog) {
-                                duration += taskLog.loggedSets.reduce((sum, set) => sum + set.reps, 0);
-                            }
-                        });
-                    }
-                    return duration;
-                }
-                if (activity.type === 'interrupt' || activity.type === 'essentials') {
+            if (!activity.completed) return 0;
+        
+            const activityTaskIds = new Set(activity.taskIds || []);
+            
+            const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
+                const logForDay = logs.find(l => l.date === dateKey);
+                if (!logForDay) return 0;
+                return logForDay.exercises
+                    .filter((ex: any) => activityTaskIds.has(ex.id))
+                    .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
+            };
+
+            switch(activity.type) {
+                case 'deepwork':
+                    return findDurationInLogs(allDeepWorkLogs, 'weight');
+                case 'upskill':
+                    return findDurationInLogs(allUpskillLogs, 'reps');
+                case 'branding':
+                    return findDurationInLogs(brandingLogs, 'weight'); // Assuming branding uses 'weight' for duration
+                case 'lead-generation':
+                    return findDurationInLogs(allLeadGenLogs, 'weight'); // Assuming lead-gen uses 'weight' for duration
+                case 'workout':
+                     const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
+                     if (workoutLog) {
+                         return workoutLog.exercises
+                             .filter(ex => activityTaskIds.has(ex.id))
+                             .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0); // Approximation
+                     }
+                     return 0;
+                case 'interrupt':
+                case 'distraction':
+                case 'essentials':
                     return activity.duration || 0;
-                }
-                return parseDurationToMinutes(activityDurations[activity.id]);
+                default:
+                    return parseDurationToMinutes(activityDurations[activity.id]);
             }
-            return 0; // Return 0 if not completed
         };
 
         const filterActivity = (activity: Activity): boolean => {
@@ -230,7 +239,20 @@ function TimesheetPageContent() {
             });
 
             const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-            const activityNameMap: Record<ActivityTypeType, string> = { deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition' };
+            const activityNameMap: Record<ActivityTypeType, string> = { 
+                deepwork: 'Deep Work', 
+                upskill: 'Learning', 
+                workout: 'Workout', 
+                branding: 'Branding', 
+                essentials: 'Essentials', 
+                planning: 'Planning', 
+                tracking: 'Tracking', 
+                'lead-generation': 'Lead Gen', 
+                interrupt: 'Interrupts',
+                distraction: 'Distractions', 
+                nutrition: 'Nutrition',
+                mindset: 'Mindset',
+             };
             
             processedActivities.forEach(activity => {
                 const mappedName = activityNameMap[activity.type];
@@ -252,74 +274,18 @@ function TimesheetPageContent() {
         }
 
         return { dailyData };
-    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, activityDurations]);
+    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, activityDurations]);
     
     const timeAllocationData = useMemo(() => {
       const dateKey = format(selectedDate, 'yyyy-MM-dd');
-      const dailySchedule = schedule[dateKey] || {};
-      const allActivitiesForDay: ProcessedActivity[] = [];
-  
-      Object.values(dailySchedule).flat().forEach((activity: any) => {
-          if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
-              let duration = 0;
-              if (activity.type === 'deepwork') {
-                  const log = allDeepWorkLogs.find(l => l.date === dateKey);
-                  if (log) {
-                      duration = log.exercises
-                          .filter(ex => activity.taskIds?.includes(ex.id))
-                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
-                  }
-              } else if (activity.type === 'upskill') {
-                  const log = allUpskillLogs.find(l => l.date === dateKey);
-                  if (log) {
-                      duration = log.exercises
-                          .filter(ex => activity.taskIds?.includes(ex.id))
-                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
-                  }
-              } else if (activity.type === 'interrupt' || activity.type === 'essentials') {
-                  duration = activity.duration || 0;
-              } else {
-                  duration = parseDurationToMinutes(activityDurations[activity.id]);
-              }
-              
-              if (duration > 0) {
-                   allActivitiesForDay.push({ ...activity, calculatedDuration: duration });
-              }
-          }
-      });
-      
-      const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-      const activityNameMap: Record<ActivityTypeType, string> = {
-          deepwork: 'Deep Work', upskill: 'Learning', workout: 'Workout', branding: 'Branding', essentials: 'Essentials', planning: 'Planning', tracking: 'Tracking', 'lead-generation': 'Lead Gen', interrupt: 'Interrupts', nutrition: 'Nutrition',
-      };
-  
-      allActivitiesForDay.forEach(activity => {
-          const mappedName = activityNameMap[activity.type];
-          if (mappedName) {
-              if (!totals[mappedName]) {
-                  totals[mappedName] = { time: 0, activities: [] };
-              }
-              totals[mappedName].time += activity.calculatedDuration;
-              totals[mappedName].activities.push({ name: activity.details, duration: activity.calculatedDuration });
-          }
-      });
-      
-      return Object.entries(totals)
-        .map(([name, data]) => ({ name, time: data.time, activities: data.activities }))
-        .filter(item => item.time > 0);
-    }, [selectedDate, schedule, activityDurations, allDeepWorkLogs, allUpskillLogs]);
+      const dayData = timeData.dailyData[dateKey];
+      return dayData?.pieData.filter(d => d.name !== 'Free Time') || [];
+    }, [selectedDate, timeData]);
 
     const pieData = useMemo(() => {
-        const totalMinutesInDay = 24 * 60;
-        const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
-        const freeTime = totalMinutesInDay - totalAllocatedMinutes;
-
-        const data = timeAllocationData.map(item => ({ name: item.name, value: item.time, activities: item.activities }));
-        if (freeTime > 0) {
-            data.push({ name: 'Free Time', value: freeTime, activities: [] });
-        }
-        return data;
-    }, [timeAllocationData]);
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        return timeData.dailyData[dateKey]?.pieData || [];
+    }, [selectedDate, timeData]);
 
     const allActivitiesInView = useMemo(() => {
         const activities = new Set<string>();
@@ -389,7 +355,7 @@ function TimesheetPageContent() {
                                                 setModalData({ date: selectedDate, activities: categoryActivities.map(a => ({...a, type: 'deepwork', slot: '', completed: true, calculatedDuration: a.duration})) });
                                             }
                                         }}>
-                                            <XAxis type="number" dataKey="time" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
+                                            <XAxis type="number" dataKey="value" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
                                             <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
                                             <Tooltip
                                                 cursor={{ fill: "hsl(var(--muted))" }}
@@ -398,7 +364,7 @@ function TimesheetPageContent() {
                                                     const data = payload[0].payload;
                                                     return (
                                                       <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.time)}</p>
+                                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
                                                         <Separator />
                                                         <ul className="space-y-1">
                                                             {data.activities.map((act: {name: string, duration: number}, index: number) => (
@@ -411,7 +377,7 @@ function TimesheetPageContent() {
                                                   return null;
                                                 }}
                                             />
-                                            <Bar dataKey="time" radius={[0, 4, 4, 0]}>
+                                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                                                 {timeAllocationData.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                 ))}
@@ -747,3 +713,4 @@ export default function TimesheetPage() {
 
 
     
+
