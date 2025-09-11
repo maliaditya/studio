@@ -427,7 +427,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 <p className="text-xs text-muted-foreground">Now Focusing On</p>
                 <div className="flex items-center justify-center gap-2 p-2 rounded-md bg-muted/30">
                     <p className="text-sm font-semibold truncate" title={nowFocusingText}>{nowFocusingText}</p>
-                    {showSubTasks && activeSubTask && 'estimatedDuration' in activeSubTask && (activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask.id && (
+                    {showSubTasks && activeSubTask && (!('estimatedDuration' in activeSubTask) || activeSubTask.estimatedDuration === undefined || activeSubTask.estimatedDuration === 0) && editingDurationTaskId !== activeSubTask.id && (
                         <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(activeSubTask.id); setSubTaskDurationInput(''); }}>
                             <Timer className="h-4 w-4" />
                         </button>
@@ -484,7 +484,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         {'estimatedDuration' in task && (
                             <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
                                 {task.estimatedDuration ? `${task.estimatedDuration}m est.` : 'No est.'}
-                                {(task.estimatedDuration === undefined || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
+                                {(!task.estimatedDuration || task.estimatedDuration === 0) && editingDurationTaskId !== task.id && (
                                     <button className="text-yellow-500" onClick={() => { setEditingDurationTaskId(task.id); setSubTaskDurationInput(''); }}>
                                         <Timer className="h-4 w-4"/>
                                     </button>
