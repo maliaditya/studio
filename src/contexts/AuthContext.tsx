@@ -37,6 +37,7 @@ import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { deleteAudio } from '@/lib/audioDB';
+import { PillarPopup } from '@/components/PillarPopup';
 
 
 interface ResourcePopupProps {
@@ -2168,12 +2169,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const openPillarPopup = (pillarName: string) => {
-    const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
     setPillarPopupState({
         pillarName,
-        x: (screenWidth - 896) / 2, // 896 is sm:max-w-4xl
-        y: (screenHeight - (screenHeight * 0.8)) / 2, // 80vh
+        x: 50,
+        y: 50,
         level: 0,
         z: 90
     });
@@ -2185,7 +2184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handlePillarPopupDragEnd = (event: DragEndEvent) => {
       const { active, delta } = event;
-      if (pillarPopupState && active.id === 'pillar-popup') {
+      if (pillarPopupState && active.id === `pillar-popup-${pillarPopupState.pillarName}`) {
           setPillarPopupState(prev => prev ? { ...prev, x: prev.x + delta.x, y: prev.y + delta.y } : null);
       }
   };
@@ -2955,5 +2954,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 

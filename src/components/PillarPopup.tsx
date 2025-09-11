@@ -4,11 +4,12 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GripVertical, Brain, HeartPulse, HandHeart, TrendingUp } from 'lucide-react';
+import { X, GripVertical, Brain, HeartPulse, HandHeart, TrendingUp, Workflow } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
-import type { PillarPopupState } from '@/types/workout';
+import type { PillarPopupState, HabitEquation } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface PillarPopupProps {
   popupState: PillarPopupState;
@@ -30,7 +31,7 @@ const pillars = [
 ];
 
 export function PillarPopup({ popupState, onClose }: PillarPopupProps) {
-  const { coreSkills, projects, metaRules, openRuleDetailPopup } = useAuth();
+  const { coreSkills, projects, metaRules, openRuleDetailPopup, pillarEquations } = useAuth();
   const { pillarName, x, y } = popupState;
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -55,14 +56,20 @@ export function PillarPopup({ popupState, onClose }: PillarPopupProps) {
     const linkedSpecializations = coreSkills.filter(s => s.purposePillar && allPillarNames.includes(s.purposePillar));
     const linkedProjects = projects.filter(p => p.purposePillar && allPillarNames.includes(p.purposePillar));
     const linkedRules = metaRules.filter(r => r.purposePillar && allPillarNames.includes(r.purposePillar));
+    const linkedRuleIds = new Set(linkedRules.map(r => r.id));
+    
+    const linkedEquations = (pillarEquations[pillarName] || []).filter(eq => 
+        (eq.metaRuleIds || []).some(ruleId => linkedRuleIds.has(ruleId))
+    );
 
     return {
       icon: PILLAR_ICONS[pillarName],
       specializations: linkedSpecializations,
       projects: linkedProjects,
       rules: linkedRules,
+      equations: linkedEquations,
     };
-  }, [pillarName, coreSkills, projects, metaRules]);
+  }, [pillarName, coreSkills, projects, metaRules, pillarEquations]);
 
   if (!pillarData) return null;
 
@@ -114,6 +121,37 @@ export function PillarPopup({ popupState, onClose }: PillarPopupProps) {
                       </li>
                     ))}
                   </ul>
+                ) : <p className="text-xs text-muted-foreground">None linked.</p>}
+              </div>
+              <div>
+                <h4 className="font-semibold text-sm mb-2">Rule Equations</h4>
+                 {pillarData.equations.length > 0 ? (
+                  <Accordion type="multiple" className="w-full">
+                    {pillarData.equations.map((eq: HabitEquation) => (
+                      <AccordionItem value={eq.id} key={eq.id} className="border p-2 rounded-md bg-muted/30">
+                        <AccordionTrigger className="text-sm font-semibold hover:no-underline p-0">
+                          {eq.outcome}
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2">
+                          <ul className="space-y-1 pl-2 border-l-2 ml-2">
+                             {(eq.metaRuleIds || []).map(id => {
+                                const rule = metaRules.find(r => r.id === id);
+                                return rule ? (
+                                    <li key={id}>
+                                      <button
+                                        className="text-left text-xs text-muted-foreground hover:text-primary w-full p-1 rounded"
+                                        onClick={(e) => openRuleDetailPopup(rule.id, e)}
+                                      >
+                                        {rule.text}
+                                      </button>
+                                    </li>
+                                ) : null
+                             })}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
                 ) : <p className="text-xs text-muted-foreground">None linked.</p>}
               </div>
             </div>
