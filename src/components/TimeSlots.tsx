@@ -1,5 +1,4 @@
 
-
       
 "use client";
 
@@ -59,7 +58,7 @@ export function TimeSlots({
   slotDurations,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -314,9 +313,9 @@ export function TimeSlots({
                     <span>{freeTime} min {isPastSlot ? 'untracked' : 'free'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                    {pillarName && (
-                        <Badge variant="outline">{pillarName}</Badge>
-                    )}
+                    {pillarName ? (
+                      <Button variant="outline" size="sm" onClick={() => openPillarPopup(pillarName)}>{pillarName}</Button>
+                    ) : <div></div>}
                     <div className={cn("flex-grow flex justify-end items-center", !pillarName && "w-full")}>
                          <Popover>
                             <PopoverTrigger asChild>
