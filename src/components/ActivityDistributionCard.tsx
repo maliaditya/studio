@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, isBefore, startOfDay, parseISO } from 'date-fns';
 import type { Activity, ActivityType, DatedWorkout, DailySchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { PieChart as PieChartIcon, X, LineChart as LineChartIcon } from 'lucide-react';
+import { PieChart as PieChartIcon, X, LineChart as LineChartIcon, Expand } from 'lucide-react';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
@@ -123,6 +123,74 @@ const ActivityDetailDialog = ({ dialogState, onClose }: {
     );
 };
 
+const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    allCategoriesData: { category: string; historicalData: { date: string; time: number }[] }[];
+}) => {
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
+                 <DialogHeader>
+                    <DialogTitle>All Activity Trends</DialogTitle>
+                    <DialogDescriptionComponent>
+                        A historical overview of time spent in each category.
+                    </DialogDescriptionComponent>
+                </DialogHeader>
+                <div className="flex-grow min-h-0 py-4">
+                    <ScrollArea className="h-full pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {allCategoriesData.map(({ category, historicalData }) => (
+                                <Card key={category}>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[category] || '#8884d8' }}/>
+                                            {category}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="h-48 w-full">
+                                        {historicalData.length > 1 ? (
+                                            <ChartContainer config={{ time: { label: 'Time (min)' } }} className="h-full w-full">
+                                                <ResponsiveContainer>
+                                                    <RechartsLineChart data={historicalData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                                                        <CartesianGrid strokeDasharray="3 3" />
+                                                        <XAxis dataKey="date" fontSize={10} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
+                                                        <YAxis fontSize={10} domain={[0, 'dataMax + 10']}/>
+                                                        <ChartTooltip
+                                                            content={({ active, payload, label }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    return (
+                                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
+                                                                        <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
+                                                                    </div>
+                                                                    )
+                                                                }
+                                                                return null
+                                                            }}
+                                                        />
+                                                        <Line type="monotone" dataKey="time" stroke={activityColorMapping[category] || 'hsl(var(--primary))'} strokeWidth={2} dot={false} />
+                                                    </RechartsLineChart>
+                                                </ResponsiveContainer>
+                                            </ChartContainer>
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                                <p>Not enough data for trend.</p>
+                                            </div>
+                                        )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export function ActivityDistributionCard() {
     const { 
         schedule, 
@@ -133,6 +201,7 @@ export function ActivityDistributionCard() {
     const [isClient, setIsClient] = useState(false);
     const [detailDialogState, setDetailDialogState] = useState<ActivityDetailDialogState | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const [isAllTrendsModalOpen, setIsAllTrendsModalOpen] = useState(false);
 
     const [position, setPosition] = useState({ x: 20, y: 870 });
     const [isDragging, setIsDragging] = useState(false);
@@ -144,20 +213,52 @@ export function ActivityDistributionCard() {
 
     const parseFormattedDuration = (durationStr: string | undefined): number => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
-        
-        let totalMinutes = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
-        const minMatch = durationStr.match(/(\d+)\s*m/);
-
-        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-        
-        // Handle cases like "30" without units, assuming it's minutes
-        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-            totalMinutes = parseInt(durationStr.trim(), 10);
+    
+        // Handle "1h 30m" format
+        if (durationStr.includes('h') || durationStr.includes('m')) {
+            let totalMinutes = 0;
+            const hourMatch = durationStr.match(/(\d+)\s*h/);
+            const minMatch = durationStr.match(/(\d+)\s*m/);
+            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+            return totalMinutes;
         }
         
-        return totalMinutes;
+        // Handle plain number string "30" as minutes
+        const parsed = parseInt(durationStr, 10);
+        return isNaN(parsed) ? 0 : parsed;
+    };
+
+    const getHistoricalData = (category: string): { date: string; time: number }[] => {
+        const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
+        
+        const dailyTotals: Record<string, number> = {};
+    
+        for (const dateKey in schedule) {
+            const daySchedule = schedule[dateKey];
+            let dailyTotalForCategory = 0;
+    
+            for (const slotName in daySchedule) {
+                const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
+                if (Array.isArray(activities)) {
+                    activities.forEach(activity => {
+                        if ((activityType && activity.type === activityType) || (!activityType && activityNameMap[activity.type] === category)) {
+                            if (activity.completed) {
+                                dailyTotalForCategory += parseFormattedDuration(activityDurations[activity.id]);
+                            }
+                        }
+                    });
+                }
+            }
+    
+            if (dailyTotalForCategory > 0) {
+                dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + dailyTotalForCategory;
+            }
+        }
+    
+        return Object.entries(dailyTotals)
+            .map(([date, time]) => ({ date, time }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     };
 
     const timeAllocation = useMemo(() => {
@@ -179,10 +280,9 @@ export function ActivityDistributionCard() {
             const isPastSlot = currentHour >= slot.endHour;
 
             activities.forEach(activity => {
-                const durationString = activityDurations[activity.id];
+                const duration = parseFormattedDuration(activityDurations[activity.id]);
                 
                 if (activity.completed) {
-                    const duration = parseFormattedDuration(durationString);
                     const mappedName = activityNameMap[activity.type];
                     if (mappedName) {
                         if (!totals[mappedName]) {
@@ -193,7 +293,6 @@ export function ActivityDistributionCard() {
                     }
                     loggedInSlot += duration;
                 } else if (!isPastSlot) {
-                    const duration = parseFormattedDuration(durationString);
                     scheduledInSlot += duration;
                 }
             });
@@ -242,37 +341,16 @@ export function ActivityDistributionCard() {
         
     }, [schedule, currentSlot, activityDurations]);
 
-    const getHistoricalData = (category: string): { date: string; time: number }[] => {
-        const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
-        if (!activityType) return [];
-    
-        const dailyTotals: Record<string, number> = {};
-    
-        // Iterate through the entire schedule history
-        for (const dateKey in schedule) {
-            const daySchedule = schedule[dateKey];
-            let dailyTotalForCategory = 0;
-    
-            for (const slotName in daySchedule) {
-                const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
-                if (Array.isArray(activities)) {
-                    activities.forEach(activity => {
-                        if (activity.type === activityType && activity.completed) {
-                            dailyTotalForCategory += parseFormattedDuration(activityDurations[activity.id]);
-                        }
-                    });
-                }
-            }
-    
-            if (dailyTotalForCategory > 0) {
-                dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + dailyTotalForCategory;
-            }
-        }
-    
-        return Object.entries(dailyTotals)
-            .map(([date, time]) => ({ date, time }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    };
+    const allCategoriesData = useMemo(() => {
+        const categoriesWithData = Object.values(activityNameMap)
+            .map(category => ({
+                category,
+                historicalData: getHistoricalData(category),
+            }))
+            .filter(item => item.historicalData.length > 0);
+        return categoriesWithData;
+    }, [schedule, activityDurations]);
+
 
     const handleItemClick = (item: { name: string; activities: { name: string, duration: number }[] }) => {
         const category = item.name;
@@ -355,11 +433,14 @@ export function ActivityDistributionCard() {
             >
                 <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                     <div className="cursor-grab active:cursor-grabbing">
-                        <CardHeader className="p-0 mb-3">
+                        <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
                             <CardTitle className="flex items-center gap-2 text-base text-primary">
                                 <PieChartIcon className="h-5 w-5 text-blue-500" />
                                 Activity Distribution
                             </CardTitle>
+                            <Button variant="ghost" size="icon" onClick={() => setIsAllTrendsModalOpen(true)}>
+                                <Expand className="h-4 w-4" />
+                            </Button>
                         </CardHeader>
                     </div>
                     <CardContent className="p-0">
@@ -396,10 +477,11 @@ export function ActivityDistributionCard() {
                     onClose={() => setDetailDialogState(null)}
                 />
             )}
+             <AllTrendsModal
+                isOpen={isAllTrendsModalOpen}
+                onOpenChange={setIsAllTrendsModalOpen}
+                allCategoriesData={allCategoriesData}
+            />
         </>
     );
 }
-    
-
-    
-
