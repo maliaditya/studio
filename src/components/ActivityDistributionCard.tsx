@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from './ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip as RechartsTooltip, Line, LineChart as RechartsLineChart, CartesianGrid } from 'recharts';
 
 
 const activityNameMap: Record<ActivityType, string> = {
@@ -128,11 +128,6 @@ export function ActivityDistributionCard() {
         schedule, 
         currentSlot,
         activityDurations,
-        allUpskillLogs,
-        allDeepWorkLogs,
-        allWorkoutLogs,
-        brandingLogs,
-        allLeadGenLogs,
     } = useAuth();
     
     const [isClient, setIsClient] = useState(false);
@@ -147,18 +142,21 @@ export function ActivityDistributionCard() {
       setIsClient(true);
     }, []);
 
-    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    const parseFormattedDuration = (durationStr: string | undefined): number => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
+        
         let totalMinutes = 0;
         const hourMatch = durationStr.match(/(\d+)\s*h/);
-        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
+
+        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
         
-        // Handle cases like "30" without units
+        // Handle cases like "30" without units, assuming it's minutes
         if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
             totalMinutes = parseInt(durationStr.trim(), 10);
         }
+        
         return totalMinutes;
     };
 
@@ -181,8 +179,10 @@ export function ActivityDistributionCard() {
             const isPastSlot = currentHour >= slot.endHour;
 
             activities.forEach(activity => {
-                const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                const durationString = activityDurations[activity.id];
+                
                 if (activity.completed) {
+                    const duration = parseFormattedDuration(durationString);
                     const mappedName = activityNameMap[activity.type];
                     if (mappedName) {
                         if (!totals[mappedName]) {
@@ -193,6 +193,7 @@ export function ActivityDistributionCard() {
                     }
                     loggedInSlot += duration;
                 } else if (!isPastSlot) {
+                    const duration = parseFormattedDuration(durationString);
                     scheduledInSlot += duration;
                 }
             });
@@ -257,7 +258,7 @@ export function ActivityDistributionCard() {
                 if (Array.isArray(activities)) {
                     activities.forEach(activity => {
                         if (activity.type === activityType && activity.completed) {
-                            dailyTotalForCategory += parseDurationToMinutes(activityDurations[activity.id]);
+                            dailyTotalForCategory += parseFormattedDuration(activityDurations[activity.id]);
                         }
                     });
                 }
@@ -401,3 +402,4 @@ export function ActivityDistributionCard() {
     
 
     
+
