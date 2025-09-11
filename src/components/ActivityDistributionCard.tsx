@@ -72,7 +72,7 @@ const slotOrder: { name: string; endHour: number, startHour: number }[] = [
 interface ActivityDetailDialogState {
     category: string;
     tasks: { name: string; duration: number }[];
-    historicalData: { date: string; time: number }[];
+    historicalData: { date: string; time: number; activities: { name: string, duration: number }[] }[];
 }
 
 const ActivityDetailDialog = ({ dialogState, onClose }: {
@@ -99,9 +99,20 @@ const ActivityDetailDialog = ({ dialogState, onClose }: {
                                     <ChartTooltip
                                         content={({ active, payload, label }) => {
                                             if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
                                                 return (
-                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
+                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
                                                     <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
+                                                    {(data.activities && data.activities.length > 0) && (
+                                                        <>
+                                                            <Separator className="my-1.5" />
+                                                            <ul className="space-y-1">
+                                                                {data.activities.map((act: { name: string; duration: number }, index: number) => (
+                                                                    <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                                ))}
+                                                            </ul>
+                                                        </>
+                                                    )}
                                                 </div>
                                                 )
                                             }
@@ -126,7 +137,7 @@ const ActivityDetailDialog = ({ dialogState, onClose }: {
 const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    allCategoriesData: { category: string; historicalData: { date: string; time: number }[] }[];
+    allCategoriesData: { category: string; historicalData: { date: string; time: number; activities: { name: string, duration: number }[] }[] }[];
 }) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -160,9 +171,20 @@ const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
                                                         <ChartTooltip
                                                             content={({ active, payload, label }) => {
                                                                 if (active && payload && payload.length) {
+                                                                    const data = payload[0].payload;
                                                                     return (
-                                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
+                                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
                                                                         <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
+                                                                        {(data.activities && data.activities.length > 0) && (
+                                                                            <>
+                                                                                <Separator className="my-1.5" />
+                                                                                <ul className="space-y-1">
+                                                                                    {data.activities.map((act: { name: string; duration: number }, index: number) => (
+                                                                                        <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
+                                                                                    ))}
+                                                                                </ul>
+                                                                            </>
+                                                                        )}
                                                                     </div>
                                                                     )
                                                                 }
@@ -213,38 +235,41 @@ export function ActivityDistributionCard() {
 
     const parseFormattedDuration = (durationStr: string | undefined): number => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-        // Handle "1h 30m" format
-        if (durationStr.includes('h') || durationStr.includes('m')) {
-            let totalMinutes = 0;
-            const hourMatch = durationStr.match(/(\d+)\s*h/);
-            const minMatch = durationStr.match(/(\d+)\s*m/);
-            if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-            if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-            return totalMinutes;
-        }
         
-        // Handle plain number string "30" as minutes
-        const parsed = parseInt(durationStr, 10);
-        return isNaN(parsed) ? 0 : parsed;
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+
+        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+        
+        // If no units, assume it's just minutes
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+             return parseInt(durationStr.trim(), 10);
+        }
+
+        return totalMinutes;
     };
 
-    const getHistoricalData = (category: string): { date: string; time: number }[] => {
+    const getHistoricalData = (category: string): { date: string; time: number; activities: { name: string, duration: number }[] }[] => {
         const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
         
-        const dailyTotals: Record<string, number> = {};
+        const dailyData: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
     
         for (const dateKey in schedule) {
             const daySchedule = schedule[dateKey];
             let dailyTotalForCategory = 0;
+            const dailyActivitiesForCategory: { name: string, duration: number }[] = [];
     
             for (const slotName in daySchedule) {
                 const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
                 if (Array.isArray(activities)) {
                     activities.forEach(activity => {
-                        if ((activityType && activity.type === activityType) || (!activityType && activityNameMap[activity.type] === category)) {
-                            if (activity.completed) {
-                                dailyTotalForCategory += parseFormattedDuration(activityDurations[activity.id]);
+                         if (activity.completed && ((activityType && activity.type === activityType) || (!activityType && activityNameMap[activity.type] === category))) {
+                            const duration = parseFormattedDuration(activityDurations[activity.id]);
+                            if (duration > 0) {
+                                dailyTotalForCategory += duration;
+                                dailyActivitiesForCategory.push({ name: activity.details, duration });
                             }
                         }
                     });
@@ -252,12 +277,16 @@ export function ActivityDistributionCard() {
             }
     
             if (dailyTotalForCategory > 0) {
-                dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + dailyTotalForCategory;
+                if (!dailyData[dateKey]) {
+                    dailyData[dateKey] = { time: 0, activities: [] };
+                }
+                dailyData[dateKey].time += dailyTotalForCategory;
+                dailyData[dateKey].activities.push(...dailyActivitiesForCategory);
             }
         }
     
-        return Object.entries(dailyTotals)
-            .map(([date, time]) => ({ date, time }))
+        return Object.entries(dailyData)
+            .map(([date, data]) => ({ date, time: data.time, activities: data.activities }))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     };
 
