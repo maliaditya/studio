@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -148,25 +147,17 @@ function TimesheetPageContent() {
         return totalMinutes;
     };
 
-    const getLoggedMinutesForDay = (dateKey: string, activityType: 'deepwork' | 'upskill') => {
-        const logs = activityType === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-        const log = logs.find(l => l.date === dateKey);
-        if (!log) return 0;
-        const durationField = activityType === 'deepwork' ? 'weight' : 'reps';
-        return log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField] || 0), 0), 0);
-    };
-
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
             if (!activity.completed) return 0;
         
-            const activityTaskIds = new Set(activity.taskIds || []);
+            const activityTaskDefIds = new Set(activity.taskIds || []);
             
             const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
                 const logForDay = logs.find(l => l.date === dateKey);
                 if (!logForDay) return 0;
                 return logForDay.exercises
-                    .filter((ex: any) => activityTaskIds.has(ex.id))
+                    .filter((ex: any) => activityTaskDefIds.has(ex.definitionId))
                     .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
             };
 
@@ -183,7 +174,7 @@ function TimesheetPageContent() {
                      const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
                      if (workoutLog) {
                          return workoutLog.exercises
-                             .filter(ex => activityTaskIds.has(ex.id))
+                             .filter(ex => activityTaskDefIds.has(ex.definitionId))
                              .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
                      }
                      return 0;
@@ -191,7 +182,7 @@ function TimesheetPageContent() {
                 case 'mindset': {
                     const mindsetLog = allMindProgrammingLogs.find(l => l.date === dateKey);
                     if (mindsetLog) {
-                        return mindsetLog.exercises.filter(ex => activityTaskIds.has(ex.id))
+                        return mindsetLog.exercises.filter(ex => activityTaskDefIds.has(ex.definitionId))
                                        .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
                     }
                     return 0;
@@ -528,7 +519,6 @@ function TimesheetPageContent() {
                                                                     const data = payload[0].payload;
                                                                     const categoryName = data.name;
                                                                     const categoryActivities = data.activities || [];
-
                                                                     return (
                                                                         <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                                                                             <p className="font-bold text-foreground">{categoryName}: {formatMinutes(data.value)}</p>
@@ -726,3 +716,4 @@ export default function TimesheetPage() {
     
 
 
+    
