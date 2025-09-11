@@ -61,6 +61,7 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'hsl(var(--destructive))',
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
+    'Mindset': 'hsl(var(--chart-5))',
     'Free Time': 'hsl(var(--muted))',
 };
 
@@ -122,7 +123,7 @@ const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpe
 
 
 function TimesheetPageContent() {
-    const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations, allWorkoutLogs, brandingLogs, allLeadGenLogs } = useAuth();
+    const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
@@ -175,20 +176,30 @@ function TimesheetPageContent() {
                 case 'upskill':
                     return findDurationInLogs(allUpskillLogs, 'reps');
                 case 'branding':
-                    return findDurationInLogs(brandingLogs, 'weight'); // Assuming branding uses 'weight' for duration
+                    return findDurationInLogs(brandingLogs, 'weight');
                 case 'lead-generation':
-                    return findDurationInLogs(allLeadGenLogs, 'weight'); // Assuming lead-gen uses 'weight' for duration
-                case 'workout':
+                    return findDurationInLogs(allLeadGenLogs, 'weight');
+                case 'workout': {
                      const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
                      if (workoutLog) {
                          return workoutLog.exercises
                              .filter(ex => activityTaskIds.has(ex.id))
-                             .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0); // Approximation
+                             .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
                      }
                      return 0;
+                }
+                case 'mindset': {
+                    const mindsetLog = allMindProgrammingLogs.find(l => l.date === dateKey);
+                    if (mindsetLog) {
+                        return mindsetLog.exercises.filter(ex => activityTaskIds.has(ex.id))
+                                       .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
+                    }
+                    return 0;
+                }
                 case 'interrupt':
                 case 'distraction':
                 case 'essentials':
+                case 'nutrition':
                     return activity.duration || 0;
                 default:
                     return parseDurationToMinutes(activityDurations[activity.id]);
@@ -274,7 +285,7 @@ function TimesheetPageContent() {
         }
 
         return { dailyData };
-    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, activityDurations]);
+    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, activityDurations]);
     
     const timeAllocationData = useMemo(() => {
       const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -713,4 +724,5 @@ export default function TimesheetPage() {
 
 
     
+
 
