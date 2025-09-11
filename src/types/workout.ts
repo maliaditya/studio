@@ -646,6 +646,19 @@ export interface PipState {
     size: { width: number; height: number };
 }
 
+export interface WidgetVisibility {
+  agenda: boolean;
+  smartLogging: boolean;
+  pistons: boolean;
+  mindset: boolean;
+  activityDistribution: boolean;
+  favorites: boolean;
+  topPriorities: boolean;
+  brainHacks: boolean;
+  ruleEquations: boolean;
+  visualizationTechniques: boolean;
+}
+
 export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
@@ -658,6 +671,7 @@ export interface UserSettings {
   workoutScheduling: WorkoutSchedulingMode;
   slotRules: Partial<Record<SlotName, string[]>>;
   schedulingLevel?: 1 | 2 | 3;
+  widgetVisibility: WidgetVisibility;
 }
 
 export interface ActiveFocusSession {

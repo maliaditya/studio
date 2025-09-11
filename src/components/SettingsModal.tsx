@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -19,7 +20,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Trash2 } from 'lucide-react';
-import type { Activity, ActivityType, WorkoutSchedulingMode } from '@/types/workout';
+import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -28,6 +29,19 @@ interface SettingsModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
+
+const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
+  { id: 'agenda', label: 'Agenda Widget' },
+  { id: 'smartLogging', label: 'Smart Logging Prompts' },
+  { id: 'pistons', label: 'Pistons of Intention' },
+  { id: 'mindset', label: 'Mindset Categories' },
+  { id: 'activityDistribution', label: 'Activity Distribution' },
+  { id: 'favorites', label: 'Favorite Cards' },
+  { id: 'topPriorities', label: 'Top Priorities' },
+  { id: 'brainHacks', label: 'Brain Hacks' },
+  { id: 'ruleEquations', label: 'Rule Equations' },
+  { id: 'visualizationTechniques', label: 'Visualization Techniques' },
+];
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule } = useAuth();
@@ -54,6 +68,13 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         variant: "destructive",
       });
     }
+  };
+
+  const handleWidgetVisibilityChange = (widgetId: keyof WidgetVisibility, isVisible: boolean) => {
+    handleSettingChange('widgetVisibility', {
+        ...settings.widgetVisibility,
+        [widgetId]: isVisible,
+    });
   };
 
   const handleDefaultHabitChange = (activityType: ActivityType, habitId: string) => {
@@ -374,7 +395,33 @@ ${JSON.stringify(finalTemplate, null, 2)}
                 </div>
 
                 <Accordion type="multiple" className="w-full">
-                  <AccordionItem value="item-scheduling" className="border rounded-lg">
+                  <AccordionItem value="item-widgets" className="border rounded-lg">
+                    <AccordionTrigger className="px-4 py-3">
+                        <div className="space-y-0.5 text-left">
+                            <Label className="text-base">Widget Visibility</Label>
+                            <p className="text-sm text-muted-foreground">
+                            Show or hide floating widgets on the dashboard.
+                            </p>
+                        </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                        <div className="space-y-3 pt-4 border-t">
+                            {WIDGET_NAMES.map(widget => (
+                                <div key={widget.id} className="flex items-center justify-between">
+                                    <Label htmlFor={`widget-${widget.id}`} className="font-normal">
+                                        {widget.label}
+                                    </Label>
+                                    <Switch
+                                        id={`widget-${widget.id}`}
+                                        checked={settings.widgetVisibility?.[widget.id] ?? true}
+                                        onCheckedChange={(checked) => handleWidgetVisibilityChange(widget.id, checked)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="item-scheduling" className="border rounded-lg mt-4">
                      <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
                           <Label className="text-base">Task Scheduling</Label>
