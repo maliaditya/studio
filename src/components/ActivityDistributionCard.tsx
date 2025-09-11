@@ -153,7 +153,7 @@ export function ActivityDistributionCard() {
         const hourMatch = durationStr.match(/(\d+)\s*h/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
         const minMatch = durationStr.match(/(\d+)\s*m/);
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
+        if (minMatch) totalMinutes += parseInt(minMatch[1], 10) * 60;
         
         // Handle cases like "30" without units
         if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
@@ -245,27 +245,28 @@ export function ActivityDistributionCard() {
         const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
         if (!activityType) return [];
     
-        let logs: DatedWorkout[];
-        let durationField: 'reps' | 'weight' = 'weight'; // default
-    
-        switch (activityType) {
-            case 'deepwork': logs = allDeepWorkLogs; durationField = 'weight'; break;
-            case 'upskill': logs = allUpskillLogs; durationField = 'reps'; break;
-            case 'workout': logs = allWorkoutLogs; durationField = 'weight'; break; // Placeholder for workout duration
-            case 'branding': logs = brandingLogs; durationField = 'weight'; break;
-            case 'lead-generation': logs = allLeadGenLogs; durationField = 'weight'; break;
-            default: return [];
-        }
-    
         const dailyTotals: Record<string, number> = {};
-        logs.forEach(log => {
-            const dayTotal = log.exercises.reduce((sum, ex) =>
-                sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField] || 0), 0)
-            , 0);
-            if (dayTotal > 0) {
-                dailyTotals[log.date] = (dailyTotals[log.date] || 0) + dayTotal;
+    
+        // Iterate through the entire schedule history
+        for (const dateKey in schedule) {
+            const daySchedule = schedule[dateKey];
+            let dailyTotalForCategory = 0;
+    
+            for (const slotName in daySchedule) {
+                const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
+                if (Array.isArray(activities)) {
+                    activities.forEach(activity => {
+                        if (activity.type === activityType && activity.completed) {
+                            dailyTotalForCategory += parseDurationToMinutes(activityDurations[activity.id]);
+                        }
+                    });
+                }
             }
-        });
+    
+            if (dailyTotalForCategory > 0) {
+                dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + dailyTotalForCategory;
+            }
+        }
     
         return Object.entries(dailyTotals)
             .map(([date, time]) => ({ date, time }))
