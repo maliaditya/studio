@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -314,7 +315,7 @@ export function TimeSlots({
                 </div>
                 <div className="flex justify-between items-center">
                     {pillarName ? (
-                      <Button variant="outline" size="sm" onClick={() => openPillarPopup(pillarName)}>{pillarName}</Button>
+                        <Button variant="outline" size="sm" onClick={() => openPillarPopup(pillarName)}>{pillarName}</Button>
                     ) : <div></div>}
                     <div className={cn("flex-grow flex justify-end items-center", !pillarName && "w-full")}>
                          <Popover>

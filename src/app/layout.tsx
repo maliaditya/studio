@@ -49,6 +49,7 @@ import { RuleEquationsCard } from '@/components/RuleEquationsCard';
 import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
 import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
+import { PillarPopup } from '@/components/PillarPopup';
 
 
 const slotEndHours: Record<string, number> = {
@@ -92,6 +93,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     closeAllResourcePopups, generalPopups, 
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
+    pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     activeFocusSession,
@@ -215,6 +217,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const handleDragEnd = (event: DragEndEvent) => {
     handlePopupDragEnd(event);
     handleRulePopupDragEnd(event);
+    handlePillarPopupDragEnd(event);
     handleHabitDetailPopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
@@ -508,6 +511,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     onClose={closeRuleDetailPopup}
                 />
             )}
+             {pillarPopupState && (
+                <PillarPopup
+                  popupState={pillarPopupState}
+                  onClose={closePillarPopup}
+                />
+             )}
              {linkedResistancePopup && (
                 <MindsetTechniquePopup
                     popupState={linkedResistancePopup}
