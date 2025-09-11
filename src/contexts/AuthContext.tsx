@@ -1152,6 +1152,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => setIsLoadingState(false), 100);
   }, []);
   
+  const loadState = useCallback((username: string) => {
+    const mainDataString = localStorage.getItem(`lifeos_data_${username}`);
+    const uiDataString = localStorage.getItem(`lifeos_ui_state_${username}`);
+    
+    if (mainDataString) {
+      try {
+        const mainData = JSON.parse(mainDataString);
+        const uiData = uiDataString ? JSON.parse(uiDataString) : {};
+        loadImportedData(mainData, uiData);
+      } catch (error) {
+        console.error("Failed to parse data from localStorage", error);
+        toast({ title: "Load Error", description: "Could not load your saved data.", variant: "destructive" });
+      }
+    } else {
+      setIsLoadingState(false);
+    }
+  }, [loadImportedData, toast]);
+
   const populatedSchedule = useMemo(() => {
     const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
   
@@ -2896,7 +2914,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         loadState(currentUser.username);
     }
-  }, [currentUser]);
+  }, [currentUser, loadState]);
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -2953,6 +2971,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 
