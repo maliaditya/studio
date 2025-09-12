@@ -82,7 +82,7 @@ const SpecializationItem: React.FC<{
         if (minutes < 60) return `${Math.round(minutes)}m`;
         const hours = Math.floor(minutes / 60);
         const remainingMinutes = Math.round(minutes % 60);
-        return `${hours}h ${remainingMinutes}m`;
+        return `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`.trim();
     };
 
     return (
@@ -229,6 +229,7 @@ function SkillPageContent() {
     return map;
   }, [upskillDefinitions, getUpskillNodeType]);
 
+  // New, robust calculation logic
   const microSkillTotals = useMemo(() => {
     const totals = new Map<string, {
       intentionEst: number;
@@ -236,64 +237,56 @@ function SkillPageContent() {
       curiosityEst: number;
       curiosityLogged: number;
     }>();
-  
-    // 1. Pre-calculate all logged minutes for every definition ID.
+
+    // 1. Pre-calculate all logged minutes for every definition ID for efficiency.
     const loggedMinutesMap = new Map<string, number>();
-  
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        const currentMins = loggedMinutesMap.get(ex.definitionId) || 0;
-        const newMins = ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
-        loggedMinutesMap.set(ex.definitionId, currentMins + newMins);
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+        if (duration > 0) {
+          loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
+        }
       });
     });
-  
     allUpskillLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        const currentMins = loggedMinutesMap.get(ex.definitionId) || 0;
-        const newMins = ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-        loggedMinutesMap.set(ex.definitionId, currentMins + newMins);
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+        if (duration > 0) {
+          loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
+        }
       });
     });
-  
-    // 2. Iterate through each micro-skill to calculate totals.
+
+    // 2. Iterate through each micro-skill to calculate its totals.
     for (const [microSkillId, microSkillInfo] of microSkillMap.entries()) {
       let intentionEst = 0;
       let intentionLogged = 0;
       let curiosityEst = 0;
       let curiosityLogged = 0;
-  
+
       const intentions = microSkillIntentions.get(microSkillInfo.microSkillName) || [];
       const curiosities = microSkillCuriosities.get(microSkillInfo.microSkillName) || [];
-  
-      // 3. For each top-level Intention, find all descendants and sum their values.
+
+      // 3. For each top-level Intention, get all descendants and sum their values.
       intentions.forEach(intention => {
         const descendantLeaves = getDescendantLeafNodes(intention.id, 'deepwork');
         intentionEst += descendantLeaves.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
         intentionLogged += descendantLeaves.reduce((sum, node) => sum + (loggedMinutesMap.get(node.id) || 0), 0);
       });
-  
+      
       // 4. For each top-level Curiosity, do the same.
       curiosities.forEach(curiosity => {
         const descendantLeaves = getDescendantLeafNodes(curiosity.id, 'upskill');
         curiosityEst += descendantLeaves.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
         curiosityLogged += descendantLeaves.reduce((sum, node) => sum + (loggedMinutesMap.get(node.id) || 0), 0);
       });
-  
+
       if (intentionEst > 0 || intentionLogged > 0 || curiosityEst > 0 || curiosityLogged > 0) {
         totals.set(microSkillId, { intentionEst, intentionLogged, curiosityEst, curiosityLogged });
       }
     }
-  
     return totals;
-  }, [
-    microSkillMap,
-    microSkillIntentions,
-    microSkillCuriosities,
-    getDescendantLeafNodes,
-    allDeepWorkLogs,
-    allUpskillLogs
-  ]);
+  }, [microSkillMap, microSkillIntentions, microSkillCuriosities, allDeepWorkLogs, allUpskillLogs, getDescendantLeafNodes]);
   
   const specializationTotals = useMemo(() => {
     const totalsMap = new Map<string, { totalEst: number; totalLogged: number }>();
@@ -859,7 +852,7 @@ function SkillPageContent() {
     if (minutes < 60) return `${Math.round(minutes)}m`;
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = Math.round(minutes % 60);
-    return `${hours}h ${remainingMinutes}m`;
+    return `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`.trim();
   };
 
   return (
