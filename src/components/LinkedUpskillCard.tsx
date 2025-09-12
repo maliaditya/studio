@@ -190,7 +190,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   };
   
   const nodeType = getUpskillNodeType(upskillDef);
-  
+
   const leafNodes = useMemo(() => {
     if (nodeType === 'Objective' || nodeType === 'Curiosity') {
         return getDescendantLeafNodes(upskillDef.id, 'upskill');
@@ -198,27 +198,25 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
     return [];
   }, [upskillDef.id, nodeType, getDescendantLeafNodes]);
 
-  const completedCount = useMemo(() => {
-    return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
-  }, [leafNodes, permanentlyLoggedTaskIds]);
-
   const isObjectiveComplete = useMemo(() => {
-    if (leafNodes.length === 0) {
-        return permanentlyLoggedTaskIds.has(upskillDef.id);
+    if (nodeType === 'Visualization' || nodeType === 'Standalone') {
+        return (upskillDef.loggedDuration || 0) > 0;
     }
-    return completedCount >= leafNodes.length;
-  }, [leafNodes, completedCount, permanentlyLoggedTaskIds, upskillDef.id]);
+    if (leafNodes.length === 0) {
+        return (upskillDef.loggedDuration || 0) > 0;
+    }
+    return leafNodes.every(node => (node.loggedDuration || 0) > 0);
+  }, [nodeType, upskillDef, leafNodes]);
   
-  const parentCuriosity = useMemo(() => {
-    if (nodeType !== 'Objective') return null;
-    return upskillDefinitions.find(d => (d.linkedUpskillIds || []).includes(upskillDef.id));
-  }, [nodeType, upskillDef.id, upskillDefinitions]);
-
+  const completedCount = useMemo(() => {
+    return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
+  }, [leafNodes]);
+  
   const isAddToSessionEnabled = useMemo(() => {
     const typeLevelMap = { 'Curiosity': 1, 'Objective': 2, 'Visualization': 3, 'Standalone': 3 };
     return typeLevelMap[nodeType as keyof typeof typeLevelMap] === schedulingLevel;
   }, [nodeType, schedulingLevel]);
-  
+
   const getIcon = () => {
     switch(nodeType) {
         case 'Curiosity': return <Flashlight className="h-5 w-5 text-amber-500 flex-shrink-0" />;
@@ -251,11 +249,10 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   const linkedProjects = (upskillDef.linkedProjectIds || [])
     .map(pid => projectsInDomain.find(p => p.id === pid))
     .filter((p): p is Project => !!p);
-  const finalIsComplete = nodeType === 'Curiosity' || nodeType === 'Objective' ? isObjectiveComplete : isComplete;
 
   return (
     <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-      <Card className={cn("relative group transition-all duration-300 hover:shadow-xl min-h-[230px]", finalIsComplete && "opacity-70 bg-muted/30")}>
+      <Card className={cn("relative group transition-all duration-300 hover:shadow-xl min-h-[230px]", isObjectiveComplete && "opacity-70 bg-muted/30")}>
         <div className="absolute inset-0 z-0" onMouseDown={(e) => isDragging && e.stopPropagation()}/>
          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
@@ -302,7 +299,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span className={cn("truncate", finalIsComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
+                                    <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={upskillDef.name}>
                                         {upskillDef.name.length > 25 ? `${upskillDef.name.substring(0, 25)}...` : upskillDef.name}
                                     </span>
                                 </TooltipTrigger>

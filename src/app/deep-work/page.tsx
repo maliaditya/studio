@@ -285,16 +285,19 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         return [];
     }, [deepworkDef.id, nodeType, getDescendantLeafNodes]);
     
+    const isObjectiveComplete = useMemo(() => {
+        if (nodeType === 'Action' || nodeType === 'Standalone') {
+            return (deepworkDef.loggedDuration || 0) > 0;
+        }
+        if (leafNodes.length === 0) {
+            return (deepworkDef.loggedDuration || 0) > 0;
+        }
+        return leafNodes.every(node => (node.loggedDuration || 0) > 0);
+    }, [nodeType, deepworkDef, leafNodes]);
+
     const completedCount = useMemo(() => {
         return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
     }, [leafNodes]);
-
-    const isObjectiveComplete = useMemo(() => {
-        if (leafNodes.length === 0) {
-             return (deepworkDef.loggedDuration || 0) > 0;
-        }
-        return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, deepworkDef]);
     
     const { isEnabled, tooltipContent } = useMemo(() => {
         const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
@@ -320,7 +323,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isActionable ? (deepworkDef.loggedDuration || 0) > 0 : isObjectiveComplete;
+    const isComplete = isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -2417,6 +2420,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
