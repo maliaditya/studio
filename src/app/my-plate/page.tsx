@@ -754,12 +754,13 @@ function MyPlatePageContent() {
   }, []);
 
   const productivityStats = useMemo(() => {
+    const todayKey = format(selectedDate, 'yyyy-MM-dd');
     const yesterday = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
 
-    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, selectedDateKey, 'upskill');
+    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, todayKey, 'upskill');
     const yesterdayUpskillMinutes = getLoggedMinutes(allUpskillLogs, yesterday, 'upskill');
 
-    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, selectedDateKey, 'deepwork');
+    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, todayKey, 'deepwork');
     const yesterdayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, yesterday, 'deepwork');
 
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
@@ -770,49 +771,59 @@ function MyPlatePageContent() {
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
-    const learningStats: Record<string, { logged: number; estimated: number }> = {};
+    // --- New, Corrected Logic for Specialization Totals ---
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
-    const allDefsMap = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
-
-    specializations.forEach(spec => {
-        let totalLoggedMinutes = 0;
-        let totalEstimatedMinutes = 0;
-        const microSkillIdsInSpec = new Set<string>();
-        
-        spec.skillAreas.forEach(area => {
-            area.microSkills.forEach(ms => microSkillIdsInSpec.add(ms.id));
-        });
-
-        const allDefsForSpec = Array.from(allDefsMap.values()).filter(def => {
-            const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === def.category);
-            return microSkill ? microSkillIdsInSpec.has(microSkill[0]) : false;
-        });
-
-        const leafNodes = new Set<string>();
-        allDefsForSpec.forEach(def => {
-            const type = upskillDefinitions.some(d => d.id === def.id) ? 'upskill' : 'deepwork';
-            getDescendantLeafNodes(def.id, type).forEach(node => leafNodes.add(node.id));
-        });
-        
-        const allLeafDefs = [...upskillDefinitions, ...deepWorkDefinitions].filter(d => leafNodes.has(d.id));
-        totalEstimatedMinutes = allLeafDefs.reduce((sum, def) => sum + (def.estimatedDuration || 0), 0);
-        
-        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-        allLogs.forEach(log => {
-            log.exercises.forEach(ex => {
-                if(leafNodes.has(ex.definitionId)) {
-                    const isUpskill = upskillDefinitions.some(d => d.id === ex.definitionId);
-                    const durationField = isUpskill ? 'reps' : 'weight';
-                    totalLoggedMinutes += ex.loggedSets.reduce((sum, set) => sum + (set[durationField as 'reps' | 'weight'] || 0), 0);
-                }
-            });
-        });
-
-        if (totalLoggedMinutes > 0 || totalEstimatedMinutes > 0) {
-            learningStats[spec.name] = { logged: totalLoggedMinutes / 60, estimated: totalEstimatedMinutes / 60 };
+    const learningStats: Record<string, { logged: number; estimated: number }> = {};
+    
+    // 1. Create a map of all logged minutes by definition ID
+    const loggedMinutesMap = new Map<string, number>();
+    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
+      log.exercises.forEach(ex => {
+        const isUpskill = allUpskillLogs.some(ulog => ulog.date === log.date && ulog.exercises.some(uex => uex.id === ex.id));
+        const durationField = isUpskill ? 'reps' : 'weight';
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
+        if (duration > 0) {
+          loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
         }
+      });
     });
 
+    specializations.forEach(spec => {
+      let totalSpecLoggedMinutes = 0;
+      let totalSpecEstimatedMinutes = 0;
+      
+      const microSkillIdsInSpec = new Set<string>();
+      spec.skillAreas.forEach(area => {
+        area.microSkills.forEach(ms => microSkillIdsInSpec.add(ms.id));
+      });
+
+      const microSkillNamesInSpec = new Set<string>();
+       microSkillIdsInSpec.forEach(id => {
+         const info = microSkillMap.get(id);
+         if(info) microSkillNamesInSpec.add(info.microSkillName);
+       });
+
+      const topLevelIntentions = deepWorkDefinitions.filter(def => 
+        microSkillNamesInSpec.has(def.category) && getDeepWorkNodeType(def) === 'Intention'
+      );
+      const topLevelCuriosities = upskillDefinitions.filter(def => 
+        microSkillNamesInSpec.has(def.category) && getUpskillNodeType(def) === 'Curiosity'
+      );
+
+      [...topLevelIntentions, ...topLevelCuriosities].forEach(topLevelTask => {
+          const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
+          const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
+          
+          leafNodes.forEach(leaf => {
+            totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
+            totalSpecLoggedMinutes += loggedMinutesMap.get(leaf.id) || 0;
+          });
+      });
+      
+      if (totalSpecLoggedMinutes > 0 || totalSpecEstimatedMinutes > 0) {
+          learningStats[spec.name] = { logged: totalSpecLoggedMinutes / 60, estimated: totalSpecEstimatedMinutes / 60 };
+      }
+    });
 
     return {
       todayUpskillHours: todayUpskillMinutes / 60,
@@ -823,7 +834,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, getLoggedMinutes, coreSkills, upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, selectedDate, selectedDateKey, microSkillMap]);
+  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, selectedDate, getLoggedMinutes]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
