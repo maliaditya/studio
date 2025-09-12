@@ -205,7 +205,7 @@ function SkillPageContent() {
   
   const uploadMicroSkillInputRef = useRef<HTMLInputElement>(null);
   const [uploadSkillAreaInfo, setUploadSkillAreaInfo] = useState<{ coreSkillId: string; skillAreaId: string } | null>(null);
-
+  
   const getDescendantsRecursive = useCallback((startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
     const descendants: ExerciseDefinition[] = [];
     const queue: string[] = [startNodeId];
@@ -278,78 +278,98 @@ function SkillPageContent() {
     return map;
   }, [upskillDefinitions]);
 
+  const getSpecializationTaskIds = useCallback((spec: CoreSkill) => {
+    const microSkillNames = new Set<string>();
+    (spec.skillAreas || []).forEach(area => {
+      (area.microSkills || []).forEach(micro => microSkillNames.add(micro.name));
+    });
+
+    const rootIntentions = (microSkillIntentions.get(spec.name) || []).filter(def => microSkillNames.has(def.category));
+    const rootCuriosities = (microSkillCuriosities.get(spec.name) || []).filter(def => microSkillNames.has(def.category));
+    
+    let allTaskIds = new Set<string>();
+    const visited = new Set<string>();
+    
+    const collectDescendants = (startNode: ExerciseDefinition, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds') => {
+        if (visited.has(startNode.id)) return;
+        visited.add(startNode.id);
+        allTaskIds.add(startNode.id);
+        (startNode[linkKey] || []).forEach(childId => {
+            const childNode = definitions.find(d => d.id === childId);
+            if (childNode) collectDescendants(childNode, definitions, linkKey);
+        });
+    };
+    
+    rootIntentions.forEach(intention => collectDescendants(intention, deepWorkDefinitions, 'linkedDeepWorkIds'));
+    rootCuriosities.forEach(curiosity => collectDescendants(curiosity, upskillDefinitions, 'linkedUpskillIds'));
+
+    return Array.from(allTaskIds);
+  }, [microSkillIntentions, microSkillCuriosities, deepWorkDefinitions, upskillDefinitions]);
+
+  const specializationTotals = useMemo(() => {
+    const totalsMap = new Map<string, { totalEst: number; totalLogged: number }>();
+    const specs = coreSkills.filter(s => s.type === 'Specialization');
+    
+    specs.forEach(spec => {
+      const taskIds = getSpecializationTaskIds(spec);
+      let totalEst = 0;
+      let totalLogged = 0;
+      
+      const allDefs = new Map([...deepWorkDefinitions.map(d => [d.id, d]), ...upskillDefinitions.map(d => [d.id, d])]);
+
+      taskIds.forEach(taskId => {
+          const def = allDefs.get(taskId);
+          if (def) {
+              const children = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+              if (children.length === 0) {
+                  totalEst += def.estimatedDuration || 0;
+              }
+          }
+      });
+      
+      allDeepWorkLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+          if (taskIds.includes(ex.definitionId)) {
+            totalLogged += ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+          }
+        });
+      });
+
+      allUpskillLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+          if (taskIds.includes(ex.definitionId)) {
+            totalLogged += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+          }
+        });
+      });
+      
+      totalsMap.set(spec.id, { totalEst, totalLogged });
+    });
+
+    return totalsMap;
+  }, [coreSkills, getSpecializationTaskIds, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
+  
   const domainTotals = useMemo(() => {
     const totalsMap = new Map<string, { totalEst: number, totalLogged: number }>();
     skillDomains.forEach(domain => {
-      let totalEst = 0;
-      let totalLogged = 0;
-      const domainCoreSkills = coreSkills.filter(s => s.domainId === domain.id);
-
-      domainCoreSkills.forEach(skill => {
-        (skill.skillAreas || []).forEach(area => {
-          (area.microSkills || []).forEach(micro => {
-            const intentions = microSkillIntentions.get(micro.name) || [];
-            const curiosities = microSkillCuriosities.get(micro.name) || [];
-
-            intentions.forEach(intention => {
-              const leafNodes = getDescendantsRecursive(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
-              totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-              const leafNodeIds = new Set(leafNodes.map(n => n.id));
-              totalLogged += allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
-                .filter(ex => leafNodeIds.has(ex.definitionId))
-                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
-            });
-
-            curiosities.forEach(curiosity => {
-              const leafNodes = getDescendantsRecursive(curiosity.id, upskillDefinitions, 'linkedUpskillIds');
-              totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-              const leafNodeIds = new Set(leafNodes.map(n => n.id));
-              totalLogged += allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
-                .filter(ex => leafNodeIds.has(ex.definitionId))
-                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
-            });
-          });
-        });
+      let totalDomainEst = 0;
+      let totalDomainLogged = 0;
+      
+      const domainCoreSkills = coreSkills.filter(s => s.domainId === domain.id && s.type === 'Specialization');
+      
+      domainCoreSkills.forEach(spec => {
+          const specTotals = specializationTotals.get(spec.id);
+          if (specTotals) {
+              totalDomainEst += specTotals.totalEst;
+              totalDomainLogged += specTotals.totalLogged;
+          }
       });
-      totalsMap.set(domain.id, { totalEst, totalLogged });
+
+      totalsMap.set(domain.id, { totalEst: totalDomainEst, totalLogged: totalDomainLogged });
     });
     return totalsMap;
-  }, [skillDomains, coreSkills, microSkillIntentions, microSkillCuriosities, getDescendantsRecursive, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
+  }, [skillDomains, coreSkills, specializationTotals]);
 
-
-  const specializationTotals = useMemo(() => {
-    const totalsMap = new Map<string, { totalEst: number, totalLogged: number }>();
-    coreSkills.filter(s => s.type === 'Specialization').forEach(spec => {
-      let totalEst = 0;
-      let totalLogged = 0;
-      (spec.skillAreas || []).forEach(area => {
-        (area.microSkills || []).forEach(micro => {
-          const intentions = microSkillIntentions.get(micro.name) || [];
-          const curiosities = microSkillCuriosities.get(micro.name) || [];
-          
-          intentions.forEach(intention => {
-            const leafNodes = getDescendantsRecursive(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
-            totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-            const leafNodeIds = new Set(leafNodes.map(n => n.id));
-            totalLogged += allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
-                .filter(ex => leafNodeIds.has(ex.definitionId))
-                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
-          });
-          
-          curiosities.forEach(curiosity => {
-            const leafNodes = getDescendantsRecursive(curiosity.id, upskillDefinitions, 'linkedUpskillIds');
-            totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-            const leafNodeIds = new Set(leafNodes.map(n => n.id));
-            totalLogged += allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
-                .filter(ex => leafNodeIds.has(ex.definitionId))
-                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
-          });
-        });
-      });
-      totalsMap.set(spec.id, { totalEst, totalLogged });
-    });
-    return totalsMap;
-  }, [coreSkills, microSkillIntentions, microSkillCuriosities, getDescendantsRecursive, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs]);
 
   const handleUploadClick = (domainId: string) => {
     setUploadDomainId(domainId);
@@ -368,7 +388,7 @@ function SkillPageContent() {
       path.forEach(folderName => {
           let folder = updatedFolders.find(f => f.name === folderName && f.parentId === parentId);
           if (!folder) {
-              folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderName, parentId: parentId };
+              folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderName, parentId: parentId, icon: 'Folder' };
               updatedFolders.push(folder);
           }
           parentId = folder.id;
@@ -400,8 +420,10 @@ function SkillPageContent() {
             const newUpskillDefs: ExerciseDefinition[] = [];
             let newResources = [...resources];
             let newResourceFolders = [...resourceFolders];
+            
+            const domainName = skillDomains.find(d => d.id === uploadDomainId)?.name || 'Unknown Domain';
 
-            let currentFolderPath = ["Skills & Project Resources", uploadDomainId, specializationData.name];
+            let currentFolderPath = ["Skills & Project Resources", domainName, specializationData.name];
             
             specializationData.skillAreas.forEach((areaData: any) => {
                 const areaFolderPath = [...currentFolderPath, areaData.name];
