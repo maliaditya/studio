@@ -770,39 +770,40 @@ function MyPlatePageContent() {
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-
+    
+    // New logic for learning stats
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
     
+    // 1. Pre-calculate all logged minutes for every definitionId
     const loggedMinutesMap = new Map<string, number>();
-    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
+    allUpskillLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        const isUpskill = allUpskillLogs.some(ulog => ulog.date === log.date && ulog.exercises.some(uex => uex.id === ex.id));
-        const durationField = isUpskill ? 'reps' : 'weight';
-        const duration = ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
-        if (duration > 0) {
-          loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
-        }
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+        loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
+      });
+    });
+    allDeepWorkLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+        loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
       });
     });
 
+    // 2. Iterate through specializations and aggregate totals
     specializations.forEach(spec => {
       let totalSpecLoggedMinutes = 0;
       let totalSpecEstimatedMinutes = 0;
-      
-      const microSkillNamesInSpec = new Set<string>();
-      spec.skillAreas.forEach(area => {
-        area.microSkills.forEach(ms => microSkillNamesInSpec.add(ms.name));
-      });
 
-      const topLevelIntentions = deepWorkDefinitions.filter(def => 
-        microSkillNamesInSpec.has(def.category) && getDeepWorkNodeType(def) === 'Intention'
-      );
-      const topLevelCuriosities = upskillDefinitions.filter(def => 
-        microSkillNamesInSpec.has(def.category) && getUpskillNodeType(def) === 'Curiosity'
-      );
+      const microSkillIds = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.id)));
+      const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-      [...topLevelIntentions, ...topLevelCuriosities].forEach(topLevelTask => {
+      const topLevelIntentions = deepWorkDefinitions.filter(def => microSkillNames.has(def.category) && getDeepWorkNodeType(def) === 'Intention');
+      const topLevelCuriosities = upskillDefinitions.filter(def => microSkillNames.has(def.category) && getUpskillNodeType(def) === 'Curiosity');
+
+      const allTopLevel = [...topLevelIntentions, ...topLevelCuriosities];
+
+      allTopLevel.forEach(topLevelTask => {
           const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
           const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
           
