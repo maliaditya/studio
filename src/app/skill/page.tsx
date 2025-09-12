@@ -236,54 +236,65 @@ function SkillPageContent() {
       curiosityEst: number;
       curiosityLogged: number;
     }>();
-
-    const calculateTotalsFor = (definitions: ExerciseDefinition[], type: 'deepwork' | 'upskill') => {
-      definitions.forEach(def => {
-        const leafNodes = getDescendantLeafNodes(def.id, type);
-        
-        const est = leafNodes.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
-        
-        const logged = leafNodes.reduce((sum, node) => {
-            const logSource = type === 'deepwork' ? allDeepWorkLogs : allUpskillLogs;
-            const durationField = type === 'deepwork' ? 'weight' : 'reps';
-            
-            const loggedTimeForNode = logSource.reduce((logSum, log) => {
-                const exerciseLog = log.exercises.find(ex => ex.definitionId === node.id);
-                if (exerciseLog) {
-                    return logSum + exerciseLog.loggedSets.reduce((setSum, set) => setSum + (set[durationField] || 0), 0);
-                }
-                return logSum;
-            }, 0);
-
-            return sum + loggedTimeForNode;
-        }, 0);
-
-        const microSkillInfo = Array.from(microSkillMap.values()).find(info => info.microSkillName === def.category);
-        if (microSkillInfo) {
-          const microSkillId = Array.from(microSkillMap.keys()).find(key => microSkillMap.get(key) === microSkillInfo)!;
-          const currentTotals = totals.get(microSkillId) || { intentionEst: 0, intentionLogged: 0, curiosityEst: 0, curiosityLogged: 0 };
-          
-          if (type === 'deepwork') {
-            currentTotals.intentionEst += est;
-            currentTotals.intentionLogged += logged;
-          } else {
-            currentTotals.curiosityEst += est;
-            currentTotals.curiosityLogged += logged;
-          }
-          totals.set(microSkillId, currentTotals);
-        }
+  
+    // 1. Pre-calculate all logged minutes for every definition ID.
+    const loggedMinutesMap = new Map<string, number>();
+  
+    allDeepWorkLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        const currentMins = loggedMinutesMap.get(ex.definitionId) || 0;
+        const newMins = ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+        loggedMinutesMap.set(ex.definitionId, currentMins + newMins);
       });
-    };
-
-    const allIntentions = Array.from(microSkillIntentions.values()).flat();
-    const allCuriosities = Array.from(microSkillCuriosities.values()).flat();
-
-    calculateTotalsFor(allIntentions, 'deepwork');
-    calculateTotalsFor(allCuriosities, 'upskill');
-
+    });
+  
+    allUpskillLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        const currentMins = loggedMinutesMap.get(ex.definitionId) || 0;
+        const newMins = ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+        loggedMinutesMap.set(ex.definitionId, currentMins + newMins);
+      });
+    });
+  
+    // 2. Iterate through each micro-skill to calculate totals.
+    for (const [microSkillId, microSkillInfo] of microSkillMap.entries()) {
+      let intentionEst = 0;
+      let intentionLogged = 0;
+      let curiosityEst = 0;
+      let curiosityLogged = 0;
+  
+      const intentions = microSkillIntentions.get(microSkillInfo.microSkillName) || [];
+      const curiosities = microSkillCuriosities.get(microSkillInfo.microSkillName) || [];
+  
+      // 3. For each top-level Intention, find all descendants and sum their values.
+      intentions.forEach(intention => {
+        const descendantLeaves = getDescendantLeafNodes(intention.id, 'deepwork');
+        intentionEst += descendantLeaves.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
+        intentionLogged += descendantLeaves.reduce((sum, node) => sum + (loggedMinutesMap.get(node.id) || 0), 0);
+      });
+  
+      // 4. For each top-level Curiosity, do the same.
+      curiosities.forEach(curiosity => {
+        const descendantLeaves = getDescendantLeafNodes(curiosity.id, 'upskill');
+        curiosityEst += descendantLeaves.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
+        curiosityLogged += descendantLeaves.reduce((sum, node) => sum + (loggedMinutesMap.get(node.id) || 0), 0);
+      });
+  
+      if (intentionEst > 0 || intentionLogged > 0 || curiosityEst > 0 || curiosityLogged > 0) {
+        totals.set(microSkillId, { intentionEst, intentionLogged, curiosityEst, curiosityLogged });
+      }
+    }
+  
     return totals;
-  }, [microSkillIntentions, microSkillCuriosities, getDescendantLeafNodes, allDeepWorkLogs, allUpskillLogs, microSkillMap]);
-
+  }, [
+    microSkillMap,
+    microSkillIntentions,
+    microSkillCuriosities,
+    getDescendantLeafNodes,
+    allDeepWorkLogs,
+    allUpskillLogs
+  ]);
+  
   const specializationTotals = useMemo(() => {
     const totalsMap = new Map<string, { totalEst: number; totalLogged: number }>();
     const specs = coreSkills.filter(s => s.type === 'Specialization');
@@ -956,8 +967,7 @@ function SkillPageContent() {
                                                                     <AlertDialogDescription>This will permanently delete the "{p.name}" project.</AlertDialogDescription>
                                                                 </AlertDialogHeader>
                                                                 <AlertDialogFooter>
-                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                                    <AlertDialogAction onClick={() => handleDeleteProject(p.id)}>Delete</AlertDialogAction>
+                                                                    <AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteProject(p.id)}>Delete</AlertDialogAction>
                                                                 </AlertDialogFooter>
                                                             </AlertDialogContent>
                                                         </AlertDialog>
@@ -1398,5 +1408,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
