@@ -255,7 +255,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     activeProjectIds,
     currentSlot,
 }, ref) => {
-    const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+    const { getDescendantLeafNodes, settings } = useAuth();
     const { schedulingLevel = 3 } = settings;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -283,18 +283,18 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
             return getDescendantLeafNodes(deepworkDef.id, 'deepwork');
         }
         return [];
-    }, [deepworkDef, nodeType, getDescendantLeafNodes]);
+    }, [deepworkDef.id, nodeType, getDescendantLeafNodes]);
     
     const completedCount = useMemo(() => {
-        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
-    }, [leafNodes, permanentlyLoggedTaskIds]);
+        return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
+    }, [leafNodes]);
 
     const isObjectiveComplete = useMemo(() => {
         if (leafNodes.length === 0) {
-             return permanentlyLoggedTaskIds.has(deepworkDef.id);
+             return (deepworkDef.loggedDuration || 0) > 0;
         }
         return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
+    }, [leafNodes, completedCount, deepworkDef]);
     
     const { isEnabled, tooltipContent } = useMemo(() => {
         const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
@@ -320,7 +320,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
+    const isComplete = isActionable ? (deepworkDef.loggedDuration || 0) > 0 : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -913,7 +913,6 @@ function DeepWorkPageContent() {
     deleteResource,
     getDeepWorkNodeType,
     getUpskillNodeType,
-    permanentlyLoggedTaskIds,
     getDescendantLeafNodes,
     activeProjectIds,
     currentSlot,
@@ -2418,6 +2417,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
