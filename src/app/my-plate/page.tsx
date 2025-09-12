@@ -787,23 +787,6 @@ function MyPlatePageContent() {
     });
 
     specializations.forEach(spec => {
-      const getDescendantLeafNodesRecursive = (startNodeId: string, type: 'deepwork' | 'upskill', visited: Set<string>): ExerciseDefinition[] => {
-          if (visited.has(startNodeId)) return [];
-          visited.add(startNodeId);
-          const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-          const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-          
-          const node = definitions.find(d => d.id === startNodeId);
-          if (!node) return [];
-
-          const children = node[linkKey] || [];
-          if (children.length === 0) {
-              return [node];
-          } else {
-              return children.flatMap(childId => getDescendantLeafNodesRecursive(childId, type, visited));
-          }
-      };
-
       let totalSpecLoggedMinutes = 0;
       let totalSpecEstimatedMinutes = 0;
       
@@ -821,7 +804,7 @@ function MyPlatePageContent() {
 
       [...topLevelIntentions, ...topLevelCuriosities].forEach(topLevelTask => {
           const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
-          const leafNodes = getDescendantLeafNodesRecursive(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork', new Set());
+          const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
           
           leafNodes.forEach(leaf => {
             totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
@@ -843,7 +826,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, selectedDate, getLoggedMinutes]);
+  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, selectedDate, getLoggedMinutes, getDescendantLeafNodes]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
