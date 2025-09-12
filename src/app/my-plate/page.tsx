@@ -770,12 +770,10 @@ function MyPlatePageContent() {
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-    
-    // --- New, Corrected Logic for Specialization Totals ---
+
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
     
-    // 1. Create a map of all logged minutes by definition ID
     const loggedMinutesMap = new Map<string, number>();
     [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
       log.exercises.forEach(ex => {
@@ -789,19 +787,30 @@ function MyPlatePageContent() {
     });
 
     specializations.forEach(spec => {
+      const getDescendantLeafNodesRecursive = (startNodeId: string, type: 'deepwork' | 'upskill', visited: Set<string>): ExerciseDefinition[] => {
+          if (visited.has(startNodeId)) return [];
+          visited.add(startNodeId);
+          const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+          const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+          
+          const node = definitions.find(d => d.id === startNodeId);
+          if (!node) return [];
+
+          const children = node[linkKey] || [];
+          if (children.length === 0) {
+              return [node];
+          } else {
+              return children.flatMap(childId => getDescendantLeafNodesRecursive(childId, type, visited));
+          }
+      };
+
       let totalSpecLoggedMinutes = 0;
       let totalSpecEstimatedMinutes = 0;
       
-      const microSkillIdsInSpec = new Set<string>();
-      spec.skillAreas.forEach(area => {
-        area.microSkills.forEach(ms => microSkillIdsInSpec.add(ms.id));
-      });
-
       const microSkillNamesInSpec = new Set<string>();
-       microSkillIdsInSpec.forEach(id => {
-         const info = microSkillMap.get(id);
-         if(info) microSkillNamesInSpec.add(info.microSkillName);
-       });
+      spec.skillAreas.forEach(area => {
+        area.microSkills.forEach(ms => microSkillNamesInSpec.add(ms.name));
+      });
 
       const topLevelIntentions = deepWorkDefinitions.filter(def => 
         microSkillNamesInSpec.has(def.category) && getDeepWorkNodeType(def) === 'Intention'
@@ -812,7 +821,7 @@ function MyPlatePageContent() {
 
       [...topLevelIntentions, ...topLevelCuriosities].forEach(topLevelTask => {
           const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
-          const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
+          const leafNodes = getDescendantLeafNodesRecursive(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork', new Set());
           
           leafNodes.forEach(leaf => {
             totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
@@ -834,7 +843,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, selectedDate, getLoggedMinutes]);
+  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, selectedDate, getLoggedMinutes]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
