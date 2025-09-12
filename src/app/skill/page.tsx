@@ -294,13 +294,19 @@ function SkillPageContent() {
             intentions.forEach(intention => {
               const leafNodes = getDescendantsRecursive(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
               totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-              totalLogged += leafNodes.reduce((sum, task) => sum + (task.loggedDuration || 0), 0);
+              const leafNodeIds = new Set(leafNodes.map(n => n.id));
+              totalLogged += allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
+                .filter(ex => leafNodeIds.has(ex.definitionId))
+                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
             });
 
             curiosities.forEach(curiosity => {
               const leafNodes = getDescendantsRecursive(curiosity.id, upskillDefinitions, 'linkedUpskillIds');
               totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-              totalLogged += leafNodes.reduce((sum, task) => sum + (task.loggedDuration || 0), 0);
+              const leafNodeIds = new Set(leafNodes.map(n => n.id));
+              totalLogged += allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
+                .filter(ex => leafNodeIds.has(ex.definitionId))
+                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
             });
           });
         });
@@ -324,13 +330,19 @@ function SkillPageContent() {
           intentions.forEach(intention => {
             const leafNodes = getDescendantsRecursive(intention.id, deepWorkDefinitions, 'linkedDeepWorkIds');
             totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-            totalLogged += leafNodes.reduce((sum, task) => sum + (task.loggedDuration || 0), 0);
+            const leafNodeIds = new Set(leafNodes.map(n => n.id));
+            totalLogged += allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
+                .filter(ex => leafNodeIds.has(ex.definitionId))
+                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
           });
           
           curiosities.forEach(curiosity => {
             const leafNodes = getDescendantsRecursive(curiosity.id, upskillDefinitions, 'linkedUpskillIds');
             totalEst += leafNodes.reduce((sum, task) => sum + (task.estimatedDuration || 0), 0);
-            totalLogged += leafNodes.reduce((sum, task) => sum + (task.loggedDuration || 0), 0);
+            const leafNodeIds = new Set(leafNodes.map(n => n.id));
+            totalLogged += allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
+                .filter(ex => leafNodeIds.has(ex.definitionId))
+                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
           });
         });
       });
@@ -1090,24 +1102,24 @@ function SkillPageContent() {
                        <Accordion type="multiple" className="w-full space-y-2">
                           {selectedCoreSkill.skillAreas.map(area => {
                               const totalAreaEst = area.microSkills.reduce((areaSum, micro) => {
-                                  const intentions = microSkillIntentions.get(micro.name) || [];
-                                  const curiosities = microSkillCuriosities.get(micro.name) || [];
-                                  const intentionEst = intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
-                                  const curiosityEst = curiosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                  const relatedIntentions = microSkillIntentions.get(micro.name) || [];
+                                  const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                  const intentionEst = relatedIntentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                  const curiosityEst = relatedCuriosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
                                   return areaSum + intentionEst + curiosityEst;
                               }, 0);
                           
                               const totalAreaLogged = area.microSkills.reduce((areaSum, micro) => {
-                                  const intentions = microSkillIntentions.get(micro.name) || [];
-                                  const curiosities = microSkillCuriosities.get(micro.name) || [];
-                                  const intentionTaskIds = intentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
-                                  const curiosityTaskIds = curiosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id));
+                                  const relatedIntentions = microSkillIntentions.get(micro.name) || [];
+                                  const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                  const intentionTaskIds = relatedIntentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id));
+                                  const curiosityTaskIds = relatedCuriosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id));
                                   const intentionLogged = allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
                                       .filter(ex => intentionTaskIds.some(leafId => leafId === ex.definitionId))
-                                      .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0), 0);
+                                      .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
                                   const curiosityLogged = allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
                                       .filter(ex => curiosityTaskIds.some(leafId => leafId === ex.definitionId))
-                                      .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0), 0);
+                                      .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
                                   return areaSum + intentionLogged + curiosityLogged;
                               }, 0);
 
@@ -1147,15 +1159,15 @@ function SkillPageContent() {
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
                                             
-                                            const totalIntentionEst = intentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                            const totalIntentionEst = relatedIntentions.reduce((sum, task) => sum + getDescendantsRecursive(task.id, deepWorkDefinitions, 'linkedDeepWorkIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
                                             const totalIntentionLogged = allDeepWorkLogs.reduce((logSum, log) => logSum + log.exercises
                                                 .filter(ex => relatedIntentions.flatMap(i => getDescendantsRecursive(i.id, deepWorkDefinitions, 'linkedDeepWorkIds').map(d => d.id)).includes(ex.definitionId))
-                                                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + set.weight, 0), 0), 0);
+                                                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0), 0);
 
-                                            const totalCuriosityEst = curiosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
+                                            const totalCuriosityEst = relatedCuriosities.reduce((sum, task) => sum + getDescendantsRecursive(task.id, upskillDefinitions, 'linkedUpskillIds').reduce((taskSum, t) => taskSum + (t.estimatedDuration || 0), 0), 0);
                                             const totalCuriosityLogged = allUpskillLogs.reduce((logSum, log) => logSum + log.exercises
                                                 .filter(ex => relatedCuriosities.flatMap(c => getDescendantsRecursive(c.id, upskillDefinitions, 'linkedUpskillIds').map(d => d.id)).includes(ex.definitionId))
-                                                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + set.reps, 0), 0), 0);
+                                                .reduce((exSum, ex) => exSum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0), 0);
 
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
