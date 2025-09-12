@@ -229,7 +229,6 @@ function SkillPageContent() {
     return map;
   }, [upskillDefinitions, getUpskillNodeType]);
 
-  // New, robust calculation logic
   const microSkillTotals = useMemo(() => {
     const totals = new Map<string, {
       intentionEst: number;
@@ -237,8 +236,8 @@ function SkillPageContent() {
       curiosityEst: number;
       curiosityLogged: number;
     }>();
-
-    // 1. Pre-calculate all logged minutes for every definition ID for efficiency.
+  
+    // 1. Pre-calculate logged minutes for all definitions
     const loggedMinutesMap = new Map<string, number>();
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
@@ -256,17 +255,17 @@ function SkillPageContent() {
         }
       });
     });
-
+  
     // 2. Iterate through each micro-skill to calculate its totals.
     for (const [microSkillId, microSkillInfo] of microSkillMap.entries()) {
       let intentionEst = 0;
       let intentionLogged = 0;
       let curiosityEst = 0;
       let curiosityLogged = 0;
-
+  
       const intentions = microSkillIntentions.get(microSkillInfo.microSkillName) || [];
       const curiosities = microSkillCuriosities.get(microSkillInfo.microSkillName) || [];
-
+  
       // 3. For each top-level Intention, get all descendants and sum their values.
       intentions.forEach(intention => {
         const descendantLeaves = getDescendantLeafNodes(intention.id, 'deepwork');
@@ -280,7 +279,7 @@ function SkillPageContent() {
         curiosityEst += descendantLeaves.reduce((sum, node) => sum + (node.estimatedDuration || 0), 0);
         curiosityLogged += descendantLeaves.reduce((sum, node) => sum + (loggedMinutesMap.get(node.id) || 0), 0);
       });
-
+  
       if (intentionEst > 0 || intentionLogged > 0 || curiosityEst > 0 || curiosityLogged > 0) {
         totals.set(microSkillId, { intentionEst, intentionLogged, curiosityEst, curiosityLogged });
       }
@@ -1401,3 +1400,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
