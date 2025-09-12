@@ -1070,23 +1070,36 @@ function DeepWorkPageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
-    if (!definition) return 0;
-    const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
-    if (leafNodes.length > 0) {
-        return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
-    }
-    return definition.loggedDuration || 0;
-  }, [getDescendantLeafNodes]);
+  const loggedMinutesMap = useMemo(() => {
+    const map = new Map<string, number>();
+    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
+      log.exercises.forEach(ex => {
+        const isUpskill = allUpskillLogs.some(ulog => ulog.date === log.date && ulog.exercises.some(uex => uex.id === ex.id));
+        const durationField = isUpskill ? 'reps' : 'weight';
+        const duration = ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
+        if (duration > 0) {
+          map.set(ex.definitionId, (map.get(ex.definitionId) || 0) + duration);
+        }
+      });
+    });
+    return map;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+  
+  const getLoggedMinutes = useCallback((definition: ExerciseDefinition, type: 'deepwork' | 'upskill'): number => {
+      const leafNodes = getDescendantLeafNodes(definition.id, type);
+      if (leafNodes.length > 0) {
+          return leafNodes.reduce((total, node) => total + (loggedMinutesMap.get(node.id) || 0), 0);
+      }
+      return loggedMinutesMap.get(definition.id) || 0;
+  }, [getDescendantLeafNodes, loggedMinutesMap]);
 
-const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
-    if (!definition) return 0;
-    const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
-    if (leafNodes.length > 0) {
-        return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
-    }
-    return definition.loggedDuration || 0;
-}, [getDescendantLeafNodes]);
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
+    return getLoggedMinutes(definition, 'deepwork');
+  }, [getLoggedMinutes]);
+
+  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
+      return getLoggedMinutes(definition, 'upskill');
+  }, [getLoggedMinutes]);
 
 
   const totalLoggedTime = useMemo(() => {
@@ -2420,6 +2433,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
