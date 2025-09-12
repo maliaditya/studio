@@ -653,7 +653,7 @@ function SkillPageContent() {
     setSelectedProjectId(null);
   };
 
-  const getDescendantsRecursive = useCallback((startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
+  const getDescendantsRecursive = (startNodeId: string, definitions: ExerciseDefinition[], linkKey: 'linkedDeepWorkIds' | 'linkedUpskillIds'): ExerciseDefinition[] => {
     const descendants: ExerciseDefinition[] = [];
     const queue: string[] = [startNodeId];
     const visited = new Set<string>();
@@ -666,7 +666,8 @@ function SkillPageContent() {
         const node = definitions.find(d => d.id === currentId);
         if (node) {
             descendants.push(node);
-            (node[linkKey] || []).forEach(childId => {
+            const childIds = (node[linkKey] || []);
+            childIds.forEach(childId => {
                 if (!visited.has(childId)) {
                     queue.push(childId);
                 }
@@ -674,20 +675,21 @@ function SkillPageContent() {
         }
     }
     return descendants;
-  }, []);
-
-  const getLoggedTime = useCallback((taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
-      let totalMinutes = 0;
-      const idSet = new Set(taskIds);
-      logs.forEach(log => {
-          log.exercises.forEach((ex: any) => {
-              if (idSet.has(ex.definitionId)) {
-                  totalMinutes += ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
-              }
-          });
+  };
+  
+  const getLoggedTime = (taskIds: string[], logs: any[], durationField: 'reps' | 'weight') => {
+    let totalMinutes = 0;
+    const idSet = new Set(taskIds);
+    logs.forEach(log => {
+      (log.exercises || []).forEach((ex: any) => {
+        if (idSet.has(ex.definitionId)) {
+          totalMinutes += (ex.loggedSets || []).reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+        }
       });
-      return totalMinutes;
-  }, []);
+    });
+    return totalMinutes;
+  };
+  
 
   const microSkillIntentions = useMemo(() => {
     const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
