@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -36,6 +35,7 @@ export function Header() {
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
+    { href: '/charts', label: 'Charts' },
     { href: '/path', label: 'Path' },
     { href: '/timesheet', label: 'Timesheet' },
     { href: '/workout-tracker', label: 'Workout' },
