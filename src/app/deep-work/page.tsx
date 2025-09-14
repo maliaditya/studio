@@ -427,8 +427,11 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                     <div className="flex items-center gap-1 flex-shrink-0">
                          {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(deepworkDef.id, 'deepwork')}>Add Action</Button>}
                          {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
-                         {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
-                        {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
+                         {loggedMinutes > 0 ? (
+                            <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>
+                         ) : estDuration && estDuration > 0 && !isComplete ? (
+                            <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>
+                         ) : null}
                     </div>
                 </CardFooter>
             </Card>
@@ -813,9 +816,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     
-                    const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                    const allChildrenCompleted = leafNodes.length > 0 && leafNodes.every(n => (n.loggedDuration || 0) > 0);
-                    const isComplete = leafNodes.length > 0 ? allChildrenCompleted : (def.loggedDuration || 0) > 0;
+                    const isComplete = (def.loggedDuration || 0) > 0;
 
                     return (
                         <LinkedUpskillCard 
@@ -2047,9 +2048,7 @@ function DeepWorkPageContent() {
                                     />
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
-                                    const leafNodes = getDescendantLeafNodes(def.id, 'upskill');
-                                    const allChildrenCompleted = leafNodes.length > 0 && leafNodes.every(n => (n.loggedDuration || 0) > 0);
-                                    const isComplete = leafNodes.length === 0 ? (def.loggedDuration || 0) > 0 : allChildrenCompleted;
+                                    const isComplete = (def.loggedDuration || 0) > 0;
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2433,6 +2432,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
