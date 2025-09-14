@@ -92,7 +92,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -228,48 +228,67 @@ function ChartsPageContent() {
     }, [habitCards]);
     
     const specializationData = useMemo(() => {
-      const dailyData: Record<string, Record<string, number>> = {}; // date -> { specName: hours }
-      const specializations = coreSkills.filter(s => s.type === 'Specialization');
-      const specNameById = new Map(specializations.map(s => [s.id, s.name]));
-      const specIdByMicroSkillCat: Record<string, string> = {};
+        const categoryToSpecialization: Record<string, string> = {};
+        const specializationNames = new Set<string>();
 
-      specializations.forEach(spec => {
-          spec.skillAreas.forEach(area => {
-              area.microSkills.forEach(ms => {
-                  specIdByMicroSkillCat[ms.name] = spec.id;
-              });
-          });
-      });
+        coreSkills
+            .filter(s => s.type === 'Specialization')
+            .forEach(spec => {
+                specializationNames.add(spec.name);
+                spec.skillAreas.forEach(area => {
+                    area.microSkills.forEach(ms => {
+                        categoryToSpecialization[ms.name] = spec.name;
+                    });
+                });
+            });
 
-      const processLogs = (logs: any[], durationField: 'reps' | 'weight') => {
-        logs.forEach(log => {
-            log.exercises.forEach((ex: any) => {
-                const specId = specIdByMicroSkillCat[ex.category];
-                if (specId) {
-                    const specName = specNameById.get(specId);
+        const dailyData: Record<string, Record<string, number>> = {}; // date -> { specName: minutes }
+
+        const processLogs = (logs: any[], durationField: 'reps' | 'weight') => {
+            logs.forEach(log => {
+                log.exercises.forEach((ex: any) => {
+                    const specName = categoryToSpecialization[ex.category];
                     if (specName) {
                         const duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
                         if (duration > 0) {
-                            if (!dailyData[log.date]) dailyData[log.date] = {};
-                            dailyData[log.date][specName] = (dailyData[log.date][specName] || 0) + duration / 60;
+                            if (!dailyData[log.date]) {
+                                dailyData[log.date] = {};
+                                specializationNames.forEach(name => {
+                                    dailyData[log.date][name] = 0;
+                                });
+                            }
+                            dailyData[log.date][specName] = (dailyData[log.date][specName] || 0) + duration;
                         }
                     }
-                }
+                });
             });
-        });
-      };
+        };
 
-      processLogs(allUpskillLogs, 'reps');
-      processLogs(allDeepWorkLogs, 'weight');
-      
-      const allDates = Object.keys(dailyData).sort();
-      return allDates.map(date => {
-          return {
-              date,
-              ...dailyData[date]
-          }
-      });
+        processLogs(allUpskillLogs, 'reps');
+        processLogs(allDeepWorkLogs, 'weight');
+
+        return Object.entries(dailyData)
+            .map(([date, specMinutes]) => {
+                const dataPoint: Record<string, any> = { date };
+                Object.entries(specMinutes).forEach(([specName, minutes]) => {
+                    dataPoint[specName] = minutes / 60; // Convert minutes to hours
+                });
+                return dataPoint;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
+
+    const specializationChartConfig = useMemo(() => {
+        const config: ChartConfig = {};
+        let i = 1;
+        coreSkills
+            .filter(s => s.type === 'Specialization')
+            .forEach(spec => {
+                config[spec.name] = { label: spec.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
+                i++;
+            });
+        return config;
+    }, [coreSkills]);
 
     const allCategoriesData = useMemo(() => {
         const categoriesWithData = Object.values(activityNameMap)
@@ -318,7 +337,7 @@ function ChartsPageContent() {
                     if (data.length < 1) return null;
 
                     if (["Specialization Hours", "Urges & Resistances"].includes(title)) {
-                        const dataKeys = Object.keys(data[0] || {}).filter(k => k !== 'date' && k !== 'dateObj');
+                        const dataKeys = Object.keys(config);
                         return (
                             <Card key={title} className="lg:col-span-2">
                                 <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
