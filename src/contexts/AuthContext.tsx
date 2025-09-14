@@ -120,7 +120,7 @@ interface AuthContextType {
   allWorkoutLogs: DatedWorkout[];
   setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   brandingLogs: DatedWorkout[];
-  setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  setBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allMindProgrammingLogs: DatedWorkout[];
@@ -432,7 +432,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [brandingLogs, setAllBrandingLogs] = useState<DatedWorkout[]>([]);
+  const [brandingLogs, setBrandingLogs] = useState<DatedWorkout[]>([]);
   const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
   
   // Data Definitions & Plans
@@ -1076,7 +1076,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAllUpskillLogs(mainData.allUpskillLogs || mainData.upskillLogs || []);
     setAllDeepWorkLogs(mainData.allDeepWorkLogs || mainData.deepWorkLogs || []);
     setAllWorkoutLogs(mainData.allWorkoutLogs || mainData.workoutLogs || []);
-    setAllBrandingLogs(mainData.brandingLogs || []);
+    setBrandingLogs(mainData.brandingLogs || []);
     setAllLeadGenLogs(mainData.allLeadGenLogs || []);
     setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
     setWorkoutMode(mainData.workoutMode || 'two-muscle');
@@ -1559,7 +1559,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             break;
         case 'branding':
             definition = deepWorkDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllBrandingLogs;
+            logsUpdater = setBrandingLogs;
             logSource = brandingLogs;
             break;
         default:
@@ -2824,7 +2824,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
-    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setAllBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
+    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, strengthTrainingMode, setStrengthTrainingMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, updateTaskDuration,
@@ -2986,3 +2986,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
