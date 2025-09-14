@@ -79,26 +79,15 @@ export async function GET(request: Request) {
   const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
-    // Instead of using list() or head(), directly try to fetch from the known public URL pattern
-    // This is often more reliable than using the SDK methods for simple public reads.
-    const blobStoreId = process.env.BLOB_READ_WRITE_TOKEN?.split('_')[1]?.toLowerCase();
-    if (!blobStoreId) {
-        throw new Error("Could not determine Blob Store ID from token.");
-    }
-    
-    // Construct the public URL. This pattern is standard for Vercel Blobs.
-    const fileUrl = `https://${blobStoreId}.public.blob.vercel-storage.com/${blobPathname}`;
+    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
 
-    const response = await fetch(fileUrl, {
-        method: 'GET',
-        headers: {
-            'x-vercel-version': '2024-03-14' // Recommended header
-        }
-    });
+    const userBlob = blobs.find(blob => blob.pathname === blobPathname);
 
-    if (response.status === 404) {
-      return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    if (!userBlob) {
+        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
     }
+
+    const response = await fetch(userBlob.url);
     
     if (!response.ok) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status} - ${response.statusText}`);
