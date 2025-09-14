@@ -242,7 +242,7 @@ function ChartsPageContent() {
                 });
             });
 
-        const dailyData: Record<string, Record<string, number>> = {}; // date -> { specName: minutes }
+        const dailyData: Record<string, Record<string, number>> = {};
 
         const processLogs = (logs: any[], durationField: 'reps' | 'weight') => {
             logs.forEach(log => {
@@ -427,3 +427,5 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+
+    
