@@ -103,7 +103,7 @@ function ChartsPageContent() {
         }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
     
         let allData = sortedLogs.map((log, index, arr) => ({
-            ...log,
+            date: log.dateObj.toISOString(),
             historicalWeight: log.weight,
             projectedWeight: null,
             isProjection: false,
@@ -122,8 +122,8 @@ function ChartsPageContent() {
         for (let i = 1; i <= weeksToGo; i++) {
             const projectedDate = addWeeks(lastLog.dateObj, i);
             allData.push({
+                date: projectedDate.toISOString(),
                 projectedWeight: lastLog.weight + (i * projectionRate),
-                timestamp: projectedDate.getTime(),
                 isProjection: true,
                 historicalWeight: null,
             } as any);
