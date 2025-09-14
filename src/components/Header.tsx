@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings } from 'lucide-react';
+import { BrainCircuit, Heart, Settings, Eye, EyeOff } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -22,6 +22,8 @@ export function Header() {
     isDemoTokenModalOpen, 
     setIsDemoTokenModalOpen, 
     pushDemoDataWithToken,
+    settings,
+    setSettings,
   } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -29,11 +31,28 @@ export function Header() {
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
-
   useEffect(() => {
     setIsClient(true);
   }, []);
-
+  
+  const handleToggleAllWidgets = () => {
+    const newVisibility = !settings.allWidgetsVisible;
+    setSettings(prev => ({
+        ...prev,
+        allWidgetsVisible: newVisibility,
+        widgetVisibility: {
+            ...prev.widgetVisibility,
+            pistons: newVisibility,
+            mindset: newVisibility,
+            activityDistribution: newVisibility,
+            favorites: newVisibility,
+            topPriorities: newVisibility,
+            brainHacks: newVisibility,
+            ruleEquations: newVisibility,
+            visualizationTechniques: newVisibility,
+        }
+    }));
+  };
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
@@ -80,6 +99,12 @@ export function Header() {
           
           <div className="flex items-center gap-4">
             {currentUser && <SaveStatusWidget />}
+             {currentUser && (
+              <Button onClick={handleToggleAllWidgets} variant="outline" size="icon" className="h-9 w-9">
+                {settings.allWidgetsVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <span className="sr-only">Toggle all widgets</span>
+              </Button>
+            )}
             <Button
               onClick={() => setIsSupportModalOpen(true)}
               variant="secondary"

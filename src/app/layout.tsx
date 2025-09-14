@@ -388,18 +388,18 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MatrixBackground />
       <ClothBackground />
       <Header />
-      {authContext.settings.widgetVisibility.pistons && <PistonsHead />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.pistons && <PistonsHead />}
       <main>{children}</main>
       <Toaster />
       <BackgroundAudioPlayer />
       <FloatingVideoPlayer />
-      {authContext.settings.widgetVisibility.mindset && <MindsetCategoriesCard />}
-      {authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
-      {authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
-      {authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
-      {authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
-      {authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
-      {authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.mindset && <MindsetCategoriesCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
       {isAllResistancesPopupOpen && <AllResistancesPopup />}
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       <StopperProgressModal 

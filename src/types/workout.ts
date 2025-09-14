@@ -672,6 +672,7 @@ export interface UserSettings {
   slotRules: Partial<Record<SlotName, string[]>>;
   schedulingLevel?: 1 | 2 | 3;
   widgetVisibility: WidgetVisibility;
+  allWidgetsVisible: boolean;
 }
 
 export interface ActiveFocusSession {
