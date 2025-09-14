@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import type { Stopper } from '@/types/workout';
+import type { Stopper, Activity, DailySchedule } from '@/types/workout';
 
 const productivityChartConfig = {
     totalMinutes: { label: "Productive Time (min)", color: "hsl(var(--chart-1))" },
@@ -30,9 +30,20 @@ const specializationChartConfig = {
 const CustomTooltip = ({ active, payload, label, context, customConfig }: { active?: boolean, payload?: any[], label?: string, context?: string, customConfig?: ChartConfig }) => {
     if (active && payload && payload.length && label) {
         const data = payload[0].payload;
+        
+        let formattedLabel = label;
+        try {
+            // Attempt to parse and format only if it looks like a valid date string
+            if (label.match(/^\d{4}-\d{2}-\d{2}/)) {
+                formattedLabel = format(parseISO(label), 'PPP');
+            }
+        } catch (e) {
+            // If parsing fails, use the original label
+        }
+
         return (
             <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                <div className="font-bold text-foreground">{format(parseISO(label), 'PPP')}</div>
+                <div className="font-bold text-foreground">{formattedLabel}</div>
                 <div className="grid gap-1.5">
                     {payload.map((p: any, index: number) => {
                         const value = p.value;
@@ -46,7 +57,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' ? 'times' : 'min'}`}
+                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' ? 'times' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -68,6 +79,7 @@ function ChartsPageContent() {
         allWorkoutLogs,
         habitCards,
         coreSkills,
+        schedule,
     } = useAuth();
 
     const productivityData = useMemo(() => {
@@ -102,7 +114,7 @@ function ChartsPageContent() {
             return { ...log, dateObj, timestamp: dateObj.getTime() };
         }).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime());
     
-        let allData = sortedLogs.map((log, index, arr) => ({
+        let allData: any[] = sortedLogs.map((log) => ({
             date: log.dateObj.toISOString(),
             historicalWeight: log.weight,
             projectedWeight: null,
@@ -125,7 +137,7 @@ function ChartsPageContent() {
                 projectedWeight: lastLog.weight + (i * projectionRate),
                 isProjection: true,
                 historicalWeight: null,
-            } as any);
+            });
         }
     
         return allData;
@@ -223,6 +235,42 @@ function ChartsPageContent() {
       });
     }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
 
+    const { activityData, activityChartConfig } = useMemo(() => {
+        const dailyData: Record<string, { dateObj: Date } & Record<string, number>> = {};
+        const activityTypes = new Set<string>();
+
+        Object.entries(schedule).forEach(([date, dailySchedule]) => {
+            const dateKey = date;
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = { dateObj: parseISO(dateKey) };
+            }
+
+            Object.values(dailySchedule).forEach(slotActivities => {
+                if (Array.isArray(slotActivities)) {
+                    (slotActivities as Activity[]).forEach(activity => {
+                        if (activity.completed) {
+                            activityTypes.add(activity.type);
+                            dailyData[dateKey][activity.type] = (dailyData[dateKey][activity.type] || 0) + 1;
+                        }
+                    });
+                }
+            });
+        });
+
+        const data = Object.values(dailyData)
+            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
+            .map(d => ({ ...d, date: d.dateObj.toISOString() }));
+        
+        const config: ChartConfig = {};
+        let i = 1;
+        activityTypes.forEach(name => {
+            config[name] = { label: name, color: `hsl(var(--chart-${(i%5)+1}))` };
+            i++;
+        });
+
+        return { activityData: data, activityChartConfig: config };
+    }, [schedule]);
+
 
     const chartComponents = [
         { title: "Productivity Trend", data: productivityData, config: productivityChartConfig, yAxisKey: "totalMinutes", context: "productivity" },
@@ -230,6 +278,7 @@ function ChartsPageContent() {
         { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, yAxisKey: "score", context: "consistency" },
         { title: "Urges & Resistances", data: resistanceData, config: resistanceChartConfig, context: "resistance" },
         { title: "Specialization Hours", data: specializationData, config: specializationChartConfig, context: "specialization"},
+        { title: "Completed Activities", data: activityData, config: activityChartConfig, context: "activities" },
     ];
 
     return (
@@ -239,10 +288,10 @@ function ChartsPageContent() {
                 <p className="mt-4 text-lg text-muted-foreground">Your key metrics at a glance.</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartComponents.map(({ title, data, config, yAxisKey, context }, index) => {
+                {chartComponents.map(({ title, data, config, context }, index) => {
                     if (data.length < 1) return null;
 
-                    if (title === "Specialization Hours" || title === "Urges & Resistances") {
+                    if (["Specialization Hours", "Urges & Resistances", "Completed Activities"].includes(title)) {
                         const dataKeys = Object.keys(data[0] || {}).filter(k => k !== 'date' && k !== 'dateObj');
                         return (
                             <Card key={title} className="lg:col-span-2">
