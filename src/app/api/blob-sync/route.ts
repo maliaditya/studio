@@ -79,15 +79,9 @@ export async function GET(request: Request) {
   const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
-    // Attempt to list the blob directly. This is more reliable than `head`.
-    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+    const blobInfo = await head(blobPathname);
 
-    if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
-      // This is the correct way to handle a user who has never synced before.
-      return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
-    }
-
-    const response = await fetch(blobs[0].url);
+    const response = await fetch(blobInfo.url);
     
     if (!response.ok) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
@@ -104,8 +98,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: userData });
 
   } catch (error) {
-    // The `list` method does not throw a 404, so we don't need to check for it here.
-    // This catch block will now handle other unexpected errors.
+    if (error && typeof error === 'object' && 'status' in error && error.status === 404) {
+      // This is the correct way to handle a user who has never synced before.
+      return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    }
+
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
