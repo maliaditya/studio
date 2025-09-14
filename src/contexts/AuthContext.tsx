@@ -1342,32 +1342,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
       return;
     }
-
+  
     const isDemo = username === 'demo';
-
+  
     if (!isDemo) {
       toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
     }
-
+  
     try {
-      const response = await fetch(`/api/blob-sync?username=${username}`);
+      const response = await fetch(`/api/blob-sync?username=${username.toLowerCase()}`);
       const result = await response.json();
-
+  
       if (!response.ok) {
         throw new Error(result.error || 'Failed to fetch data.');
       }
       
       const data = result.data;
       
-      if (data) {
-        localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data.main));
-        localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(data.ui));
-        toast({ title: "Sync Successful", description: "Data pulled from cloud. The app will now reload." });
-        setTimeout(() => window.location.reload(), 1500);
+      if (data && data.main) {
+        loadImportedData(data.main, data.ui || {});
+        toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
       } else {
         toast({ title: "No Cloud Data", description: result.message || "No data was found in the cloud for this user." });
       }
-
+  
     } catch (error) {
       console.error("Pull from cloud failed:", error);
       if (!isDemo) {
