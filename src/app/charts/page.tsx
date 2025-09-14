@@ -80,7 +80,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                         if (value === 0 || value === null || value === undefined) return null;
                         
                         let name = p.name;
-                        if (context === 'resistance' && customConfig && customConfig[p.dataKey]) {
+                        if ((context === 'resistance' || context === 'specialization') && customConfig && customConfig[p.dataKey]) {
                             name = customConfig[p.dataKey]?.label;
                         }
 
@@ -227,12 +227,12 @@ function ChartsPageContent() {
         return { resistanceData: data, resistanceChartConfig: config };
     }, [habitCards]);
     
-    const specializationData = useMemo(() => {
+    const { specializationData, specializationChartConfig } = useMemo(() => {
         const categoryToSpecialization: Record<string, string> = {};
         const specializationNames = new Set<string>();
 
         coreSkills
-            .filter(s => s.type === 'Specialization')
+            .filter(skill => skill.type === 'Specialization')
             .forEach(spec => {
                 specializationNames.add(spec.name);
                 spec.skillAreas.forEach(area => {
@@ -267,7 +267,7 @@ function ChartsPageContent() {
         processLogs(allUpskillLogs, 'reps');
         processLogs(allDeepWorkLogs, 'weight');
 
-        return Object.entries(dailyData)
+        const data = Object.entries(dailyData)
             .map(([date, specMinutes]) => {
                 const dataPoint: Record<string, any> = { date };
                 Object.entries(specMinutes).forEach(([specName, minutes]) => {
@@ -276,19 +276,16 @@ function ChartsPageContent() {
                 return dataPoint;
             })
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
-
-    const specializationChartConfig = useMemo(() => {
+            
         const config: ChartConfig = {};
         let i = 1;
-        coreSkills
-            .filter(s => s.type === 'Specialization')
-            .forEach(spec => {
-                config[spec.name] = { label: spec.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
-                i++;
-            });
-        return config;
-    }, [coreSkills]);
+        specializationNames.forEach(specName => {
+            config[specName] = { label: specName, color: `hsl(var(--chart-${(i % 5) + 1}))` };
+            i++;
+        });
+
+        return { specializationData: data, specializationChartConfig: config };
+    }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
 
     const allCategoriesData = useMemo(() => {
         const categoriesWithData = Object.values(activityNameMap)
