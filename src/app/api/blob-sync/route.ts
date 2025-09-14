@@ -1,5 +1,5 @@
 
-import { put, head } from '@vercel/blob';
+import { put, head, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -79,9 +79,15 @@ export async function GET(request: Request) {
   const blobPathname = `${username}-data.json`;
 
   try {
-    const blob = await head(blobPathname);
+    // Attempt to list the blob directly. This is more reliable than `head`.
+    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
 
-    const response = await fetch(blob.url);
+    if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
+      // This is the correct way to handle a user who has never synced before.
+      return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    }
+
+    const response = await fetch(blobs[0].url);
     
     if (!response.ok) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
@@ -98,12 +104,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: userData });
 
   } catch (error) {
-    // The `head` method throws a specific error when the blob is not found.
-    // We check for the 404 status in the error message.
-    if (error instanceof Error && error.message.includes('404')) {
-        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
-    }
-    // Handle other unexpected errors during head, fetch, or parse.
+    // The `list` method does not throw a 404, so we don't need to check for it here.
+    // This catch block will now handle other unexpected errors.
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
