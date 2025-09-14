@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -831,7 +830,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
   
     if(isParent) {
-      return isChild ? 'Objective' : 'Curiosity';
+      return isChild ? 'Curiosity' : 'Objective';
     }
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
@@ -1343,14 +1342,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
-
-    const isDemo = username === 'demo';
     
+    const isDemo = username === 'demo';
+
     if (!isDemo) {
-      toast({ 
-        title: "Syncing...", 
-        description: "Fetching your latest data from the cloud." 
-      });
+        toast({
+            title: "Syncing...",
+            description: "Fetching your latest data from the cloud."
+        });
     }
 
     try {
@@ -1365,17 +1364,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (data === null || data === undefined) {
             if (!isDemo) {
-              toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
+                toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
             }
             return;
         }
 
+        // The API returns the full data structure, not nested under `data`.
         localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data.main));
         localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(data.ui));
         
         toast({
-          title: "Sync Successful",
-          description: "Data pulled from the cloud. The app will now reload.",
+            title: "Sync Successful",
+            description: "Data pulled from the cloud. The app will now reload.",
         });
         setTimeout(() => {
             window.location.reload();
@@ -1384,11 +1384,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
         console.error("Pull from cloud failed:", error);
         if (!isDemo) {
-          toast({
-            title: "Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-          });
+            toast({
+                title: "Sync Failed",
+                description: error instanceof Error ? error.message : "An unknown error occurred.",
+                variant: "destructive",
+            });
         }
     }
   };
@@ -2979,13 +2979,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-
-
-
-
-
-
-
 
     
