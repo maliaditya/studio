@@ -276,7 +276,7 @@ function ChartsPageContent() {
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
                                             <YAxis />
-                                            <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
+                                            <RechartsTooltip content={<CustomTooltip context={context} />} />
                                             {Object.keys(config).map((key) => (
                                                 <Line key={key} type="monotone" dataKey={key} stroke={`var(--color-${key})`} name={config[key as keyof typeof config]?.label} dot={false} strokeDasharray={key === 'projectedWeight' ? '5 5' : ''}/>
                                             ))}
