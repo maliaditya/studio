@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import type { Stopper, Activity, DailySchedule } from '@/types/workout';
+import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
 
 const productivityChartConfig = {
     totalMinutes: { label: "Productive Time (min)", color: "hsl(var(--chart-1))" },
@@ -26,6 +26,36 @@ const consistencyChartConfig = {
 const specializationChartConfig = {
     hours: { label: "Hours Logged", color: "hsl(var(--chart-1))" },
 };
+
+const activityNameMap: Record<ActivityType, string> = {
+    deepwork: 'Deep Work',
+    upskill: 'Learning',
+    workout: 'Workout',
+    mindset: 'Mindset',
+    branding: 'Branding',
+    essentials: 'Essentials',
+    planning: 'Planning',
+    tracking: 'Tracking',
+    'lead-generation': 'Lead Gen',
+    interrupt: 'Interrupts',
+    distraction: 'Distractions',
+    nutrition: 'Nutrition',
+};
+
+const activityColorMapping: Record<string, string> = {
+    'Deep Work': 'hsl(var(--chart-1))',
+    'Learning': 'hsl(var(--chart-2))',
+    'Workout': 'hsl(var(--chart-3))',
+    'Branding': 'hsl(var(--chart-4))',
+    'Lead Gen': 'hsl(var(--chart-5))',
+    'Essentials': 'hsl(var(--chart-1))',
+    'Planning': 'hsl(var(--chart-2))',
+    'Tracking': 'hsl(var(--chart-3))',
+    'Interrupts': 'hsl(var(--destructive))',
+    'Distractions': 'hsl(var(--destructive))',
+    'Nutrition': 'hsl(var(--chart-4))',
+};
+
 
 const CustomTooltip = ({ active, payload, label, context, customConfig }: { active?: boolean, payload?: any[], label?: string, context?: string, customConfig?: ChartConfig }) => {
     if (active && payload && payload.length && label) {
@@ -48,16 +78,21 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                     {payload.map((p: any, index: number) => {
                         const value = p.value;
                         if (value === 0 || value === null || value === undefined) return null;
+                        
+                        let name = p.name;
+                        if (context === 'resistance' && customConfig && customConfig[p.dataKey]) {
+                            name = customConfig[p.dataKey]?.label;
+                        }
 
                         return (
                             <div key={index} className="flex w-full items-center gap-2">
                                 <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: p.color }} />
                                 <div className="flex flex-1 justify-between">
-                                    <span className="text-muted-foreground">{p.name}</span>
+                                    <span className="text-muted-foreground">{name}</span>
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' ? 'times' : 'min'}`}
+                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -80,6 +115,7 @@ function ChartsPageContent() {
         habitCards,
         coreSkills,
         schedule,
+        activityDurations,
     } = useAuth();
 
     const productivityData = useMemo(() => {
@@ -249,8 +285,9 @@ function ChartsPageContent() {
                 if (Array.isArray(slotActivities)) {
                     (slotActivities as Activity[]).forEach(activity => {
                         if (activity.completed) {
-                            activityTypes.add(activity.type);
-                            dailyData[dateKey][activity.type] = (dailyData[dateKey][activity.type] || 0) + 1;
+                            const mappedType = activityNameMap[activity.type] || activity.type;
+                            activityTypes.add(mappedType);
+                            dailyData[dateKey][mappedType] = (dailyData[dateKey][mappedType] || 0) + 1;
                         }
                     });
                 }
@@ -258,14 +295,13 @@ function ChartsPageContent() {
         });
 
         const data = Object.values(dailyData)
+            .filter(d => Object.keys(d).length > 2) // Filter out days with only dateObj
             .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
             .map(d => ({ ...d, date: d.dateObj.toISOString() }));
         
         const config: ChartConfig = {};
-        let i = 1;
         activityTypes.forEach(name => {
-            config[name] = { label: name, color: `hsl(var(--chart-${(i%5)+1}))` };
-            i++;
+            config[name] = { label: name, color: activityColorMapping[name] || 'hsl(var(--muted))' };
         });
 
         return { activityData: data, activityChartConfig: config };
@@ -273,9 +309,9 @@ function ChartsPageContent() {
 
 
     const chartComponents = [
-        { title: "Productivity Trend", data: productivityData, config: productivityChartConfig, yAxisKey: "totalMinutes", context: "productivity" },
-        { title: "Weight Trend", data: combinedWeightData, config: weightChartConfig, yAxisKey: "weight", context: "weight" },
-        { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, yAxisKey: "score", context: "consistency" },
+        { title: "Productivity Trend", data: productivityData, config: productivityChartConfig, context: "productivity" },
+        { title: "Weight Trend", data: combinedWeightData, config: weightChartConfig, context: "weight" },
+        { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, context: "consistency" },
         { title: "Urges & Resistances", data: resistanceData, config: resistanceChartConfig, context: "resistance" },
         { title: "Specialization Hours", data: specializationData, config: specializationChartConfig, context: "specialization"},
         { title: "Completed Activities", data: activityData, config: activityChartConfig, context: "activities" },
@@ -305,7 +341,7 @@ function ChartsPageContent() {
                                                 <YAxis label={{ value: title === 'Specialization Hours' ? 'Hours' : 'Count', angle: -90, position: 'insideLeft' }} />
                                                 <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
                                                 {dataKeys.map((key, i) => (
-                                                    <Line key={key} type="monotone" dataKey={key} stroke={`hsl(var(--chart-${(i%5)+1}))`} name={key} dot={false} />
+                                                    <Line key={key} type="monotone" dataKey={key} stroke={config[key]?.color || `hsl(var(--chart-${(i%5)+1}))`} name={config[key]?.label || key} dot={false} />
                                                 ))}
                                             </LineChart>
                                         </ResponsiveContainer>
