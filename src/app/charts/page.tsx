@@ -64,7 +64,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
         let formattedLabel = label;
         try {
             // Attempt to parse and format only if it looks like a valid date string
-            if (label.match(/^\d{4}-\d{2}-\d{2}/)) {
+            if (label.match(/^\d{4}-\d{2}-\d{2}/) || !isNaN(parseISO(label).getTime())) {
                 formattedLabel = format(parseISO(label), 'PPP');
             }
         } catch (e) {
@@ -92,7 +92,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : 'min'}`}
+                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -271,41 +271,32 @@ function ChartsPageContent() {
       });
     }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
 
-    const { activityData, activityChartConfig } = useMemo(() => {
-        const dailyData: Record<string, { dateObj: Date } & Record<string, number>> = {};
-        const activityTypes = new Set<string>();
+    const allCategoriesData = useMemo(() => {
+        const categoriesWithData = Object.values(activityNameMap)
+            .map(category => {
+                const historicalData = Object.entries(schedule)
+                    .map(([date, dailySchedule]) => {
+                        const dailyTotalForCategory = Object.values(dailySchedule)
+                            .flat()
+                            .filter(activity => activity && activity.completed && activityNameMap[activity.type] === category)
+                            .reduce((sum, activity) => sum + (parseInt(activityDurations[activity.id]?.replace(' min', '') || '0')), 0);
 
-        Object.entries(schedule).forEach(([date, dailySchedule]) => {
-            const dateKey = date;
-            if (!dailyData[dateKey]) {
-                dailyData[dateKey] = { dateObj: parseISO(dateKey) };
-            }
-
-            Object.values(dailySchedule).forEach(slotActivities => {
-                if (Array.isArray(slotActivities)) {
-                    (slotActivities as Activity[]).forEach(activity => {
-                        if (activity.completed) {
-                            const mappedType = activityNameMap[activity.type] || activity.type;
-                            activityTypes.add(mappedType);
-                            dailyData[dateKey][mappedType] = (dailyData[dateKey][mappedType] || 0) + 1;
-                        }
-                    });
-                }
-            });
-        });
-
-        const data = Object.values(dailyData)
-            .filter(d => Object.keys(d).length > 2) // Filter out days with only dateObj
-            .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
-            .map(d => ({ ...d, date: d.dateObj.toISOString() }));
-        
-        const config: ChartConfig = {};
-        activityTypes.forEach(name => {
-            config[name] = { label: name, color: activityColorMapping[name] || 'hsl(var(--muted))' };
-        });
-
-        return { activityData: data, activityChartConfig: config };
-    }, [schedule]);
+                        return {
+                            date: date,
+                            time: dailyTotalForCategory,
+                        };
+                    })
+                    .filter(item => item.time > 0)
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                
+                return {
+                    category,
+                    historicalData,
+                };
+            })
+            .filter(item => item.historicalData.length > 0);
+        return categoriesWithData;
+    }, [schedule, activityDurations]);
 
 
     const chartComponents = [
@@ -314,7 +305,6 @@ function ChartsPageContent() {
         { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, context: "consistency" },
         { title: "Urges & Resistances", data: resistanceData, config: resistanceChartConfig, context: "resistance" },
         { title: "Specialization Hours", data: specializationData, config: specializationChartConfig, context: "specialization"},
-        { title: "Completed Activities", data: activityData, config: activityChartConfig, context: "activities" },
     ];
 
     return (
@@ -324,10 +314,10 @@ function ChartsPageContent() {
                 <p className="mt-4 text-lg text-muted-foreground">Your key metrics at a glance.</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartComponents.map(({ title, data, config, context }, index) => {
+                {chartComponents.map(({ title, data, config, context }) => {
                     if (data.length < 1) return null;
 
-                    if (["Specialization Hours", "Urges & Resistances", "Completed Activities"].includes(title)) {
+                    if (["Specialization Hours", "Urges & Resistances"].includes(title)) {
                         const dataKeys = Object.keys(data[0] || {}).filter(k => k !== 'date' && k !== 'dateObj');
                         return (
                             <Card key={title} className="lg:col-span-2">
@@ -373,6 +363,42 @@ function ChartsPageContent() {
                         </Card>
                     );
                 })}
+            </div>
+            <div className="mt-8">
+                <h2 className="text-2xl font-bold text-center mb-4">All Activity Trends</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {allCategoriesData.map(({ category, historicalData }) => (
+                        <Card key={category}>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[category] || '#8884d8' }}/>
+                                    {category}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-48 w-full">
+                                {historicalData.length > 1 ? (
+                                    <ChartContainer config={{ time: { label: 'Time (min)' } }} className="h-full w-full">
+                                        <ResponsiveContainer>
+                                            <LineChart data={historicalData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="date" fontSize={10} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
+                                                <YAxis fontSize={10} domain={[0, 'dataMax + 10']}/>
+                                                <RechartsTooltip content={<CustomTooltip context="activity-trends" />} />
+                                                <Line type="monotone" dataKey="time" stroke={activityColorMapping[category] || 'hsl(var(--primary))'} strokeWidth={2} dot={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Not enough data for trend.</p>
+                                    </div>
+                                )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
             </div>
         </div>
     );
