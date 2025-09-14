@@ -414,6 +414,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ruleEquations: true,
       visualizationTechniques: true,
     },
+    allWidgetsVisible: true,
   });
 
   // Health State
@@ -1007,20 +1008,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [deepWorkDefinitions, upskillDefinitions, logSubTaskTime, toast, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
   
   const getAllUserData = useCallback(() => {
-    // This is the fix: create a new array of resources without the localAudioUrl property.
-    const sanitizedResources = resources.map(({ localAudioUrl, ...rest }) => {
-      // Intentionally not removing localAudioUrl for now, re-evaluating storage strategy.
-      return rest;
-    });
-
     return {
       main: {
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
         workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
         deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs,
-        resources: sanitizedResources, // Use the sanitized array here
-        resourceFolders,
+        resources, resourceFolders,
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
@@ -1158,6 +1152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         workoutScheduling: 'day-of-week',
         slotRules: {},
         widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true },
+        allWidgetsVisible: true,
     };
     setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
 
@@ -2984,6 +2979,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 
