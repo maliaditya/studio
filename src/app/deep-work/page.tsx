@@ -255,7 +255,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     activeProjectIds,
     currentSlot,
 }, ref) => {
-    const { getDescendantLeafNodes, settings } = useAuth();
+    const { getDescendantLeafNodes, settings, permanentlyLoggedTaskIds } = useAuth();
     const { schedulingLevel = 3 } = settings;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -285,19 +285,16 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         return [];
     }, [deepworkDef.id, nodeType, getDescendantLeafNodes]);
     
-    const isObjectiveComplete = useMemo(() => {
-        if (nodeType === 'Action' || nodeType === 'Standalone') {
-            return (deepworkDef.loggedDuration || 0) > 0;
-        }
-        if (leafNodes.length === 0) {
-            return (deepworkDef.loggedDuration || 0) > 0;
-        }
-        return leafNodes.every(node => (node.loggedDuration || 0) > 0);
-    }, [nodeType, deepworkDef, leafNodes]);
-
     const completedCount = useMemo(() => {
-        return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
-    }, [leafNodes]);
+        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+    }, [leafNodes, permanentlyLoggedTaskIds]);
+
+    const isObjectiveComplete = useMemo(() => {
+        if (leafNodes.length === 0) {
+            return permanentlyLoggedTaskIds.has(deepworkDef.id);
+        }
+        return completedCount >= leafNodes.length;
+    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
     
     const { isEnabled, tooltipContent } = useMemo(() => {
         const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
@@ -323,7 +320,7 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     };
 
     const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isObjectiveComplete;
+    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
     const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
     const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
 
@@ -407,13 +404,13 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
                             const childDef = deepWorkDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            const isChildLogged = (childDef.loggedDuration || 0) > 0;
+                            const isChildLogged = permanentlyLoggedTaskIds.has(childId);
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="deepwork" />;
                         })}
                         {(deepworkDef.linkedUpskillIds || []).map(childId => {
                             const childDef = upskillDefinitions.find(d => d.id === childId);
                             if (!childDef) return null;
-                            const isChildLogged = (childDef.loggedDuration || 0) > 0;
+                            const isChildLogged = permanentlyLoggedTaskIds.has(childId);
                             return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="upskill" />;
                         })}
                         {(deepworkDef.linkedResourceIds || []).map(childId => {
@@ -427,9 +424,9 @@ const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                     <div className="flex items-center gap-1 flex-shrink-0">
                          {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(deepworkDef.id, 'deepwork')}>Add Action</Button>}
                          {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
-                         {loggedMinutes > 0 ? (
+                         {isComplete || loggedMinutes > 0 ? (
                             <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>
-                         ) : estDuration && estDuration > 0 && !isComplete ? (
+                         ) : estDuration && estDuration > 0 ? (
                             <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>
                          ) : null}
                     </div>
@@ -640,7 +637,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     currentSlot,
 }, ref) => {
 
-    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes } = useAuth();
+    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
     
     const getDomainForCategory = useCallback((category: string) => {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -816,7 +813,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     const domain = getDomainForCategory(def.category);
                     const projectsInDomainForChild = domain ? projects.filter((p: Project) => p.domainId === domain.id) : [];
                     
-                    const isComplete = (def.loggedDuration || 0) > 0;
+                    const isComplete = permanentlyLoggedTaskIds.has(def.id);
 
                     return (
                         <LinkedUpskillCard 
@@ -920,6 +917,7 @@ function DeepWorkPageContent() {
     getDescendantLeafNodes,
     activeProjectIds,
     currentSlot,
+    permanentlyLoggedTaskIds,
   } = useAuth();
   const router = useRouter();
   
@@ -1071,28 +1069,13 @@ function DeepWorkPageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const loggedMinutesMap = useMemo(() => {
-    const map = new Map<string, number>();
-    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
-      log.exercises.forEach(ex => {
-        const isUpskill = allUpskillLogs.some(ulog => ulog.date === log.date && ulog.exercises.some(uex => uex.id === ex.id));
-        const durationField = isUpskill ? 'reps' : 'weight';
-        const duration = ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0);
-        if (duration > 0) {
-          map.set(ex.definitionId, (map.get(ex.definitionId) || 0) + duration);
-        }
-      });
-    });
-    return map;
-  }, [allDeepWorkLogs, allUpskillLogs]);
-  
   const getLoggedMinutes = useCallback((definition: ExerciseDefinition, type: 'deepwork' | 'upskill'): number => {
       const leafNodes = getDescendantLeafNodes(definition.id, type);
       if (leafNodes.length > 0) {
-          return leafNodes.reduce((total, node) => total + (loggedMinutesMap.get(node.id) || 0), 0);
+          return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
       }
-      return loggedMinutesMap.get(definition.id) || 0;
-  }, [getDescendantLeafNodes, loggedMinutesMap]);
+      return definition.loggedDuration || 0;
+  }, [getDescendantLeafNodes]);
 
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     return getLoggedMinutes(definition, 'deepwork');
@@ -2048,7 +2031,7 @@ function DeepWorkPageContent() {
                                     />
                                 ))}
                                 {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
-                                    const isComplete = (def.loggedDuration || 0) > 0;
+                                    const isComplete = permanentlyLoggedTaskIds.has(def.id);
                                     
                                     return (
                                         <LinkedUpskillCard 
@@ -2432,6 +2415,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
