@@ -79,24 +79,33 @@ export async function GET(request: Request) {
   const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
-    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+    // Instead of using list() or head(), directly try to fetch from the known public URL pattern
+    // This is often more reliable than using the SDK methods for simple public reads.
+    const blobStoreId = process.env.BLOB_READ_WRITE_TOKEN?.split('_')[1]?.toLowerCase();
+    if (!blobStoreId) {
+        throw new Error("Could not determine Blob Store ID from token.");
+    }
+    
+    // Construct the public URL. This pattern is standard for Vercel Blobs.
+    const fileUrl = `https://${blobStoreId}.public.blob.vercel-storage.com/${blobPathname}`;
 
-    const userBlob = blobs.find(b => b.pathname === blobPathname);
+    const response = await fetch(fileUrl, {
+        method: 'GET',
+        headers: {
+            'x-vercel-version': '2024-03-14' // Recommended header
+        }
+    });
 
-    if (!userBlob) {
-      // This is the correct way to handle a user who has never synced before.
+    if (response.status === 404) {
       return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
     }
-
-    const response = await fetch(userBlob.url);
     
     if (!response.ok) {
-        throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
+        throw new Error(`Failed to download data from Blob storage. Status: ${response.status} - ${response.statusText}`);
     }
 
     const textData = await response.text();
     
-    // If the file from the blob is empty, it's not valid JSON.
     if (!textData) {
         return NextResponse.json({ data: null, message: "Cloud data is empty." });
     }
