@@ -23,35 +23,35 @@ const consistencyChartConfig = {
   score: { label: "Consistency", color: "hsl(var(--chart-3))" },
 } satisfies ChartConfig;
 
-const resistanceChartConfig = {
-    urges: { label: "Urges", color: "hsl(var(--chart-4))" },
-    resistances: { label: "Resistances", color: "hsl(var(--chart-5))" },
-} satisfies ChartConfig;
-
 const specializationChartConfig = {
     hours: { label: "Hours Logged", color: "hsl(var(--chart-1))" },
 };
 
-const CustomTooltip = ({ active, payload, label, context }: { active?: boolean, payload?: any[], label?: string, context?: string }) => {
+const CustomTooltip = ({ active, payload, label, context, customConfig }: { active?: boolean, payload?: any[], label?: string, context?: string, customConfig?: ChartConfig }) => {
     if (active && payload && payload.length && label) {
         const data = payload[0].payload;
         return (
             <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
                 <div className="font-bold text-foreground">{format(parseISO(label), 'PPP')}</div>
                 <div className="grid gap-1.5">
-                    {payload.map((p: any, index: number) => (
-                        <div key={index} className="flex w-full items-center gap-2">
-                            <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: p.color }} />
-                            <div className="flex flex-1 justify-between">
-                                <span className="text-muted-foreground">{p.name}</span>
-                                <span className="font-mono font-medium text-foreground">
-                                    {context === 'weight' ? `${p.value.toFixed(1)} kg/lb` : 
-                                     context === 'consistency' ? `${p.value}%` :
-                                     `${p.value} ${context === 'specialization' ? 'hrs' : context === 'resistance' ? '' : 'min'}`}
-                                </span>
+                    {payload.map((p: any, index: number) => {
+                        const value = p.value;
+                        if (value === 0 || value === null || value === undefined) return null;
+
+                        return (
+                            <div key={index} className="flex w-full items-center gap-2">
+                                <div className="w-2.5 h-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: p.color }} />
+                                <div className="flex flex-1 justify-between">
+                                    <span className="text-muted-foreground">{p.name}</span>
+                                    <span className="font-mono font-medium text-foreground">
+                                        {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
+                                        context === 'consistency' ? `${value}%` :
+                                        `${value} ${context === 'specialization' ? 'hrs' : context === 'resistance' ? 'times' : 'min'}`}
+                                    </span>
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
             </div>
         );
@@ -111,12 +111,11 @@ function ChartsPageContent() {
     
         if (!goalWeight || sortedLogs.length < 1) return allData;
     
-        // Simplified projection logic for brevity
         const lastLog = sortedLogs[sortedLogs.length - 1];
         const weightToChange = goalWeight - lastLog.weight;
         if (Math.abs(weightToChange) < 0.1) return allData;
     
-        const weeksToGo = 26; // Simplified: project 6 months out
+        const weeksToGo = 26;
         const projectionRate = weightToChange / weeksToGo;
     
         for (let i = 1; i <= weeksToGo; i++) {
@@ -147,24 +146,37 @@ function ChartsPageContent() {
         return data;
     }, [allWorkoutLogs]);
     
-    const resistanceData = useMemo(() => {
-        const dailyCounts: Record<string, { dateObj: Date, urges: number, resistances: number }> = {};
-        const allStoppers: { stopper: Stopper, isUrge: boolean }[] = [];
+    const { resistanceData, resistanceChartConfig } = useMemo(() => {
+        const dailyCounts: Record<string, { dateObj: Date } & Record<string, number>> = {};
+        const allStoppers: Stopper[] = [];
+        const stopperNames = new Set<string>();
+
         habitCards.forEach(habit => {
-            (habit.urges || []).forEach(s => allStoppers.push({ stopper: s, isUrge: true }));
-            (habit.resistances || []).forEach(s => allStoppers.push({ stopper: s, isUrge: false }));
+            (habit.urges || []).forEach(s => { allStoppers.push(s); stopperNames.add(s.text); });
+            (habit.resistances || []).forEach(s => { allStoppers.push(s); stopperNames.add(s.text); });
         });
         
-        allStoppers.forEach(({ stopper, isUrge }) => {
+        allStoppers.forEach(stopper => {
             (stopper.timestamps || []).forEach(ts => {
                 const dateKey = format(new Date(ts), 'yyyy-MM-dd');
-                if (!dailyCounts[dateKey]) dailyCounts[dateKey] = { dateObj: parseISO(dateKey), urges: 0, resistances: 0 };
-                if (isUrge) dailyCounts[dateKey].urges++;
-                else dailyCounts[dateKey].resistances++;
+                if (!dailyCounts[dateKey]) {
+                    dailyCounts[dateKey] = { dateObj: parseISO(dateKey) };
+                    stopperNames.forEach(name => dailyCounts[dateKey][name] = 0);
+                };
+                dailyCounts[dateKey][stopper.text] = (dailyCounts[dateKey][stopper.text] || 0) + 1;
             });
         });
 
-        return Object.values(dailyCounts).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({ ...d, date: d.dateObj.toISOString() }));
+        const data = Object.values(dailyCounts).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({ ...d, date: d.dateObj.toISOString() }));
+        
+        const config: ChartConfig = {};
+        let i = 1;
+        stopperNames.forEach(name => {
+            config[name] = { label: name, color: `hsl(var(--chart-${(i%5)+1}))` };
+            i++;
+        });
+
+        return { resistanceData: data, resistanceChartConfig: config };
     }, [habitCards]);
     
     const specializationData = useMemo(() => {
@@ -228,10 +240,10 @@ function ChartsPageContent() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {chartComponents.map(({ title, data, config, yAxisKey, context }, index) => {
-                    if (data.length < 2) return null; // Don't render chart if not enough data
-                    
-                    if (title === "Specialization Hours") {
-                        const specNames = Object.keys(data[0] || {}).filter(k => k !== 'date');
+                    if (data.length < 1) return null;
+
+                    if (title === "Specialization Hours" || title === "Urges & Resistances") {
+                        const dataKeys = Object.keys(data[0] || {}).filter(k => k !== 'date' && k !== 'dateObj');
                         return (
                             <Card key={title} className="lg:col-span-2">
                                 <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
@@ -241,10 +253,10 @@ function ChartsPageContent() {
                                             <LineChart data={data}>
                                                 <CartesianGrid strokeDasharray="3 3" />
                                                 <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
-                                                <YAxis label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                                                <RechartsTooltip content={<CustomTooltip context={context} />} />
-                                                {specNames.map((specName, i) => (
-                                                    <Line key={specName} type="monotone" dataKey={specName} stroke={`hsl(var(--chart-${(i%5)+1}))`} name={specName} dot={false} />
+                                                <YAxis label={{ value: title === 'Specialization Hours' ? 'Hours' : 'Count', angle: -90, position: 'insideLeft' }} />
+                                                <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
+                                                {dataKeys.map((key, i) => (
+                                                    <Line key={key} type="monotone" dataKey={key} stroke={`hsl(var(--chart-${(i%5)+1}))`} name={key} dot={false} />
                                                 ))}
                                             </LineChart>
                                         </ResponsiveContainer>
@@ -264,7 +276,7 @@ function ChartsPageContent() {
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
                                             <YAxis />
-                                            <RechartsTooltip content={<CustomTooltip context={context} />} />
+                                            <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
                                             {Object.keys(config).map((key) => (
                                                 <Line key={key} type="monotone" dataKey={key} stroke={`var(--color-${key})`} name={config[key as keyof typeof config]?.label} dot={false} strokeDasharray={key === 'projectedWeight' ? '5 5' : ''}/>
                                             ))}
