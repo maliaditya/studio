@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
   }
 
-  const blobPathname = `auth/${username}.json`;
+  const blobPathname = `auth/${username.toLowerCase()}.json`;
 
   try {
     // Check if user already exists

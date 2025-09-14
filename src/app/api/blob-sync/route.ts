@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
   }
 
-  const blobPathname = `${username}-data.json`;
+  const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
     const blob = await put(blobPathname, JSON.stringify(data, null, 2), {
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
   }
 
-  const blobPathname = `${username}-data.json`;
+  const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
     // Attempt to list the blob directly. This is more reliable than `head`.

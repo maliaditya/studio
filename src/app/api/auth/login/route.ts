@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const { username, password } = await request.json();
 
   // Bypass Blob check for demo user
-  if (username === 'demo' && password === 'demo') {
+  if (username.toLowerCase() === 'demo' && password === 'demo') {
     return NextResponse.json({ success: true, message: 'Demo login successful.' });
   }
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
   }
 
-  const blobPathname = `auth/${username}.json`;
+  const blobPathname = `auth/${username.toLowerCase()}.json`;
 
   try {
     const { blobs } = await list({ prefix: blobPathname, limit: 1 });
