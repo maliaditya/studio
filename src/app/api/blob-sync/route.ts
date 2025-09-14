@@ -79,15 +79,9 @@ export async function GET(request: Request) {
   const blobPathname = `${username.toLowerCase()}-data.json`;
 
   try {
-    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+    const blob = await head(blobPathname);
 
-    const userBlob = blobs.find(blob => blob.pathname === blobPathname);
-
-    if (!userBlob) {
-        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
-    }
-
-    const response = await fetch(userBlob.url);
+    const response = await fetch(blob.url);
     
     if (!response.ok) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status} - ${response.statusText}`);
@@ -102,7 +96,10 @@ export async function GET(request: Request) {
     const userData = JSON.parse(textData);
     return NextResponse.json({ data: userData });
 
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.status === 404) {
+      return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    }
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
