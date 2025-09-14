@@ -3,13 +3,20 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
-import { Play, Pause, Volume1, Volume2, VolumeX } from 'lucide-react';
+import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function BackgroundAudioPlayer() {
-  const { isAudioPlaying, setIsAudioPlaying, globalVolume, setGlobalVolume } = useAuth();
+  const { 
+    isAudioPlaying, 
+    setIsAudioPlaying, 
+    globalVolume, 
+    setGlobalVolume,
+    settings,
+    setSettings,
+  } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Effect to sync audio element's playing state with component state
@@ -63,6 +70,25 @@ export function BackgroundAudioPlayer() {
   const handleVolumeChange = (newVolume: number[]) => {
     setGlobalVolume(newVolume[0]);
   };
+
+  const handleToggleAllWidgets = () => {
+    const newVisibility = !settings.allWidgetsVisible;
+    setSettings(prev => ({
+        ...prev,
+        allWidgetsVisible: newVisibility,
+        widgetVisibility: {
+            ...prev.widgetVisibility,
+            pistons: newVisibility,
+            mindset: newVisibility,
+            activityDistribution: newVisibility,
+            favorites: newVisibility,
+            topPriorities: newVisibility,
+            brainHacks: newVisibility,
+            ruleEquations: newVisibility,
+            visualizationTechniques: newVisibility,
+        }
+    }));
+  };
   
   const getVolumeIcon = () => {
     if (globalVolume === 0) return <VolumeX className="h-5 w-5" />;
@@ -74,6 +100,10 @@ export function BackgroundAudioPlayer() {
     <>
       <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
+        <Button onClick={handleToggleAllWidgets} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+            {settings.allWidgetsVisible ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            <span className="sr-only">Toggle all widgets</span>
+        </Button>
         <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
           {isAudioPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
         </Button>
