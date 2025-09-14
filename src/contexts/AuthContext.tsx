@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -828,9 +829,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-  
+    
     if(isParent) {
-      return isChild ? 'Curiosity' : 'Objective';
+        return isChild ? 'Objective' : 'Curiosity';
     }
     return isChild ? 'Visualization' : 'Standalone';
   }, [upskillDefinitions]);
@@ -2966,3 +2967,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 }
 
     
+
