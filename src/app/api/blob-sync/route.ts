@@ -1,5 +1,5 @@
 
-import { put, list } from '@vercel/blob';
+import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -79,19 +79,9 @@ export async function GET(request: Request) {
   const blobPathname = `${username}-data.json`;
 
   try {
-    // Use `list` to check for the blob's existence. This is more reliable than
-    // catching a specific error message from `head`.
-    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
+    const blob = await head(blobPathname);
 
-    // If the blobs array is empty OR the found blob doesn't have the exact name,
-    // it means the specific user data file doesn't exist.
-    if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
-        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
-    }
-
-    // The blob exists, so we can get its URL and fetch the content.
-    const blobInfo = blobs[0];
-    const response = await fetch(blobInfo.url);
+    const response = await fetch(blob.url);
     
     if (!response.ok) {
         throw new Error(`Failed to download data from Blob storage. Status: ${response.status}`);
@@ -108,7 +98,12 @@ export async function GET(request: Request) {
     return NextResponse.json({ data: userData });
 
   } catch (error) {
-    // This will now only catch unexpected errors during list, fetch, or parse.
+    // The `head` method throws a specific error when the blob is not found.
+    // We check for the 404 status in the error message.
+    if (error instanceof Error && error.message.includes('404')) {
+        return NextResponse.json({ data: null, message: "No cloud data found for this user. This is expected for a first-time sync." }, { status: 200 });
+    }
+    // Handle other unexpected errors during head, fetch, or parse.
     console.error(`Blob storage read error for user ${username}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
