@@ -1339,57 +1339,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pullDataFromCloud = async (usernameOverride?: string) => {
     const username = usernameOverride || currentUser?.username;
     if (!username) {
-        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-        return;
+      toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+      return;
     }
-    
+
     const isDemo = username === 'demo';
 
     if (!isDemo) {
-        toast({
-            title: "Syncing...",
-            description: "Fetching your latest data from the cloud."
-        });
+      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
     }
 
     try {
-        const response = await fetch(`/api/blob-sync?username=${username}`);
-        const result = await response.json();
+      const response = await fetch(`/api/blob-sync?username=${username}`);
+      const result = await response.json();
 
-        if (!response.ok) {
-            throw new Error(result.error || `Failed to fetch data.`);
-        }
-        
-        const data = result.data;
-        
-        if (data === null || data === undefined) {
-            if (!isDemo) {
-                toast({ title: "No Cloud Data", description: "No data was found in the cloud for this user." });
-            }
-            return;
-        }
-
-        // The API returns the full data structure, not nested under `data`.
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch data.');
+      }
+      
+      const data = result.data;
+      
+      if (data) {
         localStorage.setItem(`lifeos_data_${username}`, JSON.stringify(data.main));
         localStorage.setItem(`lifeos_ui_state_${username}`, JSON.stringify(data.ui));
-        
-        toast({
-            title: "Sync Successful",
-            description: "Data pulled from the cloud. The app will now reload.",
-        });
-        setTimeout(() => {
-            window.location.reload();
-        }, 1500);
+        toast({ title: "Sync Successful", description: "Data pulled from cloud. The app will now reload." });
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        toast({ title: "No Cloud Data", description: result.message || "No data was found in the cloud for this user." });
+      }
 
     } catch (error) {
-        console.error("Pull from cloud failed:", error);
-        if (!isDemo) {
-            toast({
-                title: "Sync Failed",
-                description: error instanceof Error ? error.message : "An unknown error occurred.",
-                variant: "destructive",
-            });
-        }
+      console.error("Pull from cloud failed:", error);
+      if (!isDemo) {
+        toast({
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+      }
     }
   };
 
