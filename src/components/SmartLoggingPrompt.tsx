@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown, Expand } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -257,6 +257,82 @@ const slotOrder: { name: string; time: string; endHour: number, startHour: numbe
 ];
 
 
+const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    allCategoriesData: { name: string, time: string, hourlyData: { name: string, today: number, yesterday: number, todayTasks: string[], yesterdayTasks: string[] }[], plannedActivities: string }[];
+}) => {
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
+                 <DialogHeader>
+                    <DialogTitle>All Activity Trends</DialogTitle>
+                    <DialogDescription>
+                        A historical overview of time spent in each category.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex-grow min-h-0 py-4">
+                    <ScrollArea className="h-full pr-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {allCategoriesData.map(({ name, hourlyData }) => (
+                                <Card key={name}>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            {name}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="h-[200px] w-full">
+                                            <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
+                                                <ResponsiveContainer>
+                                                    <LineChart data={hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
+                                                        <XAxis dataKey="name" fontSize={9} interval={0} />
+                                                        <YAxis fontSize={9} />
+                                                        <Tooltip 
+                                                          content={({ active, payload, label }) => {
+                                                            if (active && payload && payload.length) {
+                                                              return (
+                                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                                  <p className="font-bold">{label}</p>
+                                                                  {payload.map((p, i) => {
+                                                                    const dataKey = p.dataKey as 'today' | 'yesterday';
+                                                                    const tasks = p.payload[`${dataKey}Tasks`];
+                                                                    return (
+                                                                      <div key={i} style={{ color: p.color }}>
+                                                                        {p.name}: {Math.round(p.value as number)} min
+                                                                        {tasks && tasks.length > 0 && (
+                                                                            <ul className="list-disc list-inside text-muted-foreground">
+                                                                                {tasks.map((task: string, taskIndex: number) => <li key={taskIndex}>{task}</li>)}
+                                                                            </ul>
+                                                                        )}
+                                                                      </div>
+                                                                    )
+                                                                  })}
+                                                                </div>
+                                                              )
+                                                            }
+                                                            return null;
+                                                          }}
+                                                        />
+                                                        <Legend wrapperStyle={{fontSize: '0.7rem'}}/>
+                                                        <Line type="monotone" dataKey="today" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                                                        <Line type="monotone" dataKey="yesterday" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} strokeDasharray="3 3"/>
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </ChartContainer>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export function SmartLoggingPrompt({ 
     promptType, 
     activeProjects, 
@@ -278,7 +354,8 @@ export function SmartLoggingPrompt({
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
-  
+  const [isAllTrendsModalOpen, setIsAllTrendsModalOpen] = useState(false);
+
   const dailyAnalysis = useMemo(() => {
     const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
@@ -439,15 +516,20 @@ export function SmartLoggingPrompt({
                 transition={{ duration: 0.3 }}
                 className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg flex flex-col items-start gap-3"
             >
-                <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="flex-shrink-0">{currentPrompt.icon}</div>
-                    <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
+                <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex-shrink-0">{currentPrompt.icon}</div>
+                        <h3 className="font-semibold text-foreground">{currentPrompt.title}</h3>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsAllTrendsModalOpen(true)}>
+                        <Expand className="h-4 w-4" />
+                    </Button>
                 </div>
                 
                 <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
                     <div className="flex-grow">
                         {promptType === 'inactive' ? (
-                            <div className="h-[200px] -mx-2">
+                            <div className="h-[220px] -mx-2">
                               <Carousel
                                 items={dailyAnalysis.carouselItems}
                                 startIndex={currentSlotIndex}
@@ -459,7 +541,7 @@ export function SmartLoggingPrompt({
                                           <CardTitle className="text-base">🕒 {item.name}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="p-3 pt-0 flex-grow h-[150px]">
-                                            <div className="h-full w-full">
+                                            <div className="w-full h-full">
                                                 <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
                                                     <ResponsiveContainer>
                                                         <LineChart data={item.hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
@@ -569,6 +651,11 @@ export function SmartLoggingPrompt({
         </div>
       )}
     </AnimatePresence>
+    <AllTrendsModal 
+        isOpen={isAllTrendsModalOpen}
+        onOpenChange={setIsAllTrendsModalOpen}
+        allCategoriesData={dailyAnalysis.carouselItems}
+    />
     </>
   );
 }
