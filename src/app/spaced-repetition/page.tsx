@@ -10,7 +10,6 @@ import { format, parseISO, differenceInDays, addDays, startOfDay } from 'date-fn
 import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import type { RepetitionData } from '@/types/workout';
 
 const retentionChartConfig = {
   retention: { label: "Retention", color: "hsl(var(--chart-1))" },
@@ -19,12 +18,8 @@ const retentionChartConfig = {
 const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
 
 // Ebbinghaus Forgetting Curve: R = e^(-t/S)
-// We'll model S (memory strength) as being proportional to the interval.
-// A larger interval means stronger memory and slower decay.
 const calculateRetention = (daysSinceLastReview: number, lastInterval: number): number => {
     if (daysSinceLastReview < 0) return 100;
-    // The "strength" of the memory. A longer interval means a stronger memory.
-    // We add 1 to avoid division by zero and to make the initial decay faster.
     const strength = lastInterval + 1; 
     const decayRate = 1 / strength;
     const retention = Math.exp(-daysSinceLastReview * decayRate) * 100;
@@ -33,7 +28,7 @@ const calculateRetention = (daysSinceLastReview: number, lastInterval: number): 
 
 
 function SpacedRepetitionPageContent() {
-  const { coreSkills, deepWorkDefinitions, getDeepWorkNodeType } = useAuth();
+  const { coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes } = useAuth();
 
   const repetitionData = useMemo(() => {
     const microSkillsForRepetition = coreSkills
@@ -45,12 +40,13 @@ function SpacedRepetitionPageContent() {
             def.category === skill.name && getDeepWorkNodeType(def) === 'Intention'
         );
 
-        // Get all unique completion dates from all intentions for this skill
+        const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+        
         const completionDates = new Set<string>();
-        intentions.forEach(intention => {
-            if (intention.last_logged_date) {
-                completionDates.add(intention.last_logged_date);
-            }
+        allLeafNodes.forEach(node => {
+          if (node.last_logged_date) {
+            completionDates.add(node.last_logged_date);
+          }
         });
 
         const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
@@ -63,10 +59,9 @@ function SpacedRepetitionPageContent() {
             const interval = DOUBLING_INTERVALS[reps] || DOUBLING_INTERVALS[DOUBLING_INTERVALS.length - 1];
             const nextReviewDate = addDays(lastReviewDate, interval);
 
-            // If the review happened on or after the scheduled date, it's a success
             if (date >= startOfDay(nextReviewDate) || index === 0) {
                 reps++;
-            } else { // Failed recall, reset
+            } else {
                 reps = 1;
             }
             lastReviewDate = date;
@@ -77,7 +72,6 @@ function SpacedRepetitionPageContent() {
         const nextInterval = DOUBLING_INTERVALS[reps] || null;
         const nextReviewDate = lastRep && nextInterval ? addDays(lastRep.date, nextInterval) : null;
         
-        // Generate graph data
         const graphData: { date: string, retention: number }[] = [];
         if(sortedDates.length > 0) {
             const firstDate = sortedDates[0];
@@ -98,13 +92,12 @@ function SpacedRepetitionPageContent() {
                 }
                 graphData.push({
                     date: format(rep.date, 'yyyy-MM-dd'),
-                    retention: 100, // Spike to 100 on review
+                    retention: 100,
                 });
                 lastDate = rep.date;
                 lastIntervalForDecay = rep.interval;
             });
 
-            // Project decay from the last review date to the end date
              const daysSinceLast = differenceInDays(endDate, lastDate);
              for (let i = 1; i <= daysSinceLast; i++) {
                 const currentDate = addDays(lastDate, i);
@@ -124,7 +117,7 @@ function SpacedRepetitionPageContent() {
         };
 
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
