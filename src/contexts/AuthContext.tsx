@@ -814,7 +814,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
@@ -942,8 +942,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
   
         if (allChildrenCompleted) {
-          markObjectiveActivityAsComplete(def.id);
-          return false;
+          handleToggleComplete(activity.slot, activity.id, true);
+          return false; // Prevent modal from opening
         }
         
         const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
@@ -956,7 +956,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // For simple tasks
     const estDurationStr = activityDurations[activity.id];
     let minutes = 0;
     if (estDurationStr) {
@@ -975,8 +974,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
     return true;
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, markObjectiveActivityAsComplete, setFocusDuration, setFocusActivity, setFocusSessionModalOpen, handleStartFocusSession]);
-
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, handleStartFocusSession]);
+  
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -1087,7 +1086,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(handler);
         };
     }
-  }, [isLoadingState, saveState, schedule]);
+  }, [isLoadingState, saveState, schedule, settings, dailyPurposes, topPriorities, brainHacks]);
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
     setIsLoadingState(true);
