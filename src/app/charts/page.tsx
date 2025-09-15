@@ -249,7 +249,6 @@ function ChartsPageContent() {
     
     const specializationTrendData = useMemo(() => {
         const specializations: CoreSkill[] = coreSkills.filter(skill => skill.type === 'Specialization');
-        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     
         return specializations.map((spec, specIndex) => {
             const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
@@ -331,7 +330,7 @@ function ChartsPageContent() {
                     allLeafNodesUpskill.forEach(leaf => {
                         const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
                         if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0); // upskill duration is in reps
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
                         }
                     });
                 }
@@ -339,7 +338,7 @@ function ChartsPageContent() {
                     allLeafNodesDeepWork.forEach(leaf => {
                         const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
                         if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0); // deepwork duration is in weight
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
                         }
                     });
                 }
