@@ -249,9 +249,7 @@ function MyPlatePageContent() {
             let totalMinutes = 0;
             let suffix = '';
             
-            const isCompleted = activity.completed;
-  
-            if (isCompleted) {
+            if (activity.completed) {
                 const mainDefId = activity.taskIds?.[0]?.split('-')[0];
                 const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
                 
@@ -1345,4 +1343,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
