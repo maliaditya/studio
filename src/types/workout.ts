@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -185,6 +184,7 @@ export interface Activity {
   type: ActivityType;
   details: string;
   completed: boolean;
+  completedAt?: number;
   taskIds?: string[];
   slot: string;
   isRoutine?: boolean;
@@ -692,4 +692,3 @@ export interface LinkTechniqueModalState {
     stopperId: string;
     stage: 2 | 3;
 }
-

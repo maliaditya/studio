@@ -770,7 +770,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const activityIndex = activities.findIndex(act => act.id === activityId);
 
         if (activityIndex > -1) {
-            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            activities[activityIndex] = { 
+                ...activities[activityIndex], 
+                completed: isCompleted,
+                completedAt: isCompleted ? Date.now() : undefined,
+             };
             daySchedule[slotName] = activities;
             newSchedule[todayKey] = daySchedule;
         }
@@ -847,31 +851,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
         const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
         if (isParentNode) {
-            updateActivity({ ...activity, completed: true });
+            updateActivity({ ...activity, completed: true, completedAt: Date.now() });
             return;
         }
     }
 
     if (activity.type !== 'upskill' && activity.type !== 'deepwork') {
-        updateActivity({ ...activity, completed: true, duration });
+        updateActivity({ ...activity, completed: true, duration, completedAt: Date.now() });
         toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
         return;
     }
       
     const exerciseInstanceId = activity.taskIds?.[0];
     if (!exerciseInstanceId) {
-        updateActivity({ ...activity, completed: true, duration });
+        updateActivity({ ...activity, completed: true, duration, completedAt: Date.now() });
         return;
     }
 
     const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
     if (!definition) {
-        updateActivity({ ...activity, completed: true, duration });
+        updateActivity({ ...activity, completed: true, duration, completedAt: Date.now() });
         return;
     }
 
     logSubTaskTime(definition.id, duration);
-    updateActivity({ ...activity, completed: true, duration });
+    updateActivity({ ...activity, completed: true, duration, completedAt: Date.now() });
     
   }, [deepWorkDefinitions, upskillDefinitions, updateActivity, toast, getDeepWorkNodeType, getUpskillNodeType, logSubTaskTime]);
   
@@ -2919,7 +2923,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-     
-
-    
