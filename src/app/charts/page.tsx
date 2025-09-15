@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay, subDays, isSameDay } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
-import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
+import type { Stopper, Activity, DailySchedule, ActivityType, ExerciseDefinition, CoreSkill } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -122,7 +122,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                         if (value === 0 || value === null || value === undefined) return null;
                         
                         let name = p.name;
-                        if ((context === 'resistance' || context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary') && customConfig && customConfig[p.dataKey]) {
+                        if ((context === 'resistance' || context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary' || context === 'spec-trend') && customConfig && customConfig[p.dataKey]) {
                             name = customConfig[p.dataKey]?.label;
                         }
 
@@ -134,7 +134,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value.toFixed(2)} ${context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'activity-trends') ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary' || context === 'spec-trend' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'activity-trends') ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -248,98 +248,105 @@ function ChartsPageContent() {
         return data;
     }, [allWorkoutLogs]);
     
-    const { resistanceData, resistanceChartConfig } = useMemo(() => {
-        const dailyCounts: Record<string, { dateObj: Date } & Record<string, number>> = {};
-        const allStoppers: Stopper[] = [];
-        const stopperNames = new Set<string>();
-
-        habitCards.forEach(habit => {
-            (habit.urges || []).forEach(s => { allStoppers.push(s); stopperNames.add(s.text); });
-            (habit.resistances || []).forEach(s => { allStoppers.push(s); stopperNames.add(s.text); });
-        });
-        
-        allStoppers.forEach(stopper => {
-            (stopper.timestamps || []).forEach(ts => {
-                const dateKey = format(new Date(ts), 'yyyy-MM-dd');
-                if (!dailyCounts[dateKey]) {
-                    dailyCounts[dateKey] = { dateObj: parseISO(dateKey) };
-                    stopperNames.forEach(name => dailyCounts[dateKey][name] = 0);
-                };
-                dailyCounts[dateKey][stopper.text] = (dailyCounts[dateKey][stopper.text] || 0) + 1;
-            });
-        });
-
-        const data = Object.values(dailyCounts).sort((a,b) => a.dateObj.getTime() - b.dateObj.getTime()).map(d => ({ ...d, date: d.dateObj.toISOString() }));
-        
-        const config: ChartConfig = {};
-        let i = 1;
-        stopperNames.forEach(name => {
-            config[name] = { label: name, color: `hsl(var(--chart-${(i%5)+1}))` };
-            i++;
-        });
-
-        return { resistanceData: data, resistanceChartConfig: config };
-    }, [habitCards]);
+    const specializationTrendData = useMemo(() => {
+        const specializations: CoreSkill[] = coreSkills.filter(skill => skill.type === 'Specialization');
+        const allDefs: (ExerciseDefinition & {type: 'deepwork' | 'upskill'})[] = [
+            ...deepWorkLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'deepwork' as const}))),
+            ...upskillLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'upskill' as const})))
+        ];
     
-    const { specializationData, specializationChartConfig } = useMemo(() => {
-        const categoryToSpecialization: Record<string, string> = {};
-        const specializationNames = new Set<string>();
+        return specializations.map((spec, specIndex) => {
+            const microSkillIds = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.id)));
+            const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-        coreSkills
-            .filter(skill => skill.type === 'Specialization')
-            .forEach(spec => {
-                specializationNames.add(spec.name);
-                spec.skillAreas.forEach(area => {
-                    area.microSkills.forEach(ms => {
-                        categoryToSpecialization[ms.name] = spec.name;
-                    });
-                });
+            const relevantLogs = allDefs.filter(def => microSkillNames.has(def.category));
+    
+            const dailyData: Record<string, number> = {};
+    
+            relevantLogs.forEach(log => {
+                const duration = log.type === 'deepwork'
+                    ? log.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0)
+                    : log.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                
+                if (duration > 0) {
+                    if (!dailyData[log.date]) dailyData[log.date] = 0;
+                    dailyData[log.date] += duration;
+                }
             });
-
-        const dailyData: Record<string, Record<string, number>> = {};
-
-        const processLogs = (logs: typeof allUpskillLogs, isUpskill: boolean) => {
-            logs.forEach(log => {
-                log.exercises.forEach((ex: any) => {
-                    const specName = categoryToSpecialization[ex.category];
-                    if (specName) {
-                        const duration = ex.loggedDuration || 0;
-                        if (duration > 0) {
-                            if (!dailyData[log.date]) {
-                                dailyData[log.date] = {};
-                                specializationNames.forEach(name => {
-                                    dailyData[log.date][name] = 0;
-                                });
-                            }
-                            dailyData[log.date][specName] = (dailyData[log.date][specName] || 0) + duration;
+    
+            const data = Object.entries(dailyData)
+                .map(([date, minutes]) => ({
+                    date: date,
+                    hours: minutes / 60
+                }))
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+            return {
+                name: spec.name,
+                historicalData: data,
+                color: `hsl(var(--chart-${(specIndex % 5) + 1}))`
+            };
+        }).filter(spec => spec.historicalData.length > 0);
+    }, [coreSkills, allDeepWorkLogs, allUpskillLogs]);
+    
+    const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
+        const totals: Record<string, number> = {};
+        const specializations = coreSkills.filter(s => s.type === 'Specialization');
+        specializations.forEach(spec => totals[spec.name] = 0);
+    
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+    
+        specializations.forEach(spec => {
+            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
+            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
+    
+            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
+            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+    
+            let totalSpecMinutes = 0;
+    
+            if (specHoursFilter === 'all') {
+                allLeafNodesUpskill.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
+                allLeafNodesDeepWork.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
+            } else { // 'today'
+                const todaysDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
+                const todaysUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
+    
+                if (todaysUpskillLog) {
+                    allLeafNodesUpskill.forEach(leaf => {
+                        const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
+                        if (exerciseLog) {
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0); // upskill duration is in reps
                         }
-                    }
-                });
-            });
-        };
-
-        processLogs(allUpskillLogs, true);
-        processLogs(allDeepWorkLogs, false);
-
-        const data = Object.entries(dailyData)
-            .map(([date, specMinutes]) => {
-                const dataPoint: Record<string, any> = { date };
-                Object.entries(specMinutes).forEach(([specName, minutes]) => {
-                    dataPoint[specName] = minutes / 60; // Convert minutes to hours
-                });
-                return dataPoint;
-            })
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            
-        const config: ChartConfig = {};
-        let i = 1;
-        specializationNames.forEach(specName => {
-            config[specName] = { label: specName, color: `hsl(var(--chart-${(i % 5) + 1}))` };
-            i++;
+                    });
+                }
+                if (todaysDeepWorkLog) {
+                    allLeafNodesDeepWork.forEach(leaf => {
+                        const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
+                        if (exerciseLog) {
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0); // deepwork duration is in weight
+                        }
+                    });
+                }
+            }
+            totals[spec.name] = totalSpecMinutes / 60; // to hours
         });
+  
+        const summaryData = Object.entries(totals)
+            .map(([name, hours]) => ({ name, hours }))
+            .filter(d => d.hours > 0)
+            .sort((a, b) => b.hours - a.hours);
+  
+        const config: ChartConfig = {};
+        summaryData.forEach((d, i) => {
+            config[d.name] = { label: d.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
+        });
+  
+        return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
+    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
 
-        return { specializationData: data, specializationChartConfig: config };
-    }, [coreSkills, allUpskillLogs, allDeepWorkLogs]);
 
     const hourlyResistanceData = useMemo(() => {
         const log = Array.from({ length: 24 }, (_, i) => {
@@ -471,65 +478,6 @@ function ChartsPageContent() {
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
     }, [schedule, activityDurations, selectedActivityDate]);
 
-    const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
-        const totals: Record<string, number> = {};
-        const specializations = coreSkills.filter(s => s.type === 'Specialization');
-        specializations.forEach(spec => totals[spec.name] = 0);
-    
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-    
-        specializations.forEach(spec => {
-            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
-                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
-            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
-    
-            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
-                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
-            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-    
-            let totalSpecMinutes = 0;
-    
-            if (specHoursFilter === 'all') {
-                allLeafNodesUpskill.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
-                allLeafNodesDeepWork.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
-            } else { // 'today'
-                const todaysDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
-                const todaysUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
-    
-                if (todaysUpskillLog) {
-                    allLeafNodesUpskill.forEach(leaf => {
-                        const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
-                        if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0); // upskill duration is in reps
-                        }
-                    });
-                }
-                if (todaysDeepWorkLog) {
-                    allLeafNodesDeepWork.forEach(leaf => {
-                        const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
-                        if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0); // deepwork duration is in weight
-                        }
-                    });
-                }
-            }
-            totals[spec.name] = totalSpecMinutes / 60; // to hours
-        });
-  
-        const summaryData = Object.entries(totals)
-            .map(([name, hours]) => ({ name, hours }))
-            .filter(d => d.hours > 0)
-            .sort((a, b) => b.hours - a.hours);
-  
-        const config: ChartConfig = {};
-        summaryData.forEach((d, i) => {
-            config[d.name] = { label: d.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
-        });
-  
-        return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
-    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
-
-
     const allCategoriesData = useMemo(() => {
         const categoriesWithData = Object.values(activityNameMap)
             .map(category => {
@@ -563,7 +511,6 @@ function ChartsPageContent() {
         { title: "Productivity Trend", data: productivityData, config: productivityChartConfig, context: "productivity" },
         { title: "Weight Trend", data: combinedWeightData, config: weightChartConfig, context: "weight" },
         { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, context: "consistency" },
-        { title: "Specialization Trend", data: specializationData, config: specializationChartConfig, context: "specialization"},
     ];
 
     return (
@@ -573,35 +520,11 @@ function ChartsPageContent() {
                 <p className="mt-4 text-lg text-muted-foreground">Your key metrics at a glance.</p>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {chartComponents.map(({ title, data, config, context, span }) => {
+                {chartComponents.map(({ title, data, config, context }) => {
                     if (data.length < 1) return null;
 
-                    if (["Specialization Trend"].includes(title)) {
-                        const dataKeys = Object.keys(config);
-                        return (
-                            <Card key={title} className={span}>
-                                <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-                                <CardContent>
-                                    <ChartContainer config={config} className="min-h-[300px] w-full">
-                                        <ResponsiveContainer>
-                                            <LineChart data={data}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
-                                                <YAxis label={{ value: title === 'Specialization Trend' ? 'Hours' : 'Count', angle: -90, position: 'insideLeft' }} />
-                                                <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
-                                                {dataKeys.map((key, i) => (
-                                                    <Line key={key} type="monotone" dataKey={key} stroke={config[key]?.color || `hsl(var(--chart-${(i%5)+1}))`} name={config[key]?.label || key} dot={false} />
-                                                ))}
-                                            </LineChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                                </CardContent>
-                            </Card>
-                        )
-                    }
-
                     return (
-                        <Card key={title} className={span}>
+                        <Card key={title}>
                             <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
                             <CardContent>
                                 <ChartContainer config={config} className="min-h-[300px] w-full">
@@ -635,15 +558,17 @@ function ChartsPageContent() {
                     <CardContent>
                         <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
                             <ResponsiveContainer>
-                                <LineChart data={specializationHoursSummary}>
+                                <BarChart data={specializationHoursSummary} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="category" dataKey="name" />
-                                    <YAxis type="number" dataKey="hours" />
+                                    <XAxis type="number" />
+                                    <YAxis type="category" dataKey="name" width={120} />
                                     <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
-                                    {Object.keys(specHoursChartConfig).map((key) => (
-                                        <Line key={key} type="monotone" dataKey="hours" name={specHoursChartConfig[key as keyof typeof specHoursChartConfig]?.label} stroke={specHoursChartConfig[key as keyof typeof specHoursChartConfig]?.color} />
-                                    ))}
-                                </LineChart>
+                                    <Bar dataKey="hours" layout="vertical" radius={[0, 4, 4, 0]}>
+                                        {specializationHoursSummary.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
                             </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
@@ -754,6 +679,42 @@ function ChartsPageContent() {
                                                 <YAxis fontSize={10} domain={[0, 'dataMax + 10']}/>
                                                 <RechartsTooltip content={<CustomTooltip context="activity-trends" />} />
                                                 <Line type="monotone" dataKey="time" stroke={activityColorMapping[category] || 'hsl(var(--primary))'} strokeWidth={2} dot={false} />
+                                            </LineChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Not enough data for trend.</p>
+                                    </div>
+                                )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
+            <div className="mt-8">
+                <h2 className="text-2xl font-bold text-center mb-4">Specialization Trends</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {specializationTrendData.map(({ name, historicalData, color }) => (
+                        <Card key={name}>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}/>
+                                    {name}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-48 w-full">
+                                {historicalData.length > 1 ? (
+                                    <ChartContainer config={{ hours: { label: 'Hours', color: color } }} className="h-full w-full">
+                                        <ResponsiveContainer>
+                                            <LineChart data={historicalData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="date" fontSize={10} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
+                                                <YAxis fontSize={10} domain={[0, 'dataMax + 2']}/>
+                                                <RechartsTooltip content={<CustomTooltip context="spec-trend" customConfig={{'hours': {label: 'Hours'}}}/>} />
+                                                <Line type="monotone" dataKey="hours" stroke={color} strokeWidth={2} dot={false} />
                                             </LineChart>
                                         </ResponsiveContainer>
                                     </ChartContainer>
