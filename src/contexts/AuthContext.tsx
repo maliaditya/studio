@@ -284,6 +284,7 @@ interface AuthContextType {
   handleAddMicroSkill: (coreSkillId: string, areaId: string, name: string) => void;
   handleUpdateMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string, name: string) => void;
   handleDeleteMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string) => void;
+  handleToggleMicroSkillRepetition: (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => void;
 
   // Professional Experience
   companies: Company[];
@@ -1922,7 +1923,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (s.id === coreSkillId) {
         return { ...s, skillAreas: s.skillAreas.map(area => {
             if (area.id === areaId) {
-                const newMicroSkill = { id: `ms_${Date.now()}`, name: name.trim() };
+                const newMicroSkill = { id: `ms_${Date.now()}`, name: name.trim(), isReadyForRepetition: false };
                 return { ...area, microSkills: [...area.microSkills, newMicroSkill] };
             }
             return area;
@@ -1996,6 +1997,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill and all associated tasks have been removed.' });
 };
+
+  const handleToggleMicroSkillRepetition = (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => {
+    setCoreSkills(prevSkills => {
+        return prevSkills.map(skill => {
+            if (skill.id === coreSkillId) {
+                return {
+                    ...skill,
+                    skillAreas: skill.skillAreas.map(area => {
+                        if (area.id === areaId) {
+                            return {
+                                ...area,
+                                microSkills: area.microSkills.map(ms =>
+                                    ms.id === microSkillId ? { ...ms, isReadyForRepetition: isReady } : ms
+                                )
+                            };
+                        }
+                        return area;
+                    })
+                };
+            }
+            return skill;
+        });
+    });
+  };
 
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
@@ -2793,6 +2818,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     handleAddMicroSkill,
     handleUpdateMicroSkill,
     handleDeleteMicroSkill,
+    handleToggleMicroSkillRepetition,
     companies, setCompanies,
     positions, setPositions,
     purposeData, setPurposeData,

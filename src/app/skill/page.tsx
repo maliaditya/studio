@@ -103,7 +103,7 @@ const SpecializationItem: React.FC<{
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(spec.id)}>
                             <Plus className="h-4 w-4 text-green-500" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(spec)}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(spec)}><Edit className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                 </div>
@@ -153,6 +153,7 @@ function SkillPageContent() {
     handleAddMicroSkill,
     handleUpdateMicroSkill,
     handleDeleteMicroSkill,
+    handleToggleMicroSkillRepetition,
     expandedItems,
     handleExpansionChange,
     selectedDomainId, setSelectedDomainId,
@@ -382,7 +383,7 @@ function SkillPageContent() {
 
                 areaData.microSkills.forEach((microData: any) => {
                     const microSkillFolderPath = [...areaFolderPath, microData.name];
-                    const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name };
+                    const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name, isReadyForRepetition: false };
 
                     microData.curiosities.forEach((curiosityData: any) => {
                         const curiosityFolderPath = [...microSkillFolderPath, curiosityData.name];
@@ -475,7 +476,7 @@ function SkillPageContent() {
 
             microSkillsData.forEach((microData: any) => {
                 const microSkillFolderPath = [...basePath, microData.name];
-                const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name };
+                const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name, isReadyForRepetition: false };
                 
                 microData.curiosities.forEach((curiosityData: any) => {
                     const curiosityFolderPath = [...microSkillFolderPath, curiosityData.name];
@@ -1127,10 +1128,13 @@ function SkillPageContent() {
 
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
-                                                  <CardHeader className="p-3">
-                                                      <div className="flex justify-between items-start gap-2">
-                                                          <CardTitle className="text-base flex-grow">{micro.name}</CardTitle>
-                                                      </div>
+                                                  <CardHeader className="p-3 flex flex-row items-center justify-between">
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
+                                                      <Checkbox
+                                                        id={`rep-${micro.id}`}
+                                                        checked={micro.isReadyForRepetition}
+                                                        onCheckedChange={(checked) => handleToggleMicroSkillRepetition(selectedCoreSkill.id, area.id, micro.id, !!checked)}
+                                                      />
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
                                                       <div className="border-r pr-2">

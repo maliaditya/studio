@@ -443,6 +443,7 @@ export interface SkillArea {
 export interface MicroSkill {
   id: string;
   name: string;
+  isReadyForRepetition?: boolean;
 }
 
 // Project Skill Linking
@@ -689,6 +690,6 @@ export interface ActiveFocusSession {
 export interface LinkTechniqueModalState {
     isOpen: boolean;
     habitId: string;
-    stopperId: string;
+    stopper: Stopper;
     stage: 2 | 3;
 }
