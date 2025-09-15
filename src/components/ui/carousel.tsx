@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -11,14 +12,16 @@ interface CarouselProps<T> {
   items: T[]
   renderItem: (item: T) => React.ReactNode
   className?: string
+  startIndex?: number
 }
 
 export function Carousel<T>({
   items,
   renderItem,
   className,
+  startIndex = 0,
 }: CarouselProps<T>) {
-  const [currentIndex, setCurrentIndex] = React.useState(0)
+  const [currentIndex, setCurrentIndex] = React.useState(startIndex)
   const [containerHeight, setContainerHeight] = React.useState<number | "auto">("auto")
 
   // Refs for each item to measure height
@@ -26,6 +29,10 @@ export function Carousel<T>({
   React.useEffect(() => {
     itemRefs.current = itemRefs.current.slice(0, items.length)
   }, [items])
+
+  React.useEffect(() => {
+    setCurrentIndex(startIndex);
+  }, [startIndex]);
 
   // Measure and set container height when index changes
   React.useLayoutEffect(() => {

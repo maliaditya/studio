@@ -442,6 +442,11 @@ export function SmartLoggingPrompt({
   };
 
   const currentPrompt = promptType ? prompts[promptType] : null;
+  
+  const currentSlotIndex = useMemo(() => {
+    const index = slotOrder.findIndex(s => s.name === currentSlot);
+    return index === -1 ? 0 : index;
+  }, [currentSlot]);
 
   if (!currentPrompt) return null;
   
@@ -466,8 +471,11 @@ export function SmartLoggingPrompt({
                     <div className="flex-grow">
                         {promptType === 'inactive' ? (
                             <div className="h-[200px] -mx-2">
-                              <Carousel items={dailyAnalysis.carouselItems} renderItem={(item: any) => {
-                                 if (item.type === 'slot') {
+                              <Carousel
+                                items={dailyAnalysis.carouselItems}
+                                startIndex={currentSlotIndex}
+                                renderItem={(item: any) => {
+                                  if (item.type === 'slot') {
                                     return (
                                       <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
                                         <CardHeader className="p-3">
