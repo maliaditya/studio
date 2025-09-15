@@ -50,8 +50,63 @@ function AgendaWidgetItem({
     onOpenTaskContext,
     onOpenHabitPopup,
 }: AgendaWidgetItemProps) {
-  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards } = useAuth();
+  const { 
+    workoutMode, 
+    workoutPlans, 
+    exerciseDefinitions, 
+    habitCards, 
+    deepWorkDefinitions, 
+    upskillDefinitions, 
+    getDeepWorkNodeType,
+    getUpskillNodeType,
+    getDescendantLeafNodes,
+    permanentlyLoggedTaskIds,
+    getUpskillLoggedMinutesRecursive,
+    getDeepWorkLoggedMinutes,
+  } = useAuth();
   const { toast } = useToast();
+  
+  const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
+  
+  const parentTaskDefinition = useMemo(() => {
+    if (!activity.taskIds || activity.taskIds.length === 0) return null;
+    const mainDefId = activity.taskIds[0].split('-')[0];
+    return allDefs.get(mainDefId);
+  }, [activity.taskIds, allDefs]);
+  
+  const { isHighLevelTask, allSubTasksCompleted, totalLoggedMinutes } = useMemo(() => {
+    if (!parentTaskDefinition || (activity.type !== 'deepwork' && activity.type !== 'upskill')) {
+      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
+    }
+
+    const nodeType = activity.type === 'deepwork' 
+      ? getDeepWorkNodeType(parentTaskDefinition)
+      : getUpskillNodeType(parentTaskDefinition);
+    
+    const isHighLevel = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+    if (!isHighLevel) {
+      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
+    }
+
+    const leafNodes = getDescendantLeafNodes(parentTaskDefinition.id, activity.type);
+    const areAllComplete = leafNodes.length > 0 && leafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
+
+    const totalMinutes = activity.type === 'deepwork' 
+      ? getDeepWorkLoggedMinutes(parentTaskDefinition)
+      : getUpskillLoggedMinutesRecursive(parentTaskDefinition);
+
+    return { 
+      isHighLevelTask: true, 
+      allSubTasksCompleted: areAllComplete,
+      totalLoggedMinutes: totalMinutes,
+    };
+  }, [parentTaskDefinition, activity.type, getDescendantLeafNodes, permanentlyLoggedTaskIds, getDeepWorkNodeType, getUpskillNodeType, getDeepWorkLoggedMinutes, getUpskillLoggedMinutesRecursive]);
+
+  useEffect(() => {
+    if (isHighLevelTask && allSubTasksCompleted && !activity.completed) {
+      onToggleComplete(activity.slot, activity.id, true);
+    }
+  }, [isHighLevelTask, allSubTasksCompleted, activity.completed, activity.slot, activity.id, onToggleComplete]);
   
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
@@ -61,7 +116,6 @@ function AgendaWidgetItem({
 
   const linkedHabit = useMemo(() => {
     if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
-      // For simplicity, showing the first linked habit. Can be expanded later.
       return habitCards.find(h => h.id === activity.habitEquationIds![0]);
     }
     return null;
@@ -90,6 +144,13 @@ function AgendaWidgetItem({
     }
   };
   
+  let displayDuration = duration;
+  if (isHighLevelTask && totalLoggedMinutes > 0) {
+    const h = Math.floor(totalLoggedMinutes / 60);
+    const m = Math.round(totalLoggedMinutes % 60);
+    displayDuration = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + ' logged';
+  }
+  
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
       <div className="flex items-start gap-3 min-w-0 flex-grow">
@@ -103,7 +164,7 @@ function AgendaWidgetItem({
           className={cn("flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
           onClick={handleTitleClick}
         >
-          <p className={`font-medium truncate ${activity.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`} title={displayDetails}>
+          <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
             {displayDetails}
           </p>
           {linkedHabit && (
@@ -116,7 +177,7 @@ function AgendaWidgetItem({
         </div>
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
-        {duration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{duration}</p>}
+        {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
         {!activity.completed && activity.type !== 'interrupt' ? (
             <Button
                 variant="ghost"
@@ -425,4 +486,6 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+    
+
     
