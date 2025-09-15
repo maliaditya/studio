@@ -834,3 +834,4 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+
