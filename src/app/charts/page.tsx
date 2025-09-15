@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay, subDays } from 'date-fns';
+import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay, subDays, isSameDay } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
@@ -448,7 +448,7 @@ function ChartsPageContent() {
             config[name] = { label: name, color: activityColorMapping[name] };
         });
 
-        return { hourlyActivityData, hourlyActivityConfig: config };
+        return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
     }, [schedule, activityDurations, activityFilter, lastXDaysActivity]);
 
 
