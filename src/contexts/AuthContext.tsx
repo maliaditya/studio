@@ -966,7 +966,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!isLoadingState) {
         setLocalChangeCount(prev => prev + 1);
     }
-  }, [isLoadingState, schedule, settings, dailyPurposes, topPriorities, brainHacks]);
+  }, [isLoadingState, schedule, settings, dailyPurposes, topPriorities, brainHacks, activeFocusSession]);
   
   useEffect(() => {
     if (!isLoadingState && localChangeCount > 0) {
@@ -980,6 +980,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return () => clearTimeout(handler);
     }
   }, [localChangeCount, isLoadingState, saveState, settings.autoPush, settings.autoPushLimit, currentUser]);
+
+  // Special effect to save state on unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+        saveState();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [saveState]);
 
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
@@ -1054,13 +1065,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPipState(uiData.pipState || { isOpen: false, position: { x: 0, y: 0 }, size: { width: 448, height: 252 } });
     
     if (uiData.activeFocusSession) {
-      const restoredSession: ActiveFocusSession = uiData.activeFocusSession;
-      if (restoredSession.state === 'running') {
-          const timeElapsedSinceSave = (Date.now() - restoredSession.startTime) / 1000;
-          const newSecondsLeft = Math.max(0, restoredSession.totalSeconds - timeElapsedSinceSave);
-          restoredSession.secondsLeft = newSecondsLeft;
-      }
-      setActiveFocusSession(restoredSession);
+        const restoredSession: ActiveFocusSession = uiData.activeFocusSession;
+        if (restoredSession.state === 'running') {
+            const timeElapsedSinceSave = (Date.now() - restoredSession.startTime) / 1000;
+            const newSecondsLeft = Math.max(0, restoredSession.totalSeconds - timeElapsedSinceSave);
+            restoredSession.secondsLeft = newSecondsLeft;
+        }
+        setActiveFocusSession(restoredSession);
     } else {
         setActiveFocusSession(null);
     }
@@ -2915,7 +2926,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [activeFocusSession?.state, setActiveFocusSession]);
+  }, [activeFocusSession?.state]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -2940,3 +2951,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 }
 
      
+
+    
