@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { format, isBefore, parseISO, startOfDay, subDays } from 'date-fns';
+import { format, isBefore, parseISO, startOfDay, subDays, getHours } from 'date-fns';
 import { Carousel } from './ui/carousel';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -308,48 +308,50 @@ export function SmartLoggingPrompt({
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
   
     const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { name: string, startHour: number, endHour: number }) => {
-        const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
-            hour: slot.startHour + i,
-            name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
-            minutes: 0,
-            tasks: []
-        }));
-    
-        const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-        activities.filter(a => a.completed).forEach(activity => {
-            const start = activity.focusSessionInitialStartTime;
-            const end = activity.focusSessionEndTime;
-            if (start && end) {
-                let current = new Date(start);
-                while (current < new Date(end)) {
-                    const currentHour = current.getHours();
-                    const nextHour = new Date(current);
-                    nextHour.setHours(currentHour + 1, 0, 0, 0);
-    
-                    const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
-                    const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
-                    
-                    const hourIndex = currentHour - slot.startHour;
-                    if (hourIndex >= 0 && hourIndex < hourlyData.length) {
-                        hourlyData[hourIndex].minutes += minutesInHour;
-                        if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
-                            hourlyData[hourIndex].tasks.push(activity.details);
-                        }
-                    }
-                    current = nextHour;
-                }
-            } else if (activity.duration) {
-                // Simplified: distribute duration evenly if no timestamps
-                const durationPerHour = activity.duration / (slot.endHour - slot.startHour);
+      const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+          hour: slot.startHour + i,
+          name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
+          minutes: 0,
+          tasks: []
+      }));
+  
+      const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+      activities.filter(a => a.completed).forEach(activity => {
+          const start = activity.focusSessionInitialStartTime;
+          const end = activity.focusSessionEndTime;
+          if (start && end) {
+              let current = new Date(start);
+              while (current < new Date(end)) {
+                  const currentHour = current.getHours();
+                  const nextHour = new Date(current);
+                  nextHour.setHours(currentHour + 1, 0, 0, 0);
+  
+                  const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
+                  const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
+                  
+                  const hourIndex = currentHour - slot.startHour;
+                  if (hourIndex >= 0 && hourIndex < hourlyData.length && minutesInHour > 0) {
+                      hourlyData[hourIndex].minutes += minutesInHour;
+                      if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
+                          hourlyData[hourIndex].tasks.push(activity.details);
+                      }
+                  }
+                  current = nextHour;
+              }
+          } else if (activity.duration) {
+              const hoursInSlot = slot.endHour - slot.startHour;
+              if (hoursInSlot > 0) {
+                const durationPerHour = activity.duration / hoursInSlot;
                 hourlyData.forEach(hourData => {
                     hourData.minutes += durationPerHour;
                      if (!hourData.tasks.includes(activity.details)) {
                         hourData.tasks.push(activity.details);
                     }
                 });
-            }
-        });
-        return hourlyData;
+              }
+          }
+      });
+      return hourlyData;
     };
   
     const slotAnalyses = slotOrder.map(slot => {
