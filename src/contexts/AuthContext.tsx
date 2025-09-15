@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -806,6 +807,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [activityDurations]);
   
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const today = format(new Date(), 'yyyy-MM-dd');
     const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
     const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
     
@@ -814,6 +816,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return {
                 ...def,
                 loggedDuration: (def.loggedDuration || 0) + durationMinutes,
+                last_logged_date: today,
             };
         }
         return def;

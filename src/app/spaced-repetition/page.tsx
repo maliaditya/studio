@@ -1,42 +1,22 @@
 
 "use client";
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { Lightbulb, BookCopy } from 'lucide-react';
-import { format, parseISO, max } from 'date-fns';
+import { BookCopy, Lightbulb } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import type { ExerciseDefinition } from '@/types/workout';
 
 function SpacedRepetitionPageContent() {
   const { 
     deepWorkDefinitions, 
-    allDeepWorkLogs, 
     getDeepWorkNodeType, 
     coreSkills, 
-    getDescendantLeafNodes,
     getDeepWorkLoggedMinutes 
   } = useAuth();
-
-  const [lastLoggedDateMap, setLastLoggedDateMap] = useState<Map<string, Date>>(new Map());
-
-  useEffect(() => {
-    const newMap = new Map<string, Date>();
-    allDeepWorkLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          const logDate = parseISO(log.date);
-          const existingDate = newMap.get(ex.definitionId);
-          if (!existingDate || logDate > existingDate) {
-            newMap.set(ex.definitionId, logDate);
-          }
-        }
-      });
-    });
-    setLastLoggedDateMap(newMap);
-  }, [allDeepWorkLogs]);
 
   const microSkillsForRepetition = useMemo(() => {
     const repetitionSkills = coreSkills
@@ -50,25 +30,13 @@ function SpacedRepetitionPageContent() {
         
         return {
             ...skill,
-            intentions: associatedIntentions.map(intention => {
-                const totalLoggedMinutes = getDeepWorkLoggedMinutes(intention);
-
-                const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
-                const logDates = leafNodes
-                    .map(leaf => lastLoggedDateMap.get(leaf.id))
-                    .filter((date): date is Date => !!date);
-                
-                const mostRecentDate = logDates.length > 0 ? max(logDates) : null;
-                
-                return {
-                    ...intention,
-                    totalLoggedMinutes,
-                    lastLoggedDate: mostRecentDate ? format(mostRecentDate, 'MMM d, yyyy') : null,
-                };
-            })
+            intentions: associatedIntentions.map(intention => ({
+                ...intention,
+                totalLoggedMinutes: getDeepWorkLoggedMinutes(intention),
+            }))
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes, getDeepWorkLoggedMinutes, lastLoggedDateMap]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes < 1) return "0m";
@@ -83,11 +51,11 @@ function SpacedRepetitionPageContent() {
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold tracking-tight text-primary">Spaced Repetition</h1>
         <p className="mt-4 text-lg text-muted-foreground">
-          Review your logged Intentions and marked micro-skills to reinforce your knowledge.
+          Review your marked micro-skills and their associated high-level intentions.
         </p>
       </div>
       
-      {microSkillsForRepetition.length > 0 && (
+      {microSkillsForRepetition.length > 0 ? (
         <div>
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><BookCopy className="h-6 w-6 text-blue-500" />Micro-Skills for Repetition</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -109,8 +77,8 @@ function SpacedRepetitionPageContent() {
                                         <Badge variant="secondary">{formatMinutes(intention.totalLoggedMinutes)}</Badge>
                                       )}
                                     </div>
-                                    {intention.lastLoggedDate && (
-                                      <p className="text-xs text-muted-foreground mt-1">Last logged: {intention.lastLoggedDate}</p>
+                                    {intention.last_logged_date && (
+                                      <p className="text-xs text-muted-foreground mt-1">Last logged: {format(parseISO(intention.last_logged_date), 'MMM d, yyyy')}</p>
                                     )}
                                   </li>
                                 ))}
@@ -124,9 +92,7 @@ function SpacedRepetitionPageContent() {
                 ))}
             </div>
         </div>
-      )}
-
-      {microSkillsForRepetition.length === 0 && (
+      ) : (
         <Card className="mt-8">
             <CardContent className="p-8 text-center text-muted-foreground">
                 <p>You haven't marked any "Micro-Skills" for repetition yet.</p>

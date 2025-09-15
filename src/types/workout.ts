@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -57,6 +58,7 @@ export interface ExerciseDefinition {
   iconUrl?: string;
   estimatedDuration?: number; // Total minutes
   loggedDuration?: number; // Total minutes logged for this specific task
+  last_logged_date?: string; // New field: yyyy-MM-dd
   decompositionData?: { id: string; text: string, type: 'text' }[];
   focusAreaIds?: string[];
   sourceUpskillId?: string;
