@@ -247,136 +247,14 @@ const TruthSection = React.memo(({ habit }: { habit: Resource }) => {
 });
 TruthSection.displayName = 'TruthSection';
 
-const slotOrder: { name: string; time: string; endHour: number }[] = [
-    { name: 'Late Night', time: '12am–4am', endHour: 4 },
-    { name: 'Dawn', time: '4am–8am', endHour: 8 },
-    { name: 'Morning', time: '8am–12pm', endHour: 12 },
-    { name: 'Afternoon', time: '12pm–4pm', endHour: 16 },
-    { name: 'Evening', time: '4pm–8pm', endHour: 20 },
-    { name: 'Night', time: '8pm–12am', endHour: 24 }
+const slotOrder: { name: string; time: string; endHour: number, startHour: number }[] = [
+    { name: 'Late Night', time: '12am–4am', endHour: 4, startHour: 0 },
+    { name: 'Dawn', time: '4am–8am', endHour: 8, startHour: 4 },
+    { name: 'Morning', time: '8am–12pm', endHour: 12, startHour: 8 },
+    { name: 'Afternoon', time: '12pm–4pm', endHour: 16, startHour: 12 },
+    { name: 'Evening', time: '4pm–8pm', endHour: 20, startHour: 16 },
+    { name: 'Night', time: '8pm–12am', endHour: 24, startHour: 20 }
 ];
-
-const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }: {
-    analysis: any,
-    isOpen: boolean,
-    onOpenChange: (open: boolean) => void,
-    getLoggedMinutes: (activity: ActivityType, dateKey: string) => number
-}) => {
-
-    const renderSlotContent = (item: any) => {
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const activitiesInSlot = (analysis.schedule[todayKey]?.[item.name] as ActivityType[] || [])
-            .filter(a => a.completed)
-            .map(a => ({
-                name: a.details,
-                duration: getLoggedMinutes(a, todayKey)
-            }))
-            .filter(a => a.duration > 0);
-        
-        const historicalData = (item.historicalData || []).map((d: any) => ({
-            ...d,
-            date: format(parseISO(d.date), 'MMM d')
-        }));
-        
-        return (
-            <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
-                <div className="grid grid-cols-2 gap-4 text-center">
-                    <div>
-                        <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
-                        <p className="text-xs text-muted-foreground">Minutes Logged</p>
-                    </div>
-                    <div>
-                        <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
-                        <p className="text-xs text-muted-foreground">Minutes Untracked</p>
-                    </div>
-                </div>
-                <div className="pt-2 border-t text-xs">
-                    <h4 className="font-semibold mb-1">Planned:</h4>
-                    <p className="text-muted-foreground">{item.plannedTasks}</p>
-                </div>
-                {historicalData.length > 1 ? (
-                    <div className="h-40 -mx-4 -mb-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={historicalData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <XAxis dataKey="date" fontSize={10} />
-                                <YAxis fontSize={10} />
-                                <Tooltip
-                                    content={({ active, payload, label }) => {
-                                        if (active && payload && payload.length) {
-                                            const data = payload[0].payload;
-                                            return (
-                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
-                                                    <p>{format(parseISO(data.fullDate), 'PPP')}</p>
-                                                    <p>Time: {data.time} min</p>
-                                                </div>
-                                            );
-                                        }
-                                        return null;
-                                    }}
-                                />
-                                <Line type="monotone" dataKey="time" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                ) : (
-                    activitiesInSlot.length > 0 && (
-                        <div className="pt-2 border-t text-xs">
-                            <h4 className="font-semibold mb-1">Completed:</h4>
-                            <ul>
-                                {activitiesInSlot.map((act, i) => <li key={i}>{act.name} ({act.duration}m)</li>)}
-                            </ul>
-                        </div>
-                    )
-                )}
-                <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                    {item.insight}
-                </blockquote>
-            </CardContent>
-        );
-    }
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Daily Time Analysis</DialogTitle>
-                    <DialogDescription>
-                        Here's a breakdown of how your time was spent today.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="h-[60vh]">
-                    <Carousel
-                        items={analysis.carouselItems}
-                        renderItem={(item) => (
-                            <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
-                                <CardHeader className="p-3">
-                                    <CardTitle className="text-base">{item.type === 'slot' ? `🕒 ${item.name}` : `📊 Daily Summary`}</CardTitle>
-                                </CardHeader>
-                                {item.type === 'slot' ? renderSlotContent(item) : (
-                                    <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
-                                        <div className="grid grid-cols-2 gap-4 text-center">
-                                            <div>
-                                                <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
-                                                <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
-                                                <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
-                                            </div>
-                                        </div>
-                                         <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                                            {item.insight}
-                                        </blockquote>
-                                    </CardContent>
-                                )}
-                            </Card>
-                        )}
-                    />
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
-};
 
 
 export function SmartLoggingPrompt({ 
@@ -396,133 +274,81 @@ export function SmartLoggingPrompt({
     habitCards,
     mechanismCards,
     schedule,
-    allUpskillLogs,
-    allDeepWorkLogs,
-    allWorkoutLogs,
-    allLeadGenLogs,
-    brandingLogs
+    getDescendantLeafNodes,
+    permanentlyLoggedTaskIds
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
 
-  const getLoggedMinutes = useCallback((activity: ActivityType, dateKey: string): number => {
+  const getLoggedMinutes = useCallback((activity: ActivityType): number => {
     if (!activity.completed) return 0;
-  
-    const activityTaskIds = new Set(activity.taskIds || []);
-    
-    let logs: DatedWorkout[] = [];
-    let durationField: 'reps' | 'weight' | null = null;
-    let isWorkout = false;
-  
-    switch (activity.type) {
-      case 'upskill':
-        logs = allUpskillLogs;
-        durationField = 'reps';
-        break;
-      case 'deepwork':
-      case 'branding':
-      case 'lead-generation':
-        logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
-        durationField = 'weight'; 
-        break;
-      case 'workout':
-        logs = allWorkoutLogs;
-        isWorkout = true;
-        break;
-      default:
-        return activity.duration || 0;
-    }
-  
-    if (activityTaskIds.size === 0) {
-      return activity.duration || 0;
-    }
 
-    const logForDay = logs.find(l => l.date === dateKey);
-    if (!logForDay) return 0;
-  
-    return logForDay.exercises
-      .filter(ex => activityTaskIds.has(ex.id))
-      .reduce((sum, ex) => {
-        return sum + (ex.loggedSets || []).reduce((setSum, set) => {
-          if (isWorkout) {
-            return setSum + 15;
-          }
-          return setSum + (set[durationField!] || 0);
-        }, 0);
-      }, 0);
-  }, [allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs]);
+    let totalMinutes = 0;
+    if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+        const pauses = activity.focusSessionPauses || [];
+        const totalPauseMs = pauses.reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+        totalMinutes = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime - totalPauseMs) / 60000;
+    } else if (activity.duration) {
+        totalMinutes = activity.duration;
+    }
+    return Math.round(totalMinutes);
+  }, []);
   
   const dailyAnalysis = useMemo(() => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
 
-    let totalLogged = 0;
-
     const slotAnalyses = slotOrder.map(slot => {
         const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-        const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task, todayKey), 0);
         
-        totalLogged += loggedTime;
-        const now = new Date();
-        const isPastDay = isBefore(startOfDay(parseISO(todayKey)), startOfDay(now));
-        const isPastSlot = isPastDay || now.getHours() >= slot.endHour;
+        const hourlyData = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+            hour: slot.startHour + i,
+            name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
+            minutes: 0,
+            tasks: [] as string[]
+        }));
 
-        const wastedTime = isPastSlot ? Math.max(0, 240 - loggedTime) : 0;
-        
-        const plannedTaskDetails = activities.map(a => a.details).join(', ') || 'None';
-        
-        const historicalData = activities.length > 0 ? Object.entries(schedule)
-            .map(([date, dailySchedule]) => {
-                let dailyTotalForCategory = 0;
-                activities.forEach(activity => {
-                    const activityInHistory = (dailySchedule[slot.name as keyof DailySchedule] as ActivityType[])?.find(a => a.details === activity.details && a.type === activity.type && a.completed);
-                    if (activityInHistory) {
-                        dailyTotalForCategory += getLoggedMinutes(activityInHistory, date);
+        activities.filter(a => a.completed).forEach(activity => {
+            const start = activity.focusSessionInitialStartTime;
+            const end = activity.focusSessionEndTime;
+            if (start && end) {
+                let current = new Date(start);
+                while (current < new Date(end)) {
+                    const currentHour = current.getHours();
+                    const nextHour = new Date(current);
+                    nextHour.setHours(currentHour + 1, 0, 0, 0);
+
+                    const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
+                    const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
+                    
+                    const hourIndex = hourlyData.findIndex(h => h.hour === currentHour);
+                    if (hourIndex > -1 && minutesInHour > 0) {
+                        hourlyData[hourIndex].minutes += minutesInHour;
+                        if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
+                            hourlyData[hourIndex].tasks.push(activity.details);
+                        }
                     }
-                });
-                return { date, fullDate: date, time: dailyTotalForCategory };
-            })
-            .filter(item => item.time > 0)
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
+                    current = nextHour;
+                }
+            }
+        });
 
-
-        let insight = "";
-        const loggedHours = Math.floor(loggedTime / 60);
-        const wastedHours = Math.floor(wastedTime / 60);
-
-        if (!isPastSlot) {
-           insight = slot.name === currentSlot ? `This block is active. You have ${240 - loggedTime} min remaining to make an impact.` : "This slot is upcoming. Plan it wisely.";
-        } else if (loggedTime === 0) {
-          insight = "You let the whole block slip away—4 hours drifted without return.";
-        } else if (loggedTime < 180) { // Less than 3 hours
-          insight = `You gained ${loggedHours > 0 ? `${loggedHours} hour${loggedHours > 1 ? 's' : ''} of value` : `${loggedTime} minutes of value`}, but ${wastedHours > 0 ? `${wastedHours} hour${wastedHours > 1 ? 's' : ''}`: `${wastedTime} minutes`} were untracked.`;
-        } else if (loggedTime < 240) { // 3-4 hours
-          insight = "Strong effort: most of the hours worked for you, only a little escaped.";
-        } else { // 4+ hours
-          insight = "Full power—every minute of this block was captured. Nothing wasted.";
-        }
+        const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task), 0);
+        
+        const now = new Date();
+        const isPastSlot = now.getHours() >= slot.endHour;
 
         return {
             type: 'slot' as const,
             name: slot.name,
             time: slot.time,
-            plannedTasks: plannedTaskDetails,
             loggedTime: loggedTime,
-            wastedTime: wastedTime,
-            insight: insight,
-            historicalData: historicalData,
+            hourlyData: hourlyData,
         };
     });
 
-    const totalWasted = slotAnalyses.reduce((sum, s) => sum + s.wastedTime, 0);
-    const summaryInsight = `You've invested ${totalLogged} minutes in focused work today${totalWasted > 0 ? `, while ${totalWasted} minutes were unallocated` : ''}. Keep the momentum going.`;
-
     return {
-        schedule, // Pass the whole schedule object through
-        carouselItems: [
-            ...slotAnalyses,
-            { type: 'summary' as const, totalLogged, totalWasted, insight: summaryInsight }
-        ]
+        carouselItems: slotAnalyses
     };
   }, [schedule, currentSlot, getLoggedMinutes]);
 
@@ -569,7 +395,7 @@ export function SmartLoggingPrompt({
       title: "Today's Analysis",
       description: "You have tasks scheduled. Ready to start a focus session?",
        actions: [
-        { label: "Full Review", onClick: () => setIsReviewOpen(true) },
+        // This button is effectively removed by not rendering it.
        ]
     },
     completed: {
@@ -618,53 +444,37 @@ export function SmartLoggingPrompt({
                                     return (
                                       <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
                                         <CardHeader className="p-3">
-                                          <CardTitle className="text-base">🕒 {item.name} <span className="text-sm font-normal text-muted-foreground">({item.time})</span></CardTitle>
+                                          <CardTitle className="text-base">🕒 {item.name}</CardTitle>
                                         </CardHeader>
-                                        <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
-                                          <div className="grid grid-cols-2 gap-4 text-center">
-                                              <div>
-                                                  <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
-                                                  <p className="text-xs text-muted-foreground">Minutes Logged</p>
-                                              </div>
-                                              <div>
-                                                  <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
-                                                  <p className="text-xs text-muted-foreground">Minutes Untracked</p>
-                                              </div>
-                                          </div>
-                                          <div className="pt-2 border-t text-xs">
-                                              <h4 className="font-semibold mb-1">Planned:</h4>
-                                              <p className="text-muted-foreground">{item.plannedTasks}</p>
-                                          </div>
-                                          <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                                              {item.insight}
-                                          </blockquote>
+                                        <CardContent className="p-3 pt-0 flex-grow">
+                                            <div className="h-full w-full">
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={item.hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
+                                                        <XAxis dataKey="name" fontSize={9} interval={0} />
+                                                        <YAxis fontSize={9} />
+                                                        <Tooltip 
+                                                          content={({ active, payload, label }) => {
+                                                            if (active && payload && payload.length) {
+                                                              const data = payload[0].payload;
+                                                              return (
+                                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                                  <p className="font-bold">{label}: {data.minutes.toFixed(0)} min</p>
+                                                                  <ul className="list-disc list-inside">
+                                                                    {data.tasks.map((task: string, i: number) => <li key={i}>{task}</li>)}
+                                                                  </ul>
+                                                                </div>
+                                                              )
+                                                            }
+                                                            return null;
+                                                          }}
+                                                        />
+                                                        <Line type="monotone" dataKey="minutes" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            </div>
                                         </CardContent>
                                       </Card>
                                     );
-                                }
-                                if (item.type === 'summary') {
-                                    return (
-                                        <Card className="h-full flex flex-col justify-between bg-muted/30 border-0 shadow-none">
-                                            <CardHeader className="p-3">
-                                                <CardTitle className="text-base">📊 Daily Summary</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="p-3 pt-0 text-sm space-y-3">
-                                                 <div className="grid grid-cols-2 gap-4 text-center">
-                                                    <div>
-                                                        <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
-                                                        <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
-                                                        <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
-                                                    </div>
-                                                </div>
-                                                 <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                                                    {item.insight}
-                                                </blockquote>
-                                            </CardContent>
-                                        </Card>
-                                    )
                                 }
                                 return null;
                               }} />
@@ -733,9 +543,6 @@ export function SmartLoggingPrompt({
         </div>
       )}
     </AnimatePresence>
-    <DailyReviewDialog analysis={dailyAnalysis} isOpen={isReviewOpen} onOpenChange={setIsReviewOpen} getLoggedMinutes={getLoggedMinutes} />
     </>
   );
 }
-
-    
