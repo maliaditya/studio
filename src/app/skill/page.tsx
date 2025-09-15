@@ -1400,5 +1400,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
