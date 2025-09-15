@@ -19,6 +19,7 @@ import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 import { Carousel } from './ui/carousel';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -257,50 +258,110 @@ const slotOrder: { name: string; time: string; endHour: number }[] = [
     { name: 'Night', time: '8pm–12am', endHour: 24 }
 ];
 
-const DailyReviewDialog = ({ analysis, isOpen, onOpenChange }: { analysis: any, isOpen: boolean, onOpenChange: (open: boolean) => void }) => (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>Daily Time Analysis</DialogTitle>
-                <DialogDescription>
-                    Here's a breakdown of how your time was spent today.
-                </DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="h-96 pr-4">
-                <div className="space-y-4 py-4">
-                    {analysis.carouselItems.map((item: any, index: number) => {
-                        if (item.type === 'slot') {
-                            return (
-                                <div key={index}>
-                                    <h4 className="font-semibold">{item.name} ({item.time})</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Logged: {item.loggedTime} min | Untracked: {item.wastedTime} min
-                                    </p>
-                                    <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
-                                        {item.insight}
-                                    </blockquote>
-                                </div>
-                            );
-                        } else if (item.type === 'summary') {
-                             return (
-                                <div key="summary" className="pt-4 border-t">
-                                    <h4 className="font-semibold">Daily Summary</h4>
-                                    <p className="text-sm text-muted-foreground">
-                                        Total Logged: {item.totalLogged} min | Total Untracked: {item.totalWasted} min
-                                    </p>
-                                     <blockquote className="mt-2 pl-2 border-l-2 text-sm italic">
-                                        {item.insight}
-                                    </blockquote>
-                                </div>
-                            );
-                        }
-                        return null;
-                    })}
+const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }: {
+    analysis: any,
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    getLoggedMinutes: (activity: ActivityType, dateKey: string) => number
+}) => {
+
+    const renderSlotContent = (item: any) => {
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        const activitiesInSlot = (analysis.schedule[todayKey]?.[item.name] as ActivityType[] || [])
+            .filter(a => a.completed)
+            .map(a => ({
+                name: a.details,
+                duration: getLoggedMinutes(a, todayKey)
+            }))
+            .filter(a => a.duration > 0);
+
+        return (
+            <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
+                <div className="grid grid-cols-2 gap-4 text-center">
+                    <div>
+                        <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
+                        <p className="text-xs text-muted-foreground">Minutes Logged</p>
+                    </div>
+                    <div>
+                        <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
+                        <p className="text-xs text-muted-foreground">Minutes Untracked</p>
+                    </div>
                 </div>
-            </ScrollArea>
-        </DialogContent>
-    </Dialog>
-);
+                {activitiesInSlot.length > 0 && (
+                    <div className="h-40">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={activitiesInSlot} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                                <XAxis type="number" hide />
+                                <YAxis type="category" dataKey="name" hide />
+                                <Tooltip
+                                    cursor={{ fill: "hsl(var(--muted))" }}
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            return (
+                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
+                                                    <p className="font-bold">{data.name}</p>
+                                                    <p className="text-muted-foreground">{data.duration} minutes</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Bar dataKey="duration" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                )}
+                <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                    {item.insight}
+                </blockquote>
+            </CardContent>
+        );
+    }
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Daily Time Analysis</DialogTitle>
+                    <DialogDescription>
+                        Here's a breakdown of how your time was spent today.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="h-[60vh]">
+                    <Carousel
+                        items={analysis.carouselItems}
+                        renderItem={(item) => (
+                            <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
+                                <CardHeader className="p-3">
+                                    <CardTitle className="text-base">{item.type === 'slot' ? `🕒 ${item.name}` : `📊 Daily Summary`}</CardTitle>
+                                </CardHeader>
+                                {item.type === 'slot' ? renderSlotContent(item) : (
+                                    <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
+                                        <div className="grid grid-cols-2 gap-4 text-center">
+                                            <div>
+                                                <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
+                                                <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
+                                                <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
+                                            </div>
+                                        </div>
+                                        <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                                            {item.insight}
+                                        </blockquote>
+                                    </CardContent>
+                                )}
+                            </Card>
+                        )}
+                    />
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 
 export function SmartLoggingPrompt({ 
@@ -369,8 +430,7 @@ export function SmartLoggingPrompt({
       .reduce((sum, ex) => {
         return sum + (ex.loggedSets || []).reduce((setSum, set) => {
           if (isWorkout) {
-            // This is a placeholder for a more complex duration calculation for workouts
-            return setSum + 15; // Assume 15 min per logged workout set for now
+            return setSum + 15;
           }
           return setSum + (set[durationField!] || 0);
         }, 0);
@@ -427,12 +487,14 @@ export function SmartLoggingPrompt({
     const summaryInsight = `You've invested ${totalLogged} minutes in focused work today${totalWasted > 0 ? `, while ${totalWasted} minutes were unallocated` : ''}. Keep the momentum going.`;
 
     return {
+        schedule, // Pass the whole schedule object through
         carouselItems: [
             ...slotAnalyses,
             { type: 'summary' as const, totalLogged, totalWasted, insight: summaryInsight }
         ]
     };
   }, [schedule, currentSlot, getLoggedMinutes]);
+
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
   
@@ -499,62 +561,6 @@ export function SmartLoggingPrompt({
 
   if (!currentPrompt) return null;
   
-  const renderCarouselItem = (item: any) => {
-    if (item.type === 'slot') {
-        return (
-          <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
-            <CardHeader className="p-3">
-              <CardTitle className="text-base">🕒 {item.name} <span className="text-sm font-normal text-muted-foreground">({item.time})</span></CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                  <div>
-                      <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
-                      <p className="text-xs text-muted-foreground">Minutes Logged</p>
-                  </div>
-                  <div>
-                      <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
-                      <p className="text-xs text-muted-foreground">Minutes Untracked</p>
-                  </div>
-              </div>
-              <div>
-                  <p className="font-semibold text-xs text-foreground">Planned:</p>
-                  <p className="text-xs text-muted-foreground truncate" title={item.plannedTasks}>{item.plannedTasks}</p>
-              </div>
-              <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                  {item.insight}
-              </blockquote>
-            </CardContent>
-          </Card>
-        );
-    }
-    if (item.type === 'summary') {
-        return (
-            <Card className="h-full flex flex-col justify-between bg-muted/30 border-0 shadow-none">
-                <CardHeader className="p-3">
-                    <CardTitle className="text-base">📊 Daily Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0 text-sm space-y-3">
-                     <div className="grid grid-cols-2 gap-4 text-center">
-                        <div>
-                            <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
-                            <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
-                        </div>
-                        <div>
-                            <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
-                            <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
-                        </div>
-                    </div>
-                     <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
-                        {item.insight}
-                    </blockquote>
-                </CardContent>
-            </Card>
-        )
-    }
-    return null;
-  }
-
   return (
     <>
     <AnimatePresence>
@@ -576,7 +582,57 @@ export function SmartLoggingPrompt({
                     <div className="flex-grow">
                         {promptType === 'inactive' ? (
                             <div className="h-48 -mx-2">
-                              <Carousel items={dailyAnalysis.carouselItems} renderItem={renderCarouselItem} />
+                              <Carousel items={dailyAnalysis.carouselItems} renderItem={(item: any) => {
+                                 if (item.type === 'slot') {
+                                    return (
+                                      <Card className="h-full flex flex-col bg-muted/30 border-0 shadow-none">
+                                        <CardHeader className="p-3">
+                                          <CardTitle className="text-base">🕒 {item.name} <span className="text-sm font-normal text-muted-foreground">({item.time})</span></CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
+                                          <div className="grid grid-cols-2 gap-4 text-center">
+                                              <div>
+                                                  <p className="font-bold text-lg text-green-500">{item.loggedTime}</p>
+                                                  <p className="text-xs text-muted-foreground">Minutes Logged</p>
+                                              </div>
+                                              <div>
+                                                  <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
+                                                  <p className="text-xs text-muted-foreground">Minutes Untracked</p>
+                                              </div>
+                                          </div>
+                                          <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                                              {item.insight}
+                                          </blockquote>
+                                        </CardContent>
+                                      </Card>
+                                    );
+                                }
+                                if (item.type === 'summary') {
+                                    return (
+                                        <Card className="h-full flex flex-col justify-between bg-muted/30 border-0 shadow-none">
+                                            <CardHeader className="p-3">
+                                                <CardTitle className="text-base">📊 Daily Summary</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-3 pt-0 text-sm space-y-3">
+                                                 <div className="grid grid-cols-2 gap-4 text-center">
+                                                    <div>
+                                                        <p className="font-bold text-lg text-green-500">{item.totalLogged}</p>
+                                                        <p className="text-xs text-muted-foreground">Total Minutes Logged</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-lg text-orange-500">{item.totalWasted}</p>
+                                                        <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
+                                                    </div>
+                                                </div>
+                                                 <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                                                    {item.insight}
+                                                </blockquote>
+                                            </CardContent>
+                                        </Card>
+                                    )
+                                }
+                                return null;
+                              }} />
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground w-full flex-shrink-0">{currentPrompt.description}</p>
@@ -642,7 +698,7 @@ export function SmartLoggingPrompt({
         </div>
       )}
     </AnimatePresence>
-    <DailyReviewDialog analysis={dailyAnalysis} isOpen={isReviewOpen} onOpenChange={setIsReviewOpen} />
+    <DailyReviewDialog analysis={dailyAnalysis} isOpen={isReviewOpen} onOpenChange={setIsReviewOpen} getLoggedMinutes={getLoggedMinutes} />
     </>
   );
 }
