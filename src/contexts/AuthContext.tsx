@@ -888,6 +888,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
   
+  useEffect(() => {
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    
+    const checkAndUpdateSchedule = () => {
+        setSchedule(currentSchedule => {
+            let scheduleChanged = false;
+            const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
+
+            Object.keys(newSchedule).forEach(dateKey => {
+                Object.keys(newSchedule[dateKey]).forEach(slotName => {
+                    const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                    if (Array.isArray(activities)) {
+                        activities.forEach((activity, index) => {
+                            if (!activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill')) {
+                                const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+                                const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+                                
+                                if (mainDef) {
+                                    const nodeType = activity.type === 'upskill' ? getUpskillNodeType(mainDef) : getDeepWorkNodeType(mainDef);
+                                    if (['Intention', 'Curiosity', 'Objective'].includes(nodeType)) {
+                                        const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
+                                        if (leafNodes.length > 0 && leafNodes.every(leaf => permanentlyLoggedTaskIds.has(leaf.id))) {
+                                            newSchedule[dateKey][slotName][index].completed = true;
+                                            scheduleChanged = true;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+
+            return scheduleChanged ? newSchedule : currentSchedule;
+        });
+    };
+    
+    checkAndUpdateSchedule();
+
+  }, [permanentlyLoggedTaskIds, schedule, setSchedule, deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes]);
+
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     // If it has sub-tasks, handle it like an objective
     if (activity.subTasks && activity.subTasks.length > 0) {
@@ -1058,9 +1099,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             clearTimeout(handler);
         };
     }
-  }, [
-    isLoadingState, saveState, schedule // Added schedule to the dependency array
-  ]);
+  }, [isLoadingState, saveState, schedule]);
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
     setIsLoadingState(true);
@@ -2968,6 +3007,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 }
 
     
+
 
 
 

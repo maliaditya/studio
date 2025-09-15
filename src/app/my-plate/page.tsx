@@ -205,15 +205,15 @@ function MyPlatePageContent() {
     const visited = new Set<string>();
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
 
-    function recurse(d: ExerciseDefinition) {
-        if (visited.has(d.id)) return;
-        visited.add(d.id);
+    function recurse(currentDef: ExerciseDefinition) {
+        if (!currentDef || visited.has(currentDef.id)) return;
+        visited.add(currentDef.id);
   
-        const deepWorkChildren = d.linkedDeepWorkIds || [];
-        const upskillChildren = d.linkedUpskillIds || [];
+        const deepWorkChildren = currentDef.linkedDeepWorkIds || [];
+        const upskillChildren = currentDef.linkedUpskillIds || [];
 
         if (deepWorkChildren.length === 0 && upskillChildren.length === 0) {
-            total += d.estimatedDuration || 0;
+            total += currentDef.estimatedDuration || 0;
         } else {
             deepWorkChildren.forEach(childId => {
                 const childDef = allDefsMap.get(childId);
@@ -252,48 +252,40 @@ function MyPlatePageContent() {
             const isCompleted = activity.completed;
   
             if (isCompleted) {
-              const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-              const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
-              
-              const findDurationInLogs = (logs: DatedWorkout[], durationField: 'reps' | 'weight') => {
-                  const logForDay = logs.find(l => l.date === dateKey);
-                  if (!logForDay) return 0;
-                  return logForDay.exercises
-                      .filter(ex => activity.taskIds?.includes(ex.id))
-                      .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField] || 0), 0), 0);
-              };
-
-              switch(activity.type) {
-                  case 'upskill':
-                      totalMinutes = findDurationInLogs(allUpskillLogs, 'reps');
-                      break;
-                  case 'deepwork':
-                  case 'branding':
-                  case 'lead-generation':
-                      const logs = activity.type === 'deepwork' ? allDeepWorkLogs : activity.type === 'branding' ? brandingLogs : allLeadGenLogs;
-                      totalMinutes = findDurationInLogs(logs, 'weight');
-                      break;
-                  case 'workout':
-                    const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
-                    if (workoutLog) {
-                      totalMinutes = workoutLog.exercises
-                        .filter(ex => activity.taskIds?.includes(ex.id))
-                        .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
+                const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+                const mainDef = mainDefId ? allDefs.get(mainDefId) : null;
+                
+                if (mainDef && ((mainDef.linkedDeepWorkIds?.length ?? 0) > 0 || (mainDef.linkedUpskillIds?.length ?? 0) > 0)) {
+                    const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
+                    totalMinutes = leafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
+                    suffix = ' logged';
+                } else if (activity.duration) {
+                    totalMinutes = activity.duration;
+                    suffix = ' logged';
+                } else if (activity.type === 'workout') {
+                    const log = allWorkoutLogs.find(l => l.date === dateKey);
+                    if (log) {
+                        const workoutExercise = log.exercises.find(ex => activity.taskIds?.some(tid => tid === ex.id));
+                        if(workoutExercise) {
+                           totalMinutes = workoutExercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        }
                     }
-                    break;
-                  case 'mindset':
-                    const mindsetLog = allMindProgrammingLogs.find(l => l.date === dateKey);
-                    if (mindsetLog) {
-                        totalMinutes = mindsetLog.exercises
-                            .filter(ex => activity.taskIds?.includes(ex.id))
-                            .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
+                    suffix = ' logged';
+                } else {
+                    let logs, durationField;
+                    if (activity.type === 'upskill') { logs = allUpskillLogs; durationField = 'reps'; } 
+                    else if (activity.type === 'deepwork') { logs = allDeepWorkLogs; durationField = 'weight'; }
+                    
+                    if (logs && durationField) {
+                        const loggedDuration = (logs.find(log => log.date === dateKey)
+                          ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                          .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set[durationField as 'reps'|'weight'] || 0), 0), 0) || 0);
+                        if (loggedDuration > 0) {
+                            totalMinutes = loggedDuration;
+                            suffix = ' logged';
+                        }
                     }
-                    break;
-                  default:
-                    totalMinutes = activity.duration || 0;
-                    break;
-              }
-              suffix = ' logged';
+                }
             } else {
               // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
@@ -337,7 +329,7 @@ function MyPlatePageContent() {
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
-  
+
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
     const daySchedule = schedule[selectedDateKey];
@@ -1353,3 +1345,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
