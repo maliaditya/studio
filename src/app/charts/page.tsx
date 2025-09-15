@@ -133,7 +133,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'hourly-activity' || context === 'activity-trends') ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' || context === 'hourly-activity' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'activity-trends') ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -462,7 +462,7 @@ function ChartsPageContent() {
                     const minutesInHour = (endOfInterval.getTime() - current.getTime()) / 60000;
                     
                     if (minutesInHour > 0) {
-                        hourlyData[currentHour][activityName] = (hourlyData[currentHour][activityName] || 0) + minutesInHour;
+                        hourlyData[currentHour][activityName] = (hourlyData[currentHour][activityName] || 0) + (minutesInHour / 60);
                     }
                     
                     current = nextHour;
@@ -659,7 +659,7 @@ function ChartsPageContent() {
                                 <LineChart data={hourlyActivityData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
-                                    <YAxis label={{ value: 'Minutes Logged', angle: -90, position: 'insideLeft' }} />
+                                    <YAxis label={{ value: 'Hours Logged', angle: -90, position: 'insideLeft' }} />
                                     <RechartsTooltip content={<CustomTooltip context="hourly-activity" customConfig={hourlyActivityConfig} />} />
                                     {Object.keys(activityColorMapping).map((key, i) => (
                                       <Line key={key} type="monotone" dataKey={key} name={key} stroke={activityColorMapping[key]} dot={false} />
