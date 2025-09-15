@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -251,8 +250,8 @@ function ChartsPageContent() {
     const specializationTrendData = useMemo(() => {
         const specializations: CoreSkill[] = coreSkills.filter(skill => skill.type === 'Specialization');
         const allDefs: (ExerciseDefinition & {type: 'deepwork' | 'upskill'})[] = [
-            ...deepWorkLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'deepwork' as const}))),
-            ...upskillLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'upskill' as const})))
+            ...allDeepWorkLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'deepwork' as const}))),
+            ...allUpskillLogs.flatMap(log => log.exercises.map(ex => ({...ex, date: log.date, type: 'upskill' as const})))
         ];
     
         return specializations.map((spec, specIndex) => {
