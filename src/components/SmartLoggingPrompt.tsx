@@ -19,7 +19,8 @@ import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { format, isBefore, parseISO, startOfDay } from 'date-fns';
 import { Carousel } from './ui/carousel';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 interface SmartLoggingPromptProps {
   promptType: 'empty' | 'inactive' | 'completed' | 'focus' | null;
@@ -274,7 +275,12 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }:
                 duration: getLoggedMinutes(a, todayKey)
             }))
             .filter(a => a.duration > 0);
-
+        
+        const historicalData = (item.historicalData || []).map((d: any) => ({
+            ...d,
+            date: format(parseISO(d.date), 'MMM d')
+        }));
+        
         return (
             <CardContent className="p-3 pt-0 text-sm space-y-3 flex-grow">
                 <div className="grid grid-cols-2 gap-4 text-center">
@@ -287,31 +293,39 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }:
                         <p className="text-xs text-muted-foreground">Minutes Untracked</p>
                     </div>
                 </div>
-                {activitiesInSlot.length > 0 && (
-                    <div className="h-40">
+                {historicalData.length > 1 ? (
+                    <div className="h-40 -mx-4 -mb-2">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={activitiesInSlot} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                                <XAxis type="number" hide />
-                                <YAxis type="category" dataKey="name" hide />
+                            <LineChart data={historicalData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                <XAxis dataKey="date" fontSize={10} />
+                                <YAxis fontSize={10} />
                                 <Tooltip
-                                    cursor={{ fill: "hsl(var(--muted))" }}
                                     content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                             const data = payload[0].payload;
                                             return (
                                                 <div className="p-2 bg-background border rounded-md text-xs shadow-lg">
-                                                    <p className="font-bold">{data.name}</p>
-                                                    <p className="text-muted-foreground">{data.duration} minutes</p>
+                                                    <p>{format(parseISO(data.fullDate), 'PPP')}</p>
+                                                    <p>Time: {data.time} min</p>
                                                 </div>
                                             );
                                         }
                                         return null;
                                     }}
                                 />
-                                <Bar dataKey="duration" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                            </BarChart>
+                                <Line type="monotone" dataKey="time" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                            </LineChart>
                         </ResponsiveContainer>
                     </div>
+                ) : (
+                    activitiesInSlot.length > 0 && (
+                        <div className="pt-2 border-t text-xs">
+                            <h4 className="font-semibold mb-1">Completed:</h4>
+                            <ul>
+                                {activitiesInSlot.map((act, i) => <li key={i}>{act.name} ({act.duration}m)</li>)}
+                            </ul>
+                        </div>
+                    )
                 )}
                 <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
                     {item.insight}
@@ -349,7 +363,7 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }:
                                                 <p className="text-xs text-muted-foreground">Total Minutes Untracked</p>
                                             </div>
                                         </div>
-                                        <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
+                                         <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
                                             {item.insight}
                                         </blockquote>
                                     </CardContent>
@@ -455,6 +469,21 @@ export function SmartLoggingPrompt({
         const wastedTime = isPastSlot ? Math.max(0, 240 - loggedTime) : 0;
         
         const plannedTaskDetails = activities.map(a => a.details).join(', ') || 'None';
+        
+        const historicalData = activities.length > 0 ? Object.entries(schedule)
+            .map(([date, dailySchedule]) => {
+                let dailyTotalForCategory = 0;
+                activities.forEach(activity => {
+                    const activityInHistory = (dailySchedule[slot.name as keyof DailySchedule] as ActivityType[])?.find(a => a.details === activity.details && a.type === activity.type && a.completed);
+                    if (activityInHistory) {
+                        dailyTotalForCategory += getLoggedMinutes(activityInHistory, date);
+                    }
+                });
+                return { date, fullDate: date, time: dailyTotalForCategory };
+            })
+            .filter(item => item.time > 0)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) : [];
+
 
         let insight = "";
         const loggedHours = Math.floor(loggedTime / 60);
@@ -480,6 +509,7 @@ export function SmartLoggingPrompt({
             loggedTime: loggedTime,
             wastedTime: wastedTime,
             insight: insight,
+            historicalData: historicalData,
         };
     });
 
