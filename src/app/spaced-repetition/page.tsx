@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BookCopy, BrainCircuit } from 'lucide-react';
 import { format, parseISO, differenceInDays, addDays, startOfDay, isBefore } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 
 const retentionChartConfig = {
@@ -79,17 +79,32 @@ function SpacedRepetitionPageContent() {
         const nextInterval = DOUBLING_INTERVALS[reps] || 128;
         const nextReviewDate = addDays(lastReviewDate, nextInterval);
 
-        const retentionCurve: { date: string; retention: number | null; projection: number | null; isReview: boolean }[] = [];
+        const retentionCurve: { date: string; retention: number | null; projection: number | null; isReview: boolean; timestamp: number; }[] = [];
+        const milestonePoints: { x: number; y: number; label: string }[] = [];
+
         if (repHistor.length > 0) {
             const firstDate = repHistor[0].date;
             const today = startOfDay(new Date());
-            const lastDate = nextReviewDate > today ? nextReviewDate : today;
             
-            for (let d = startOfDay(firstDate); d <= lastDate && isBefore(d, addDays(today, 365)); d = addDays(d, 1)) {
+            let futureReviewDate = lastReviewDate;
+            for (let i = reps; i < DOUBLING_INTERVALS.length; i++) {
+                const interval = DOUBLING_INTERVALS[i];
+                futureReviewDate = addDays(futureReviewDate, interval);
+                milestonePoints.push({
+                    x: futureReviewDate.getTime(),
+                    y: calculateRetention(interval, DOUBLING_INTERVALS[i-1] || 0),
+                    label: `Review in ${interval} days`
+                });
+            }
+
+            const lastDate = milestonePoints.length > 0 ? new Date(milestonePoints[milestonePoints.length - 1].x) : nextReviewDate;
+
+            
+            for (let d = startOfDay(firstDate); d <= lastDate && isBefore(d, addDays(today, 365*2)); d = addDays(d, 1)) {
                 let currentRep = repHistor.find(r => format(r.date, 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd'));
                 
                 if (currentRep) {
-                    retentionCurve.push({ date: format(d, 'MMM d'), retention: 100, projection: null, isReview: true });
+                    retentionCurve.push({ date: format(d, 'MMM d'), retention: 100, projection: null, isReview: true, timestamp: d.getTime() });
                 } else {
                     const latestPastRep = [...repHistor].reverse().find(r => r.date <= d);
                     if (latestPastRep) {
@@ -97,9 +112,9 @@ function SpacedRepetitionPageContent() {
                         const retention = calculateRetention(daysSince, latestPastRep.interval);
                         
                         if (d > today) {
-                             retentionCurve.push({ date: format(d, 'MMM d'), retention: null, projection: retention, isReview: false });
+                             retentionCurve.push({ date: format(d, 'MMM d'), retention: null, projection: retention, isReview: false, timestamp: d.getTime() });
                         } else {
-                            retentionCurve.push({ date: format(d, 'MMM d'), retention, projection: null, isReview: false });
+                            retentionCurve.push({ date: format(d, 'MMM d'), retention, projection: null, isReview: false, timestamp: d.getTime() });
                         }
                     }
                 }
@@ -111,10 +126,11 @@ function SpacedRepetitionPageContent() {
           retentionCurve,
           nextReviewDate,
           nextInterval,
-          reps
+          reps,
+          milestonePoints,
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, getDeepWorkNodeType]);
 
   if (repetitionData.length === 0) {
     return (
@@ -138,7 +154,7 @@ function SpacedRepetitionPageContent() {
           </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {repetitionData.map(({ skill, retentionCurve, nextReviewDate, nextInterval, reps }) => (
+        {repetitionData.map(({ skill, retentionCurve, nextReviewDate, nextInterval, reps, milestonePoints }) => (
           <Card key={skill.id} className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -155,7 +171,14 @@ function SpacedRepetitionPageContent() {
                   <ResponsiveContainer>
                     <LineChart data={retentionCurve} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" tickFormatter={(val, index) => index % 14 === 0 ? val : ''} fontSize={10}/>
+                      <XAxis 
+                          dataKey="timestamp" 
+                          type="number"
+                          scale="time"
+                          domain={['dataMin', 'dataMax']}
+                          tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} 
+                          fontSize={10}
+                      />
                       <YAxis domain={[0, 100]} tickFormatter={(val) => `${val}%`} fontSize={10}/>
                       <RechartsTooltip 
                         content={({ active, payload, label }) => {
@@ -166,7 +189,7 @@ function SpacedRepetitionPageContent() {
                                 <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
                                     <div className="grid gap-1.5">
                                         <div className="flex flex-col">
-                                            <span className="text-[0.7rem] uppercase text-muted-foreground">{label}</span>
+                                            <span className="text-[0.7rem] uppercase text-muted-foreground">{format(new Date(label), 'PPP')}</span>
                                             <span className="font-bold text-foreground">{dataPoint.name}: {value?.toFixed(0)}%</span>
                                         </div>
                                     </div>
@@ -195,6 +218,11 @@ function SpacedRepetitionPageContent() {
                         connectNulls
                         name="Projection"
                       />
+                      {milestonePoints.map((dot, i) => (
+                          <ReferenceDot key={i} x={dot.x} y={dot.y} r={4} fill="var(--color-projection)" stroke="none">
+                              <title>{dot.label}</title>
+                          </ReferenceDot>
+                      ))}
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartContainer>
