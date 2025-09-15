@@ -287,50 +287,46 @@ export function SmartLoggingPrompt({
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
   
     const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { name: string, startHour: number, endHour: number }) => {
-      const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
-          hour: slot.startHour + i,
-          name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
-          minutes: 0,
-          tasks: []
-      }));
-  
-      const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-      activities.filter(a => a.completed).forEach(activity => {
-          const start = activity.focusSessionInitialStartTime;
-          const end = activity.focusSessionEndTime;
-          if (start && end) {
-              let current = new Date(start);
-              while (current < new Date(end)) {
-                  const currentHour = current.getHours();
-                  const nextHour = new Date(current);
-                  nextHour.setHours(currentHour + 1, 0, 0, 0);
-  
-                  const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
-                  const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
-                  
-                  const hourIndex = currentHour - slot.startHour;
-                  if (hourIndex >= 0 && hourIndex < hourlyData.length && minutesInHour > 0) {
-                      hourlyData[hourIndex].minutes += minutesInHour;
-                      if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
-                          hourlyData[hourIndex].tasks.push(activity.details);
-                      }
-                  }
-                  current = nextHour;
-              }
-          } else if (activity.duration) {
-              const hoursInSlot = slot.endHour - slot.startHour;
-              if (hoursInSlot > 0) {
-                const durationPerHour = activity.duration / hoursInSlot;
-                hourlyData.forEach(hourData => {
-                    hourData.minutes += durationPerHour;
-                     if (!hourData.tasks.includes(activity.details)) {
-                        hourData.tasks.push(activity.details);
+        const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+            hour: slot.startHour + i,
+            name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
+            minutes: 0,
+            tasks: []
+        }));
+    
+        const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+        activities.filter(a => a.completed).forEach(activity => {
+            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                let current = new Date(activity.focusSessionInitialStartTime);
+                while (current < new Date(activity.focusSessionEndTime)) {
+                    const currentHour = current.getHours();
+                    const nextHour = new Date(current);
+                    nextHour.setHours(currentHour + 1, 0, 0, 0);
+    
+                    const endOfInterval = new Date(activity.focusSessionEndTime) < nextHour ? new Date(activity.focusSessionEndTime) : nextHour;
+                    const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
+                    
+                    const hourIndex = currentHour - slot.startHour;
+                    if (hourIndex >= 0 && hourIndex < hourlyData.length && minutesInHour > 0) {
+                        hourlyData[hourIndex].minutes += minutesInHour;
+                        if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
+                            hourlyData[hourIndex].tasks.push(activity.details);
+                        }
                     }
-                });
-              }
-          }
-      });
-      return hourlyData;
+                    current = nextHour;
+                }
+            } else if (activity.completedAt && activity.duration) {
+                const completionHour = new Date(activity.completedAt).getHours();
+                const hourIndex = completionHour - slot.startHour;
+                if (hourIndex >= 0 && hourIndex < hourlyData.length) {
+                    hourlyData[hourIndex].minutes += activity.duration;
+                     if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
+                        hourlyData[hourIndex].tasks.push(activity.details);
+                    }
+                }
+            }
+        });
+        return hourlyData;
     };
   
     const slotAnalyses = slotOrder.map(slot => {
@@ -480,7 +476,7 @@ export function SmartLoggingPrompt({
                                                                         const tasks = p.payload[`${dataKey}Tasks`];
                                                                         return (
                                                                           <div key={i} style={{ color: p.color }}>
-                                                                            {p.name}: {p.value.toFixed(0)} min
+                                                                            {p.name}: {Math.round(p.value as number)} min
                                                                             {tasks && tasks.length > 0 && (
                                                                                 <ul className="list-disc list-inside text-muted-foreground">
                                                                                     {tasks.map((task: string, taskIndex: number) => <li key={taskIndex}>{task}</li>)}
