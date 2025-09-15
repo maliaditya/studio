@@ -5,11 +5,12 @@ import React, { useMemo, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { BookCopy, BrainCircuit } from 'lucide-react';
+import { BookCopy, ZoomOut } from 'lucide-react';
 import { format, parseISO, differenceInDays, addDays, startOfDay, isBefore } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, ReferenceDot } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, ReferenceDot, Brush } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
+import { Button } from '@/components/ui/button';
 
 const retentionChartConfig = {
   retention: { label: "Retention", color: "hsl(var(--chart-1))" },
@@ -30,7 +31,9 @@ const calculateRetention = (daysSinceLastReview: number, lastInterval: number): 
 
 
 function SpacedRepetitionPageContent() {
-  const { coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes } = useAuth();
+  const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes } = useAuth();
+  const [chartKey, setChartKey] = useState(Date.now());
+  const [brushIndex, setBrushIndex] = useState<{ startIndex?: number; endIndex?: number }>({});
 
   const repetitionData = useMemo(() => {
     const microSkillsForRepetition = coreSkills
@@ -39,7 +42,7 @@ function SpacedRepetitionPageContent() {
 
     return microSkillsForRepetition.map(skill => {
         const intentions = deepWorkDefinitions.filter(def => 
-            def.category === skill.name && getDeepWorkNodeType(def) === 'Intention'
+            def.category === skill.name
         );
 
         const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
@@ -130,7 +133,23 @@ function SpacedRepetitionPageContent() {
           milestonePoints,
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, getDeepWorkNodeType]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
+
+  const isZoomed = useMemo(() => {
+    if (repetitionData.some(d => d.retentionCurve.length <= 1)) return false;
+    const { startIndex, endIndex } = brushIndex;
+    const dataLength = repetitionData[0]?.retentionCurve.length || 0;
+    return (
+      startIndex !== undefined &&
+      endIndex !== undefined &&
+      (startIndex !== 0 || endIndex !== dataLength - 1)
+    );
+  }, [brushIndex, repetitionData]);
+
+  const handleResetZoom = () => {
+    setBrushIndex({});
+    setChartKey(Date.now());
+  };
 
   if (repetitionData.length === 0) {
     return (
@@ -147,7 +166,7 @@ function SpacedRepetitionPageContent() {
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
        <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight text-primary flex items-center justify-center gap-3">
-              <BrainCircuit /> Spaced Repetition Schedule
+              Spaced Repetition Schedule
           </h1>
           <p className="mt-4 text-lg text-muted-foreground">
               Review your micro-skills to strengthen your memory retention over time.
@@ -157,19 +176,29 @@ function SpacedRepetitionPageContent() {
         {repetitionData.map(({ skill, retentionCurve, nextReviewDate, nextInterval, reps, milestonePoints }) => (
           <Card key={skill.id} className="shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookCopy className="text-primary h-5 w-5"/>
-                {skill.name}
-              </CardTitle>
-              <CardDescription>
-                Next review in {nextInterval} days on {format(nextReviewDate, 'MMM d, yyyy')}. Total reps: {reps}.
-              </CardDescription>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookCopy className="text-primary h-5 w-5"/>
+                    {skill.name}
+                  </CardTitle>
+                  <CardDescription>
+                    Next review in {nextInterval} days on {format(nextReviewDate, 'MMM d, yyyy')}. Total reps: {reps}.
+                  </CardDescription>
+                </div>
+                {isZoomed && (
+                    <Button variant="outline" size="sm" onClick={handleResetZoom} className="flex-shrink-0">
+                        <ZoomOut className="mr-2 h-4 w-4" />
+                        Reset Zoom
+                    </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {retentionCurve.length > 0 ? (
-                <ChartContainer config={retentionChartConfig} className="h-[250px] w-full">
+                <ChartContainer config={retentionChartConfig} key={chartKey} className="h-[250px] w-full">
                   <ResponsiveContainer>
-                    <LineChart data={retentionCurve} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <LineChart data={retentionCurve} margin={{ top: 5, right: 20, left: -10, bottom: 40 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
                           dataKey="timestamp" 
@@ -223,6 +252,14 @@ function SpacedRepetitionPageContent() {
                               <title>{dot.label}</title>
                           </ReferenceDot>
                       ))}
+                      <Brush 
+                          dataKey="timestamp" 
+                          height={40} 
+                          stroke="hsl(var(--primary))" 
+                          tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')}
+                          travellerWidth={15}
+                          onChange={(e) => setBrushIndex({startIndex: e.startIndex, endIndex: e.endIndex})}
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartContainer>
