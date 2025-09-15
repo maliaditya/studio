@@ -473,23 +473,16 @@ function ChartsPageContent() {
         specializations.forEach(spec => totals[spec.name] = 0);
     
         if (specHoursFilter === 'all') {
-            const loggedMinutesMap = new Map<string, number>();
-            [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
-                if (def.loggedDuration && def.loggedDuration > 0) {
-                    loggedMinutesMap.set(def.id, def.loggedDuration);
-                }
-            });
-    
             specializations.forEach(spec => {
                 const descendantLeavesUpskill = getDescendantLeafNodes(spec.id, 'upskill');
                 const descendantLeavesDeepWork = getDescendantLeafNodes(spec.id, 'deepwork');
                 
                 let totalSpecMinutes = 0;
                 descendantLeavesUpskill.forEach(leaf => {
-                    totalSpecMinutes += loggedMinutesMap.get(leaf.id) || 0;
+                    totalSpecMinutes += leaf.loggedDuration || 0;
                 });
                 descendantLeavesDeepWork.forEach(leaf => {
-                    totalSpecMinutes += loggedMinutesMap.get(leaf.id) || 0;
+                    totalSpecMinutes += leaf.loggedDuration || 0;
                 });
                 totals[spec.name] = totalSpecMinutes / 60; // to hours
             });
