@@ -162,9 +162,7 @@ function ChartsPageContent() {
     
     const [resistanceFilter, setResistanceFilter] = useState<'all' | 'today' | 'lastX'>('all');
     const [lastXDays, setLastXDays] = useState(5);
-    const [activityFilter, setActivityFilter] = useState<'all' | 'today' | 'lastX' | 'specificDay'>('all');
-    const [lastXDaysActivity, setLastXDaysActivity] = useState(5);
-    const [specificActivityDay, setSpecificActivityDay] = useState<Date | undefined>(new Date());
+    const [selectedActivityDate, setSelectedActivityDate] = useState<Date>(new Date());
 
     const productivityData = useMemo(() => {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
@@ -413,37 +411,24 @@ function ChartsPageContent() {
             });
             return record;
         });
-
-        const today = startOfDay(new Date());
-
-        Object.entries(schedule).forEach(([date, dailySchedule]) => {
-            const eventDate = parseISO(date);
-            let includeDate = false;
-            if (activityFilter === 'all') {
-                includeDate = true;
-            } else if (activityFilter === 'today') {
-                includeDate = isSameDay(eventDate, today);
-            } else if (activityFilter === 'lastX') {
-                const filterStartDate = subDays(today, lastXDaysActivity - 1);
-                includeDate = eventDate >= filterStartDate && eventDate <= today;
-            } else if (activityFilter === 'specificDay' && specificActivityDay) {
-                includeDate = isSameDay(eventDate, specificActivityDay);
-            }
-            if (!includeDate) return;
-
+    
+        const selectedDateKey = format(selectedActivityDate, 'yyyy-MM-dd');
+        const dailySchedule = schedule[selectedDateKey];
+    
+        if (dailySchedule) {
             Object.values(dailySchedule).flat().forEach((activity: Activity) => {
                 if (!activity.completed) return;
                 
                 const activityName = activityNameMap[activity.type];
                 if (!activityName) return;
-
+    
                 let startTime, endTime;
                 if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
                     startTime = new Date(activity.focusSessionInitialStartTime);
                     endTime = new Date(activity.focusSessionEndTime);
                 } else if (activity.duration) {
                     // Fallback for simple duration tasks (interrupts, essentials)
-                    const activityDate = parseISO(date);
+                    const activityDate = parseISO(selectedDateKey);
                     // Distribute it somewhat arbitrarily for now if no start time exists
                     const startHour = activityDate.getHours();
                     startTime = new Date(activityDate.setHours(startHour, 0, 0, 0));
@@ -451,13 +436,13 @@ function ChartsPageContent() {
                 } else {
                     return; // No time data to process
                 }
-
+    
                 let current = startTime;
                 while (current < endTime) {
                     const currentHour = current.getHours();
                     const nextHour = new Date(current);
                     nextHour.setHours(currentHour + 1, 0, 0, 0);
-
+    
                     const endOfInterval = endTime < nextHour ? endTime : nextHour;
                     const minutesInHour = (endOfInterval.getTime() - current.getTime()) / 60000;
                     
@@ -468,15 +453,15 @@ function ChartsPageContent() {
                     current = nextHour;
                 }
             });
-        });
+        }
         
         const config: ChartConfig = {};
         Object.keys(activityColorMapping).forEach(name => {
             config[name] = { label: name, color: activityColorMapping[name] };
         });
-
+    
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
-    }, [schedule, activityDurations, activityFilter, lastXDaysActivity, specificActivityDay]);
+    }, [schedule, activityDurations, selectedActivityDate]);
 
 
     const allCategoriesData = useMemo(() => {
@@ -615,37 +600,22 @@ function ChartsPageContent() {
                         <CardTitle>Hourly Activity Log</CardTitle>
                         <CardDescription>A historical log of your logged activity time, grouped by the hour of the day.</CardDescription>
                         <div className="flex flex-wrap items-center gap-2 pt-2">
-                            <Button variant={activityFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('all')}>All Time</Button>
-                            <Button variant={activityFilter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('today')}>Today</Button>
-                            <div className="flex items-center gap-2">
-                                <Button variant={activityFilter === 'lastX' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('lastX')}>Last</Button>
-                                <Input
-                                    type="number"
-                                    value={lastXDaysActivity}
-                                    onChange={(e) => setLastXDaysActivity(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                                    className="w-16 h-8 text-sm"
-                                    onFocus={() => setActivityFilter('lastX')}
-                                />
-                                <span className="text-sm">Days</span>
-                            </div>
                             <Popover>
                                 <PopoverTrigger asChild>
                                 <Button
-                                    variant={activityFilter === 'specificDay' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className={cn("w-[240px] justify-start text-left font-normal", !specificActivityDay && "text-muted-foreground")}
+                                    variant={"outline"}
+                                    className={cn("w-[240px] justify-start text-left font-normal", !selectedActivityDate && "text-muted-foreground")}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {specificActivityDay ? format(specificActivityDay, "PPP") : <span>Pick a date</span>}
+                                    {selectedActivityDate ? format(selectedActivityDate, "PPP") : <span>Pick a date</span>}
                                 </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
                                 <Calendar
                                     mode="single"
-                                    selected={specificActivityDay}
+                                    selected={selectedActivityDate}
                                     onSelect={(date) => {
-                                        setSpecificActivityDay(date);
-                                        setActivityFilter('specificDay');
+                                        if (date) setSelectedActivityDate(date);
                                     }}
                                     initialFocus
                                 />
