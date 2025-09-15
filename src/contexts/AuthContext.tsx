@@ -561,6 +561,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const prevUser = usePrevious(currentUser);
   
+  const setTheme = useCallback((newTheme: string) => {
+    setThemeState(newTheme);
+    localStorage.setItem('lifeos_theme', newTheme);
+  }, []);
+
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
     const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
@@ -629,58 +634,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-  
-    if (def) {
-      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-  
-      if (isParentNode) {
-        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-        if (allLeafNodes.length > 0) {
-          const allChildrenCompleted = allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
-  
-          if (allChildrenCompleted) {
-            handleToggleComplete(activity.slot, activity.id, true);
-            toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
-            return false;
-          }
-        }
-      }
-    }
-    
-    const estDurationStr = activityDurations[activity.id];
-    let minutes = 0;
-    if (estDurationStr) {
-      const hMatch = estDurationStr.match(/(\d+)h/);
-      const mMatch = estDurationStr.match(/(\d+)m/);
-      const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
-      const m = mMatch ? parseInt(mMatch[1]) : 0;
-      minutes = h + m;
-      if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
-          minutes = parseInt(estDurationStr.trim());
-      }
-    }
-    if (isNaN(minutes) || minutes <= 0) minutes = 45;
-  
-    setFocusDuration(minutes);
-    setFocusActivity(activity);
-    setFocusSessionModalOpen(true);
-    return true;
-  }, [
-    deepWorkDefinitions, 
-    upskillDefinitions, 
-    getUpskillNodeType, 
-    getDeepWorkNodeType, 
-    getDescendantLeafNodes, 
-    activityDurations, 
-    handleToggleComplete,
-    toast
-  ]);
-  
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
@@ -810,7 +763,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
 
-  
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
+    const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+    
+    setDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === subTaskId) {
+            return {
+                ...def,
+                loggedDuration: (def.loggedDuration || 0) + durationMinutes,
+            };
+        }
+        return def;
+    }));
+  }, [setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions]);
+
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -869,8 +836,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logSubTaskTime(definition.id, duration);
     updateActivityInSchedule({ completed: true, duration });
     
-  }, [deepWorkDefinitions, upskillDefinitions, logSubTaskTime, toast, getDeepWorkNodeType, getUpskillNodeType, setSchedule]);
+  }, [deepWorkDefinitions, upskillDefinitions, setSchedule, toast, getDeepWorkNodeType, getUpskillNodeType, logSubTaskTime]);
   
+  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+  
+    if (def) {
+      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+  
+      if (isParentNode) {
+        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
+        if (allLeafNodes.length > 0) {
+          const allChildrenCompleted = allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
+  
+          if (allChildrenCompleted) {
+            handleToggleComplete(activity.slot, activity.id, true);
+            toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
+            return false;
+          }
+        }
+      }
+    }
+    
+    const estDurationStr = activityDurations[activity.id];
+    let minutes = 0;
+    if (estDurationStr) {
+      const hMatch = estDurationStr.match(/(\d+)h/);
+      const mMatch = estDurationStr.match(/(\d+)m/);
+      const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
+      const m = mMatch ? parseInt(mMatch[1]) : 0;
+      minutes = h + m;
+      if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
+          minutes = parseInt(estDurationStr.trim());
+      }
+    }
+    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+  
+    setFocusDuration(minutes);
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
+    return true;
+  }, [
+    deepWorkDefinitions, 
+    upskillDefinitions, 
+    getUpskillNodeType, 
+    getDeepWorkNodeType, 
+    getDescendantLeafNodes, 
+    activityDurations, 
+    handleToggleComplete,
+    toast
+  ]);
+
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -2643,7 +2662,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         z: 100,
     });
   };
+  
+  const handleStartFocusSession = (activity: Activity, duration: number) => {
+    setIsAudioPlaying(true);
+    const now = Date.now();
+    setActiveFocusSession({
+        activity,
+        duration,
+        secondsLeft: duration * 60,
+        totalSeconds: duration * 60,
+        startTime: now,
+        subTaskStartTime: now,
+        state: 'running',
+    });
+  };
 
+  const updateTaskDuration = (taskId: string, duration: number) => {
+      let found = false;
+      const newUpskillDefs = upskillDefinitions.map(def => {
+          if (def.id === taskId) {
+              found = true;
+              return { ...def, estimatedDuration: duration };
+          }
+          return def;
+      });
+      if(found) {
+        setUpskillDefinitions(newUpskillDefs);
+        return;
+      }
+      
+      const newDeepWorkDefs = deepWorkDefinitions.map(def => {
+          if (def.id === taskId) {
+              return { ...def, estimatedDuration: duration };
+          }
+          return def;
+      });
+      setDeepWorkDefinitions(newDeepWorkDefs);
+  };
+  
+  const openStopperProgressPopup = (stopper: Stopper, habitName: string) => {
+      setStopperProgressPopup({ isOpen: true, stopper, habitName });
+  };
+  
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2729,7 +2789,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
     microSkillMap,
-    permanentlyLoggedTaskIds, getDescendantLeafNodes,
+    permanentlyLoggedTaskIds: new Set(),
+    getDescendantLeafNodes,
     calculateTotalEstimate,
     expandedItems, setExpandedItems, handleExpansionChange,
     selectedDomainId, setSelectedDomainId,
@@ -2768,7 +2829,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
     setTheme(savedTheme);
-  }, []);
+  }, [setTheme]);
   
    useEffect(() => {
     const interval = setInterval(() => {
