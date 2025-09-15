@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -2892,6 +2891,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval);
   }, []);
 
+   useEffect(() => {
+    let timerId: NodeJS.Timeout | undefined;
+
+    if (activeFocusSession?.state === 'running') {
+      timerId = setInterval(() => {
+        setActiveFocusSession(prev => {
+          if (!prev || prev.state !== 'running') {
+            clearInterval(timerId!);
+            return prev;
+          }
+          if (prev.secondsLeft <= 1) {
+            clearInterval(timerId!);
+            return { ...prev, secondsLeft: 0, state: 'paused' };
+          }
+          return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerId) {
+        clearInterval(timerId);
+      }
+    };
+  }, [activeFocusSession?.state, setActiveFocusSession]);
+
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -2914,4 +2939,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Snacks & Supplements",
 }
 
-    
+     
