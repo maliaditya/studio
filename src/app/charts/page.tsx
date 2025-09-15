@@ -616,14 +616,14 @@ function ChartsPageContent() {
                     <CardContent>
                         <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
                             <ResponsiveContainer>
-                                <BarChart data={specializationHoursSummary} layout="vertical" onClick={handleBarClick}>
+                                <BarChart data={specializationHoursSummary} layout="vertical">
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" />
                                     <YAxis type="category" dataKey="name" width={120} />
                                     <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
-                                    <Bar dataKey="hours" layout="vertical" radius={[0, 4, 4, 0]}>
+                                    <Bar dataKey="hours" layout="vertical" radius={[0, 4, 4, 0]} onClick={handleBarClick}>
                                         {specializationHoursSummary.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} cursor="pointer" />
+                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
                                         ))}
                                     </Bar>
                                 </BarChart>
