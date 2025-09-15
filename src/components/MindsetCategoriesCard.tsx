@@ -142,6 +142,9 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
+    const [filter, setFilter] = useState<'all' | 'today' | 'lastX'>('all');
+    const [lastXDays, setLastXDays] = useState(5);
+    
     const chartData = React.useMemo(() => {
         const log = Array.from({ length: 24 }, (_, i) => {
             const startAmPm = i < 12 ? 'AM' : 'PM';
@@ -157,22 +160,29 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
             };
         });
 
+        const today = startOfDay(new Date());
+        const filterStartDate = filter === 'today' ? today : subDays(today, lastXDays - 1);
+        
         allLinkedResistances.forEach(link => {
             if (link.stopper.timestamps) {
                 link.stopper.timestamps.forEach(ts => {
-                    const hour = new Date(ts).getHours();
-                    if (link.isUrge) {
-                        log[hour].urges++;
-                        log[hour].urgeDetails.push(link.stopper.text);
-                    } else {
-                        log[hour].resistances++;
-                        log[hour].resistanceDetails.push(link.stopper.text);
+                    const eventDate = new Date(ts);
+                    
+                    if (filter === 'all' || (filter === 'today' && isSameDay(eventDate, today)) || (filter === 'lastX' && eventDate >= filterStartDate)) {
+                        const hour = eventDate.getHours();
+                        if (link.isUrge) {
+                            log[hour].urges++;
+                            log[hour].urgeDetails.push(link.stopper.text);
+                        } else {
+                            log[hour].resistances++;
+                            log[hour].resistanceDetails.push(link.stopper.text);
+                        }
                     }
                 });
             }
         });
         return log;
-    }, [allLinkedResistances]);
+    }, [allLinkedResistances, filter, lastXDays]);
 
     const CustomTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
@@ -216,6 +226,21 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                         A historical log of all your urges and resistances, grouped by the hour of the day they were recorded.
                     </DialogDescription>
                 </DialogHeader>
+                 <div className="flex flex-wrap items-center gap-2">
+                    <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>All Time</Button>
+                    <Button variant={filter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('today')}>Today</Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant={filter === 'lastX' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('lastX')}>Last</Button>
+                      <Input 
+                        type="number" 
+                        value={lastXDays}
+                        onChange={(e) => setLastXDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                        className="w-16 h-8 text-sm"
+                        onFocus={() => setFilter('lastX')}
+                      />
+                      <span className="text-sm">Days</span>
+                    </div>
+                </div>
                 <div className="w-full h-[400px] py-4">
                    <ResponsiveContainer width="100%" height="100%">
                         <RechartsLineChart
