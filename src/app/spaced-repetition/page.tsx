@@ -9,6 +9,7 @@ import { Lightbulb } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import type { ExerciseDefinition } from '@/types/workout';
 
 interface LoggedIntention {
   id: string;
@@ -21,19 +22,18 @@ function SpacedRepetitionPageContent() {
   const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType } = useAuth();
 
   const loggedIntentions = useMemo(() => {
-    // 1. Find all definitions that are 'Intention' type.
+    // 1. Find all 'Intention' type definitions that have been worked on.
     const intentionNodes = deepWorkDefinitions.filter(
-      def => getDeepWorkNodeType(def) === 'Intention'
+      def => getDeepWorkNodeType(def) === 'Intention' && (def.loggedDuration || 0) > 0
     );
     const intentionIds = new Set(intentionNodes.map(i => i.id));
     
     // 2. Create a map to store logged dates for each intention.
-    const intentionLogsMap = new Map<string, { def: typeof intentionNodes[0], dates: Set<string> }>();
+    const intentionLogsMap = new Map<string, { def: ExerciseDefinition, dates: Set<string> }>();
 
-    // 3. Iterate through all deep work logs to find completed intentions.
+    // 3. Efficiently iterate through logs once to gather dates for the relevant intentions.
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        // Check if the exercise is an Intention and has been worked on.
         if (intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
           if (!intentionLogsMap.has(ex.definitionId)) {
             const definition = intentionNodes.find(n => n.id === ex.definitionId);
@@ -46,7 +46,7 @@ function SpacedRepetitionPageContent() {
       });
     });
 
-    // 4. Convert the map to an array and sort.
+    // 4. Convert the map to an array for rendering.
     const result: LoggedIntention[] = [];
     intentionLogsMap.forEach((value, key) => {
       result.push({
@@ -57,8 +57,10 @@ function SpacedRepetitionPageContent() {
       });
     });
     
-    // Sort intentions by the most recent log date.
-    return result.sort((a, b) => new Date(b.dates[0]).getTime() - new Date(a.dates[0]).getTime());
+    // 5. Sort intentions by the most recent log date.
+    return result.sort((a, b) => 
+        new Date(b.dates[0]).getTime() - new Date(a.dates[0]).getTime()
+    );
 
   }, [deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType]);
 
