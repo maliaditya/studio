@@ -232,7 +232,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     // Important: Re-calculate what the next task is AFTER updating state.
     // We create a temporary updated list of completed IDs to find the correct next task.
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !isSubTaskComplete(st));
+    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !(st as ExerciseDefinition).loggedDuration && !('completed' in st && st.completed));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -242,7 +242,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [
     activeSubTask,
     subTasks,
-    isSubTaskComplete,
     logSubTaskTime,
     handleStartSubTask,
     handleStop,
@@ -267,15 +266,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     if (activeFocusSession?.state === 'idle' && showSubTasks) {
-      if (!activeSubTask && subTasks.length > 0 && completedSubTaskComponents.length >= subTasks.length) {
-        // All tasks are completed, stop the session.
+      const allDone = subTasks.length > 0 && subTasks.every(isSubTaskComplete);
+      if (allDone) {
         handleStop(true);
       } else if (activeSubTask) {
-        // There's a pending task, start it.
         handleStartSubTask(activeSubTask);
       }
     }
-  }, [activeFocusSession?.state, showSubTasks, activeSubTask, handleStartSubTask, subTasks.length, completedSubTaskComponents.length, handleStop]);
+  }, [activeFocusSession?.state, showSubTasks, activeSubTask, handleStartSubTask, isSubTaskComplete, subTasks, handleStop]);
 
   useEffect(() => {
     if (activeFocusSession?.secondsLeft === 0 && activeFocusSession.state === 'running') {
