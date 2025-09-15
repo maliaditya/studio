@@ -633,24 +633,7 @@ function MyPlatePageContent() {
     } else if (activity.type === 'mindset') {
         handleStartMindsetLog(activity);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
-      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-      const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-      const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-      
-      let nodeType = '';
-      if (mainDef) {
-        if(activity.type === 'upskill') nodeType = getUpskillNodeType(mainDef);
-        if(activity.type === 'deepwork') nodeType = getDeepWorkNodeType(mainDef);
-      }
-      
-      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType || '');
-      
-      if (isParentNode) {
-        setEditingActivity({ slotName, activity });
-        setIsLearningModalOpen(true);
-      } else {
-        onOpenFocusModal(activity);
-      }
+      onOpenFocusModal(activity);
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
     } else if (activity.type === 'essentials') {

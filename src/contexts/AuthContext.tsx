@@ -106,7 +106,7 @@ interface AuthContextType {
   setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   focusActivity: Activity | null;
   focusDuration: number;
-  onOpenFocusModal: (activity: Activity) => boolean;
+  onOpenFocusModal: (activity: Activity) => void;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
   activeFocusSession: ActiveFocusSession | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
@@ -779,9 +779,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    // This function is now simplified, as the complex logic has been moved
-    // to the page component where the click originates.
+  const onOpenFocusModal = useCallback((activity: Activity) => {
     const estDurationStr = activityDurations[activity.id];
     let minutes = 0;
     if (estDurationStr) {
@@ -953,14 +951,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Special effect to save state on unload
   useEffect(() => {
-    const handleBeforeUnload = () => {
-        saveState();
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+        if (localChangeCount > 0) {
+            saveState();
+        }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
         window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [saveState]);
+  }, [saveState, localChangeCount]);
 
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
@@ -1036,7 +1036,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     if (uiData.activeFocusSession) {
         const restoredSession: ActiveFocusSession = uiData.activeFocusSession;
-        if (restoredSession.state === 'running') {
+        if (restoredSession.state === 'running' && restoredSession.startTime) {
             const timeElapsedSinceSave = (Date.now() - restoredSession.startTime) / 1000;
             const newSecondsLeft = Math.max(0, restoredSession.totalSeconds - timeElapsedSinceSave);
             restoredSession.secondsLeft = newSecondsLeft;
@@ -2896,7 +2896,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         clearInterval(timerId);
       }
     };
-  }, [activeFocusSession?.state]);
+  }, [activeFocusSession?.state, setActiveFocusSession]);
 
   return (
     <AuthContext.Provider value={value}>
