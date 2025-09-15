@@ -20,6 +20,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
+import { ChartContainer } from './ui/chart';
+import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -140,37 +142,18 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
-    
-    const getResistanceHighlightClass = (timestamps: number[] = []) => {
-        const todayStart = startOfDay(new Date());
-        const todayTimestamps = timestamps.filter(ts => ts >= todayStart.getTime());
-        const count = todayTimestamps.length;
-        
-        const sevenDaysAgo = subDays(todayStart, 7);
-        const lastTimestamp = Math.max(0, ...timestamps);
-        const isDormant = lastTimestamp > 0 && isBefore(new Date(lastTimestamp), sevenDaysAgo);
-
-        let highlightClass = 'bg-muted/50';
-        if (count === 1) highlightClass = 'bg-yellow-500/20';
-        else if (count === 2) highlightClass = 'bg-orange-500/20';
-        else if (count >= 3) highlightClass = 'bg-red-500/20';
-        else if (count === 0 && !isDormant) highlightClass = 'bg-green-500/10';
-
-        return { className: highlightClass, dormant: isDormant };
-    };
-
-    const hourlyLog = React.useMemo(() => {
+    const chartData = React.useMemo(() => {
         const log = Array.from({ length: 24 }, (_, i) => {
-            const start = i % 12 === 0 ? 12 : i % 12;
             const startAmPm = i < 12 ? 'AM' : 'PM';
-            const end = (i + 1) % 12 === 0 ? 12 : (i + 1) % 12;
-            const endAmPm = (i + 1) === 24 ? 'AM' : i + 1 < 12 ? 'AM' : 'PM';
+            const hourLabel = i % 12 === 0 ? 12 : i % 12;
             
             return {
                 hour: i,
-                label: `${start} ${startAmPm} - ${end} ${endAmPm}`,
-                urges: new Map<string, { count: number, timestamps: number[] }>(),
-                resistances: new Map<string, { count: number, timestamps: number[] }>(),
+                name: `${hourLabel}${startAmPm}`,
+                urges: 0,
+                resistances: 0,
+                urgeDetails: [] as string[],
+                resistanceDetails: [] as string[],
             };
         });
 
@@ -178,16 +161,51 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
             if (link.stopper.timestamps) {
                 link.stopper.timestamps.forEach(ts => {
                     const hour = new Date(ts).getHours();
-                    const targetMap = link.isUrge ? log[hour].urges : log[hour].resistances;
-                    const entry = targetMap.get(link.stopper.text) || { count: 0, timestamps: [] };
-                    entry.count++;
-                    entry.timestamps.push(ts);
-                    targetMap.set(link.stopper.text, entry);
+                    if (link.isUrge) {
+                        log[hour].urges++;
+                        log[hour].urgeDetails.push(link.stopper.text);
+                    } else {
+                        log[hour].resistances++;
+                        log[hour].resistanceDetails.push(link.stopper.text);
+                    }
                 });
             }
         });
-        return log.filter(hour => hour.urges.size > 0 || hour.resistances.size > 0);
+        return log;
     }, [allLinkedResistances]);
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            const hourData = chartData.find(d => d.name === label);
+            return (
+                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                    <p className="font-bold text-lg">{label}</p>
+                    {payload.map((pld: any) => (
+                        <div key={pld.dataKey} style={{ color: pld.color }}>
+                            <strong>{pld.name}:</strong> {pld.value}
+                        </div>
+                    ))}
+                    {hourData?.urgeDetails.length > 0 && (
+                        <div className="mt-2 pt-2 border-t">
+                            <p className="font-semibold">Urges:</p>
+                            <ul className="list-disc list-inside">
+                                {hourData.urgeDetails.map((d, i) => <li key={`urge-${i}`}>{d}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                    {hourData?.resistanceDetails.length > 0 && (
+                        <div className="mt-2 pt-2 border-t">
+                            <p className="font-semibold">Resistances:</p>
+                             <ul className="list-disc list-inside">
+                                {hourData.resistanceDetails.map((d, i) => <li key={`res-${i}`}>{d}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        return null;
+    };
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -198,53 +216,21 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                         A historical log of all your urges and resistances, grouped by the hour of the day they were recorded.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full pr-4">
-                        <Table>
-                            <TableHeader className="sticky top-0 bg-background z-10">
-                                <TableRow>
-                                    <TableHead className="w-[120px]">Hour</TableHead>
-                                    <TableHead>Urges</TableHead>
-                                    <TableHead>Resistances</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {hourlyLog.length > 0 ? hourlyLog.map(({ hour, label, urges, resistances }) => (
-                                    <TableRow key={hour}>
-                                        <TableCell className="font-medium text-xs">{label}</TableCell>
-                                        <TableCell>
-                                            <ul className="space-y-1">
-                                                {Array.from(urges.entries()).map(([text, data]) => {
-                                                    const { className, dormant } = getResistanceHighlightClass(data.timestamps);
-                                                    return (
-                                                        <li key={text} className={cn("text-xs p-1 rounded-md", className)}>
-                                                            <span className={cn(dormant && "line-through")}>{text}</span> {data.count > 1 && <span className="font-bold">({data.count})</span>}
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </TableCell>
-                                        <TableCell>
-                                            <ul className="space-y-1">
-                                                {Array.from(resistances.entries()).map(([text, data]) => {
-                                                    const { className, dormant } = getResistanceHighlightClass(data.timestamps);
-                                                    return (
-                                                        <li key={text} className={cn("text-xs p-1 rounded-md", className)}>
-                                                            <span className={cn(dormant && "line-through")}>{text}</span> {data.count > 1 && <span className="font-bold">({data.count})</span>}
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : (
-                                    <TableRow>
-                                        <TableCell colSpan={3} className="h-24 text-center">No logged urges or resistances found.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </ScrollArea>
+                <div className="flex-grow min-h-[400px]">
+                   <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart
+                            data={chartData}
+                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                        >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis allowDecimals={false} />
+                            <Tooltip content={<CustomTooltip />}/>
+                            <Legend />
+                            <Line type="monotone" dataKey="urges" stroke="#ef4444" name="Urges" />
+                            <Line type="monotone" dataKey="resistances" stroke="#3b82f6" name="Resistances" />
+                        </RechartsLineChart>
+                   </ResponsiveContainer>
                 </div>
             </DialogContent>
         </Dialog>
@@ -580,5 +566,3 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
-
-    
