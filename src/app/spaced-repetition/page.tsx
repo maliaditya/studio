@@ -19,7 +19,7 @@ interface LoggedIntention {
 }
 
 function SpacedRepetitionPageContent() {
-  const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, coreSkills, getDescendantLeafNodes } = useAuth();
+  const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, coreSkills } = useAuth();
 
   const loggedIntentions = useMemo(() => {
     const intentionNodes = deepWorkDefinitions.filter(
@@ -30,7 +30,9 @@ function SpacedRepetitionPageContent() {
 
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
+        // Find if the exercise definition is an intention we care about
         const intentionNode = intentionNodes.find(n => n.id === ex.definitionId);
+        // Only consider it logged if it has logged sets
         if (intentionNode && (ex.loggedSets?.length ?? 0) > 0) {
           if (!intentionLogsMap.has(ex.definitionId)) {
             intentionLogsMap.set(ex.definitionId, { def: intentionNode, dates: new Set() });
@@ -42,6 +44,7 @@ function SpacedRepetitionPageContent() {
 
     const result: LoggedIntention[] = [];
     intentionLogsMap.forEach((value, key) => {
+      // Use loggedDuration as the source of truth for whether something has ever been logged
       if (value.def.loggedDuration && value.def.loggedDuration > 0) {
         result.push({
           id: key,
@@ -68,33 +71,12 @@ function SpacedRepetitionPageContent() {
             def.category === skill.name && getDeepWorkNodeType(def) === 'Intention'
         );
         
-        const intentionsWithCompletion = associatedIntentions.map(intention => {
-            const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
-            const isCompleted = leafNodes.length > 0 && leafNodes.every(leaf => (leaf.loggedDuration || 0) > 0);
-
-            if (!isCompleted) return null;
-
-            const leafNodeIds = new Set(leafNodes.map(n => n.id));
-            const logDates = allDeepWorkLogs
-                .filter(log => log.exercises.some(ex => leafNodeIds.has(ex.definitionId) && ex.loggedSets.length > 0))
-                .map(log => log.date);
-
-            const mostRecentDate = logDates.length > 0
-                ? logDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
-                : null;
-            
-            return {
-                ...intention,
-                lastCompleted: mostRecentDate
-            };
-        }).filter((i): i is ExerciseDefinition & { lastCompleted: string | null } => i !== null && i.lastCompleted !== null);
-
         return {
             ...skill,
-            intentions: intentionsWithCompletion
+            intentions: associatedIntentions
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, allDeepWorkLogs, getDescendantLeafNodes]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType]);
 
 
   return (
@@ -148,18 +130,17 @@ function SpacedRepetitionPageContent() {
                         <CardContent>
                           {skill.intentions.length > 0 ? (
                             <div className="space-y-2">
-                              <h4 className="text-sm font-semibold text-muted-foreground">Completed Intentions:</h4>
-                              <ul className="space-y-1 text-sm">
+                              <h4 className="text-sm font-semibold text-muted-foreground">Intentions:</h4>
+                              <ul className="space-y-1 text-sm list-disc list-inside">
                                 {skill.intentions.map(intention => (
-                                  <li key={intention.id} className="flex justify-between items-center">
+                                  <li key={intention.id}>
                                     <span>{intention.name}</span>
-                                    <Badge variant="secondary" className="text-xs">{format(parseISO(intention.lastCompleted!), 'MMM d')}</Badge>
                                   </li>
                                 ))}
                               </ul>
                             </div>
                           ) : (
-                            <p className="text-sm text-muted-foreground italic">No completed intentions for this skill yet.</p>
+                            <p className="text-sm text-muted-foreground italic">No intentions defined for this skill yet.</p>
                           )}
                         </CardContent>
                     </Card>
