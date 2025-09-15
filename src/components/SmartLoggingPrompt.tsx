@@ -333,17 +333,11 @@ export function SmartLoggingPrompt({
             }
         });
 
-        const loggedTime = activities.reduce((sum, task) => sum + getLoggedMinutes(task), 0);
-        
-        const now = new Date();
-        const isPastSlot = now.getHours() >= slot.endHour;
-
         return {
             type: 'slot' as const,
             name: slot.name,
             time: slot.time,
-            loggedTime: loggedTime,
-            hourlyData: hourlyData,
+            hourlyData,
         };
     });
 
