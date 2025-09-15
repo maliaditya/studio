@@ -264,8 +264,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   useEffect(() => {
     if (activeFocusSession?.state === 'idle' && showSubTasks) {
         if (activeSubTask) {
-             handleStartSubTask(activeSubTask);
-        } else if (subTasks.length > 0 && completedSubTaskComponents.length === subTasks.length) {
+            handleStartSubTask(activeSubTask);
+        } else if (subTasks.length > 0 && completedSubTaskComponents.length >= subTasks.length) {
             handleStop(true);
         }
     }
@@ -549,5 +549,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
-
-    
