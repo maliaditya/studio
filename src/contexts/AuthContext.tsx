@@ -415,6 +415,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       visualizationTechniques: true,
     },
     allWidgetsVisible: true,
+    agendaShowCurrentSlotOnly: false,
   });
 
   // Health State
@@ -1058,7 +1059,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
     }
   }, [
-    isLoadingState, saveState
+    isLoadingState, saveState, schedule // Added schedule to the dependency array
   ]);
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
@@ -1152,6 +1153,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         slotRules: {},
         widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true },
         allWidgetsVisible: true,
+        agendaShowCurrentSlotOnly: false,
     };
     setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
 
@@ -2966,5 +2968,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 }
 
     
+
 
 

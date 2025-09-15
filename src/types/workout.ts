@@ -193,7 +193,7 @@ export interface Activity {
   focusSessionStartTime?: number; // Tracks start of current segment (or initial start)
   focusSessionEndTime?: number;
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
-  focusSessionInitialDuration?: number; // The originally intended duration
+  focusSessionInitialDuration?: number;
   postSessionReview?: PostSessionReview;
   duration?: number; // For interruptions
   subTasks?: SubTask[]; // Added for sub-task functionality
@@ -673,6 +673,7 @@ export interface UserSettings {
   schedulingLevel?: 1 | 2 | 3;
   widgetVisibility: WidgetVisibility;
   allWidgetsVisible: boolean;
+  agendaShowCurrentSlotOnly: boolean;
 }
 
 export interface ActiveFocusSession {
@@ -691,3 +692,4 @@ export interface LinkTechniqueModalState {
     stopperId: string;
     stage: 2 | 3;
 }
+

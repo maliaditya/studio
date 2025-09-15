@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -22,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
+import { Progress } from './ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -95,7 +98,7 @@ function AgendaWidgetItem({
         <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
             {activity.completed 
               ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-              : <Circle className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
             }
         </button>
         <div 
@@ -174,12 +177,11 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, settings, setSettings } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState('');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [showCurrentSlotOnly, setShowCurrentSlotOnly] = useState(false);
 
   useEffect(() => {
     setPurposeText(dailyPurposes[dayKey] || '');
@@ -203,7 +205,7 @@ export function TodaysScheduleCard({
         return [];
     });
 
-    if (showCurrentSlotOnly) {
+    if (settings.agendaShowCurrentSlotOnly) {
         allActivities = allActivities.filter(activity => activity.slot === currentSlot);
     }
     
@@ -213,7 +215,7 @@ export function TodaysScheduleCard({
         }
         return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
     });
-  }, [todaysSchedule, showCurrentSlotOnly, currentSlot]);
+  }, [todaysSchedule, settings.agendaShowCurrentSlotOnly, currentSlot]);
 
   const pendingTasks = React.useMemo(() => {
     const yesterday = addDays(date, -1);
@@ -303,8 +305,8 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowCurrentSlotOnly(p => !p)}>
-                        <Focus className={cn("h-4 w-4", showCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSettings(prev => ({...prev, agendaShowCurrentSlotOnly: !prev.agendaShowCurrentSlotOnly}))}>
+                        <Focus className={cn("h-4 w-4", settings.agendaShowCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
                     </Button>
                     <Popover>
                         <PopoverTrigger asChild>
