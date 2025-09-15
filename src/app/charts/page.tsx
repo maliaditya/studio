@@ -251,19 +251,22 @@ function ChartsPageContent() {
         const specializations: CoreSkill[] = coreSkills.filter(skill => skill.type === 'Specialization');
     
         return specializations.map((spec, specIndex) => {
-            const allLeafNodes = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => {
-                const curiosities = upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity');
-                const intentions = deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention');
-                return [...curiosities, ...intentions];
-            }).flatMap(task => [...getDescendantLeafNodes(task.id, 'deepwork'), ...getDescendantLeafNodes(task.id, 'upskill')]);
-            
-            const leafNodeIds = new Set(allLeafNodes.map(n => n.id));
+            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms =>
+                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
+            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
     
+            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms =>
+                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
+            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            
+            const leafNodeIdsUpskill = new Set(allLeafNodesUpskill.map(n => n.id));
+            const leafNodeIdsDeepWork = new Set(allLeafNodesDeepWork.map(n => n.id));
+
             const dailyData: Record<string, number> = {};
     
             allDeepWorkLogs.forEach(log => {
                 const dailyMinutes = log.exercises
-                    .filter(ex => leafNodeIds.has(ex.definitionId))
+                    .filter(ex => leafNodeIdsDeepWork.has(ex.definitionId))
                     .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0);
                 if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
@@ -273,7 +276,7 @@ function ChartsPageContent() {
     
             allUpskillLogs.forEach(log => {
                 const dailyMinutes = log.exercises
-                    .filter(ex => leafNodeIds.has(ex.definitionId))
+                    .filter(ex => leafNodeIdsUpskill.has(ex.definitionId))
                     .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0);
                 if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
@@ -748,5 +751,7 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+
+    
 
     
