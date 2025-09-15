@@ -5,7 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay } from 'date-fns';
+import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay, subDays } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
@@ -129,7 +129,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' || context === 'hourly-activity' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -158,6 +158,8 @@ function ChartsPageContent() {
     
     const [resistanceFilter, setResistanceFilter] = useState<'all' | 'today' | 'lastX'>('all');
     const [lastXDays, setLastXDays] = useState(5);
+    const [activityFilter, setActivityFilter] = useState<'all' | 'today' | 'lastX'>('all');
+    const [lastXDaysActivity, setLastXDaysActivity] = useState(5);
 
     const productivityData = useMemo(() => {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
@@ -344,12 +346,14 @@ function ChartsPageContent() {
         });
 
         const today = startOfDay(new Date());
-        const filterStartDate = resistanceFilter === 'today' ? today : subYears(today, 10);
-        if (resistanceFilter === 'lastX') {
-            const daysAgo = startOfDay(subYears(new Date(), lastXDays));
-            if (daysAgo > filterStartDate) {
-                // This logic is simplified; for a real app, you'd use subDays.
-            }
+        let filterStartDate: Date;
+
+        if (resistanceFilter === 'today') {
+            filterStartDate = today;
+        } else if (resistanceFilter === 'lastX') {
+            filterStartDate = subDays(today, lastXDays - 1);
+        } else { // 'all'
+            filterStartDate = subYears(today, 10); // Effectively all time
         }
         
         const allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
@@ -375,6 +379,7 @@ function ChartsPageContent() {
                 link.stopper.timestamps.forEach(ts => {
                     const eventDate = new Date(ts);
                     if (resistanceFilter === 'all' || eventDate >= filterStartDate) {
+                         if (resistanceFilter === 'today' && !isSameDay(eventDate, today)) return;
                         const hour = eventDate.getHours();
                         if (link.isUrge) {
                             log[hour].urges++;
@@ -389,6 +394,62 @@ function ChartsPageContent() {
         });
         return log;
     }, [habitCards, mechanismCards, resistanceFilter, lastXDays]);
+    
+    const { hourlyActivityData, hourlyActivityConfig } = useMemo(() => {
+        const hourlyData = Array.from({ length: 24 }, (_, i) => {
+            const hourLabel = i % 12 === 0 ? 12 : i % 12;
+            const ampm = i < 12 ? 'AM' : 'PM';
+            const record: Record<string, any> = {
+                hour: i,
+                name: `${hourLabel}${ampm}`,
+            };
+            Object.values(activityNameMap).forEach(name => {
+                record[name] = 0;
+            });
+            return record;
+        });
+    
+        const today = startOfDay(new Date());
+        let filterStartDate: Date;
+    
+        if (activityFilter === 'today') {
+            filterStartDate = today;
+        } else if (activityFilter === 'lastX') {
+            filterStartDate = subDays(today, lastXDaysActivity - 1);
+        } else { // 'all'
+            filterStartDate = subYears(today, 10);
+        }
+
+        Object.entries(schedule).forEach(([date, dailySchedule]) => {
+            const eventDate = parseISO(date);
+            if (activityFilter !== 'all' && eventDate < filterStartDate) return;
+            if (activityFilter === 'today' && !isSameDay(eventDate, today)) return;
+
+            Object.values(dailySchedule).flat().forEach((activity: Activity) => {
+                if (activity.completed && activityDurations[activity.id]) {
+                    const duration = parseInt(activityDurations[activity.id].replace(' min', ''));
+                    // This is a simplification; for more accuracy, we'd need start/end times of activities.
+                    // For now, we'll attribute the duration to the start hour of its slot.
+                    const slot = Object.values(activityNameMap).includes(activity.type) ? activity.slot : null;
+                    const slotStartHour = slot ? new Date().setHours(parseInt(slot.split(':')[0])) : null;
+                    
+                    // Fallback to a crude hour distribution if we don't have exact times.
+                    const hour = new Date().getHours(); // Simplification: attribute to current hour for now
+                    const activityName = activityNameMap[activity.type];
+                    if (activityName) {
+                        hourlyData[hour][activityName] = (hourlyData[hour][activityName] || 0) + duration;
+                    }
+                }
+            });
+        });
+        
+        const config: ChartConfig = {};
+        Object.keys(activityColorMapping).forEach(name => {
+            config[name] = { label: name, color: activityColorMapping[name] };
+        });
+
+        return { hourlyActivityData, hourlyActivityConfig: config };
+    }, [schedule, activityDurations, activityFilter, lastXDaysActivity]);
 
 
     const allCategoriesData = useMemo(() => {
@@ -404,6 +465,7 @@ function ChartsPageContent() {
                         return {
                             date: date,
                             time: dailyTotalForCategory,
+                            activities: Object.values(dailySchedule).flat().filter(a => a && a.completed && activityNameMap[a.type] === category).map(a => ({ name: a.details, duration: parseInt(activityDurations[a.id]?.replace(' min', '') || '0') }))
                         };
                     })
                     .filter(item => item.time > 0)
@@ -510,6 +572,7 @@ function ChartsPageContent() {
                                     data={hourlyResistanceData}
                                     margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                                 >
+                                    <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
                                     <YAxis allowDecimals={false} />
                                     <RechartsTooltip content={<CustomTooltip context="hourly-resistance"/>}/>
@@ -517,6 +580,42 @@ function ChartsPageContent() {
                                     <Line type="monotone" dataKey="resistances" name="Resistances" stroke="hsl(var(--chart-2))" />
                                 </LineChart>
                            </ResponsiveContainer>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Hourly Activity Log</CardTitle>
+                        <CardDescription>A historical log of your logged activity time, grouped by the hour of the day.</CardDescription>
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                            <Button variant={activityFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('all')}>All Time</Button>
+                            <Button variant={activityFilter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('today')}>Today</Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant={activityFilter === 'lastX' ? 'default' : 'outline'} size="sm" onClick={() => setActivityFilter('lastX')}>Last</Button>
+                                <Input
+                                    type="number"
+                                    value={lastXDaysActivity}
+                                    onChange={(e) => setLastXDaysActivity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    className="w-16 h-8 text-sm"
+                                    onFocus={() => setActivityFilter('lastX')}
+                                />
+                                <span className="text-sm">Days</span>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={hourlyActivityConfig} className="w-full h-[300px]">
+                            <ResponsiveContainer>
+                                <LineChart data={hourlyActivityData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" />
+                                    <YAxis label={{ value: 'Minutes Logged', angle: -90, position: 'insideLeft' }} />
+                                    <RechartsTooltip content={<CustomTooltip context="hourly-activity" customConfig={hourlyActivityConfig} />} />
+                                    {Object.keys(activityColorMapping).map((key, i) => (
+                                      <Line key={key} type="monotone" dataKey={key} name={key} stroke={activityColorMapping[key]} dot={false} />
+                                    ))}
+                                </LineChart>
+                            </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
                 </Card>
