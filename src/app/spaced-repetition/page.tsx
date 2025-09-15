@@ -53,7 +53,7 @@ function SpacedRepetitionPageContent() {
 
         const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
 
-        const repHistory: { date: Date, interval: number }[] = [];
+        const repHistor: { date: Date, interval: number }[] = [];
         let reps = 0;
         let lastReviewDate = sortedDates.length > 0 ? sortedDates[0] : new Date();
 
@@ -114,7 +114,7 @@ function SpacedRepetitionPageContent() {
           reps
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, getDeepWorkNodeType]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes]);
 
   if (repetitionData.length === 0) {
     return (
