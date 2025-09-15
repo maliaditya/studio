@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Lightbulb, BookCopy } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, max } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import type { ExerciseDefinition, MicroSkill } from '@/types/workout';
@@ -25,6 +25,30 @@ function SpacedRepetitionPageContent() {
     const repetitionSkills = coreSkills
       .flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills))
       .filter(ms => ms.isReadyForRepetition);
+
+    // 1. Create a map from leaf node ID to its parent Intention ID
+    const leafToIntentionMap = new Map<string, string>();
+    const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
+    intentions.forEach(intention => {
+        const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
+        leafNodes.forEach(leaf => {
+            leafToIntentionMap.set(leaf.id, intention.id);
+        });
+    });
+
+    // 2. Find the last logged date for each leaf node
+    const lastLoggedDateByLeafId = new Map<string, Date>();
+    allDeepWorkLogs.forEach(log => {
+        log.exercises.forEach(ex => {
+            if (ex.loggedSets.length > 0) {
+                const logDate = parseISO(log.date);
+                const existingDate = lastLoggedDateByLeafId.get(ex.definitionId);
+                if (!existingDate || logDate > existingDate) {
+                    lastLoggedDateByLeafId.set(ex.definitionId, logDate);
+                }
+            }
+        });
+    });
       
     return repetitionSkills.map(skill => {
         const associatedIntentions = deepWorkDefinitions.filter(def => 
@@ -36,31 +60,19 @@ function SpacedRepetitionPageContent() {
             intentions: associatedIntentions.map(intention => {
                 const totalLoggedMinutes = getDeepWorkLoggedMinutes(intention);
 
-                let lastLoggedDate: string | null = null;
-                if (totalLoggedMinutes > 0) {
-                    const leafNodeIds = new Set(getDescendantLeafNodes(intention.id, 'deepwork').map(n => n.id));
-                    let mostRecentDate: Date | null = null;
-
-                    for (const log of allDeepWorkLogs) {
-                        const hasLoggedLeaf = log.exercises.some(ex => 
-                            leafNodeIds.has(ex.definitionId) && ex.loggedSets.length > 0
-                        );
-                        if (hasLoggedLeaf) {
-                            const logDate = parseISO(log.date);
-                            if (!mostRecentDate || logDate > mostRecentDate) {
-                                mostRecentDate = logDate;
-                            }
-                        }
-                    }
-                    if (mostRecentDate) {
-                        lastLoggedDate = format(mostRecentDate, 'MMM d, yyyy');
-                    }
-                }
-
+                // 3. Find the most recent date from this Intention's leaf nodes
+                const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
+                const logDates = leafNodes
+                    .map(leaf => lastLoggedDateByLeafId.get(leaf.id))
+                    .filter((date): date is Date => !!date);
+                
+                const mostRecentDate = logDates.length > 0 ? max(logDates) : null;
+                const lastLoggedDate = mostRecentDate ? format(mostRecentDate, 'MMM d, yyyy') : null;
+                
                 return {
                     ...intention,
-                    totalLoggedMinutes: totalLoggedMinutes,
-                    lastLoggedDate: lastLoggedDate
+                    totalLoggedMinutes,
+                    lastLoggedDate
                 };
             })
         };
