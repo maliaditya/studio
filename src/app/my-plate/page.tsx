@@ -1,7 +1,4 @@
 
-
-      
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -632,11 +629,7 @@ function MyPlatePageContent() {
     if (!activity || activity.completed) return;
   
     if (activity.type === 'workout') {
-      const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
-      setTodaysExercises(exercises);
-      setTodaysMuscleGroups(muscleGroups);
-      setWorkoutActivityToLog(activity);
-      setIsTodaysWorkoutModalOpen(true);
+      handleStartWorkoutLog(activity);
     } else if (activity.type === 'mindset') {
         handleStartMindsetLog(activity);
     } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
@@ -653,10 +646,10 @@ function MyPlatePageContent() {
       const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType || '');
       
       if (isParentNode) {
-        onOpenFocusModal(activity);
-      } else {
         setEditingActivity({ slotName, activity });
         setIsLearningModalOpen(true);
+      } else {
+        onOpenFocusModal(activity);
       }
     } else if (activity.type === 'lead-generation') {
       handleStartLeadGenLog(activity);
@@ -1343,8 +1336,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-
-    

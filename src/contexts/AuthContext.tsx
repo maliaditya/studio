@@ -780,28 +780,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setSchedule]);
 
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-  
-    if (def) {
-      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-  
-      if (isParentNode) {
-        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-        if (allLeafNodes.length > 0) {
-          const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
-  
-          if (allChildrenCompleted) {
-            handleToggleComplete(activity.slot, activity.id, true);
-            toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
-            return false;
-          }
-        }
-      }
-    }
-    
+    // This function is now simplified, as the complex logic has been moved
+    // to the page component where the click originates.
     const estDurationStr = activityDurations[activity.id];
     let minutes = 0;
     if (estDurationStr) {
@@ -820,17 +800,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
     return true;
-  }, [
-    deepWorkDefinitions, 
-    upskillDefinitions, 
-    getUpskillNodeType, 
-    getDeepWorkNodeType, 
-    getDescendantLeafNodes, 
-    activityDurations,
-    handleToggleComplete,
-    toast,
-    permanentlyLoggedTaskIds
-  ]);
+  }, [activityDurations]);
   
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
@@ -2902,7 +2872,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(interval);
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     let timerId: NodeJS.Timeout | undefined;
 
     if (activeFocusSession?.state === 'running') {
