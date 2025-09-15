@@ -386,7 +386,7 @@ function ChartsPageContent() {
         
         allDeepWorkLogs.forEach(log => {
             log.exercises.forEach(ex => {
-                if(intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
+                if (intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
                     loggedIntentions.push({ name: ex.name, date: log.date });
                 }
             })
@@ -405,7 +405,7 @@ function ChartsPageContent() {
         const { x, y, payload } = props;
         return (
             <g transform={`translate(${x},${y})`}>
-                <text x={0} y={0} dy={0} dx={-10} textAnchor="end" fill="hsl(var(--foreground))" className="text-xs cursor-pointer hover:fill-primary" onClick={() => handleYAxisClick(payload.value)}>
+                <text x={0} y={0} dy={4} dx={-10} textAnchor="end" fill="hsl(var(--foreground))" className="text-xs cursor-pointer hover:fill-primary" onClick={() => handleYAxisClick(payload.value)}>
                     {payload.value}
                 </text>
             </g>
