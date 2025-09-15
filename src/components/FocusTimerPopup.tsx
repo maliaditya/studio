@@ -229,14 +229,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     setPromptForCompletion(false);
   
-    // Find the next task in the original list
-    // Crucially, we need to find the next task that is *not yet complete* in this session
     const nextTask = subTasks.find(st => st.id !== activeSubTask.id && !isSubTaskComplete(st));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
     } else {
-      // No more pending tasks, the objective is complete
       handleStop(true);
     }
   }, [
@@ -445,7 +442,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                             <Button size="xs" type="submit">Set</Button>
                         </form>
                     )}
-                  {!promptForCompletion && (
+                  {!promptForCompletion && !allSubTasksCompleted && (
                     <div className="flex items-center">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleTogglePause}>
                           {activeFocusSession.state === 'running' ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -504,7 +501,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                         </span>
                     </div>
                   ))}
-                  {pendingSubTasks.length === 0 && (
+                  {pendingSubTasks.length === 0 && !allSubTasksCompleted && (
+                    <p className="text-xs text-center text-muted-foreground py-4">Loading next task...</p>
+                  )}
+                  {allSubTasksCompleted && (
                     <p className="text-xs text-center text-muted-foreground py-4">All tasks completed!</p>
                   )}
                 </div>
@@ -549,3 +549,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
+
+    
