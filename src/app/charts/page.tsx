@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState } from 'react';
@@ -478,35 +479,28 @@ function ChartsPageContent() {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
     
         specializations.forEach(spec => {
-            const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
+            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
     
-            const topLevelUpskill = upskillDefinitions.filter(def => 
-                microSkillNames.has(def.category) && getUpskillNodeType(def) === 'Curiosity'
-            );
-            const topLevelDeepWork = deepWorkDefinitions.filter(def => 
-                microSkillNames.has(def.category) && getDeepWorkNodeType(def) === 'Intention'
-            );
+            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
+            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
     
             let totalSpecMinutes = 0;
     
             if (specHoursFilter === 'all') {
-                const allLeafNodesUpskill = topLevelUpskill.flatMap(tlu => getDescendantLeafNodes(tlu.id, 'upskill'));
-                const allLeafNodesDeepWork = topLevelDeepWork.flatMap(tld => getDescendantLeafNodes(tld.id, 'deepwork'));
-                
                 allLeafNodesUpskill.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
                 allLeafNodesDeepWork.forEach(leaf => { totalSpecMinutes += leaf.loggedDuration || 0; });
             } else { // 'today'
                 const todaysDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
                 const todaysUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
-                
-                const allLeafNodesUpskill = topLevelUpskill.flatMap(tlu => getDescendantLeafNodes(tlu.id, 'upskill'));
-                const allLeafNodesDeepWork = topLevelDeepWork.flatMap(tld => getDescendantLeafNodes(tld.id, 'deepwork'));
-
+    
                 if (todaysUpskillLog) {
                     allLeafNodesUpskill.forEach(leaf => {
                         const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
                         if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0); // upskill duration is in reps
                         }
                     });
                 }
@@ -514,7 +508,7 @@ function ChartsPageContent() {
                     allLeafNodesDeepWork.forEach(leaf => {
                         const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
                         if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0); // deepwork duration is in weight
                         }
                     });
                 }
@@ -641,17 +635,15 @@ function ChartsPageContent() {
                     <CardContent>
                         <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
                             <ResponsiveContainer>
-                                <BarChart data={specializationHoursSummary} layout="vertical" margin={{ left: 20 }}>
-                                    <CartesianGrid horizontal={false} />
-                                    <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tickMargin={10} width={100} />
-                                    <XAxis type="number" dataKey="hours" />
+                                <LineChart data={specializationHoursSummary}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="category" dataKey="name" />
+                                    <YAxis type="number" dataKey="hours" />
                                     <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
-                                    <Bar dataKey="hours" radius={4}>
-                                        {specializationHoursSummary.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
+                                    {Object.keys(specHoursChartConfig).map((key) => (
+                                        <Line key={key} type="monotone" dataKey="hours" name={specHoursChartConfig[key as keyof typeof specHoursChartConfig]?.label} stroke={specHoursChartConfig[key as keyof typeof specHoursChartConfig]?.color} />
+                                    ))}
+                                </LineChart>
                             </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
