@@ -252,35 +252,36 @@ function ChartsPageContent() {
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     
         return specializations.map((spec, specIndex) => {
-            const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
-            
-            const dailyData: Record<string, number> = {};
+            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
+            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
     
-            // Process Deep Work Logs
+            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
+                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
+            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+    
+            const leafNodeIdsUpskill = new Set(allLeafNodesUpskill.map(n => n.id));
+            const leafNodeIdsDeepWork = new Set(allLeafNodesDeepWork.map(n => n.id));
+
+            const dailyData: Record<string, number> = {};
+
             allDeepWorkLogs.forEach(log => {
-                let dailyMinutes = 0;
-                log.exercises.forEach(ex => {
-                    const def = allDefs.find(d => d.id === ex.definitionId);
-                    if (def && microSkillNames.has(def.category)) {
-                        dailyMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
-                    }
-                });
+                const dailyMinutes = log.exercises
+                    .filter(ex => leafNodeIdsDeepWork.has(ex.definitionId))
+                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0);
+
                 if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
                     dailyData[log.date] += dailyMinutes;
                 }
             });
-    
-            // Process Upskill Logs
+
             allUpskillLogs.forEach(log => {
-                let dailyMinutes = 0;
-                log.exercises.forEach(ex => {
-                    const def = allDefs.find(d => d.id === ex.definitionId);
-                    if (def && microSkillNames.has(def.category)) {
-                        dailyMinutes += ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-                    }
-                });
-                 if (dailyMinutes > 0) {
+                const dailyMinutes = log.exercises
+                    .filter(ex => leafNodeIdsUpskill.has(ex.definitionId))
+                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0);
+                
+                if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
                     dailyData[log.date] += dailyMinutes;
                 }
@@ -299,7 +300,7 @@ function ChartsPageContent() {
                 color: `hsl(var(--chart-${(specIndex % 5) + 1}))`
             };
         }).filter(spec => spec.historicalData.length > 0);
-    }, [coreSkills, allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions]);
+    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, allDeepWorkLogs, allUpskillLogs]);
     
     const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
         const totals: Record<string, number> = {};
