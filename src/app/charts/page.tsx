@@ -251,35 +251,30 @@ function ChartsPageContent() {
         const specializations: CoreSkill[] = coreSkills.filter(skill => skill.type === 'Specialization');
     
         return specializations.map((spec, specIndex) => {
-            const allLeafNodesUpskill = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
-                upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity')
-            ).flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
+            const allLeafNodes = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => {
+                const curiosities = upskillDefinitions.filter(def => def.category === ms.name && getUpskillNodeType(def) === 'Curiosity');
+                const intentions = deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention');
+                return [...curiosities, ...intentions];
+            }).flatMap(task => [...getDescendantLeafNodes(task.id, 'deepwork'), ...getDescendantLeafNodes(task.id, 'upskill')]);
+            
+            const leafNodeIds = new Set(allLeafNodes.map(n => n.id));
     
-            const allLeafNodesDeepWork = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms => 
-                deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
-            ).flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-    
-            const leafNodeIdsUpskill = new Set(allLeafNodesUpskill.map(n => n.id));
-            const leafNodeIdsDeepWork = new Set(allLeafNodesDeepWork.map(n => n.id));
-
             const dailyData: Record<string, number> = {};
-
+    
             allDeepWorkLogs.forEach(log => {
                 const dailyMinutes = log.exercises
-                    .filter(ex => leafNodeIdsDeepWork.has(ex.definitionId))
+                    .filter(ex => leafNodeIds.has(ex.definitionId))
                     .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.weight || 0), 0), 0);
-
                 if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
                     dailyData[log.date] += dailyMinutes;
                 }
             });
-
+    
             allUpskillLogs.forEach(log => {
                 const dailyMinutes = log.exercises
-                    .filter(ex => leafNodeIdsUpskill.has(ex.definitionId))
+                    .filter(ex => leafNodeIds.has(ex.definitionId))
                     .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + (set.reps || 0), 0), 0);
-                
                 if (dailyMinutes > 0) {
                     if (!dailyData[log.date]) dailyData[log.date] = 0;
                     dailyData[log.date] += dailyMinutes;
@@ -325,20 +320,21 @@ function ChartsPageContent() {
             } else { // 'today'
                 const todaysDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
                 const todaysUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
-    
+                
+                const leafNodeIdsUpskill = new Set(allLeafNodesUpskill.map(leaf => leaf.id));
+                const leafNodeIdsDeepWork = new Set(allLeafNodesDeepWork.map(leaf => leaf.id));
+
                 if (todaysUpskillLog) {
-                    allLeafNodesUpskill.forEach(leaf => {
-                        const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
-                        if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                    todaysUpskillLog.exercises.forEach(exerciseLog => {
+                        if (leafNodeIdsUpskill.has(exerciseLog.definitionId)) {
+                             totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
                         }
                     });
                 }
                 if (todaysDeepWorkLog) {
-                    allLeafNodesDeepWork.forEach(leaf => {
-                        const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
-                        if (exerciseLog) {
-                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                    todaysDeepWorkLog.exercises.forEach(exerciseLog => {
+                        if (leafNodeIdsDeepWork.has(exerciseLog.definitionId)) {
+                           totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
                         }
                     });
                 }
