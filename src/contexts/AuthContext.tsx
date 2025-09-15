@@ -358,6 +358,8 @@ interface AuthContextType {
   setTopPriorities: React.Dispatch<React.SetStateAction<Priority[]>>;
   brainHacks: BrainHack[];
   setBrainHacks: React.Dispatch<React.SetStateAction<BrainHack[]>>;
+  getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
+  getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -618,24 +620,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return leafNodes;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
-        const activityIndex = activities.findIndex(act => act.id === activityId);
-
-        if (activityIndex > -1) {
-            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
-            daySchedule[slotName] = activities;
-            newSchedule[todayKey] = daySchedule;
-        }
-        
-        return newSchedule;
-    });
-  }, [setSchedule]);
-
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
@@ -764,7 +748,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
-
+  
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
     const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
@@ -777,6 +761,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
+  
+  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+
+        if (activityIndex > -1) {
+            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            daySchedule[slotName] = activities;
+            newSchedule[todayKey] = daySchedule;
+        }
+        
+        return newSchedule;
+    });
+  }, [setSchedule]);
 
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
@@ -906,6 +908,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
   }, [deepWorkDefinitions, upskillDefinitions, updateActivity, toast, getDeepWorkNodeType, getUpskillNodeType, logSubTaskTime]);
   
+  const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
+    const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
+    if (leafNodes.length > 0) {
+        return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
+    }
+    return definition.loggedDuration || 0;
+  }, [getDescendantLeafNodes]);
+
+  const getUpskillLoggedMinutesRecursive = useCallback((definition: ExerciseDefinition): number => {
+      const leafNodes = getDescendantLeafNodes(definition.id, 'upskill');
+      if (leafNodes.length > 0) {
+          return leafNodes.reduce((total, node) => total + (node.loggedDuration || 0), 0);
+      }
+      return definition.loggedDuration || 0;
+  }, [getDescendantLeafNodes]);
+
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -2825,6 +2843,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     stopperProgressPopup, openStopperProgressPopup, setStopperProgressPopup,
     topPriorities, setTopPriorities,
     brainHacks, setBrainHacks,
+    getDeepWorkLoggedMinutes,
+    getUpskillLoggedMinutesRecursive
   };
 
   useEffect(() => {
@@ -2844,7 +2864,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
     
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
-    setTheme(savedTheme);
+    setThemeState(savedTheme);
   }, [setTheme]);
   
    useEffect(() => {
@@ -2893,3 +2913,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
+    
