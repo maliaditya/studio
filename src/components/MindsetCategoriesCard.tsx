@@ -216,7 +216,7 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
                         A historical log of all your urges and resistances, grouped by the hour of the day they were recorded.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow min-h-[400px]">
+                <div className="w-full h-[400px] py-4">
                    <ResponsiveContainer width="100%" height="100%">
                         <RechartsLineChart
                             data={chartData}
