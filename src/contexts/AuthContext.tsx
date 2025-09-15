@@ -561,102 +561,125 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const prevUser = usePrevious(currentUser);
   
-  const openStopperProgressPopup = (stopper: Stopper, habitName: string) => {
-    setStopperProgressPopup({
-        isOpen: true,
-        stopper: stopper,
-        habitName: habitName,
-    });
-  };
-
-  const setTheme = (newTheme: string) => {
-    setThemeState(newTheme);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lifeos_theme', newTheme);
-      document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
-      document.body.classList.add(`theme-${newTheme}`);
+  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
+    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+    
+    if (isParent) {
+        return isChild ? 'Objective' : 'Intention';
     }
-  };
+    return isChild ? 'Action' : 'Standalone';
+  }, [deepWorkDefinitions]);
 
-  const handleStartFocusSession = useCallback((activity: Activity, duration: number) => {
-    const dateKey = format(new Date(), 'yyyy-MM-dd');
-    const fullActivityFromState = (schedule[dateKey]?.[activity.slot] as Activity[] | undefined)?.find(a => a.id === activity.id);
-
-    const activityToStart = fullActivityFromState || activity;
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
     
-    const updatedActivity: Activity = {
-        ...activityToStart,
-        focusSessionInitialStartTime: Date.now(),
-        focusSessionStartTime: Date.now(),
-        focusSessionEndTime: undefined,
-        focusSessionPauses: [],
-        focusSessionInitialDuration: duration,
-    };
-    
-    updateActivity(updatedActivity); // Persist start time immediately
+    if(isParent) {
+        return isChild ? 'Objective' : 'Curiosity';
+    }
+    return isChild ? 'Visualization' : 'Standalone';
+  }, [upskillDefinitions]);
 
-    setActiveFocusSession({
-        activity: updatedActivity,
-        duration: duration,
-        secondsLeft: duration * 60,
-        totalSeconds: duration * 60,
-        startTime: Date.now(),
-        state: 'running',
-    });
-    setFocusSessionModalOpen(false);
-  }, [schedule]);
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    
+    const leafNodes: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        
+        const node = definitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const children = node[linkKey] || [];
+        if (children.length === 0) {
+            leafNodes.push(node);
+        } else {
+            children.forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const updateActivity = (updatedActivity: Activity) => {
+  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
     setSchedule(prev => {
         const newSchedule = { ...prev };
-        let found = false;
-        for (const dateKey in newSchedule) {
-            for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                if (Array.isArray(activities)) {
-                    const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-                    if (activityIndex > -1) {
-                        activities[activityIndex] = updatedActivity;
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if (found) break;
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+
+        if (activityIndex > -1) {
+            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            daySchedule[slotName] = activities;
+            newSchedule[todayKey] = daySchedule;
         }
+        
         return newSchedule;
     });
-  };
+  }, [setSchedule]);
 
-  useEffect(() => {
-    const timerInterval = setInterval(() => {
-      if (activeFocusSession && activeFocusSession.state === 'running') {
-        const now = Date.now();
-        const elapsed = (now - activeFocusSession.startTime) / 1000;
-        const newSecondsLeft = Math.max(0, activeFocusSession.totalSeconds - elapsed);
-        setActiveFocusSession(prev => prev ? { ...prev, secondsLeft: newSecondsLeft } : null);
+  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
+  
+    if (def) {
+      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+  
+      if (isParentNode) {
+        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
+        if (allLeafNodes.length > 0) {
+          const allChildrenCompleted = allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
+  
+          if (allChildrenCompleted) {
+            handleToggleComplete(activity.slot, activity.id, true);
+            toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
+            return false;
+          }
+        }
       }
-    }, 1000);
-    return () => clearInterval(timerInterval);
-  }, [activeFocusSession]);
-
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    if (!subTaskId || durationMinutes <= 0) return;
-
-    const isUpskill = upskillDefinitions.some(d => d.id === subTaskId);
-    const updater = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
-
-    updater(prevDefs => 
-        prevDefs.map(def => 
-            def.id === subTaskId 
-                ? { ...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes }
-                : def
-        )
-    );
-
-    const definition = (isUpskill ? upskillDefinitions : deepWorkDefinitions).find(d => d.id === subTaskId);
-    toast({ title: "Sub-task Logged", description: `Logged ${durationMinutes} minutes for "${definition?.name}".` });
-  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast]);
+    }
+    
+    const estDurationStr = activityDurations[activity.id];
+    let minutes = 0;
+    if (estDurationStr) {
+      const hMatch = estDurationStr.match(/(\d+)h/);
+      const mMatch = estDurationStr.match(/(\d+)m/);
+      const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
+      const m = mMatch ? parseInt(mMatch[1]) : 0;
+      minutes = h + m;
+      if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
+          minutes = parseInt(estDurationStr.trim());
+      }
+    }
+    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+  
+    setFocusDuration(minutes);
+    setFocusActivity(activity);
+    setFocusSessionModalOpen(true);
+    return true;
+  }, [
+    deepWorkDefinitions, 
+    upskillDefinitions, 
+    getUpskillNodeType, 
+    getDeepWorkNodeType, 
+    getDescendantLeafNodes, 
+    activityDurations, 
+    handleToggleComplete,
+    toast
+  ]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
@@ -689,36 +712,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
-    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-    
-    const leafNodes: ExerciseDefinition[] = [];
-    const queue: string[] = [startNodeId];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        
-        const node = definitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const children = node[linkKey] || [];
-        if (children.length === 0) {
-            leafNodes.push(node);
-        } else {
-            children.forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    return leafNodes;
-  }, [deepWorkDefinitions, upskillDefinitions]);
-
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
@@ -816,121 +809,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
-  
-  const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
-    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
-    
-    if (isParent) {
-        return isChild ? 'Objective' : 'Intention';
-    }
-    return isChild ? 'Action' : 'Standalone';
-  }, [deepWorkDefinitions]);
 
-  const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
-    
-    if(isParent) {
-        return isChild ? 'Objective' : 'Curiosity';
-    }
-    return isChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions]);
-
-  const updateTaskDuration = (taskId: string, duration: number) => {
-    const updater = (definitions: ExerciseDefinition[]) => 
-      definitions.map(d => d.id === taskId ? { ...d, estimatedDuration: duration } : d);
-      
-    setDeepWorkDefinitions(prev => updater(prev));
-    setUpskillDefinitions(prev => updater(prev));
-    
-    toast({ title: 'Duration Updated', description: `Estimated duration has been set to ${duration} minutes.`});
-  };
-  
-  const permanentlyLoggedTaskIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    const processLogs = (logs: DatedWorkout[]) => {
-      (logs || []).forEach(log => {
-        (log.exercises || []).forEach(ex => {
-          if ((ex.loggedSets?.length ?? 0) > 0) {
-            loggedIds.add(ex.definitionId);
-          }
-        });
-      });
-    };
-    processLogs(allDeepWorkLogs);
-    processLogs(allUpskillLogs);
-    return loggedIds;
-  }, [allDeepWorkLogs, allUpskillLogs]);
-
-  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
-        const activityIndex = activities.findIndex(act => act.id === activityId);
-
-        if (activityIndex > -1) {
-            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
-            daySchedule[slotName] = activities;
-            newSchedule[todayKey] = daySchedule;
-        }
-        
-        return newSchedule;
-    });
-  }, [setSchedule]);
-
-  const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-  
-    if (def) {
-        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-        
-        if (isParentNode) {
-            const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-            if (allLeafNodes.length > 0) {
-                const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
-        
-                if (allChildrenCompleted) {
-                  handleToggleComplete(activity.slot, activity.id, true);
-                  toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
-                  return false; // Prevent modal from opening
-                }
-            }
-            
-            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
-            if (firstPendingNode) {
-              handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
-            } else {
-              handleStartFocusSession(activity, 25); // Fallback
-            }
-            return true;
-        }
-    }
-    
-    const estDurationStr = activityDurations[activity.id];
-    let minutes = 0;
-    if (estDurationStr) {
-        const hMatch = estDurationStr.match(/(\d+)h/);
-        const mMatch = estDurationStr.match(/(\d+)m/);
-        const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
-        const m = mMatch ? parseInt(mMatch[1]) : 0;
-        minutes = h + m;
-        if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
-            minutes = parseInt(estDurationStr.trim());
-        }
-    }
-    if (isNaN(minutes) || minutes <= 0) minutes = 45;
-  
-    setFocusDuration(minutes);
-    setFocusActivity(activity);
-    setFocusSessionModalOpen(true);
-    return true;
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, handleStartFocusSession, toast, handleToggleComplete]);
   
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -2937,5 +2816,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-    
