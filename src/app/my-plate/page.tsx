@@ -652,7 +652,7 @@ function MyPlatePageContent() {
       
       const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType || '');
       
-      if (isParentNode && activity.taskIds && activity.taskIds.length > 0) {
+      if (isParentNode) {
         onOpenFocusModal(activity);
       } else {
         setEditingActivity({ slotName, activity });
@@ -1345,3 +1345,6 @@ export default function MyPlatePage() {
 }
 
 
+
+
+    
