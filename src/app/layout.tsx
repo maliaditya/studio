@@ -83,12 +83,6 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 };
 
 
-// export const metadata: Metadata = {
-//   title: 'LifeOS',
-//   description: 'Your personal dashboard for growth and productivity.',
-// };
-// Metadata needs to be in a server component, moving to a new AppWrapper client component
-
 function AppWrapper({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const authContext = useAuth();
@@ -592,11 +586,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [isBrowser, setIsBrowser] = React.useState(false);
-  useEffect(() => {
-    setIsBrowser(true);
-  }, []);
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -613,8 +602,9 @@ export default function RootLayout({
           <AppWrapper>{children}</AppWrapper>
         </AuthProvider>
         <Analytics />
-        {isBrowser ? <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} /> : null}
+        <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} />
       </body>
     </html>
   );
 }
+
