@@ -47,6 +47,7 @@ export function Header() {
     { href: '/personal-branding', label: 'Branding' },
     { href: '/strategic-planning', label: 'Strategy' },
     { href: '/resources', label: 'Resources' },
+    { href: '/spaced-repetition', label: 'Spaced Repetition' },
   ];
 
   return (
