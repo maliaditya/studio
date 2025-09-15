@@ -279,27 +279,6 @@ export function SmartLoggingPrompt({
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   
-  const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-    let totalMinutes = 0;
-    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-    const minMatch = durationStr.match(/(\d+)\s*m/);
-
-    if (hourMatch) {
-        totalMinutes += parseFloat(hourMatch[1]) * 60;
-    }
-    if (minMatch) {
-        totalMinutes += parseInt(minMatch[1], 10);
-    }
-    
-    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-        totalMinutes += parseInt(durationStr.trim(), 10);
-    }
-
-    return totalMinutes;
-  };
-
   const dailyAnalysis = useMemo(() => {
     const today = new Date();
     const todayKey = format(today, 'yyyy-MM-dd');
@@ -483,7 +462,7 @@ export function SmartLoggingPrompt({
                                         <CardHeader className="p-3">
                                           <CardTitle className="text-base">🕒 {item.name}</CardTitle>
                                         </CardHeader>
-                                        <CardContent className="p-3 pt-0 flex-grow">
+                                        <CardContent className="p-3 pt-0 flex-grow h-[150px]">
                                             <div className="h-full w-full">
                                                 <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
                                                     <ResponsiveContainer>
