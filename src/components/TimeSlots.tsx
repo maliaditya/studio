@@ -369,6 +369,16 @@ export function TimeSlots({
                                 <Briefcase className="h-4 w-4 mr-2" />
                                 Add Deep Work
                             </Button>
+                             <Separator className="my-1" />
+                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'planning')}>
+                                <ClipboardList className="h-4 w-4 mr-2" />
+                                Add Planning
+                            </Button>
+                             <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'tracking')}>
+                                <ClipboardCheck className="h-4 w-4 mr-2" />
+                                Add Tracking
+                            </Button>
+                            <Separator className="my-1" />
                             <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'essentials')}>
                                 <CheckSquare className="h-4 w-4 mr-2" />
                                 Add Daily Essentials
