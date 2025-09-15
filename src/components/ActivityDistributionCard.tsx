@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -49,6 +50,7 @@ const activityColorMapping: Record<string, string> = {
     'Untracked Time': 'hsl(var(--muted))',
     'Scheduled': 'hsl(var(--muted))',
     'Free Time': 'hsl(var(--muted))',
+    'Mindset': 'hsl(var(--chart-5))',
 };
 
 const formatMinutes = (minutes: number) => {
@@ -416,6 +418,7 @@ export function ActivityDistributionCard() {
     
     const handleMouseUp = () => {
         setIsDragging(false);
+        localStorage.setItem('all_resistances_position', JSON.stringify(position));
     };
 
     useEffect(() => {

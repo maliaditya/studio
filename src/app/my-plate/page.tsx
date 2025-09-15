@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -102,7 +103,7 @@ function MyPlatePageContent() {
     productizationPlans,
     offerizationPlans,
     onOpenIntentionPopup,
-    onOpenFocusModal,
+    handleStartFocusSession,
     setIsAudioPlaying,
     openTaskContextPopup,
     metaRules,
@@ -626,16 +627,32 @@ function MyPlatePageContent() {
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (!activity || activity.completed) return;
+    if (activity.completed) return;
   
-    if (activity.type === 'workout') {
-      handleStartWorkoutLog(activity);
+    // High-level tasks (Objectives, Intentions, Curiosities) should always open the selection modal
+    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+    if (mainDefId) {
+        const mainDef = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === mainDefId);
+        if (mainDef) {
+            const isUpskill = upskillDefinitions.some(d => d.id === mainDefId);
+            const nodeType = isUpskill ? getUpskillNodeType(mainDef) : getDeepWorkNodeType(mainDef);
+            if (['Objective', 'Intention', 'Curiosity'].includes(nodeType)) {
+                 setEditingActivity({ slotName, activity });
+                 setIsLearningModalOpen(true);
+                 return;
+            }
+        }
+    }
+    
+    // For specific, schedulable tasks, start the focus timer directly.
+    if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
+        handleStartFocusSession(activity, 45); // Assuming a default duration
+    } else if (activity.type === 'workout') {
+        handleStartWorkoutLog(activity);
     } else if (activity.type === 'mindset') {
         handleStartMindsetLog(activity);
-    } else if (['upskill', 'deepwork', 'branding'].includes(activity.type)) {
-      onOpenFocusModal(activity);
     } else if (activity.type === 'lead-generation') {
-      handleStartLeadGenLog(activity);
+        handleStartLeadGenLog(activity);
     } else if (activity.type === 'essentials') {
         setEssentialDetails(activity.details);
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
@@ -909,18 +926,18 @@ function MyPlatePageContent() {
     const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
     const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
     const activityNameMap: Record<ActivityType, string> = {
-        deepwork: 'Deep Work',
-        upskill: 'Learning',
-        workout: 'Workout',
-        mindset: 'Mindset',
-        branding: 'Branding',
-        essentials: 'Essentials',
-        planning: 'Planning',
-        tracking: 'Tracking',
-        'lead-generation': 'Lead Gen',
-        interrupt: 'Interrupts',
-        distraction: 'Distractions',
-        nutrition: 'Nutrition',
+      deepwork: 'Deep Work',
+      upskill: 'Learning',
+      workout: 'Workout',
+      mindset: 'Mindset',
+      branding: 'Branding',
+      essentials: 'Essentials',
+      planning: 'Planning',
+      tracking: 'Tracking',
+      'lead-generation': 'Lead Gen',
+      interrupt: 'Interrupts',
+      distraction: 'Distractions',
+      nutrition: 'Nutrition',
     };
 
     dailyActivities.forEach((activity) => {
@@ -1046,7 +1063,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={onOpenFocusModal}
+                        onOpenFocusModal={handleStartFocusSession}
                         onOpenTaskContext={openTaskContextPopup}
                         onOpenHabitPopup={openRuleDetailPopup}
                         currentSlot={currentSlot}
