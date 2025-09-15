@@ -11,13 +11,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import type { ExerciseDefinition, MicroSkill } from '@/types/workout';
 
-interface LoggedIntention {
-  id: string;
-  name: string;
-  category: string;
-  dates: string[];
-}
-
 function SpacedRepetitionPageContent() {
   const { 
     deepWorkDefinitions, 
@@ -27,48 +20,6 @@ function SpacedRepetitionPageContent() {
     getDescendantLeafNodes,
     getDeepWorkLoggedMinutes 
   } = useAuth();
-
-  const loggedIntentions = useMemo(() => {
-    const intentionNodes = deepWorkDefinitions.filter(
-      def => getDeepWorkNodeType(def) === 'Intention'
-    );
-    
-    const intentionLogsMap = new Map<string, { def: ExerciseDefinition, dates: Set<string> }>();
-
-    allDeepWorkLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        const intentionNode = intentionNodes.find(n => {
-            const leafNodes = getDescendantLeafNodes(n.id, 'deepwork');
-            return leafNodes.some(leaf => leaf.id === ex.definitionId);
-        });
-        
-        if (intentionNode && (ex.loggedSets?.length ?? 0) > 0) {
-          if (!intentionLogsMap.has(intentionNode.id)) {
-            intentionLogsMap.set(intentionNode.id, { def: intentionNode, dates: new Set() });
-          }
-          intentionLogsMap.get(intentionNode.id)?.dates.add(log.date);
-        }
-      });
-    });
-
-    const result: LoggedIntention[] = [];
-    intentionLogsMap.forEach((value, key) => {
-        const totalLogged = getDeepWorkLoggedMinutes(value.def);
-        if (totalLogged > 0) {
-            result.push({
-                id: key,
-                name: value.def.name,
-                category: value.def.category,
-                dates: Array.from(value.dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
-            });
-        }
-    });
-    
-    return result.sort((a, b) => 
-        new Date(b.dates[0]).getTime() - new Date(a.dates[0]).getTime()
-    );
-
-  }, [deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, getDescendantLeafNodes, getDeepWorkLoggedMinutes]);
 
   const microSkillsForRepetition = useMemo(() => {
     const repetitionSkills = coreSkills
@@ -82,13 +33,39 @@ function SpacedRepetitionPageContent() {
         
         return {
             ...skill,
-            intentions: associatedIntentions.map(intention => ({
-                ...intention,
-                totalLoggedMinutes: getDeepWorkLoggedMinutes(intention)
-            }))
+            intentions: associatedIntentions.map(intention => {
+                const totalLoggedMinutes = getDeepWorkLoggedMinutes(intention);
+
+                let lastLoggedDate: string | null = null;
+                if (totalLoggedMinutes > 0) {
+                    const leafNodeIds = new Set(getDescendantLeafNodes(intention.id, 'deepwork').map(n => n.id));
+                    let mostRecentDate: Date | null = null;
+
+                    for (const log of allDeepWorkLogs) {
+                        const hasLoggedLeaf = log.exercises.some(ex => 
+                            leafNodeIds.has(ex.definitionId) && ex.loggedSets.length > 0
+                        );
+                        if (hasLoggedLeaf) {
+                            const logDate = parseISO(log.date);
+                            if (!mostRecentDate || logDate > mostRecentDate) {
+                                mostRecentDate = logDate;
+                            }
+                        }
+                    }
+                    if (mostRecentDate) {
+                        lastLoggedDate = format(mostRecentDate, 'MMM d, yyyy');
+                    }
+                }
+
+                return {
+                    ...intention,
+                    totalLoggedMinutes: totalLoggedMinutes,
+                    lastLoggedDate: lastLoggedDate
+                };
+            })
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes, allDeepWorkLogs, getDescendantLeafNodes]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes < 1) return "0m";
@@ -107,36 +84,6 @@ function SpacedRepetitionPageContent() {
         </p>
       </div>
       
-      {loggedIntentions.length > 0 && (
-        <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Lightbulb className="h-6 w-6 text-amber-500" />Logged Intentions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {loggedIntentions.map(intention => (
-                <Card key={intention.id} className="flex flex-col">
-                <CardHeader>
-                    <CardTitle className="flex items-start gap-2">
-                    <span>{intention.name}</span>
-                    </CardTitle>
-                    <CardDescription>{intention.category}</CardDescription>
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <h4 className="font-semibold text-sm mb-2">Logged Dates:</h4>
-                    <ScrollArea className="h-32 pr-4">
-                    <div className="flex flex-wrap gap-1">
-                        {intention.dates.map(date => (
-                        <Badge key={date} variant="outline" className="font-normal">
-                            {format(parseISO(date), 'MMM d, yyyy')}
-                        </Badge>
-                        ))}
-                    </div>
-                    </ScrollArea>
-                </CardContent>
-                </Card>
-            ))}
-            </div>
-        </div>
-      )}
-
       {microSkillsForRepetition.length > 0 && (
         <div>
             <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><BookCopy className="h-6 w-6 text-blue-500" />Micro-Skills for Repetition</h2>
@@ -150,12 +97,17 @@ function SpacedRepetitionPageContent() {
                           {skill.intentions.length > 0 ? (
                             <div className="space-y-2">
                               <h4 className="text-sm font-semibold text-muted-foreground">Intentions:</h4>
-                              <ul className="space-y-1 text-sm list-disc list-inside">
+                              <ul className="space-y-2 text-sm list-inside">
                                 {skill.intentions.map(intention => (
-                                  <li key={intention.id} className="flex justify-between items-center">
-                                    <span>{intention.name}</span>
-                                    {intention.totalLoggedMinutes > 0 && (
+                                  <li key={intention.id} className="p-2 rounded-md bg-muted/50">
+                                    <div className="flex justify-between items-start">
+                                      <span className="font-medium text-foreground">{intention.name}</span>
+                                      {intention.totalLoggedMinutes > 0 && (
                                         <Badge variant="secondary">{formatMinutes(intention.totalLoggedMinutes)}</Badge>
+                                      )}
+                                    </div>
+                                    {intention.lastLoggedDate && (
+                                      <p className="text-xs text-muted-foreground mt-1">Last logged: {intention.lastLoggedDate}</p>
                                     )}
                                   </li>
                                 ))}
@@ -171,11 +123,11 @@ function SpacedRepetitionPageContent() {
         </div>
       )}
 
-      {loggedIntentions.length === 0 && microSkillsForRepetition.length === 0 && (
+      {microSkillsForRepetition.length === 0 && (
         <Card className="mt-8">
             <CardContent className="p-8 text-center text-muted-foreground">
-                <p>You haven't logged any "Intentions" or marked any "Micro-Skills" for repetition yet.</p>
-                <p className="mt-2">Once you do, they will appear here for review.</p>
+                <p>You haven't marked any "Micro-Skills" for repetition yet.</p>
+                <p className="mt-2">Go to the Skill page and check the box next to a micro-skill to begin.</p>
             </CardContent>
         </Card>
       )}
