@@ -695,3 +695,22 @@ export interface LinkTechniqueModalState {
     stopper: Stopper;
     stage: 2 | 3;
 }
+
+export interface RepetitionData {
+  microSkillId: string;
+  performanceHistory: {
+    date: string; // YYYY-MM-DD
+    result: 'success' | 'fail';
+  }[];
+  repetitions: number; // successful recalls in a row
+  interval: number; // days
+  easeFactor: number;
+  nextReviewDate: string | null; // YYYY-MM-DD
+}
+
+export interface DailyReviewLog {
+    date: string; // YYYY-MM-DD
+    totalReviews: number;
+    successes: number;
+    failures: number;
+}
