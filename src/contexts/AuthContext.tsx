@@ -563,7 +563,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const setTheme = useCallback((newTheme: string) => {
     setThemeState(newTheme);
-    localStorage.setItem('lifeos_theme', newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lifeos_theme', newTheme);
+    }
   }, []);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
@@ -763,81 +765,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
 
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
-    const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
-    
-    setDefinitions(prevDefs => prevDefs.map(def => {
-        if (def.id === subTaskId) {
-            return {
-                ...def,
-                loggedDuration: (def.loggedDuration || 0) + durationMinutes,
-            };
-        }
-        return def;
-    }));
-  }, [setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions]);
-
-  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-
-    const updateActivityInSchedule = (updatedActivityProps: Partial<Activity>) => {
-        setSchedule(prev => {
-            const newSchedule = { ...prev };
-            for (const dateKey in newSchedule) {
-                if (newSchedule[dateKey]) {
-                    for (const slotName in newSchedule[dateKey]) {
-                        const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                        if (Array.isArray(activities)) {
-                            const activityIndex = activities.findIndex(a => a.id === activity.id);
-                            if (activityIndex > -1) {
-                                const updatedActivities = [...activities];
-                                updatedActivities[activityIndex] = { ...activities[activityIndex], ...updatedActivityProps };
-                                newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
-                                return newSchedule; 
-                            }
-                        }
-                    }
-                }
-            }
-            return newSchedule;
-        });
-    };
-
-    const taskDef = allDefs.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
-    if (taskDef) {
-        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
-        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-        if (isParentNode) {
-            updateActivityInSchedule({ completed: true });
-            return;
-        }
-    }
-
-    if (activity.type !== 'upskill' && activity.type !== 'deepwork') {
-        updateActivityInSchedule({ completed: true, duration });
-        toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
-        return;
-    }
-      
-    const exerciseInstanceId = activity.taskIds?.[0];
-    if (!exerciseInstanceId) {
-        updateActivityInSchedule({ completed: true, duration });
-        return;
-    }
-
-    const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
-    if (!definition) {
-        updateActivityInSchedule({ completed: true, duration });
-        return;
-    }
-
-    logSubTaskTime(definition.id, duration);
-    updateActivityInSchedule({ completed: true, duration });
-    
-  }, [deepWorkDefinitions, upskillDefinitions, setSchedule, toast, getDeepWorkNodeType, getUpskillNodeType, logSubTaskTime]);
-  
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
@@ -890,6 +817,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast
   ]);
 
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
+    const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+    
+    setDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === subTaskId) {
+            return {
+                ...def,
+                loggedDuration: (def.loggedDuration || 0) + durationMinutes,
+            };
+        }
+        return def;
+    }));
+  }, [setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions]);
+
+  const updateActivity = useCallback((updatedActivity: Activity) => {
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      for (const dateKey in newSchedule) {
+        if (newSchedule[dateKey]) {
+          for (const slotName in newSchedule[dateKey]) {
+            const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+            if (Array.isArray(activities)) {
+              const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+              if (activityIndex > -1) {
+                const updatedActivities = [...activities];
+                updatedActivities[activityIndex] = updatedActivity;
+                newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
+                return newSchedule; 
+              }
+            }
+          }
+        }
+      }
+      return newSchedule;
+    });
+  }, [setSchedule]);
+
+  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+
+    const taskDef = allDefs.find(def => activity.taskIds?.some(tid => tid.startsWith(def.id)));
+    if (taskDef) {
+        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(taskDef) : getDeepWorkNodeType(taskDef);
+        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+        if (isParentNode) {
+            updateActivity({ ...activity, completed: true });
+            return;
+        }
+    }
+
+    if (activity.type !== 'upskill' && activity.type !== 'deepwork') {
+        updateActivity({ ...activity, completed: true, duration });
+        toast({ title: "Session Logged", description: `Logged ${duration} minutes for "${activity.details}".` });
+        return;
+    }
+      
+    const exerciseInstanceId = activity.taskIds?.[0];
+    if (!exerciseInstanceId) {
+        updateActivity({ ...activity, completed: true, duration });
+        return;
+    }
+
+    const definition = allDefs.find(def => exerciseInstanceId.startsWith(def.id));
+    if (!definition) {
+        updateActivity({ ...activity, completed: true, duration });
+        return;
+    }
+
+    logSubTaskTime(definition.id, duration);
+    updateActivity({ ...activity, completed: true, duration });
+    
+  }, [deepWorkDefinitions, upskillDefinitions, updateActivity, toast, getDeepWorkNodeType, getUpskillNodeType, logSubTaskTime]);
+  
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -2827,9 +2829,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setCurrentUser(user);
     setLoading(false);
     
-    const savedTheme = localStorage.getItem('lifeos_theme') || 'ad-dark';
-    setTheme(savedTheme);
-  }, [setTheme]);
+    const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
+    setThemeState(savedTheme);
+  }, []);
   
    useEffect(() => {
     const interval = setInterval(() => {
@@ -2877,3 +2879,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
