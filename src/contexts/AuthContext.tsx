@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -930,17 +928,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [permanentlyLoggedTaskIds, schedule, setSchedule, deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes]);
 
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
-    // If it has sub-tasks, handle it like an objective
-    if (activity.subTasks && activity.subTasks.length > 0) {
-      if (activity.subTasks.every(st => st.completed)) {
-        updateActivity({ ...activity, completed: true });
-        return false;
-      }
-      handleStartFocusSession(activity, 25); // Default duration, will adjust for sub-tasks
-      return true;
-    }
-  
-    // Existing logic for deep work / upskill
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
@@ -951,14 +938,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       if (isParentNode) {
         const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-        const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
+        const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
   
         if (allChildrenCompleted) {
           markObjectiveActivityAsComplete(def.id);
           return false;
         }
         
-        const firstPendingNode = allLeafNodes.find(node => !(node.loggedDuration && node.loggedDuration > 0));
+        const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
         if (firstPendingNode) {
           handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
         } else {
@@ -968,7 +955,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     
-    // For simple tasks without linked definitions or sub-tasks
+    // For simple tasks
     const estDurationStr = activityDurations[activity.id];
     let minutes = 0;
     if (estDurationStr) {
@@ -987,7 +974,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
     return true;
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, activityDurations, markObjectiveActivityAsComplete, setFocusDuration, setFocusActivity, setFocusSessionModalOpen, handleStartFocusSession, updateActivity]);
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, markObjectiveActivityAsComplete, setFocusDuration, setFocusActivity, setFocusSessionModalOpen, handleStartFocusSession]);
 
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -3005,9 +2992,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-    
-
-
-
-
