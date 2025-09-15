@@ -300,7 +300,7 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }:
                                 <XAxis dataKey="date" fontSize={10} />
                                 <YAxis fontSize={10} />
                                 <Tooltip
-                                    content={({ active, payload }) => {
+                                    content={({ active, payload, label }) => {
                                         if (active && payload && payload.length) {
                                             const data = payload[0].payload;
                                             return (
