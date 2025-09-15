@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -273,12 +274,31 @@ export function SmartLoggingPrompt({
     habitCards,
     mechanismCards,
     schedule,
-    getDescendantLeafNodes,
-    permanentlyLoggedTaskIds
+    activityDurations
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
-  const [fullReviewData, setFullReviewData] = useState<any[] | null>(null);
+  
+  const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+        totalMinutes += parseInt(minMatch[1], 10);
+    }
+    
+    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+        totalMinutes += parseInt(durationStr.trim(), 10);
+    }
+
+    return totalMinutes;
+  };
 
   const dailyAnalysis = useMemo(() => {
     const today = new Date();
@@ -287,61 +307,61 @@ export function SmartLoggingPrompt({
     const todaysSchedule = schedule[todayKey] || {};
     const yesterdaysSchedule = schedule[yesterdayKey] || {};
   
-    const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { startHour: number, endHour: number }) => {
-      const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
-        hour: slot.startHour + i,
-        name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
-        minutes: 0,
-        tasks: []
-      }));
-  
-      const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-      activities.filter(a => a.completed).forEach(activity => {
-        const start = activity.focusSessionInitialStartTime;
-        const end = activity.focusSessionEndTime;
-        if (start && end) {
-          let current = new Date(start);
-          while (current < new Date(end)) {
-            const currentHour = current.getHours();
-            const nextHour = new Date(current);
-            nextHour.setHours(currentHour + 1, 0, 0, 0);
-  
-            const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
-            const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
-            
-            const hourData = hourlyData.find(h => h.hour === currentHour);
-            if (hourData && minutesInHour > 0) {
-              hourData.minutes += minutesInHour;
-              if (!hourData.tasks.includes(activity.details)) {
-                hourData.tasks.push(activity.details);
-              }
+    const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { name: string, startHour: number, endHour: number }) => {
+        const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+            hour: slot.startHour + i,
+            name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
+            minutes: 0,
+            tasks: []
+        }));
+    
+        const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+        activities.filter(a => a.completed).forEach(activity => {
+            const start = activity.focusSessionInitialStartTime;
+            const end = activity.focusSessionEndTime;
+            if (start && end) {
+                let current = new Date(start);
+                while (current < new Date(end)) {
+                    const currentHour = current.getHours();
+                    const nextHour = new Date(current);
+                    nextHour.setHours(currentHour + 1, 0, 0, 0);
+    
+                    const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
+                    const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
+                    
+                    const hourIndex = currentHour - slot.startHour;
+                    if (hourIndex >= 0 && hourIndex < hourlyData.length) {
+                        hourlyData[hourIndex].minutes += minutesInHour;
+                        if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
+                            hourlyData[hourIndex].tasks.push(activity.details);
+                        }
+                    }
+                    current = nextHour;
+                }
+            } else if (activity.duration) {
+                // Simplified: distribute duration evenly if no timestamps
+                const durationPerHour = activity.duration / (slot.endHour - slot.startHour);
+                hourlyData.forEach(hourData => {
+                    hourData.minutes += durationPerHour;
+                     if (!hourData.tasks.includes(activity.details)) {
+                        hourData.tasks.push(activity.details);
+                    }
+                });
             }
-            current = nextHour;
-          }
-        } else if (activity.duration) {
-          const activityHour = Math.floor(Math.random() * (slot.endHour - slot.startHour)) + slot.startHour;
-          const hourData = hourlyData.find(h => h.hour === activityHour);
-          if (hourData) {
-            hourData.minutes += activity.duration;
-            if (!hourData.tasks.includes(activity.details)) {
-              hourData.tasks.push(activity.details);
-            }
-          }
-        }
-      });
-      return hourlyData;
+        });
+        return hourlyData;
     };
   
     const slotAnalyses = slotOrder.map(slot => {
-      const todayHourlyData = calculateHourlyData(todaysSchedule, slot);
-      const yesterdayHourlyData = calculateHourlyData(yesterdaysSchedule, slot);
+      const todayHourly = calculateHourlyData(todaysSchedule, slot);
+      const yesterdayHourly = calculateHourlyData(yesterdaysSchedule, slot);
       
-      const combinedHourlyData = todayHourlyData.map((todayData, index) => ({
+      const combinedHourlyData = todayHourly.map((todayData, index) => ({
         name: todayData.name,
         today: todayData.minutes,
-        yesterday: yesterdayHourlyData[index]?.minutes || 0,
+        yesterday: yesterdayHourly[index]?.minutes || 0,
         todayTasks: todayData.tasks,
-        yesterdayTasks: yesterdayHourlyData[index]?.tasks || [],
+        yesterdayTasks: yesterdayHourly[index]?.tasks || [],
       }));
 
       const todayPlannedActivities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
@@ -466,11 +486,20 @@ export function SmartLoggingPrompt({
                                                                   return (
                                                                     <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
                                                                       <p className="font-bold">{label}</p>
-                                                                      {payload.map((p, i) => (
-                                                                        <p key={i} style={{ color: p.color }}>
-                                                                          {p.name}: {p.value.toFixed(0)} min
-                                                                        </p>
-                                                                      ))}
+                                                                      {payload.map((p, i) => {
+                                                                        const dataKey = p.dataKey as 'today' | 'yesterday';
+                                                                        const tasks = p.payload[`${dataKey}Tasks`];
+                                                                        return (
+                                                                          <div key={i} style={{ color: p.color }}>
+                                                                            {p.name}: {p.value.toFixed(0)} min
+                                                                            {tasks && tasks.length > 0 && (
+                                                                                <ul className="list-disc list-inside text-muted-foreground">
+                                                                                    {tasks.map((task: string, taskIndex: number) => <li key={taskIndex}>{task}</li>)}
+                                                                                </ul>
+                                                                            )}
+                                                                          </div>
+                                                                        )
+                                                                      })}
                                                                     </div>
                                                                   )
                                                                 }
