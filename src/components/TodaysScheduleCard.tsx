@@ -1,6 +1,4 @@
 
-
-      
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -243,13 +241,11 @@ export function TodaysScheduleCard({
                 setPosition(parsed);
             } catch (e) {
                  console.error("Failed to parse widget position from localStorage", e);
-                 // Fallback to default position if parsing fails
                  const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
                  const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
                  setPosition({ x: initialX, y: initialY });
             }
         } else {
-             // Default position if nothing is saved
             const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
             const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
             setPosition({ x: initialX, y: initialY });
@@ -429,3 +425,4 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+    
