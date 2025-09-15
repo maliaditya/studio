@@ -468,56 +468,69 @@ function ChartsPageContent() {
     }, [schedule, activityDurations, selectedActivityDate]);
 
     const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
-      const totals: Record<string, number> = {};
-      const todayKey = format(new Date(), 'yyyy-MM-dd');
-      
-      const specializations = coreSkills.filter(s => s.type === 'Specialization');
-      specializations.forEach(spec => totals[spec.name] = 0);
+        const totals: Record<string, number> = {};
+        const specializations = coreSkills.filter(s => s.type === 'Specialization');
+        specializations.forEach(spec => totals[spec.name] = 0);
+    
+        if (specHoursFilter === 'all') {
+            specializations.forEach(spec => {
+                const descendantLeavesDeepWork = getDescendantLeafNodes(spec.id, 'deepwork');
+                const descendantLeavesUpskill = getDescendantLeafNodes(spec.id, 'upskill');
+                
+                let totalSpecMinutes = 0;
+                descendantLeavesDeepWork.forEach(leaf => {
+                    totalSpecMinutes += leaf.loggedDuration || 0;
+                });
+                descendantLeavesUpskill.forEach(leaf => {
+                    totalSpecMinutes += leaf.loggedDuration || 0;
+                });
+                totals[spec.name] = totalSpecMinutes / 60; // to hours
+            });
+        } else { // 'today'
+            const todayKey = format(new Date(), 'yyyy-MM-dd');
+            const todaysDeepWorkLog = allDeepWorkLogs.find(log => log.date === todayKey);
+            const todaysUpskillLog = allUpskillLogs.find(log => log.date === todayKey);
+    
+            specializations.forEach(spec => {
+                const descendantLeavesDeepWork = getDescendantLeafNodes(spec.id, 'deepwork');
+                const descendantLeavesUpskill = getDescendantLeafNodes(spec.id, 'upskill');
+                
+                let totalSpecMinutes = 0;
+    
+                if (todaysDeepWorkLog) {
+                    descendantLeavesDeepWork.forEach(leaf => {
+                        const exerciseLog = todaysDeepWorkLog.exercises.find(ex => ex.definitionId === leaf.id);
+                        if (exerciseLog) {
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                        }
+                    });
+                }
+    
+                if (todaysUpskillLog) {
+                    descendantLeavesUpskill.forEach(leaf => {
+                        const exerciseLog = todaysUpskillLog.exercises.find(ex => ex.definitionId === leaf.id);
+                        if (exerciseLog) {
+                            totalSpecMinutes += exerciseLog.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
+                        }
+                    });
+                }
+                
+                totals[spec.name] = totalSpecMinutes / 60; // to hours
+            });
+        }
   
-      const loggedMinutesMap = new Map<string, number>();
+        const summaryData = Object.entries(totals)
+            .map(([name, hours]) => ({ name, hours }))
+            .filter(d => d.hours > 0)
+            .sort((a, b) => b.hours - a.hours);
   
-      if (specHoursFilter === 'all') {
-          [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
-              if (def.loggedDuration && def.loggedDuration > 0) {
-                  loggedMinutesMap.set(def.id, def.loggedDuration);
-              }
-          });
-      } else { // 'today'
-          [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
-              if (log.date === todayKey) {
-                  log.exercises.forEach(ex => {
-                      const duration = ex.loggedSets.reduce((sum, set) => sum + (ex.category === 'Upskill' ? set.reps : set.weight), 0);
-                      if (duration > 0) {
-                          loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
-                      }
-                  });
-              }
-          });
-      }
+        const config: ChartConfig = {};
+        summaryData.forEach((d, i) => {
+            config[d.name] = { label: d.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
+        });
   
-      specializations.forEach(spec => {
-          const descendantLeaves = getDescendantLeafNodes(spec.id, 'deepwork')
-              .concat(getDescendantLeafNodes(spec.id, 'upskill'));
-          
-          let totalSpecMinutes = 0;
-          descendantLeaves.forEach(leaf => {
-              totalSpecMinutes += loggedMinutesMap.get(leaf.id) || 0;
-          });
-          totals[spec.name] = totalSpecMinutes / 60; // to hours
-      });
-
-      const summaryData = Object.entries(totals)
-          .map(([name, hours]) => ({ name, hours }))
-          .filter(d => d.hours > 0)
-          .sort((a, b) => b.hours - a.hours);
-
-      const config: ChartConfig = {};
-      summaryData.forEach((d, i) => {
-          config[d.name] = { label: d.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
-      });
-
-      return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
-  }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
+        return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
+    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
 
 
     const allCategoriesData = useMemo(() => {
@@ -771,4 +784,5 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
- 
+
+    
