@@ -19,24 +19,21 @@ interface LoggedIntention {
 }
 
 function SpacedRepetitionPageContent() {
-  const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, coreSkills } = useAuth();
+  const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, coreSkills, getDescendantLeafNodes } = useAuth();
 
   const loggedIntentions = useMemo(() => {
     const intentionNodes = deepWorkDefinitions.filter(
-      def => getDeepWorkNodeType(def) === 'Intention' && (def.loggedDuration || 0) > 0
+      def => getDeepWorkNodeType(def) === 'Intention'
     );
-    const intentionIds = new Set(intentionNodes.map(i => i.id));
     
     const intentionLogsMap = new Map<string, { def: ExerciseDefinition, dates: Set<string> }>();
 
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        if (intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
+        const intentionNode = intentionNodes.find(n => n.id === ex.definitionId);
+        if (intentionNode && (ex.loggedSets?.length ?? 0) > 0) {
           if (!intentionLogsMap.has(ex.definitionId)) {
-            const definition = intentionNodes.find(n => n.id === ex.definitionId);
-            if (definition) {
-              intentionLogsMap.set(ex.definitionId, { def: definition, dates: new Set() });
-            }
+            intentionLogsMap.set(ex.definitionId, { def: intentionNode, dates: new Set() });
           }
           intentionLogsMap.get(ex.definitionId)?.dates.add(log.date);
         }
@@ -45,12 +42,14 @@ function SpacedRepetitionPageContent() {
 
     const result: LoggedIntention[] = [];
     intentionLogsMap.forEach((value, key) => {
-      result.push({
-        id: key,
-        name: value.def.name,
-        category: value.def.category,
-        dates: Array.from(value.dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
-      });
+      if (value.def.loggedDuration && value.def.loggedDuration > 0) {
+        result.push({
+          id: key,
+          name: value.def.name,
+          category: value.def.category,
+          dates: Array.from(value.dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
+        });
+      }
     });
     
     return result.sort((a, b) => 
@@ -70,24 +69,33 @@ function SpacedRepetitionPageContent() {
         );
         
         const intentionsWithCompletion = associatedIntentions.map(intention => {
+            const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
+            const isCompleted = leafNodes.length > 0 && leafNodes.every(leaf => (leaf.loggedDuration || 0) > 0);
+
+            if (!isCompleted) return null;
+
+            const leafNodeIds = new Set(leafNodes.map(n => n.id));
             const logDates = allDeepWorkLogs
-                .filter(log => log.exercises.some(ex => ex.definitionId === intention.id && ex.loggedSets.length > 0))
+                .filter(log => log.exercises.some(ex => leafNodeIds.has(ex.definitionId) && ex.loggedSets.length > 0))
                 .map(log => log.date);
+
             const mostRecentDate = logDates.length > 0
                 ? logDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
                 : null;
+            
             return {
                 ...intention,
                 lastCompleted: mostRecentDate
             };
-        }).filter(i => i.lastCompleted); // Only include intentions that have been logged
+        }).filter((i): i is ExerciseDefinition & { lastCompleted: string | null } => i !== null && i.lastCompleted !== null);
 
         return {
             ...skill,
             intentions: intentionsWithCompletion
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, allDeepWorkLogs]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, allDeepWorkLogs, getDescendantLeafNodes]);
+
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
