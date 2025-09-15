@@ -763,51 +763,40 @@ function MyPlatePageContent() {
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
     
-    // New logic for learning stats
-    const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
-    
-    // 1. Pre-calculate all logged minutes for every definitionId
+    const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
+
     const loggedMinutesMap = new Map<string, number>();
-    allUpskillLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-        loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
-      });
-    });
-    allDeepWorkLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        const duration = ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
-        loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + duration);
-      });
+    allDefs.forEach(def => {
+        if (def.loggedDuration && def.loggedDuration > 0) {
+            loggedMinutesMap.set(def.id, def.loggedDuration);
+        }
     });
 
-    // 2. Iterate through specializations and aggregate totals
+    const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
     specializations.forEach(spec => {
-      let totalSpecLoggedMinutes = 0;
-      let totalSpecEstimatedMinutes = 0;
+        let totalSpecLoggedMinutes = 0;
+        let totalSpecEstimatedMinutes = 0;
 
-      const microSkillIds = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.id)));
-      const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+        const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-      const topLevelIntentions = deepWorkDefinitions.filter(def => microSkillNames.has(def.category) && getDeepWorkNodeType(def) === 'Intention');
-      const topLevelCuriosities = upskillDefinitions.filter(def => microSkillNames.has(def.category) && getUpskillNodeType(def) === 'Curiosity');
+        const topLevelIntentions = deepWorkDefinitions.filter(def => microSkillNames.has(def.category) && getDeepWorkNodeType(def) === 'Intention');
+        const topLevelCuriosities = upskillDefinitions.filter(def => microSkillNames.has(def.category) && getUpskillNodeType(def) === 'Curiosity');
+        const allTopLevel = [...topLevelIntentions, ...topLevelCuriosities];
 
-      const allTopLevel = [...topLevelIntentions, ...topLevelCuriosities];
-
-      allTopLevel.forEach(topLevelTask => {
-          const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
-          const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
-          
-          leafNodes.forEach(leaf => {
-            totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
-            totalSpecLoggedMinutes += loggedMinutesMap.get(leaf.id) || 0;
-          });
-      });
-      
-      if (totalSpecLoggedMinutes > 0 || totalSpecEstimatedMinutes > 0) {
-          learningStats[spec.name] = { logged: totalSpecLoggedMinutes / 60, estimated: totalSpecEstimatedMinutes / 60 };
-      }
+        allTopLevel.forEach(topLevelTask => {
+            const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
+            const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
+            
+            leafNodes.forEach(leaf => {
+              totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
+              totalSpecLoggedMinutes += loggedMinutesMap.get(leaf.id) || 0;
+            });
+        });
+        
+        if (totalSpecLoggedMinutes > 0 || totalSpecEstimatedMinutes > 0) {
+            learningStats[spec.name] = { logged: totalSpecLoggedMinutes / 60, estimated: totalSpecEstimatedMinutes / 60 };
+        }
     });
 
     return {
