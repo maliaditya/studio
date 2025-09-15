@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -17,9 +16,9 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { cn } from '@/lib/utils';
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { format, isBefore, parseISO, startOfDay } from 'date-fns';
+import { format, isBefore, parseISO, startOfDay, subDays } from 'date-fns';
 import { Carousel } from './ui/carousel';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 
 interface SmartLoggingPromptProps {
@@ -279,80 +278,85 @@ export function SmartLoggingPrompt({
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [fullReviewData, setFullReviewData] = useState<any[] | null>(null);
 
-  const getLoggedMinutes = useCallback((activity: ActivityType): number => {
-    if (!activity.completed) return 0;
-
-    let totalMinutes = 0;
-    if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-        const pauses = activity.focusSessionPauses || [];
-        const totalPauseMs = pauses.reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-        totalMinutes = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime - totalPauseMs) / 60000;
-    } else if (activity.duration) {
-        totalMinutes = activity.duration;
-    }
-    return Math.round(totalMinutes);
-  }, []);
-  
   const dailyAnalysis = useMemo(() => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const today = new Date();
+    const todayKey = format(today, 'yyyy-MM-dd');
+    const yesterdayKey = format(subDays(today, 1), 'yyyy-MM-dd');
     const todaysSchedule = schedule[todayKey] || {};
-
-    const slotAnalyses = slotOrder.map(slot => {
-        const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
-        
-        const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
-            hour: slot.startHour + i,
-            name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
-            minutes: 0,
-            tasks: []
-        }));
-
-        activities.filter(a => a.completed).forEach(activity => {
-            const start = activity.focusSessionInitialStartTime;
-            const end = activity.focusSessionEndTime;
-            if (start && end) {
-                let current = new Date(start);
-                while (current < new Date(end)) {
-                    const currentHour = current.getHours();
-                    const nextHour = new Date(current);
-                    nextHour.setHours(currentHour + 1, 0, 0, 0);
-
-                    const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
-                    const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
-                    
-                    const hourData = hourlyData.find(h => h.hour === currentHour);
-                    if (hourData && minutesInHour > 0) {
-                        hourData.minutes += minutesInHour;
-                        if (!hourData.tasks.includes(activity.details)) {
-                            hourData.tasks.push(activity.details);
-                        }
-                    }
-                    current = nextHour;
-                }
-            } else if (activity.duration) { // Handle non-focus session tasks
-                const activityHour = Math.floor(Math.random() * (slot.endHour - slot.startHour)) + slot.startHour;
-                const hourData = hourlyData.find(h => h.hour === activityHour);
-                if(hourData) {
-                    hourData.minutes += activity.duration;
-                    if (!hourData.tasks.includes(activity.details)) {
-                        hourData.tasks.push(activity.details);
-                    }
-                }
+    const yesterdaysSchedule = schedule[yesterdayKey] || {};
+  
+    const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { startHour: number, endHour: number }) => {
+      const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+        hour: slot.startHour + i,
+        name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
+        minutes: 0,
+        tasks: []
+      }));
+  
+      const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+      activities.filter(a => a.completed).forEach(activity => {
+        const start = activity.focusSessionInitialStartTime;
+        const end = activity.focusSessionEndTime;
+        if (start && end) {
+          let current = new Date(start);
+          while (current < new Date(end)) {
+            const currentHour = current.getHours();
+            const nextHour = new Date(current);
+            nextHour.setHours(currentHour + 1, 0, 0, 0);
+  
+            const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
+            const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
+            
+            const hourData = hourlyData.find(h => h.hour === currentHour);
+            if (hourData && minutesInHour > 0) {
+              hourData.minutes += minutesInHour;
+              if (!hourData.tasks.includes(activity.details)) {
+                hourData.tasks.push(activity.details);
+              }
             }
-        });
+            current = nextHour;
+          }
+        } else if (activity.duration) {
+          const activityHour = Math.floor(Math.random() * (slot.endHour - slot.startHour)) + slot.startHour;
+          const hourData = hourlyData.find(h => h.hour === activityHour);
+          if (hourData) {
+            hourData.minutes += activity.duration;
+            if (!hourData.tasks.includes(activity.details)) {
+              hourData.tasks.push(activity.details);
+            }
+          }
+        }
+      });
+      return hourlyData;
+    };
+  
+    const slotAnalyses = slotOrder.map(slot => {
+      const todayHourlyData = calculateHourlyData(todaysSchedule, slot);
+      const yesterdayHourlyData = calculateHourlyData(yesterdaysSchedule, slot);
+      
+      const combinedHourlyData = todayHourlyData.map((todayData, index) => ({
+        name: todayData.name,
+        today: todayData.minutes,
+        yesterday: yesterdayHourlyData[index]?.minutes || 0,
+        todayTasks: todayData.tasks,
+        yesterdayTasks: yesterdayHourlyData[index]?.tasks || [],
+      }));
 
-        return {
-            type: 'slot' as const,
-            name: slot.name,
-            time: slot.time,
-            hourlyData: hourlyData.length > 0 ? hourlyData : [],
-            plannedActivities: activities.map(a => a.details).join(', ') || 'None'
-        };
+      const todayPlannedActivities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+      
+      return {
+        type: 'slot' as const,
+        name: slot.name,
+        time: slot.time,
+        hourlyData: combinedHourlyData,
+        plannedActivities: todayPlannedActivities.map(a => a.details).join(', ') || 'None'
+      };
     });
-
+  
     return {
-        carouselItems: slotAnalyses
+      carouselItems: slotAnalyses
     };
   }, [schedule]);
 
@@ -399,7 +403,6 @@ export function SmartLoggingPrompt({
       title: "Today's Analysis",
       description: "You have tasks scheduled. Ready to start a focus session?",
        actions: [
-        // This button is effectively removed by not rendering it.
        ]
     },
     completed: {
@@ -442,7 +445,7 @@ export function SmartLoggingPrompt({
                 <div className="w-full space-y-3 flex-grow min-h-0 flex flex-col">
                     <div className="flex-grow">
                         {promptType === 'inactive' ? (
-                            <div className="h-48 -mx-2">
+                            <div className="h-[200px] -mx-2">
                               <Carousel items={dailyAnalysis.carouselItems} renderItem={(item: any) => {
                                  if (item.type === 'slot') {
                                     return (
@@ -451,8 +454,8 @@ export function SmartLoggingPrompt({
                                           <CardTitle className="text-base">🕒 {item.name}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="p-3 pt-0 flex-grow">
-                                            <div className="h-[120px] w-full">
-                                                <ChartContainer config={{minutes: {label: 'Minutes'}}} className="w-full h-full">
+                                            <div className="h-full w-full">
+                                                <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
                                                     <ResponsiveContainer>
                                                         <LineChart data={item.hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
                                                             <XAxis dataKey="name" fontSize={9} interval={0} />
@@ -460,21 +463,23 @@ export function SmartLoggingPrompt({
                                                             <Tooltip 
                                                               content={({ active, payload, label }) => {
                                                                 if (active && payload && payload.length) {
-                                                                  const data = payload[0].payload;
                                                                   return (
                                                                     <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
-                                                                      <p className="font-bold">{label}: {data.minutes.toFixed(0)} min</p>
-                                                                      {data.tasks.length > 0 && <Separator className="my-1" />}
-                                                                      <ul className="list-disc list-inside">
-                                                                        {data.tasks.map((task: string, i: number) => <li key={i}>{task}</li>)}
-                                                                      </ul>
+                                                                      <p className="font-bold">{label}</p>
+                                                                      {payload.map((p, i) => (
+                                                                        <p key={i} style={{ color: p.color }}>
+                                                                          {p.name}: {p.value.toFixed(0)} min
+                                                                        </p>
+                                                                      ))}
                                                                     </div>
                                                                   )
                                                                 }
                                                                 return null;
                                                               }}
                                                             />
-                                                            <Line type="monotone" dataKey="minutes" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                                                            <Legend wrapperStyle={{fontSize: '0.7rem'}}/>
+                                                            <Line type="monotone" dataKey="today" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                                                            <Line type="monotone" dataKey="yesterday" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} strokeDasharray="3 3"/>
                                                         </LineChart>
                                                     </ResponsiveContainer>
                                                 </ChartContainer>
