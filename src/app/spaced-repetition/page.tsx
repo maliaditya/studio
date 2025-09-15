@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -81,12 +81,12 @@ function SpacedRepetitionPageContent() {
 
         const retentionCurve: { date: string; retention: number | null; projection: number | null; isReview: boolean }[] = [];
         if (repHistor.length > 0) {
-            const firstDate = repHistory[0].date;
+            const firstDate = repHistor[0].date;
             const today = startOfDay(new Date());
             const lastDate = nextReviewDate > today ? nextReviewDate : today;
             
             for (let d = startOfDay(firstDate); d <= lastDate && isBefore(d, addDays(today, 365)); d = addDays(d, 1)) {
-                let currentRep = repHistory.find(r => format(r.date, 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd'));
+                let currentRep = repHistor.find(r => format(r.date, 'yyyy-MM-dd') === format(d, 'yyyy-MM-dd'));
                 
                 if (currentRep) {
                     retentionCurve.push({ date: format(d, 'MMM d'), retention: 100, projection: null, isReview: true });
@@ -163,9 +163,13 @@ function SpacedRepetitionPageContent() {
                             const dataPoint = payload[0];
                             const value = dataPoint.value;
                             return (
-                                <div className="rounded-lg border bg-background p-2.5 shadow-sm">
-                                    <p className="font-bold text-sm">{label}</p>
-                                    <p className="text-xs">{dataPoint.name}: {value?.toFixed(0)}%</p>
+                                <div className="rounded-lg border bg-background p-2.5 shadow-sm min-w-[12rem]">
+                                    <div className="grid gap-1.5">
+                                        <div className="flex flex-col">
+                                            <span className="text-[0.7rem] uppercase text-muted-foreground">{label}</span>
+                                            <span className="font-bold text-foreground">{dataPoint.name}: {value?.toFixed(0)}%</span>
+                                        </div>
+                                    </div>
                                 </div>
                             )
                           }
