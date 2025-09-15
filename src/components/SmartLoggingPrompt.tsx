@@ -301,11 +301,11 @@ export function SmartLoggingPrompt({
     const slotAnalyses = slotOrder.map(slot => {
         const activities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
         
-        const hourlyData = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
+        const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
             hour: slot.startHour + i,
             name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
             minutes: 0,
-            tasks: [] as string[]
+            tasks: []
         }));
 
         activities.filter(a => a.completed).forEach(activity => {
@@ -321,14 +321,23 @@ export function SmartLoggingPrompt({
                     const endOfInterval = new Date(end) < nextHour ? new Date(end) : nextHour;
                     const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
                     
-                    const hourIndex = hourlyData.findIndex(h => h.hour === currentHour);
-                    if (hourIndex > -1 && minutesInHour > 0) {
-                        hourlyData[hourIndex].minutes += minutesInHour;
-                        if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
-                            hourlyData[hourIndex].tasks.push(activity.details);
+                    const hourData = hourlyData.find(h => h.hour === currentHour);
+                    if (hourData && minutesInHour > 0) {
+                        hourData.minutes += minutesInHour;
+                        if (!hourData.tasks.includes(activity.details)) {
+                            hourData.tasks.push(activity.details);
                         }
                     }
                     current = nextHour;
+                }
+            } else if (activity.duration) { // Handle non-focus session tasks
+                const activityHour = Math.floor(Math.random() * (slot.endHour - slot.startHour)) + slot.startHour;
+                const hourData = hourlyData.find(h => h.hour === activityHour);
+                if(hourData) {
+                    hourData.minutes += activity.duration;
+                    if (!hourData.tasks.includes(activity.details)) {
+                        hourData.tasks.push(activity.details);
+                    }
                 }
             }
         });
@@ -337,14 +346,15 @@ export function SmartLoggingPrompt({
             type: 'slot' as const,
             name: slot.name,
             time: slot.time,
-            hourlyData,
+            hourlyData: hourlyData.length > 0 ? hourlyData : [],
+            plannedActivities: activities.map(a => a.details).join(', ') || 'None'
         };
     });
 
     return {
         carouselItems: slotAnalyses
     };
-  }, [schedule, currentSlot, getLoggedMinutes]);
+  }, [schedule]);
 
 
   const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
@@ -441,30 +451,33 @@ export function SmartLoggingPrompt({
                                           <CardTitle className="text-base">🕒 {item.name}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="p-3 pt-0 flex-grow">
-                                            <div className="h-full w-full">
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={item.hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
-                                                        <XAxis dataKey="name" fontSize={9} interval={0} />
-                                                        <YAxis fontSize={9} />
-                                                        <Tooltip 
-                                                          content={({ active, payload, label }) => {
-                                                            if (active && payload && payload.length) {
-                                                              const data = payload[0].payload;
-                                                              return (
-                                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
-                                                                  <p className="font-bold">{label}: {data.minutes.toFixed(0)} min</p>
-                                                                  <ul className="list-disc list-inside">
-                                                                    {data.tasks.map((task: string, i: number) => <li key={i}>{task}</li>)}
-                                                                  </ul>
-                                                                </div>
-                                                              )
-                                                            }
-                                                            return null;
-                                                          }}
-                                                        />
-                                                        <Line type="monotone" dataKey="minutes" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
+                                            <div className="h-[120px] w-full">
+                                                <ChartContainer config={{minutes: {label: 'Minutes'}}} className="w-full h-full">
+                                                    <ResponsiveContainer>
+                                                        <LineChart data={item.hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
+                                                            <XAxis dataKey="name" fontSize={9} interval={0} />
+                                                            <YAxis fontSize={9} />
+                                                            <Tooltip 
+                                                              content={({ active, payload, label }) => {
+                                                                if (active && payload && payload.length) {
+                                                                  const data = payload[0].payload;
+                                                                  return (
+                                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                                      <p className="font-bold">{label}: {data.minutes.toFixed(0)} min</p>
+                                                                      {data.tasks.length > 0 && <Separator className="my-1" />}
+                                                                      <ul className="list-disc list-inside">
+                                                                        {data.tasks.map((task: string, i: number) => <li key={i}>{task}</li>)}
+                                                                      </ul>
+                                                                    </div>
+                                                                  )
+                                                                }
+                                                                return null;
+                                                              }}
+                                                            />
+                                                            <Line type="monotone" dataKey="minutes" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                                                        </LineChart>
+                                                    </ResponsiveContainer>
+                                                </ChartContainer>
                                             </div>
                                         </CardContent>
                                       </Card>
