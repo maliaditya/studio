@@ -372,16 +372,18 @@ function ChartsPageContent() {
         return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
     }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
 
-    const handleYAxisClick = (specializationName: string) => {
+    const handleBarClick = (data: any) => {
+        if (!data || !data.name) return;
+        const specializationName = data.name;
+
         const spec = coreSkills.find(s => s.name === specializationName && s.type === 'Specialization');
         if (!spec) return;
-        
+
         const intentionNodes = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms =>
             deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
         );
 
         const intentionIds = new Set(intentionNodes.map(i => i.id));
-        
         const loggedIntentions: LoggedIntention[] = [];
         
         allDeepWorkLogs.forEach(log => {
@@ -391,7 +393,7 @@ function ChartsPageContent() {
                 }
             })
         });
-        
+
         const uniqueLoggedIntentions = Array.from(new Map(loggedIntentions.map(item => [`${item.name}-${item.date}`, item])).values())
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -399,17 +401,6 @@ function ChartsPageContent() {
             specializationName,
             loggedIntentions: uniqueLoggedIntentions
         });
-    };
-    
-    const CustomizedYAxisTick = (props: any) => {
-        const { x, y, payload } = props;
-        return (
-            <g transform={`translate(${x},${y})`}>
-                <text x={0} y={0} dy={4} dx={-10} textAnchor="end" fill="hsl(var(--foreground))" className="text-xs cursor-pointer hover:fill-primary" onClick={() => handleYAxisClick(payload.value)}>
-                    {payload.value}
-                </text>
-            </g>
-        );
     };
 
 
@@ -614,7 +605,7 @@ function ChartsPageContent() {
                 <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Top Specializations</CardTitle>
-                        <CardDescription>Total hours logged per specialization. Click a label for more details.</CardDescription>
+                        <CardDescription>Total hours logged per specialization. Click a bar for more details.</CardDescription>
                         <div className="flex flex-wrap items-center gap-2 pt-2">
                             <Button variant={specHoursFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('all')}>All Time</Button>
                             <Button variant={specHoursFilter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('today')}>Today</Button>
@@ -623,14 +614,14 @@ function ChartsPageContent() {
                     <CardContent>
                         <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
                             <ResponsiveContainer>
-                                <BarChart data={specializationHoursSummary} layout="vertical" margin={{ left: 20 }}>
+                                <BarChart data={specializationHoursSummary} layout="vertical" margin={{ left: 20 }} onClick={(data) => handleBarClick(data?.activePayload?.[0]?.payload)}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" />
-                                    <YAxis type="category" dataKey="name" width={100} tick={<CustomizedYAxisTick />} />
+                                    <YAxis type="category" dataKey="name" width={100} />
                                     <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
                                     <Bar dataKey="hours" layout="vertical" radius={[0, 4, 4, 0]}>
                                         {specializationHoursSummary.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
+                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} cursor="pointer"/>
                                         ))}
                                     </Bar>
                                 </BarChart>
