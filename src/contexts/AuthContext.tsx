@@ -765,6 +765,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
 
+  const permanentlyLoggedTaskIds = useMemo(() => {
+    const loggedIds = new Set<string>();
+    const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
+    allLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          loggedIds.add(ex.definitionId);
+        }
+      });
+    });
+    return loggedIds;
+  }, [allDeepWorkLogs, allUpskillLogs]);
+
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
@@ -777,7 +790,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (isParentNode) {
         const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
         if (allLeafNodes.length > 0) {
-          const allChildrenCompleted = allLeafNodes.every(node => (node.loggedDuration || 0) > 0);
+          const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
   
           if (allChildrenCompleted) {
             handleToggleComplete(activity.slot, activity.id, true);
@@ -812,11 +825,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     getUpskillNodeType, 
     getDeepWorkNodeType, 
     getDescendantLeafNodes, 
-    activityDurations, 
+    activityDurations,
     handleToggleComplete,
-    toast
+    toast,
+    permanentlyLoggedTaskIds
   ]);
-
+  
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
     const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
@@ -1625,7 +1639,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
-      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling);
+      const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
       const newLog = { id: dateKey, date: dateKey, exercises };
       setAllWorkoutLogs(prev => [...prev, newLog]);
       workoutLog = newLog;
@@ -2791,7 +2805,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
     microSkillMap,
-    permanentlyLoggedTaskIds: new Set(),
+    permanentlyLoggedTaskIds,
     getDescendantLeafNodes,
     calculateTotalEstimate,
     expandedItems, setExpandedItems, handleExpansionChange,
@@ -2830,8 +2844,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
     
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
-    setThemeState(savedTheme);
-  }, []);
+    setTheme(savedTheme);
+  }, [setTheme]);
   
    useEffect(() => {
     const interval = setInterval(() => {
@@ -2879,4 +2893,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
