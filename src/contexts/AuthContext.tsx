@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, WidgetVisibility } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -862,71 +863,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return loggedIds;
   }, [allDeepWorkLogs, allUpskillLogs]);
 
-  const markObjectiveActivityAsComplete = useCallback((definitionId: string) => {
-    setSchedule(prevSchedule => {
-      const newSchedule = { ...prevSchedule };
-      let activityUpdated = false;
-      
-      for (const dateKey in newSchedule) {
-        const daySchedule = newSchedule[dateKey];
-        for (const slotName in daySchedule) {
-          const activities = daySchedule[slotName] as Activity[] | undefined;
-          if (Array.isArray(activities)) {
-            const activityIndex = activities.findIndex(act => act.taskIds?.some(tid => tid.startsWith(definitionId)));
-            if (activityIndex > -1 && !activities[activityIndex].completed) {
-              const updatedActivity = { ...activities[activityIndex], completed: true };
-              (newSchedule[dateKey][slotName] as Activity[])[activityIndex] = updatedActivity;
-              activityUpdated = true;
-              break; 
-            }
-          }
+  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+
+        if (activityIndex > -1) {
+            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
+            daySchedule[slotName] = activities;
+            newSchedule[todayKey] = daySchedule;
         }
-        if (activityUpdated) break;
-      }
-      return newSchedule;
+        
+        return newSchedule;
     });
   }, [setSchedule]);
-  
-  useEffect(() => {
-    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    
-    const checkAndUpdateSchedule = () => {
-        setSchedule(currentSchedule => {
-            let scheduleChanged = false;
-            const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
-
-            Object.keys(newSchedule).forEach(dateKey => {
-                Object.keys(newSchedule[dateKey]).forEach(slotName => {
-                    const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-                    if (Array.isArray(activities)) {
-                        activities.forEach((activity, index) => {
-                            if (!activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill')) {
-                                const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-                                const mainDef = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
-                                
-                                if (mainDef) {
-                                    const nodeType = activity.type === 'upskill' ? getUpskillNodeType(mainDef) : getDeepWorkNodeType(mainDef);
-                                    if (['Intention', 'Curiosity', 'Objective'].includes(nodeType)) {
-                                        const leafNodes = getDescendantLeafNodes(mainDef.id, activity.type as 'deepwork' | 'upskill');
-                                        if (leafNodes.length > 0 && leafNodes.every(leaf => permanentlyLoggedTaskIds.has(leaf.id))) {
-                                            newSchedule[dateKey][slotName][index].completed = true;
-                                            scheduleChanged = true;
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-
-            return scheduleChanged ? newSchedule : currentSchedule;
-        });
-    };
-    
-    checkAndUpdateSchedule();
-
-  }, [permanentlyLoggedTaskIds, schedule, setSchedule, deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes]);
 
   const onOpenFocusModal = useCallback((activity: Activity): boolean => {
     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
@@ -934,26 +887,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const def = mainDefId ? allDefs.find(d => d.id === mainDefId) : null;
   
     if (def) {
-      const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
-      const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-      
-      if (isParentNode) {
-        const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
-        const allChildrenCompleted = allLeafNodes.length > 0 && allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
-  
-        if (allChildrenCompleted) {
-          handleToggleComplete(activity.slot, activity.id, true);
-          return false; // Prevent modal from opening
-        }
+        const nodeType = activity.type === 'upskill' ? getUpskillNodeType(def) : getDeepWorkNodeType(def);
+        const isParentNode = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
         
-        const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
-        if (firstPendingNode) {
-          handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
-        } else {
-          handleStartFocusSession(activity, 25); // Fallback
+        if (isParentNode) {
+            const allLeafNodes = getDescendantLeafNodes(def.id, activity.type as 'deepwork' | 'upskill');
+            if (allLeafNodes.length > 0) {
+                const allChildrenCompleted = allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
+        
+                if (allChildrenCompleted) {
+                  handleToggleComplete(activity.slot, activity.id, true);
+                  toast({ title: "Objective Complete", description: `All sub-tasks for '${def.name}' are done.`});
+                  return false; // Prevent modal from opening
+                }
+            }
+            
+            const firstPendingNode = allLeafNodes.find(node => !permanentlyLoggedTaskIds.has(node.id));
+            if (firstPendingNode) {
+              handleStartFocusSession(activity, firstPendingNode.estimatedDuration || 25);
+            } else {
+              handleStartFocusSession(activity, 25); // Fallback
+            }
+            return true;
         }
-        return true;
-      }
     }
     
     const estDurationStr = activityDurations[activity.id];
@@ -974,7 +930,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
     return true;
-  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, handleStartFocusSession]);
+  }, [deepWorkDefinitions, upskillDefinitions, getUpskillNodeType, getDeepWorkNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, activityDurations, handleStartFocusSession, toast, handleToggleComplete]);
   
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1077,16 +1033,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (!isLoadingState) {
-        const handler = setTimeout(() => {
-            saveState();
-            setLocalChangeCount(0); // Reset after saving
-        }, 1000); // Debounce save operations
-
-        return () => {
-            clearTimeout(handler);
-        };
+        setLocalChangeCount(prev => prev + 1);
     }
-  }, [isLoadingState, saveState, schedule, settings, dailyPurposes, topPriorities, brainHacks]);
+  }, [isLoadingState, schedule, settings, dailyPurposes, topPriorities, brainHacks]);
+  
+  useEffect(() => {
+    if (!isLoadingState && localChangeCount > 0) {
+      const handler = setTimeout(() => {
+        saveState();
+        if (settings.autoPush && currentUser && localChangeCount >= settings.autoPushLimit) {
+            pushDataToCloud();
+        }
+      }, 1000);
+
+      return () => clearTimeout(handler);
+    }
+  }, [localChangeCount, isLoadingState, saveState, settings.autoPush, settings.autoPushLimit, currentUser]);
+
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
     setIsLoadingState(true);
@@ -1477,24 +1440,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ... (the rest of your context provider remains the same)
   // [No changes from the provided file content needed below this line for this fix]
   // ...
-  const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
-        const activityIndex = activities.findIndex(act => act.id === activityId);
-
-        if (activityIndex > -1) {
-            activities[activityIndex] = { ...activities[activityIndex], completed: isCompleted };
-            daySchedule[slotName] = activities;
-            newSchedule[todayKey] = daySchedule;
-        }
-        
-        return newSchedule;
-    });
-  };
-
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
