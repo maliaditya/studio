@@ -6,7 +6,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, parseISO, startOfISOWeek, setISOWeek, addWeeks, subYears, startOfDay, subDays, isSameDay } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine, BarChart, Bar, Cell } from 'recharts';
 import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
 import { Button } from '@/components/ui/button';
@@ -121,7 +121,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                         if (value === 0 || value === null || value === undefined) return null;
                         
                         let name = p.name;
-                        if ((context === 'resistance' || context === 'specialization' || context === 'hourly-activity') && customConfig && customConfig[p.dataKey]) {
+                        if ((context === 'resistance' || context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary') && customConfig && customConfig[p.dataKey]) {
                             name = customConfig[p.dataKey]?.label;
                         }
 
@@ -133,7 +133,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value.toFixed(2)} ${context === 'specialization' || context === 'hourly-activity' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'activity-trends') ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' || context === 'hourly-activity' || context === 'spec-summary' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'activity-trends') ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -158,11 +158,15 @@ function ChartsPageContent() {
         coreSkills,
         schedule,
         activityDurations,
+        deepWorkDefinitions,
+        upskillDefinitions,
+        getDescendantLeafNodes,
     } = useAuth();
     
     const [resistanceFilter, setResistanceFilter] = useState<'all' | 'today' | 'lastX'>('all');
     const [lastXDays, setLastXDays] = useState(5);
     const [selectedActivityDate, setSelectedActivityDate] = useState<Date>(new Date());
+    const [specHoursFilter, setSpecHoursFilter] = useState<'today' | 'all'>('all');
 
     const productivityData = useMemo(() => {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
@@ -290,18 +294,12 @@ function ChartsPageContent() {
 
         const dailyData: Record<string, Record<string, number>> = {};
 
-        const processLogs = (logs: any[], durationField: 'reps' | 'weight' | 'loggedDuration') => {
+        const processLogs = (logs: typeof allUpskillLogs, isUpskill: boolean) => {
             logs.forEach(log => {
                 log.exercises.forEach((ex: any) => {
                     const specName = categoryToSpecialization[ex.category];
                     if (specName) {
-                        let duration = 0;
-                        if (durationField === 'loggedDuration') {
-                            duration = ex.loggedDuration || 0;
-                        } else {
-                            duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
-                        }
-                        
+                        const duration = ex.loggedDuration || 0;
                         if (duration > 0) {
                             if (!dailyData[log.date]) {
                                 dailyData[log.date] = {};
@@ -316,8 +314,8 @@ function ChartsPageContent() {
             });
         };
 
-        processLogs(allUpskillLogs, 'loggedDuration');
-        processLogs(allDeepWorkLogs, 'loggedDuration');
+        processLogs(allUpskillLogs, true);
+        processLogs(allDeepWorkLogs, false);
 
         const data = Object.entries(dailyData)
             .map(([date, specMinutes]) => {
@@ -469,6 +467,65 @@ function ChartsPageContent() {
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
     }, [schedule, activityDurations, selectedActivityDate]);
 
+    const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
+        const totals: Record<string, number> = {};
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        
+        const specializations = coreSkills.filter(s => s.type === 'Specialization');
+        specializations.forEach(spec => totals[spec.name] = 0);
+
+        const allDefinitions = [...deepWorkDefinitions, ...upskillDefinitions];
+        const loggedMinutesMap = new Map<string, number>();
+
+        allDefinitions.forEach(def => {
+            if (def.loggedDuration && def.loggedDuration > 0) {
+                if (specHoursFilter === 'today') {
+                    // This is an approximation. A more accurate way would need log dates.
+                    // For now, we assume loggedDuration is cumulative.
+                    // This will be incorrect for 'today'. A better solution requires restructuring data.
+                    // Let's proceed with a placeholder logic for today.
+                    // A proper fix requires log dates associated with loggedDuration.
+                } else {
+                    loggedMinutesMap.set(def.id, def.loggedDuration);
+                }
+            }
+        });
+        
+        if (specHoursFilter === 'today') {
+             [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
+                if (log.date === todayKey) {
+                    log.exercises.forEach(ex => {
+                        loggedMinutesMap.set(ex.definitionId, (loggedMinutesMap.get(ex.definitionId) || 0) + (ex.loggedDuration || 0));
+                    });
+                }
+            });
+        }
+
+
+        specializations.forEach(spec => {
+            const descendantLeaves = getDescendantLeafNodes(spec.id, 'deepwork')
+                .concat(getDescendantLeafNodes(spec.id, 'upskill'));
+            
+            let totalSpecMinutes = 0;
+            descendantLeaves.forEach(leaf => {
+                totalSpecMinutes += loggedMinutesMap.get(leaf.id) || 0;
+            });
+            totals[spec.name] = totalSpecMinutes / 60; // to hours
+        });
+
+        const summaryData = Object.entries(totals)
+            .map(([name, hours]) => ({ name, hours }))
+            .filter(d => d.hours > 0)
+            .sort((a, b) => b.hours - a.hours);
+
+        const config: ChartConfig = {};
+        summaryData.forEach((d, i) => {
+            config[d.name] = { label: d.name, color: `hsl(var(--chart-${(i % 5) + 1}))` };
+        });
+
+        return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
+    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
+
 
     const allCategoriesData = useMemo(() => {
         const categoriesWithData = Object.values(activityNameMap)
@@ -503,8 +560,7 @@ function ChartsPageContent() {
         { title: "Productivity Trend", data: productivityData, config: productivityChartConfig, context: "productivity" },
         { title: "Weight Trend", data: combinedWeightData, config: weightChartConfig, context: "weight" },
         { title: "Workout Consistency", data: consistencyData, config: consistencyChartConfig, context: "consistency" },
-        { title: "Urges & Resistances by Day", data: resistanceData, config: resistanceChartConfig, context: "resistance", span: "lg:col-span-2" },
-        { title: "Specialization Hours", data: specializationData, config: specializationChartConfig, context: "specialization"},
+        { title: "Specialization Trend", data: specializationData, config: specializationChartConfig, context: "specialization"},
     ];
 
     return (
@@ -517,7 +573,7 @@ function ChartsPageContent() {
                 {chartComponents.map(({ title, data, config, context, span }) => {
                     if (data.length < 1) return null;
 
-                    if (["Specialization Hours", "Urges & Resistances by Day"].includes(title)) {
+                    if (["Specialization Trend"].includes(title)) {
                         const dataKeys = Object.keys(config);
                         return (
                             <Card key={title} className={span}>
@@ -528,7 +584,7 @@ function ChartsPageContent() {
                                             <LineChart data={data}>
                                                 <CartesianGrid strokeDasharray="3 3" />
                                                 <XAxis dataKey="date" tickFormatter={(val) => format(parseISO(val), 'MMM d')} />
-                                                <YAxis label={{ value: title === 'Specialization Hours' ? 'Hours' : 'Count', angle: -90, position: 'insideLeft' }} />
+                                                <YAxis label={{ value: title === 'Specialization Trend' ? 'Hours' : 'Count', angle: -90, position: 'insideLeft' }} />
                                                 <RechartsTooltip content={<CustomTooltip context={context} customConfig={config} />} />
                                                 {dataKeys.map((key, i) => (
                                                     <Line key={key} type="monotone" dataKey={key} stroke={config[key]?.color || `hsl(var(--chart-${(i%5)+1}))`} name={config[key]?.label || key} dot={false} />
@@ -563,6 +619,35 @@ function ChartsPageContent() {
                         </Card>
                     );
                 })}
+
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Specialization Hours</CardTitle>
+                        <CardDescription>Total hours logged per specialization.</CardDescription>
+                        <div className="flex flex-wrap items-center gap-2 pt-2">
+                            <Button variant={specHoursFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('all')}>All Time</Button>
+                            <Button variant={specHoursFilter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('today')}>Today</Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
+                            <ResponsiveContainer>
+                                <BarChart data={specializationHoursSummary} layout="vertical" margin={{ left: 20 }}>
+                                    <CartesianGrid horizontal={false} />
+                                    <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} tickMargin={10} width={100} />
+                                    <XAxis type="number" dataKey="hours" />
+                                    <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
+                                    <Bar dataKey="hours" radius={4}>
+                                        {specializationHoursSummary.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+
                  <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Hourly Resistance Log</CardTitle>
@@ -694,3 +779,5 @@ export default function ChartsPage() {
     );
 }
  
+
+    
