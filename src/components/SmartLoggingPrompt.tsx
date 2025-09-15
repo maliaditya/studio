@@ -157,49 +157,46 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
             </div>
             {stoppers.length > 0 && (
                 <ul className="text-xs space-y-1">
-                    {stoppers.map(s => {
-                        const linkedTechnique = mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId);
-                        return (
-                            <li key={s.id} className="border-t pt-2 group/stopper">
-                                <div className="flex items-center gap-1">
-                                    <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
-                                    <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
-                                       <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                             <Button variant="ghost" size="icon" className="h-6 w-6">
-                                                  <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
-                                              </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent className="w-56 z-[150]">
-                                              {mindProgrammingDefinitions.map(tech => (
-                                                  <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
-                                                      {tech.name}
-                                                  </DropdownMenuItem>
-                                              ))}
-                                              <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
-                                                  Unlink
+                    {stoppers.map(s => (
+                        <li key={s.id} className="border-t pt-2 group/stopper">
+                            <div className="flex items-center gap-1">
+                                <EditableStep point={s} onUpdate={(id, text) => handleUpdateStopper(id, text)} onDelete={() => handleDeleteStopper(habit.id, s.id)} />
+                                <div className="flex-shrink-0 flex items-center opacity-0 group-hover/stopper:opacity-100 transition-opacity">
+                                   <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                         <Button variant="ghost" size="icon" className="h-6 w-6">
+                                              <PlusCircle className="h-3.5 w-3.5 text-blue-500"/>
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent className="w-56 z-[150]">
+                                          {mindProgrammingDefinitions.map(tech => (
+                                              <DropdownMenuItem key={tech.id} onSelect={() => handleLinkTechnique(s.id, tech.id)}>
+                                                  {tech.name}
                                               </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                      </DropdownMenu>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
-                                        <Trash2 className="h-3 w-3 text-destructive" />
-                                      </Button>
-                                    </div>
+                                          ))}
+                                          <DropdownMenuItem onSelect={() => handleLinkTechnique(s.id, null)} className="text-destructive">
+                                              Unlink
+                                          </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                  </DropdownMenu>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
                                 </div>
-                                {linkedTechnique ? (
-                                    <div className="mt-1 pl-6">
-                                        <Badge 
-                                            variant="secondary" 
-                                            className="font-normal truncate cursor-pointer hover:ring-1 hover:ring-primary"
-                                            onClick={(e) => onTechniqueClick(linkedTechnique.id, e)}
-                                        >
-                                            <span className="truncate">{linkedTechnique.name}</span>
-                                        </Badge>
-                                    </div>
-                                ) : null}
-                            </li>
-                        )
-                    })}
+                            </div>
+                            {s.linkedTechniqueId ? (
+                                <div className="mt-1 pl-6">
+                                    <Badge 
+                                        variant="secondary" 
+                                        className="font-normal truncate cursor-pointer hover:ring-1 hover:ring-primary"
+                                        onClick={(e) => onTechniqueClick(s.linkedTechniqueId!, e)}
+                                    >
+                                        <span className="truncate">{mindProgrammingDefinitions.find(t => t.id === s.linkedTechniqueId)?.name || 'Linked Technique'}</span>
+                                    </Badge>
+                                </div>
+                            ) : null}
+                        </li>
+                    ))}
                 </ul>
             )}
         </div>
@@ -292,6 +289,10 @@ const DailyReviewDialog = ({ analysis, isOpen, onOpenChange, getLoggedMinutes }:
                         <p className="font-bold text-lg text-orange-500">{item.wastedTime}</p>
                         <p className="text-xs text-muted-foreground">Minutes Untracked</p>
                     </div>
+                </div>
+                <div className="pt-2 border-t text-xs">
+                    <h4 className="font-semibold mb-1">Planned:</h4>
+                    <p className="text-muted-foreground">{item.plannedTasks}</p>
                 </div>
                 {historicalData.length > 1 ? (
                     <div className="h-40 -mx-4 -mb-2">
@@ -630,6 +631,10 @@ export function SmartLoggingPrompt({
                                                   <p className="text-xs text-muted-foreground">Minutes Untracked</p>
                                               </div>
                                           </div>
+                                          <div className="pt-2 border-t text-xs">
+                                              <h4 className="font-semibold mb-1">Planned:</h4>
+                                              <p className="text-muted-foreground">{item.plannedTasks}</p>
+                                          </div>
                                           <blockquote className="mt-4 border-l-2 pl-4 italic text-xs text-muted-foreground">
                                               {item.insight}
                                           </blockquote>
@@ -732,3 +737,5 @@ export function SmartLoggingPrompt({
     </>
   );
 }
+
+    
