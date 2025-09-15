@@ -388,14 +388,11 @@ function ChartsPageContent() {
         const loggedIntentions: LoggedIntention[] = [];
         
         allDeepWorkLogs.forEach(log => {
-            const hasLoggedIntention = log.exercises.some(ex => intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0);
-            if(hasLoggedIntention) {
-                log.exercises.forEach(ex => {
-                    if(intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
-                        loggedIntentions.push({ name: ex.name, date: log.date });
-                    }
-                })
-            }
+            log.exercises.forEach(ex => {
+                if(intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
+                    loggedIntentions.push({ name: ex.name, date: log.date });
+                }
+            })
         });
         
         // Remove duplicates and sort by date descending
@@ -837,5 +834,3 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
-
-    
