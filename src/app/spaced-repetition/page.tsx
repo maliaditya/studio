@@ -60,10 +60,34 @@ function SpacedRepetitionPageContent() {
   }, [deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType]);
 
   const microSkillsForRepetition = useMemo(() => {
-    return coreSkills
-        .flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills))
-        .filter(ms => ms.isReadyForRepetition);
-  }, [coreSkills]);
+    const repetitionSkills = coreSkills
+      .flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills))
+      .filter(ms => ms.isReadyForRepetition);
+      
+    return repetitionSkills.map(skill => {
+        const associatedIntentions = deepWorkDefinitions.filter(def => 
+            def.category === skill.name && getDeepWorkNodeType(def) === 'Intention'
+        );
+        
+        const intentionsWithCompletion = associatedIntentions.map(intention => {
+            const logDates = allDeepWorkLogs
+                .filter(log => log.exercises.some(ex => ex.definitionId === intention.id && ex.loggedSets.length > 0))
+                .map(log => log.date);
+            const mostRecentDate = logDates.length > 0
+                ? logDates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+                : null;
+            return {
+                ...intention,
+                lastCompleted: mostRecentDate
+            };
+        }).filter(i => i.lastCompleted); // Only include intentions that have been logged
+
+        return {
+            ...skill,
+            intentions: intentionsWithCompletion
+        };
+    });
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, allDeepWorkLogs]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -113,6 +137,23 @@ function SpacedRepetitionPageContent() {
                         <CardHeader>
                             <CardTitle>{skill.name}</CardTitle>
                         </CardHeader>
+                        <CardContent>
+                          {skill.intentions.length > 0 ? (
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-semibold text-muted-foreground">Completed Intentions:</h4>
+                              <ul className="space-y-1 text-sm">
+                                {skill.intentions.map(intention => (
+                                  <li key={intention.id} className="flex justify-between items-center">
+                                    <span>{intention.name}</span>
+                                    <Badge variant="secondary" className="text-xs">{format(parseISO(intention.lastCompleted!), 'MMM d')}</Badge>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">No completed intentions for this skill yet.</p>
+                          )}
+                        </CardContent>
                     </Card>
                 ))}
             </div>
