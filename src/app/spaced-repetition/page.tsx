@@ -15,7 +15,8 @@ function SpacedRepetitionPageContent() {
     deepWorkDefinitions, 
     getDeepWorkNodeType, 
     coreSkills, 
-    getDeepWorkLoggedMinutes 
+    getDeepWorkLoggedMinutes,
+    getDescendantLeafNodes,
   } = useAuth();
 
   const microSkillsForRepetition = useMemo(() => {
@@ -30,13 +31,26 @@ function SpacedRepetitionPageContent() {
         
         return {
             ...skill,
-            intentions: associatedIntentions.map(intention => ({
-                ...intention,
-                totalLoggedMinutes: getDeepWorkLoggedMinutes(intention),
-            }))
+            intentions: associatedIntentions.map(intention => {
+                const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
+                const lastLoggedDate = leafNodes.reduce((latest, node) => {
+                    if (!node.last_logged_date) return latest;
+                    const nodeDate = parseISO(node.last_logged_date);
+                    if (!latest || nodeDate > latest) {
+                        return nodeDate;
+                    }
+                    return latest;
+                }, null as Date | null);
+                
+                return {
+                    ...intention,
+                    totalLoggedMinutes: getDeepWorkLoggedMinutes(intention),
+                    last_logged_date: lastLoggedDate ? format(lastLoggedDate, 'MMM d, yyyy') : null,
+                };
+            })
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes, getDescendantLeafNodes]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes < 1) return "0m";
@@ -78,7 +92,7 @@ function SpacedRepetitionPageContent() {
                                       )}
                                     </div>
                                     {intention.last_logged_date && (
-                                      <p className="text-xs text-muted-foreground mt-1">Last logged: {format(parseISO(intention.last_logged_date), 'MMM d, yyyy')}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Last logged: {intention.last_logged_date}</p>
                                     )}
                                   </li>
                                 ))}
