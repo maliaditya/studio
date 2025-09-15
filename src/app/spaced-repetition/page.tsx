@@ -19,7 +19,14 @@ interface LoggedIntention {
 }
 
 function SpacedRepetitionPageContent() {
-  const { deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, coreSkills } = useAuth();
+  const { 
+    deepWorkDefinitions, 
+    allDeepWorkLogs, 
+    getDeepWorkNodeType, 
+    coreSkills, 
+    getDescendantLeafNodes,
+    getDeepWorkLoggedMinutes 
+  } = useAuth();
 
   const loggedIntentions = useMemo(() => {
     const intentionNodes = deepWorkDefinitions.filter(
@@ -30,36 +37,38 @@ function SpacedRepetitionPageContent() {
 
     allDeepWorkLogs.forEach(log => {
       log.exercises.forEach(ex => {
-        // Find if the exercise definition is an intention we care about
-        const intentionNode = intentionNodes.find(n => n.id === ex.definitionId);
-        // Only consider it logged if it has logged sets
+        const intentionNode = intentionNodes.find(n => {
+            const leafNodes = getDescendantLeafNodes(n.id, 'deepwork');
+            return leafNodes.some(leaf => leaf.id === ex.definitionId);
+        });
+        
         if (intentionNode && (ex.loggedSets?.length ?? 0) > 0) {
-          if (!intentionLogsMap.has(ex.definitionId)) {
-            intentionLogsMap.set(ex.definitionId, { def: intentionNode, dates: new Set() });
+          if (!intentionLogsMap.has(intentionNode.id)) {
+            intentionLogsMap.set(intentionNode.id, { def: intentionNode, dates: new Set() });
           }
-          intentionLogsMap.get(ex.definitionId)?.dates.add(log.date);
+          intentionLogsMap.get(intentionNode.id)?.dates.add(log.date);
         }
       });
     });
 
     const result: LoggedIntention[] = [];
     intentionLogsMap.forEach((value, key) => {
-      // Use loggedDuration as the source of truth for whether something has ever been logged
-      if (value.def.loggedDuration && value.def.loggedDuration > 0) {
-        result.push({
-          id: key,
-          name: value.def.name,
-          category: value.def.category,
-          dates: Array.from(value.dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
-        });
-      }
+        const totalLogged = getDeepWorkLoggedMinutes(value.def);
+        if (totalLogged > 0) {
+            result.push({
+                id: key,
+                name: value.def.name,
+                category: value.def.category,
+                dates: Array.from(value.dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
+            });
+        }
     });
     
     return result.sort((a, b) => 
         new Date(b.dates[0]).getTime() - new Date(a.dates[0]).getTime()
     );
 
-  }, [deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType]);
+  }, [deepWorkDefinitions, allDeepWorkLogs, getDeepWorkNodeType, getDescendantLeafNodes, getDeepWorkLoggedMinutes]);
 
   const microSkillsForRepetition = useMemo(() => {
     const repetitionSkills = coreSkills
@@ -73,11 +82,21 @@ function SpacedRepetitionPageContent() {
         
         return {
             ...skill,
-            intentions: associatedIntentions
+            intentions: associatedIntentions.map(intention => ({
+                ...intention,
+                totalLoggedMinutes: getDeepWorkLoggedMinutes(intention)
+            }))
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes]);
 
+  const formatMinutes = (minutes: number) => {
+    if (minutes < 1) return "0m";
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = Math.round(minutes % 60);
+    return `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`.trim();
+  };
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -133,8 +152,11 @@ function SpacedRepetitionPageContent() {
                               <h4 className="text-sm font-semibold text-muted-foreground">Intentions:</h4>
                               <ul className="space-y-1 text-sm list-disc list-inside">
                                 {skill.intentions.map(intention => (
-                                  <li key={intention.id}>
+                                  <li key={intention.id} className="flex justify-between items-center">
                                     <span>{intention.name}</span>
+                                    {intention.totalLoggedMinutes > 0 && (
+                                        <Badge variant="secondary">{formatMinutes(intention.totalLoggedMinutes)}</Badge>
+                                    )}
                                   </li>
                                 ))}
                               </ul>
