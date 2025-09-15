@@ -1,15 +1,14 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { Lightbulb, BookCopy } from 'lucide-react';
 import { format, parseISO, max } from 'date-fns';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import type { ExerciseDefinition, MicroSkill } from '@/types/workout';
+import type { ExerciseDefinition } from '@/types/workout';
 
 function SpacedRepetitionPageContent() {
   const { 
@@ -21,34 +20,28 @@ function SpacedRepetitionPageContent() {
     getDeepWorkLoggedMinutes 
   } = useAuth();
 
+  const [lastLoggedDateMap, setLastLoggedDateMap] = useState<Map<string, Date>>(new Map());
+
+  useEffect(() => {
+    const newMap = new Map<string, Date>();
+    allDeepWorkLogs.forEach(log => {
+      log.exercises.forEach(ex => {
+        if (ex.loggedSets.length > 0) {
+          const logDate = parseISO(log.date);
+          const existingDate = newMap.get(ex.definitionId);
+          if (!existingDate || logDate > existingDate) {
+            newMap.set(ex.definitionId, logDate);
+          }
+        }
+      });
+    });
+    setLastLoggedDateMap(newMap);
+  }, [allDeepWorkLogs]);
+
   const microSkillsForRepetition = useMemo(() => {
     const repetitionSkills = coreSkills
       .flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills))
       .filter(ms => ms.isReadyForRepetition);
-
-    // 1. Create a map from leaf node ID to its parent Intention ID
-    const leafToIntentionMap = new Map<string, string>();
-    const intentions = deepWorkDefinitions.filter(def => getDeepWorkNodeType(def) === 'Intention');
-    intentions.forEach(intention => {
-        const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
-        leafNodes.forEach(leaf => {
-            leafToIntentionMap.set(leaf.id, intention.id);
-        });
-    });
-
-    // 2. Find the last logged date for each leaf node
-    const lastLoggedDateByLeafId = new Map<string, Date>();
-    allDeepWorkLogs.forEach(log => {
-        log.exercises.forEach(ex => {
-            if (ex.loggedSets.length > 0) {
-                const logDate = parseISO(log.date);
-                const existingDate = lastLoggedDateByLeafId.get(ex.definitionId);
-                if (!existingDate || logDate > existingDate) {
-                    lastLoggedDateByLeafId.set(ex.definitionId, logDate);
-                }
-            }
-        });
-    });
       
     return repetitionSkills.map(skill => {
         const associatedIntentions = deepWorkDefinitions.filter(def => 
@@ -60,24 +53,22 @@ function SpacedRepetitionPageContent() {
             intentions: associatedIntentions.map(intention => {
                 const totalLoggedMinutes = getDeepWorkLoggedMinutes(intention);
 
-                // 3. Find the most recent date from this Intention's leaf nodes
                 const leafNodes = getDescendantLeafNodes(intention.id, 'deepwork');
                 const logDates = leafNodes
-                    .map(leaf => lastLoggedDateByLeafId.get(leaf.id))
+                    .map(leaf => lastLoggedDateMap.get(leaf.id))
                     .filter((date): date is Date => !!date);
                 
                 const mostRecentDate = logDates.length > 0 ? max(logDates) : null;
-                const lastLoggedDate = mostRecentDate ? format(mostRecentDate, 'MMM d, yyyy') : null;
                 
                 return {
                     ...intention,
                     totalLoggedMinutes,
-                    lastLoggedDate
+                    lastLoggedDate: mostRecentDate ? format(mostRecentDate, 'MMM d, yyyy') : null,
                 };
             })
         };
     });
-  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDeepWorkLoggedMinutes, allDeepWorkLogs, getDescendantLeafNodes]);
+  }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes, getDeepWorkLoggedMinutes, lastLoggedDateMap]);
 
   const formatMinutes = (minutes: number) => {
     if (minutes < 1) return "0m";
