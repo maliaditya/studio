@@ -11,6 +11,10 @@ import { ChartContainer, ChartConfig } from '@/components/ui/chart';
 import type { Stopper, Activity, DailySchedule, ActivityType } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 const productivityChartConfig = {
     totalMinutes: { label: "Productive Time (min)", color: "hsl(var(--chart-1))" },
@@ -158,8 +162,9 @@ function ChartsPageContent() {
     
     const [resistanceFilter, setResistanceFilter] = useState<'all' | 'today' | 'lastX'>('all');
     const [lastXDays, setLastXDays] = useState(5);
-    const [activityFilter, setActivityFilter] = useState<'all' | 'today' | 'lastX'>('all');
+    const [activityFilter, setActivityFilter] = useState<'all' | 'today' | 'lastX' | 'specificDay'>('all');
     const [lastXDaysActivity, setLastXDaysActivity] = useState(5);
+    const [specificActivityDay, setSpecificActivityDay] = useState<Date | undefined>(new Date());
 
     const productivityData = useMemo(() => {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
@@ -408,22 +413,23 @@ function ChartsPageContent() {
             });
             return record;
         });
-    
+
         const today = startOfDay(new Date());
-        let filterStartDate: Date;
-    
-        if (activityFilter === 'today') {
-            filterStartDate = today;
-        } else if (activityFilter === 'lastX') {
-            filterStartDate = subDays(today, lastXDaysActivity - 1);
-        } else { // 'all'
-            filterStartDate = subYears(today, 10);
-        }
 
         Object.entries(schedule).forEach(([date, dailySchedule]) => {
             const eventDate = parseISO(date);
-            if (activityFilter !== 'all' && eventDate < filterStartDate) return;
-            if (activityFilter === 'today' && !isSameDay(eventDate, today)) return;
+            let includeDate = false;
+            if (activityFilter === 'all') {
+                includeDate = true;
+            } else if (activityFilter === 'today') {
+                includeDate = isSameDay(eventDate, today);
+            } else if (activityFilter === 'lastX') {
+                const filterStartDate = subDays(today, lastXDaysActivity - 1);
+                includeDate = eventDate >= filterStartDate;
+            } else if (activityFilter === 'specificDay' && specificActivityDay) {
+                includeDate = isSameDay(eventDate, specificActivityDay);
+            }
+            if (!includeDate) return;
 
             Object.values(dailySchedule).flat().forEach((activity: Activity) => {
                 if (activity.completed && activityDurations[activity.id]) {
@@ -449,7 +455,7 @@ function ChartsPageContent() {
         });
 
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
-    }, [schedule, activityDurations, activityFilter, lastXDaysActivity]);
+    }, [schedule, activityDurations, activityFilter, lastXDaysActivity, specificActivityDay]);
 
 
     const allCategoriesData = useMemo(() => {
@@ -601,6 +607,29 @@ function ChartsPageContent() {
                                 />
                                 <span className="text-sm">Days</span>
                             </div>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant={activityFilter === 'specificDay' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className={cn("w-[240px] justify-start text-left font-normal", !specificActivityDay && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {specificActivityDay ? format(specificActivityDay, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={specificActivityDay}
+                                    onSelect={(date) => {
+                                        setSpecificActivityDay(date);
+                                        setActivityFilter('specificDay');
+                                    }}
+                                    initialFocus
+                                />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -667,3 +696,4 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+ 
