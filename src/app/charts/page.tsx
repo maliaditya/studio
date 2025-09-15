@@ -121,7 +121,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                         if (value === 0 || value === null || value === undefined) return null;
                         
                         let name = p.name;
-                        if ((context === 'resistance' || context === 'specialization') && customConfig && customConfig[p.dataKey]) {
+                        if ((context === 'resistance' || context === 'specialization' || context === 'hourly-activity') && customConfig && customConfig[p.dataKey]) {
                             name = customConfig[p.dataKey]?.label;
                         }
 
@@ -133,7 +133,7 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
                                     <span className="font-mono font-medium text-foreground">
                                         {context === 'weight' ? `${value.toFixed(1)} kg/lb` : 
                                         context === 'consistency' ? `${value}%` :
-                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' || context === 'hourly-activity' ? (value === 1 ? 'time' : 'times') : context === 'activity-trends' ? 'min' : 'min'}`}
+                                        `${value.toFixed(2)} ${context === 'specialization' ? 'hrs' : context === 'resistance' || context === 'activities' || context === 'activity-distribution' ? (value === 1 ? 'time' : 'times') : (context === 'hourly-activity' || context === 'activity-trends') ? 'min' : 'min'}`}
                                     </span>
                                 </div>
                             </div>
@@ -425,26 +425,47 @@ function ChartsPageContent() {
                 includeDate = isSameDay(eventDate, today);
             } else if (activityFilter === 'lastX') {
                 const filterStartDate = subDays(today, lastXDaysActivity - 1);
-                includeDate = eventDate >= filterStartDate;
+                includeDate = eventDate >= filterStartDate && eventDate <= today;
             } else if (activityFilter === 'specificDay' && specificActivityDay) {
                 includeDate = isSameDay(eventDate, specificActivityDay);
             }
             if (!includeDate) return;
 
             Object.values(dailySchedule).flat().forEach((activity: Activity) => {
-                if (activity.completed && activityDurations[activity.id]) {
-                    const duration = parseInt(activityDurations[activity.id].replace(' min', ''));
-                    // This is a simplification; for more accuracy, we'd need start/end times of activities.
-                    // For now, we'll attribute the duration to the start hour of its slot.
-                    const slot = Object.values(activityNameMap).includes(activity.type) ? activity.slot : null;
-                    const slotStartHour = slot ? new Date().setHours(parseInt(slot.split(':')[0])) : null;
+                if (!activity.completed) return;
+                
+                const activityName = activityNameMap[activity.type];
+                if (!activityName) return;
+
+                let startTime, endTime;
+                if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                    startTime = new Date(activity.focusSessionInitialStartTime);
+                    endTime = new Date(activity.focusSessionEndTime);
+                } else if (activity.duration) {
+                    // Fallback for simple duration tasks (interrupts, essentials)
+                    const activityDate = parseISO(date);
+                    // Distribute it somewhat arbitrarily for now if no start time exists
+                    const startHour = activityDate.getHours();
+                    startTime = new Date(activityDate.setHours(startHour, 0, 0, 0));
+                    endTime = new Date(startTime.getTime() + activity.duration * 60 * 1000);
+                } else {
+                    return; // No time data to process
+                }
+
+                let current = startTime;
+                while (current < endTime) {
+                    const currentHour = current.getHours();
+                    const nextHour = new Date(current);
+                    nextHour.setHours(currentHour + 1, 0, 0, 0);
+
+                    const endOfInterval = endTime < nextHour ? endTime : nextHour;
+                    const minutesInHour = (endOfInterval.getTime() - current.getTime()) / 60000;
                     
-                    // Fallback to a crude hour distribution if we don't have exact times.
-                    const hour = new Date().getHours(); // Simplification: attribute to current hour for now
-                    const activityName = activityNameMap[activity.type];
-                    if (activityName) {
-                        hourlyData[hour][activityName] = (hourlyData[hour][activityName] || 0) + duration;
+                    if (minutesInHour > 0) {
+                        hourlyData[currentHour][activityName] = (hourlyData[currentHour][activityName] || 0) + minutesInHour;
                     }
+                    
+                    current = nextHour;
                 }
             });
         });
