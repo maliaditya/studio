@@ -15,6 +15,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarIcon } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const productivityChartConfig = {
     totalMinutes: { label: "Productive Time (min)", color: "hsl(var(--chart-1))" },
@@ -146,6 +149,16 @@ const CustomTooltip = ({ active, payload, label, context, customConfig }: { acti
     return null;
 };
 
+interface LoggedIntention {
+    name: string;
+    date: string;
+}
+
+interface IntentionModalData {
+    specializationName: string;
+    loggedIntentions: LoggedIntention[];
+}
+
 function ChartsPageContent() {
     const { 
         allUpskillLogs, 
@@ -170,6 +183,7 @@ function ChartsPageContent() {
     const [lastXDays, setLastXDays] = useState(5);
     const [selectedActivityDate, setSelectedActivityDate] = useState<Date>(new Date());
     const [specHoursFilter, setSpecHoursFilter] = useState<'all' | 'today'>('all');
+    const [intentionModalData, setIntentionModalData] = useState<IntentionModalData | null>(null);
 
     const productivityData = useMemo(() => {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
@@ -357,6 +371,42 @@ function ChartsPageContent() {
   
         return { specializationHoursSummary: summaryData, specHoursChartConfig: config };
     }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, specHoursFilter, allDeepWorkLogs, allUpskillLogs]);
+
+    const handleBarClick = (data: any) => {
+        if (!data || !data.activePayload || !data.activePayload[0]) return;
+        const specializationName = data.activePayload[0].payload.name;
+
+        const spec = coreSkills.find(s => s.name === specializationName && s.type === 'Specialization');
+        if (!spec) return;
+
+        const intentionNodes = spec.skillAreas.flatMap(sa => sa.microSkills).flatMap(ms =>
+            deepWorkDefinitions.filter(def => def.category === ms.name && getDeepWorkNodeType(def) === 'Intention')
+        );
+
+        const intentionIds = new Set(intentionNodes.map(i => i.id));
+        
+        const loggedIntentions: LoggedIntention[] = [];
+        
+        allDeepWorkLogs.forEach(log => {
+            const hasLoggedIntention = log.exercises.some(ex => intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0);
+            if(hasLoggedIntention) {
+                log.exercises.forEach(ex => {
+                    if(intentionIds.has(ex.definitionId) && ex.loggedSets.length > 0) {
+                        loggedIntentions.push({ name: ex.name, date: log.date });
+                    }
+                })
+            }
+        });
+        
+        // Remove duplicates and sort by date descending
+        const uniqueLoggedIntentions = Array.from(new Map(loggedIntentions.map(item => [`${item.name}-${item.date}`, item])).values())
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        setIntentionModalData({
+            specializationName,
+            loggedIntentions: uniqueLoggedIntentions
+        });
+    };
 
 
     const hourlyResistanceData = useMemo(() => {
@@ -559,8 +609,8 @@ function ChartsPageContent() {
 
                 <Card className="lg:col-span-2">
                     <CardHeader>
-                        <CardTitle>Specialization Hours</CardTitle>
-                        <CardDescription>Total hours logged per specialization.</CardDescription>
+                        <CardTitle>Top Specializations</CardTitle>
+                        <CardDescription>Total hours logged per specialization. Click a bar for more details.</CardDescription>
                         <div className="flex flex-wrap items-center gap-2 pt-2">
                             <Button variant={specHoursFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('all')}>All Time</Button>
                             <Button variant={specHoursFilter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setSpecHoursFilter('today')}>Today</Button>
@@ -569,14 +619,14 @@ function ChartsPageContent() {
                     <CardContent>
                         <ChartContainer config={specHoursChartConfig} className="w-full h-[300px]">
                             <ResponsiveContainer>
-                                <BarChart data={specializationHoursSummary} layout="vertical">
+                                <BarChart data={specializationHoursSummary} layout="vertical" onClick={handleBarClick}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" />
                                     <YAxis type="category" dataKey="name" width={120} />
                                     <RechartsTooltip content={<CustomTooltip context="spec-summary" customConfig={specHoursChartConfig}/>}/>
                                     <Bar dataKey="hours" layout="vertical" radius={[0, 4, 4, 0]}>
                                         {specializationHoursSummary.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} />
+                                            <Cell key={`cell-${index}`} fill={specHoursChartConfig[entry.name]?.color || `hsl(var(--chart-${(index % 5) + 1}))`} cursor="pointer" />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -740,6 +790,42 @@ function ChartsPageContent() {
                     ))}
                 </div>
             </div>
+            {intentionModalData && (
+                <Dialog open={!!intentionModalData} onOpenChange={() => setIntentionModalData(null)}>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Logged Intentions for "{intentionModalData.specializationName}"</DialogTitle>
+                            <DialogDescription>A log of all intentions you have completed for this specialization.</DialogDescription>
+                        </DialogHeader>
+                        <div className="max-h-[60vh] mt-4">
+                            <ScrollArea className="h-full pr-4">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Intention</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {intentionModalData.loggedIntentions.length > 0 ? (
+                                            intentionModalData.loggedIntentions.map((intention, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{format(parseISO(intention.date), 'PPP')}</TableCell>
+                                                    <TableCell>{intention.name}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={2} className="text-center h-24">No intentions have been logged for this specialization yet.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </ScrollArea>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }
@@ -751,7 +837,5 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
-
-    
 
     
