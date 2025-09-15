@@ -168,7 +168,7 @@ function ChartsPageContent() {
         const dailyData: Record<string, { dateObj: Date, upskill: number, deepwork: number }> = {};
         
         allUpskillLogs.forEach(log => {
-            const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
+            const duration = log.exercises.reduce((sum, ex) => sum + (ex.loggedDuration || 0), 0);
             if (duration > 0) {
                 if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), upskill: 0, deepwork: 0 };
                 dailyData[log.date].upskill += duration;
@@ -176,7 +176,7 @@ function ChartsPageContent() {
         });
 
         allDeepWorkLogs.forEach(log => {
-            const duration = log.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
+            const duration = log.exercises.reduce((sum, ex) => sum + (ex.loggedDuration || 0), 0);
             if (duration > 0) {
                 if (!dailyData[log.date]) dailyData[log.date] = { dateObj: parseISO(log.date), upskill: 0, deepwork: 0 };
                 dailyData[log.date].deepwork += duration;
@@ -290,12 +290,18 @@ function ChartsPageContent() {
 
         const dailyData: Record<string, Record<string, number>> = {};
 
-        const processLogs = (logs: any[], durationField: 'reps' | 'weight') => {
+        const processLogs = (logs: any[], durationField: 'reps' | 'weight' | 'loggedDuration') => {
             logs.forEach(log => {
                 log.exercises.forEach((ex: any) => {
                     const specName = categoryToSpecialization[ex.category];
                     if (specName) {
-                        const duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+                        let duration = 0;
+                        if (durationField === 'loggedDuration') {
+                            duration = ex.loggedDuration || 0;
+                        } else {
+                            duration = ex.loggedSets.reduce((sum: number, set: any) => sum + (set[durationField] || 0), 0);
+                        }
+                        
                         if (duration > 0) {
                             if (!dailyData[log.date]) {
                                 dailyData[log.date] = {};
@@ -310,8 +316,8 @@ function ChartsPageContent() {
             });
         };
 
-        processLogs(allUpskillLogs, 'reps');
-        processLogs(allDeepWorkLogs, 'weight');
+        processLogs(allUpskillLogs, 'loggedDuration');
+        processLogs(allDeepWorkLogs, 'loggedDuration');
 
         const data = Object.entries(dailyData)
             .map(([date, specMinutes]) => {
