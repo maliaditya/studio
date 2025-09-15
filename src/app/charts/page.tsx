@@ -467,20 +467,19 @@ function ChartsPageContent() {
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
     }, [schedule, activityDurations, selectedActivityDate]);
 
-    const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
+     const { specializationHoursSummary, specHoursChartConfig } = useMemo(() => {
         const totals: Record<string, number> = {};
         const specializations = coreSkills.filter(s => s.type === 'Specialization');
         specializations.forEach(spec => totals[spec.name] = 0);
     
         if (specHoursFilter === 'all') {
-            const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
             const loggedMinutesMap = new Map<string, number>();
-            allDefs.forEach(def => {
+            [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => {
                 if (def.loggedDuration && def.loggedDuration > 0) {
                     loggedMinutesMap.set(def.id, def.loggedDuration);
                 }
             });
-
+    
             specializations.forEach(spec => {
                 const descendantLeavesUpskill = getDescendantLeafNodes(spec.id, 'upskill');
                 const descendantLeavesDeepWork = getDescendantLeafNodes(spec.id, 'deepwork');
