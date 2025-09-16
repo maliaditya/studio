@@ -6,11 +6,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Repeat } from 'lucide-react';
+import { Repeat, Focus } from 'lucide-react';
 import { Button } from './ui/button';
 import { SpacedRepetitionModal } from './SpacedRepetitionModal';
 import type { MicroSkill } from '@/types/workout';
-import { format, parseISO, addDays, differenceInDays, isBefore } from 'date-fns';
+import { format, parseISO, addDays, differenceInDays, isBefore, isToday, startOfToday } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 export function SpacedRepetitionPopup() {
     const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes } = useAuth();
@@ -21,6 +22,7 @@ export function SpacedRepetitionPopup() {
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
     const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
+    const [showOnlyToday, setShowOnlyToday] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
@@ -41,7 +43,7 @@ export function SpacedRepetitionPopup() {
             )
         );
 
-        return repetitionSkills.map(skill => {
+        let skillsToReview = repetitionSkills.map(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
             const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
             const completionDates = new Set<string>();
@@ -72,11 +74,20 @@ export function SpacedRepetitionPopup() {
             return {
                 ...skill,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
-                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, new Date()),
+                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
-        }).sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+        });
 
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
+        if (showOnlyToday) {
+            const today = startOfToday();
+            skillsToReview = skillsToReview.filter(skill => 
+                isBefore(skill.nextReviewDate, today) || isToday(skill.nextReviewDate)
+            );
+        }
+
+        return skillsToReview.sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, showOnlyToday]);
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
@@ -126,7 +137,7 @@ export function SpacedRepetitionPopup() {
         userSelect: isDragging ? 'none' : 'auto',
     };
     
-    if (!isClient || repetitionSkillsWithDates.length === 0) {
+    if (!isClient || coreSkills.flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills.filter(ms => ms.isReadyForRepetition))).length === 0) {
         return null;
     }
 
@@ -143,11 +154,19 @@ export function SpacedRepetitionPopup() {
             >
                 <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
                     <div className="cursor-grab active:cursor-grabbing">
-                        <CardHeader className="p-0 mb-3">
+                        <CardHeader className="p-0 mb-3 flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base text-primary">
                                 <Repeat className="h-5 w-5 text-blue-500" />
                                 Spaced Repetition Queue
                             </CardTitle>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => setShowOnlyToday(prev => !prev)}
+                            >
+                                <Focus className={cn("h-4 w-4 text-muted-foreground", showOnlyToday && "text-primary")} />
+                            </Button>
                         </CardHeader>
                     </div>
                     <CardContent className="p-0">
@@ -167,6 +186,11 @@ export function SpacedRepetitionPopup() {
                                         </Button>
                                     </li>
                                 ))}
+                                {repetitionSkillsWithDates.length === 0 && (
+                                    <p className="text-center text-sm text-muted-foreground pt-16">
+                                        {showOnlyToday ? "No reviews for today!" : "No skills in queue."}
+                                    </p>
+                                )}
                             </ul>
                         </ScrollArea>
                     </CardContent>
