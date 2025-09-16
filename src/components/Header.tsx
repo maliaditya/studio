@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings, Eye, EyeOff } from 'lucide-react';
+import { BrainCircuit, Heart, Settings, Eye, EyeOff, ChevronDown } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -13,6 +13,12 @@ import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Header() {
   const { 
@@ -36,18 +42,21 @@ export function Header() {
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
     { href: '/charts', label: 'Charts' },
-    { href: '/path', label: 'Path' },
     { href: '/timesheet', label: 'Timesheet' },
     { href: '/workout-tracker', label: 'Workout' },
-    { href: '/mind-programming', label: 'Mind Programming' },
-    { href: '/patterns', label: 'Patterns' },
-    { href: '/purpose', label: 'Purpose' },
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
-    { href: '/personal-branding', label: 'Branding' },
-    { href: '/strategic-planning', label: 'Strategy' },
+    { href: '/strategic-planning', label: 'Planning' },
     { href: '/resources', label: 'Resources' },
+  ];
+
+  const dropdownLinks = [
+    { href: '/path', label: 'Path' },
     { href: '/portfolio', label: 'Portfolio' },
+    { href: '/purpose', label: 'Purpose' },
+    { href: '/patterns', label: 'Patterns' },
+    { href: '/mind-programming', label: 'Mind Programming' },
+    { href: '/personal-branding', label: 'Branding' },
   ];
 
   return (
@@ -75,6 +84,21 @@ export function Header() {
                     {link.label}
                   </Link>
                 ))}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="text-sm font-medium text-muted-foreground hover:text-primary focus:text-primary data-[state=open]:text-primary gap-1">
+                      Strategy
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {dropdownLinks.map(link => (
+                       <DropdownMenuItem key={link.href} asChild>
+                         <Link href={link.href}>{link.label}</Link>
+                       </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
             </nav>
           </div>
           
