@@ -48,6 +48,7 @@ export function Header() {
     { href: '/strategic-planning', label: 'Strategy' },
     { href: '/resources', label: 'Resources' },
     { href: '/spaced-repetition', label: 'Spaced Repetition' },
+    { href: '/portfolio', label: 'Portfolio' },
   ];
 
   return (
