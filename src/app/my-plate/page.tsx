@@ -738,60 +738,46 @@ function MyPlatePageContent() {
     setEditingActivity(null);
   };
   
-  const getLoggedMinutes = useCallback((logs: DatedWorkout[], dateKey: string, taskType: 'deepwork' | 'upskill') => {
-    const dailyLog = logs.find(log => log.date === dateKey);
-    if (!dailyLog) return 0;
-    const durationField = taskType === 'deepwork' ? 'weight' : 'reps';
-    return dailyLog.exercises.reduce((total, ex) => total + ex.loggedSets.reduce((sum, set) => sum + (set[durationField] || 0), 0), 0);
-  }, []);
-
   const productivityStats = useMemo(() => {
     const todayKey = format(selectedDate, 'yyyy-MM-dd');
-    const yesterday = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
 
-    const todayUpskillMinutes = getLoggedMinutes(allUpskillLogs, todayKey, 'upskill');
-    const yesterdayUpskillMinutes = getLoggedMinutes(allUpskillLogs, yesterday, 'upskill');
+    const getMinutesForDay = (definitions: ExerciseDefinition[], dateKey: string): number => {
+        return definitions
+            .filter(def => def.last_logged_date === dateKey && def.loggedDuration)
+            .reduce((sum, def) => sum + def.loggedDuration!, 0);
+    };
 
-    const todayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, todayKey, 'deepwork');
-    const yesterdayDeepWorkMinutes = getLoggedMinutes(allDeepWorkLogs, yesterday, 'deepwork');
+    const todayUpskillMinutes = getMinutesForDay(upskillDefinitions, todayKey);
+    const yesterdayUpskillMinutes = getMinutesForDay(upskillDefinitions, yesterdayKey);
 
+    const todayDeepWorkMinutes = getMinutesForDay(deepWorkDefinitions, todayKey);
+    const yesterdayDeepWorkMinutes = getMinutesForDay(deepWorkDefinitions, yesterdayKey);
+    
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
-      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
     const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
-    
+
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
-    const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
-
-    const loggedMinutesMap = new Map<string, number>();
-    allDefs.forEach(def => {
-        if (def.loggedDuration && def.loggedDuration > 0) {
-            loggedMinutesMap.set(def.id, def.loggedDuration);
-        }
-    });
-
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
+    
     specializations.forEach(spec => {
         let totalSpecLoggedMinutes = 0;
         let totalSpecEstimatedMinutes = 0;
 
         const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
 
-        const topLevelIntentions = deepWorkDefinitions.filter(def => microSkillNames.has(def.category) && getDeepWorkNodeType(def) === 'Intention');
-        const topLevelCuriosities = upskillDefinitions.filter(def => microSkillNames.has(def.category) && getUpskillNodeType(def) === 'Curiosity');
-        const allTopLevel = [...topLevelIntentions, ...topLevelCuriosities];
+        const allTasks = [...upskillDefinitions, ...deepWorkDefinitions];
 
-        allTopLevel.forEach(topLevelTask => {
-            const isUpskill = upskillDefinitions.some(d => d.id === topLevelTask.id);
-            const leafNodes = getDescendantLeafNodes(topLevelTask.id, isUpskill ? 'upskill' : 'deepwork');
-            
-            leafNodes.forEach(leaf => {
-              totalSpecEstimatedMinutes += leaf.estimatedDuration || 0;
-              totalSpecLoggedMinutes += loggedMinutesMap.get(leaf.id) || 0;
-            });
+        allTasks.forEach(task => {
+            if (microSkillNames.has(task.category)) {
+                totalSpecLoggedMinutes += task.loggedDuration || 0;
+                totalSpecEstimatedMinutes += task.estimatedDuration || 0;
+            }
         });
         
         if (totalSpecLoggedMinutes > 0 || totalSpecEstimatedMinutes > 0) {
@@ -808,7 +794,7 @@ function MyPlatePageContent() {
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, coreSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, selectedDate, getLoggedMinutes, getDescendantLeafNodes]);
+  }, [upskillDefinitions, deepWorkDefinitions, coreSkills, selectedDate]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -1325,3 +1311,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+

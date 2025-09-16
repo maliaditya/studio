@@ -60,15 +60,15 @@ const activityColorMapping: Record<string, string> = {
     'Deep Work': 'hsl(var(--chart-1))',
     'Learning': 'hsl(var(--chart-2))',
     'Workout': 'hsl(var(--chart-3))',
-    'Branding': 'hsl(var(--chart-4))',
-    'Lead Gen': 'hsl(var(--chart-5))',
-    'Essentials': 'hsl(var(--chart-1))',
-    'Planning': 'hsl(var(--chart-2))',
-    'Tracking': 'hsl(var(--chart-3))',
+    'Mindset': 'hsl(var(--chart-4))',
+    'Branding': 'hsl(var(--chart-5))',
+    'Lead Gen': 'hsl(27, 87%, 67%)', // A distinct orange
+    'Essentials': 'hsl(173, 58%, 39%)', // A distinct teal
+    'Planning': 'hsl(197, 37%, 24%)', // A distinct dark blue
+    'Tracking': 'hsl(43, 74%, 66%)', // A distinct yellow
     'Interrupts': 'hsl(var(--destructive))',
-    'Distractions': 'hsl(var(--destructive))',
-    'Nutrition': 'hsl(var(--chart-4))',
-    'Mindset': 'hsl(var(--chart-5))',
+    'Distractions': 'hsl(0, 70%, 50%)', // A different red
+    'Nutrition': 'hsl(27, 87%, 67%)', // Shared orange
     'Free Time': 'hsl(var(--muted))',
 };
 
@@ -618,3 +618,4 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     </>
   );
 }
+
