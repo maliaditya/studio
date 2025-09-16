@@ -30,6 +30,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule, ActivityType } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
+import { KanbanPageContent, KanbanPageContent as ChartsPageContent } from '@/app/kanban/page';
+import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
+
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -48,7 +51,6 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 interface ProductivitySnapshotProps {
   stats: any;
   timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[];
-  onOpenStatsModal: () => void;
   onOpenKanbanModal: () => void;
   onOpenTimeAllocationModal: () => void;
   todaysSchedule: DailySchedule;
@@ -261,12 +263,13 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 };
 
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsModal, onOpenKanbanModal, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenKanbanModal, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
-  
+  const [isChartModalOpen, setIsChartModalOpen] = useState(false);
+
   const themeColors = useThemeColors();
   
   const topSpecializations = useMemo(() => {
@@ -385,9 +388,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
               <LayoutDashboard className="h-4 w-4" />
               <span className="sr-only">Open Kanban Board</span>
             </Button>
-            <Button variant="outline" size="icon" onClick={onOpenStatsModal}>
+            <Button variant="outline" size="icon" onClick={() => setIsChartModalOpen(true)}>
               <BarChart3 className="h-4 w-4" />
-              <span className="sr-only">Open Stats Overview</span>
+              <span className="sr-only">Open Charts</span>
             </Button>
           </div>
         </CardHeader>
@@ -631,6 +634,16 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
         </Dialog>
       )}
 
+      <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-4 border-b">
+                <DialogTitle>Charts</DialogTitle>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+              <ChartsPageContentActual />
+            </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

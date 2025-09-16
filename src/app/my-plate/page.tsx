@@ -18,7 +18,6 @@ import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { DietPlanModal } from '@/components/DietPlanModal';
-import { StatsOverviewModal } from '@/components/StatsOverviewModal';
 import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
@@ -43,7 +42,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { TodaysDietCard } from '@/components/TodaysDietCard';
+import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const slotEndHours: Record<string, number> = {
@@ -153,7 +152,6 @@ function MyPlatePageContent() {
   const [isLearningModalOpen, setIsLearningModalOpen] = useState(false);
   const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
-  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [isTimeAllocationModalOpen, setIsTimeAllocationModalOpen] = useState(false);
@@ -1059,7 +1057,6 @@ function MyPlatePageContent() {
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
                     timeAllocationData={timeAllocationData}
-                    onOpenStatsModal={() => setIsStatsModalOpen(true)} 
                     onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                     onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
@@ -1198,19 +1195,6 @@ function MyPlatePageContent() {
         onOpenChange={setIsDietPlanModalOpen}
       />
 
-      <StatsOverviewModal
-        isOpen={isStatsModalOpen}
-        onOpenChange={setIsStatsModalOpen}
-        allWorkoutLogs={allWorkoutLogs}
-        allUpskillLogs={allUpskillLogs}
-        allDeepWorkLogs={allDeepWorkLogs}
-        weightLogs={weightLogs}
-        goalWeight={goalWeight}
-        consistencyData={[]}
-        totalHoursData={[]}
-        todayHoursData={[]}
-      />
-      
       <Dialog open={isTimeAllocationModalOpen} onOpenChange={setIsTimeAllocationModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -1352,5 +1336,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-

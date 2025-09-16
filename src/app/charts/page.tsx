@@ -159,7 +159,7 @@ interface IntentionModalData {
     loggedIntentions: LoggedIntention[];
 }
 
-function ChartsPageContent() {
+export function ChartsPageContent() {
     const { 
         allUpskillLogs, 
         allDeepWorkLogs, 
@@ -817,5 +817,3 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
-
-    
