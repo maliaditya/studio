@@ -62,13 +62,13 @@ const activityColorMapping: Record<string, string> = {
     'Workout': 'hsl(var(--chart-3))',
     'Mindset': 'hsl(var(--chart-4))',
     'Branding': 'hsl(var(--chart-5))',
-    'Lead Gen': 'hsl(27, 87%, 67%)', // A distinct orange
-    'Essentials': 'hsl(173, 58%, 39%)', // A distinct teal
-    'Planning': 'hsl(197, 37%, 24%)', // A distinct dark blue
-    'Tracking': 'hsl(43, 74%, 66%)', // A distinct yellow
+    'Lead Gen': 'hsl(27, 87%, 67%)',
+    'Essentials': 'hsl(173, 58%, 39%)',
+    'Planning': 'hsl(197, 37%, 24%)',
+    'Tracking': 'hsl(43, 74%, 66%)',
     'Interrupts': 'hsl(var(--destructive))',
-    'Distractions': 'hsl(0, 70%, 50%)', // A different red
-    'Nutrition': 'hsl(27, 87%, 67%)', // Shared orange
+    'Distractions': 'hsl(0, 70%, 50%)',
+    'Nutrition': 'hsl(340, 82%, 56%)',
     'Free Time': 'hsl(var(--muted))',
 };
 
@@ -365,6 +365,14 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     return data;
   }, [timeAllocationData, themeColors]);
 
+  const productivityLevel = stats.productivityLevel;
+  let levelText = 'Building';
+  if (productivityLevel >= 75) {
+    levelText = 'Elite';
+  } else if (productivityLevel >= 50) {
+    levelText = 'Consistent';
+  }
+
   return (
     <>
       <Card className="h-full bg-card/50">
@@ -387,7 +395,15 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
                 <p className="text-muted-foreground">Productivity Level</p>
-                <p className="text-muted-foreground mt-2">Not enough data</p>
+                {productivityLevel !== undefined ? (
+                    <>
+                        <h3 className="text-3xl font-bold">{productivityLevel.toFixed(0)}%</h3>
+                        <p className="text-sm font-semibold text-primary">{levelText}</p>
+                        <p className="text-xs text-muted-foreground mt-1">based on 30-day average</p>
+                    </>
+                ) : (
+                    <p className="text-muted-foreground mt-2">Not enough data</p>
+                )}
               <Separator className="my-4" />
               <p className="text-muted-foreground">Total Productive Hours</p>
               <h3 className="text-2xl font-bold">{stats.totalProductiveHours.toFixed(2)}</h3>
@@ -618,4 +634,3 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenStatsMod
     </>
   );
 }
-

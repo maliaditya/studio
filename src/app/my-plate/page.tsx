@@ -52,6 +52,22 @@ const slotEndHours: Record<string, number> = {
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
+const activityColorMapping: Record<string, string> = {
+    'Deep Work': 'hsl(var(--chart-1))',
+    'Learning': 'hsl(var(--chart-2))',
+    'Workout': 'hsl(var(--chart-3))',
+    'Mindset': 'hsl(var(--chart-4))',
+    'Branding': 'hsl(var(--chart-5))',
+    'Lead Gen': 'hsl(27, 87%, 67%)',
+    'Essentials': 'hsl(173, 58%, 39%)',
+    'Planning': 'hsl(197, 37%, 24%)',
+    'Tracking': 'hsl(43, 74%, 66%)',
+    'Interrupts': 'hsl(var(--destructive))',
+    'Distractions': 'hsl(0, 70%, 50%)',
+    'Nutrition': 'hsl(340, 82%, 56%)',
+    'Free Time': 'hsl(var(--muted))',
+};
+
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
     if (!durationStr || typeof durationStr !== 'string') return 0;
     
@@ -739,24 +755,46 @@ function MyPlatePageContent() {
   };
   
   const productivityStats = useMemo(() => {
-    const todayKey = format(selectedDate, 'yyyy-MM-dd');
-    const yesterdayKey = format(subDays(selectedDate, 1), 'yyyy-MM-dd');
+    const today = startOfToday();
+    const todayKey = format(today, 'yyyy-MM-dd');
+    const yesterdayKey = format(subDays(today, 1), 'yyyy-MM-dd');
+    
+    const thirtyDaysAgo = subDays(today, 30);
+
+    let totalProductiveMinutesLast30Days = 0;
+    const productiveDays = new Set<string>();
 
     const getMinutesForDay = (definitions: ExerciseDefinition[], dateKey: string): number => {
-        return definitions
-            .filter(def => def.last_logged_date === dateKey && def.loggedDuration)
-            .reduce((sum, def) => sum + def.loggedDuration!, 0);
+      return definitions
+        .filter(def => def.last_logged_date === dateKey && def.loggedDuration)
+        .reduce((sum, def) => sum + def.loggedDuration!, 0);
     };
+    
+    [...upskillDefinitions, ...deepWorkDefinitions].forEach(def => {
+        if (def.last_logged_date && def.loggedDuration) {
+            const logDate = parseISO(def.last_logged_date);
+            if (isAfter(logDate, thirtyDaysAgo) || isSameDay(logDate, thirtyDaysAgo)) {
+                totalProductiveMinutesLast30Days += def.loggedDuration;
+                productiveDays.add(def.last_logged_date);
+            }
+        }
+    });
+    
+    const numberOfProductiveDays = productiveDays.size || 1;
+    const avgDailyProductiveHours = (totalProductiveMinutesLast30Days / numberOfProductiveDays) / 60;
+    const productivityLevel = settings.dailyProductiveHoursGoal > 0 
+      ? (avgDailyProductiveHours / settings.dailyProductiveHoursGoal) * 100
+      : 0;
 
     const todayUpskillMinutes = getMinutesForDay(upskillDefinitions, todayKey);
     const yesterdayUpskillMinutes = getMinutesForDay(upskillDefinitions, yesterdayKey);
 
     const todayDeepWorkMinutes = getMinutesForDay(deepWorkDefinitions, todayKey);
     const yesterdayDeepWorkMinutes = getMinutesForDay(deepWorkDefinitions, yesterdayKey);
-    
+
     const calculateChange = (todayVal: number, yesterdayVal: number) => {
-        if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
-        return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
+      if (yesterdayVal === 0) return todayVal > 0 ? Infinity : 0;
+      return ((todayVal - yesterdayVal) / yesterdayVal) * 100;
     };
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
@@ -793,8 +831,9 @@ function MyPlatePageContent() {
       totalProductiveHours: totalTodayMinutes / 60,
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
+      productivityLevel,
     };
-  }, [upskillDefinitions, deepWorkDefinitions, coreSkills, selectedDate]);
+  }, [upskillDefinitions, deepWorkDefinitions, coreSkills, selectedDate, settings.dailyProductiveHoursGoal]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -940,7 +979,8 @@ function MyPlatePageContent() {
       upskillChange,
       totalProductiveHours,
       avgProductiveHoursChange,
-      learningStats
+      learningStats,
+      productivityLevel,
     } = productivityStats;
   
     const todaysActivities = schedule[selectedDateKey] || {};
@@ -961,6 +1001,7 @@ function MyPlatePageContent() {
       upcomingReleases: upcomingReleases,
       learningStats: learningStats,
       brandingStatus,
+      productivityLevel,
     };
   }, [productivityStats, schedule, selectedDateKey, upcomingReleases, brandingStatus]);
 
@@ -1311,4 +1352,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 

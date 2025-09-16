@@ -666,6 +666,7 @@ export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
+  dailyProductiveHoursGoal: number; // New setting
   carryForwardEssentials: boolean;
   carryForwardNutrition: boolean;
   smartLogging: boolean;

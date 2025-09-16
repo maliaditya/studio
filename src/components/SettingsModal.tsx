@@ -548,6 +548,18 @@ ${JSON.stringify(finalTemplate, null, 2)}
                       Manage general application behavior.
                     </p>
                   </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="daily-goal" className="font-normal flex-shrink-0">
+                      Daily Productive Hours Goal:
+                    </Label>
+                    <Input
+                      id="daily-goal"
+                      type="number"
+                      value={settings.dailyProductiveHoursGoal || 4}
+                      onChange={(e) => handleSettingChange('dailyProductiveHoursGoal', parseInt(e.target.value, 10) || 0)}
+                      className="w-20 h-8"
+                    />
+                  </div>
                    <div className="flex items-center space-x-2">
                     <Switch
                       id="smart-logging"
