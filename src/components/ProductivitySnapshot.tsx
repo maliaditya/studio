@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -9,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, LayoutDashboard, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -30,8 +29,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule, ActivityType } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
-import { KanbanPageContent, KanbanPageContent as ChartsPageContent } from '@/app/kanban/page';
+import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
+import { TimesheetPageContent } from '@/app/timesheet/page';
 
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -51,7 +51,6 @@ const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
 interface ProductivitySnapshotProps {
   stats: any;
   timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[];
-  onOpenKanbanModal: () => void;
   onOpenTimeAllocationModal: () => void;
   todaysSchedule: DailySchedule;
   activityDurations: Record<string, string>;
@@ -263,12 +262,13 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 };
 
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenKanbanModal, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
+  const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
 
   const themeColors = useThemeColors();
   
@@ -384,9 +384,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenKanbanMo
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" onClick={onOpenKanbanModal}>
-              <LayoutDashboard className="h-4 w-4" />
-              <span className="sr-only">Open Kanban Board</span>
+            <Button variant="outline" size="icon" onClick={() => setIsTimesheetModalOpen(true)}>
+              <Clock className="h-4 w-4" />
+              <span className="sr-only">Open Timesheet</span>
             </Button>
             <Button variant="outline" size="icon" onClick={() => setIsChartModalOpen(true)}>
               <BarChart3 className="h-4 w-4" />
@@ -644,6 +644,13 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenKanbanMo
                     <ChartsPageContentActual />
                 </ScrollArea>
             </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+          <div className="flex-grow min-h-0">
+              <TimesheetPageContent isModal={true} />
+          </div>
         </DialogContent>
       </Dialog>
     </>

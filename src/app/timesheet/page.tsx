@@ -21,6 +21,9 @@ import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip } from 'recharts';
 
+interface TimesheetPageContentProps {
+  isModal?: boolean;
+}
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
@@ -121,7 +124,7 @@ const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpe
 };
 
 
-function TimesheetPageContent() {
+export function TimesheetPageContent({ isModal = false }: TimesheetPageContentProps) {
     const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -643,17 +646,17 @@ function TimesheetPageContent() {
     };
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <Card className="mb-6">
-                <CardHeader>
+        <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
+            <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0")}>
+                <CardHeader className={cn(isModal ? "p-4 border-b" : "")}>
                     <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
                     <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0" : "")}>
                     <div className="flex flex-wrap items-center gap-4">
                         <Popover>
                             <PopoverTrigger asChild>
-                                <Button variant={"outline"} className="w-[280px] justify-start text-left font-normal">
+                                <Button variant={"outline"} className="w-auto sm:w-[280px] justify-start text-left font-normal">
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {format(selectedDate, 'PPP')}
                                 </Button>
@@ -672,7 +675,7 @@ function TimesheetPageContent() {
                         <div className="flex items-center gap-2">
                              <Filter className="h-4 w-4 text-muted-foreground"/>
                              <Select value={activityFilter} onValueChange={(v) => setActivityFilter(v as ActivityFilter)}>
-                                <SelectTrigger className="w-[200px]">
+                                <SelectTrigger className="w-auto sm:w-[200px]">
                                     <SelectValue placeholder="Filter activities..." />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -684,13 +687,16 @@ function TimesheetPageContent() {
                             </Select>
                         </div>
                     </div>
+                    <div className={cn(isModal && "flex-grow min-h-0")}>
+                        <ScrollArea className={cn(isModal && "h-full")}>
+                            {viewMode === 'day' && renderDayView()}
+                            {viewMode === 'week' && renderWeekView()}
+                            {viewMode === 'month' && renderMonthView()}
+                        </ScrollArea>
+                    </div>
                 </CardContent>
             </Card>
             
-            {viewMode === 'day' && renderDayView()}
-            {viewMode === 'week' && renderWeekView()}
-            {viewMode === 'month' && renderMonthView()}
-
             {modalData && (
                 <DayDetailModal 
                     isOpen={!!modalData}
@@ -710,10 +716,3 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
-
-
-
-    
-
-
-    
