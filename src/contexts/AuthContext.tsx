@@ -1353,10 +1353,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem(`lifeos_data_${currentUser!.username}`, JSON.stringify(mainData));
             localStorage.setItem(`lifeos_ui_state_${currentUser!.username}`, JSON.stringify(uiData));
 
-            // Directly update state
-            loadImportedData(mainData, uiData);
+            toast({ title: "Import Successful!", description: "Reloading the app with your new data..." });
 
-            toast({ title: "Import Successful", description: "Your data has been loaded." });
+            // Force a reload to ensure the new state is applied everywhere
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
   
           } catch (error) {
             console.error("Import failed:", error);
