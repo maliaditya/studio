@@ -103,6 +103,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     activeFocusSession,
     setActiveFocusSession,
     handleLogLearning,
+    handleToggleMicroSkillRepetition,
     todaysDietPopup,
     closeTodaysDietPopup,
     handleTodaysDietPopupDragEnd,
@@ -415,6 +416,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             initialSecondsLeft={activeFocusSession.secondsLeft}
             onClose={() => setActiveFocusSession(null)}
             onLogTime={handleLogLearning}
+            onToggleMicroSkillRepetition={handleToggleMicroSkillRepetition}
           />
         )}
       {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda) && (
