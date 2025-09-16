@@ -102,7 +102,7 @@ interface AuthContextType {
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => void;
   updateActivity: (updatedActivity: Activity) => void;
 
-  // Focus Timer
+  // Focus Session
   focusSessionModalOpen: boolean;
   setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   focusActivity: Activity | null;
@@ -568,7 +568,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [topPriorities, setTopPriorities] = useState<Priority[]>([]);
   const [brainHacks, setBrainHacks] = useState<BrainHack[]>([]);
 
-  // Spaced Repetition State
+  // Spaced Repetition
   const [spacedRepetitionData, setSpacedRepetitionData] = useState<Record<string, RepetitionData>>({});
   const [dailyReviewLogs, setDailyReviewLogs] = useState<DailyReviewLog[]>([]);
   
@@ -1346,18 +1346,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             const importedData = JSON.parse(text);
             
-            // Handle both old and new backup formats
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
 
-            localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(mainData));
-            localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(uiData));
+            // Save to localStorage
+            localStorage.setItem(`lifeos_data_${currentUser!.username}`, JSON.stringify(mainData));
+            localStorage.setItem(`lifeos_ui_state_${currentUser!.username}`, JSON.stringify(uiData));
 
-            toast({ title: "Import Successful", description: "Your data has been saved. Reloading the application..." });
-  
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
+            // Directly update state
+            loadImportedData(mainData, uiData);
+
+            toast({ title: "Import Successful", description: "Your data has been loaded." });
   
           } catch (error) {
             console.error("Import failed:", error);
