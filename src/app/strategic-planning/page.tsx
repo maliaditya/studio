@@ -1,11 +1,10 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2 } from 'lucide-react';
+import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2, Github, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -668,7 +667,7 @@ function ProductizationContent() {
   const handleStartEditingRelease = (projectId: string, release?: Release) => {
     setEditingRelease({
         projectId,
-        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
+        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [], addToPortfolio: true }
     });
   };
 
@@ -822,6 +821,14 @@ function ProductizationContent() {
             <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this release?"/>
           </div>
           <div>
+              <Label htmlFor="github-link">GitHub Link</Label>
+              <Input id="github-link" value={release.githubLink || ''} onChange={(e) => handleUpdateEditingRelease('githubLink', e.target.value)} placeholder="https://github.com/user/repo"/>
+          </div>
+          <div>
+              <Label htmlFor="demo-link">Demo Link</Label>
+              <Input id="demo-link" value={release.demoLink || ''} onChange={(e) => handleUpdateEditingRelease('demoLink', e.target.value)} placeholder="https://my-app.vercel.app"/>
+          </div>
+          <div>
             <Label>Included Features</Label>
             <div className="space-y-2 mt-2 rounded-md border p-3 max-h-48 overflow-y-auto">
               {project.features.map(fa => (
@@ -835,6 +842,14 @@ function ProductizationContent() {
                 </div>
               ))}
             </div>
+          </div>
+          <div className="flex items-center space-x-2">
+              <Checkbox
+                  id="add-to-portfolio"
+                  checked={release.addToPortfolio}
+                  onCheckedChange={(checked) => handleUpdateEditingRelease('addToPortfolio', !!checked)}
+              />
+              <Label htmlFor="add-to-portfolio">Add to Portfolio</Label>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
@@ -951,6 +966,8 @@ function ProductizationContent() {
                                     <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
                                   </div>
                                   <div className="flex items-center">
+                                    {release.githubLink && <a href={release.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4 mr-2"/></a>}
+                                    {release.demoLink && <a href={release.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4 mr-2"/></a>}
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(project.id, release)}><Edit className="h-4 w-4"/></Button>
                                     <AlertDialog>
                                       <AlertDialogTrigger asChild>
@@ -1107,7 +1124,7 @@ function OfferizationContent() {
     const spec = coreSkills.find(s => s.id === specializationId);
     setEditingRelease({
         specializationId,
-        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [] }
+        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [], addToPortfolio: true }
     });
     setSelectedSpecForMicro(spec || null);
     setSelectedSkillAreaForMicro(null);
@@ -1613,6 +1630,14 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                     <Label htmlFor="release-desc">Description</Label>
                     <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?" />
                 </div>
+                 <div>
+                    <Label htmlFor="github-link">GitHub Link</Label>
+                    <Input id="github-link" value={release.githubLink || ''} onChange={(e) => handleUpdateEditingRelease('githubLink', e.target.value)} placeholder="https://github.com/user/repo"/>
+                </div>
+                <div>
+                    <Label htmlFor="demo-link">Demo Link</Label>
+                    <Input id="demo-link" value={release.demoLink || ''} onChange={(e) => handleUpdateEditingRelease('demoLink', e.target.value)} placeholder="https://my-app.vercel.app"/>
+                </div>
                 <div>
                     <Label>Included Micro-Skills</Label>
                     <div className="space-y-2 mt-2 p-3 border rounded-md">
@@ -1655,6 +1680,14 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                             </div>
                         </ScrollArea>
                     </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="add-to-portfolio"
+                        checked={release.addToPortfolio}
+                        onCheckedChange={(checked) => handleUpdateEditingRelease('addToPortfolio', !!checked)}
+                    />
+                    <Label htmlFor="add-to-portfolio">Add to Portfolio</Label>
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>

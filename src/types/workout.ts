@@ -228,6 +228,9 @@ export interface Release {
   totalAvailableHours?: number;
   totalLoggedHours?: number;
   totalEstimatedHours?: number;
+  githubLink?: string;
+  demoLink?: string;
+  addToPortfolio?: boolean;
 }
 
 export interface Offer {
