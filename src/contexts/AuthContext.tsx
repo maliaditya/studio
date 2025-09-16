@@ -2878,11 +2878,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const user = getCurrentLocalUser();
     if (user) {
-      setCurrentUser(user);
-      loadState(user.username);
-    } else {
-      setLoading(false);
+        setCurrentUser(user);
+        loadState(user.username);
     }
+    setLoading(false);
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
     setThemeState(savedTheme);
   }, [loadState]);
