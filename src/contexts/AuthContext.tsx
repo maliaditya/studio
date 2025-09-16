@@ -1348,15 +1348,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
-
-            localStorage.setItem(`lifeos_data_${currentUser!.username}`, JSON.stringify(mainData));
-            localStorage.setItem(`lifeos_ui_state_${currentUser!.username}`, JSON.stringify(uiData));
-
-            toast({ title: "Import Successful!", description: "Reloading the app with your new data..." });
             
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            loadImportedData(mainData, uiData);
+            
+            toast({ title: "Import Successful!", description: "Your data has been loaded." });
   
           } catch (error) {
             console.error("Import failed:", error);
@@ -1369,10 +1364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     input.click();
   };
-
-  // ... (the rest of your context provider remains the same)
-  // [No changes from the provided file content needed below this line for this fix]
-  // ...
+  
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
@@ -2878,8 +2870,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const user = getCurrentLocalUser();
     if (user) {
-        setCurrentUser(user);
-        loadState(user.username);
+      setCurrentUser(user);
+      loadState(user.username);
     }
     setLoading(false);
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
