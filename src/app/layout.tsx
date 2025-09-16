@@ -51,6 +51,7 @@ import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { PillarPopup } from '@/components/PillarPopup';
 import { AllResistancesPopup } from '@/components/AllResistancesPopup';
+import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
 
 
 const slotEndHours: Record<string, number> = {
@@ -395,6 +396,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.spacedRepetition && <SpacedRepetitionPopup />}
       {isAllResistancesPopupOpen && <AllResistancesPopup />}
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       <StopperProgressModal 

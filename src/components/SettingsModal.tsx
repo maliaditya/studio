@@ -41,6 +41,7 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
   { id: 'brainHacks', label: 'Brain Hacks' },
   { id: 'ruleEquations', label: 'Rule Equations' },
   { id: 'visualizationTechniques', label: 'Visualization Techniques' },
+  { id: 'spacedRepetition', label: 'Spaced Repetition Queue' },
 ];
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {

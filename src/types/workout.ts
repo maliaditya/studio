@@ -436,6 +436,7 @@ export interface CoreSkill {
   skillAreas: SkillArea[];
   purposePillar?: string;
   parentId?: string | null;
+  addToPortfolio?: boolean; // New field
 }
 
 export interface SkillArea {
@@ -663,6 +664,7 @@ export interface WidgetVisibility {
   brainHacks: boolean;
   ruleEquations: boolean;
   visualizationTechniques: boolean;
+  spacedRepetition: boolean;
 }
 
 export interface UserSettings {
