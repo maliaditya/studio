@@ -32,7 +32,17 @@ export function SpacedRepetitionPopup() {
         } else {
             setPosition({ x: window.innerWidth - 340, y: 620 });
         }
+        const savedFilterState = localStorage.getItem('spacedRepetition_showOnlyToday');
+        if (savedFilterState) {
+            setShowOnlyToday(JSON.parse(savedFilterState));
+        }
     }, []);
+
+    useEffect(() => {
+      if (isClient) {
+        localStorage.setItem('spacedRepetition_showOnlyToday', JSON.stringify(showOnlyToday));
+      }
+    }, [showOnlyToday, isClient]);
 
     const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
 
