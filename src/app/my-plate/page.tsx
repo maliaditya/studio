@@ -646,7 +646,7 @@ function MyPlatePageContent() {
     
     // For specific, schedulable tasks, start the focus timer directly.
     if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
-        handleStartFocusSession(activity, 45); // Assuming a default duration
+        onOpenFocusModal(activity);
     } else if (activity.type === 'workout') {
         handleStartWorkoutLog(activity);
     } else if (activity.type === 'mindset') {
@@ -1052,7 +1052,7 @@ function MyPlatePageContent() {
                         onStartWorkoutLog={handleStartWorkoutLog}
                         onStartLeadGenLog={handleStartLeadGenLog}
                         onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={handleStartFocusSession}
+                        onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={openTaskContextPopup}
                         onOpenHabitPopup={openRuleDetailPopup}
                         currentSlot={currentSlot}

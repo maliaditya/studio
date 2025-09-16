@@ -66,7 +66,9 @@ const activityColorMapping: Record<string, string> = {
     'Planning': 'hsl(var(--chart-2))',
     'Tracking': 'hsl(var(--chart-3))',
     'Interrupts': 'hsl(var(--destructive))',
+    'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
+    'Mindset': 'hsl(var(--chart-5))',
     'Free Time': 'hsl(var(--muted))',
 };
 
