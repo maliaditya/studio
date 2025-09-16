@@ -640,7 +640,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenKanbanMo
                 <DialogTitle>Charts</DialogTitle>
             </DialogHeader>
             <div className="flex-grow min-h-0">
-              <ChartsPageContentActual />
+                <ScrollArea className="h-full">
+                    <ChartsPageContentActual />
+                </ScrollArea>
             </div>
         </DialogContent>
       </Dialog>
