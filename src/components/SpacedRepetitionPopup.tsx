@@ -10,9 +10,10 @@ import { Repeat } from 'lucide-react';
 import { Button } from './ui/button';
 import { SpacedRepetitionModal } from './SpacedRepetitionModal';
 import type { MicroSkill } from '@/types/workout';
+import { format, parseISO, addDays, differenceInDays, isBefore } from 'date-fns';
 
 export function SpacedRepetitionPopup() {
-    const { coreSkills } = useAuth();
+    const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes } = useAuth();
     const [isClient, setIsClient] = useState(false);
     
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -31,13 +32,51 @@ export function SpacedRepetitionPopup() {
         }
     }, []);
 
-    const repetitionSkills = useMemo(() => {
-        return coreSkills.flatMap(cs => 
+    const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
+
+    const repetitionSkillsWithDates = useMemo(() => {
+        const repetitionSkills = coreSkills.flatMap(cs => 
             cs.skillAreas.flatMap(sa => 
                 sa.microSkills.filter(ms => ms.isReadyForRepetition)
             )
         );
-    }, [coreSkills]);
+
+        return repetitionSkills.map(skill => {
+            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+            const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            const completionDates = new Set<string>();
+            allLeafNodes.forEach(node => {
+                if (node.last_logged_date) completionDates.add(node.last_logged_date);
+            });
+            const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+
+            let reps = 0;
+            let lastReviewDate = sortedDates.length > 0 ? sortedDates[0] : new Date();
+
+            if (sortedDates.length > 0) {
+                reps = 1;
+                for (let i = 1; i < sortedDates.length; i++) {
+                    const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
+                    if (daysBetween <= (DOUBLING_INTERVALS[reps - 1] || 128)) {
+                        reps++;
+                    } else {
+                        reps = 1;
+                    }
+                    lastReviewDate = sortedDates[i];
+                }
+            }
+
+            const nextInterval = DOUBLING_INTERVALS[reps] || 128;
+            const nextReviewDate = addDays(lastReviewDate, nextInterval);
+
+            return {
+                ...skill,
+                nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
+                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, new Date()),
+            };
+        }).sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
@@ -87,7 +126,7 @@ export function SpacedRepetitionPopup() {
         userSelect: isDragging ? 'none' : 'auto',
     };
     
-    if (!isClient || repetitionSkills.length === 0) {
+    if (!isClient || repetitionSkillsWithDates.length === 0) {
         return null;
     }
 
@@ -114,14 +153,17 @@ export function SpacedRepetitionPopup() {
                     <CardContent className="p-0">
                         <ScrollArea className="h-48 pr-3">
                             <ul className="space-y-2">
-                                {repetitionSkills.map(skill => (
+                                {repetitionSkillsWithDates.map(skill => (
                                     <li key={skill.id}>
                                         <Button
                                             variant="secondary"
-                                            className="w-full justify-start h-auto text-left"
+                                            className="w-full justify-between h-auto text-left"
                                             onClick={() => setRepetitionModalState({ isOpen: true, skill })}
                                         >
-                                            {skill.name}
+                                            <span className="truncate pr-2">{skill.name}</span>
+                                            <span className={`text-xs whitespace-nowrap ${skill.isOverdue ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
+                                                {format(skill.nextReviewDate, 'MMM dd')}
+                                            </span>
                                         </Button>
                                     </li>
                                 ))}
