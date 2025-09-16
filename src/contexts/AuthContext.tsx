@@ -1349,13 +1349,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
 
-            // Save to localStorage
             localStorage.setItem(`lifeos_data_${currentUser!.username}`, JSON.stringify(mainData));
             localStorage.setItem(`lifeos_ui_state_${currentUser!.username}`, JSON.stringify(uiData));
 
             toast({ title: "Import Successful!", description: "Reloading the app with your new data..." });
-
-            // Force a reload to ensure the new state is applied everywhere
+            
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
@@ -2878,24 +2876,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    if (currentUser?.username) {
-        const settingsKey = `lifeos_settings_${currentUser.username}`;
-        const storedSettings = localStorage.getItem(settingsKey);
-        if (storedSettings) {
-          setSettings(JSON.parse(storedSettings));
-        }
-        loadState(currentUser.username);
-    }
-  }, [currentUser, loadState]);
-
-  useEffect(() => {
     const user = getCurrentLocalUser();
-    setCurrentUser(user);
-    setLoading(false);
-    
+    if (user) {
+      setCurrentUser(user);
+      loadState(user.username);
+    } else {
+      setLoading(false);
+    }
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
     setThemeState(savedTheme);
-  }, [setTheme]);
+  }, [loadState]);
   
    useEffect(() => {
     const interval = setInterval(() => {
