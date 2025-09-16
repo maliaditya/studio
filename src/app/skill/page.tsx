@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
@@ -35,6 +35,8 @@ import { SkillLibrary } from '@/components/SkillLibrary';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import { SpacedRepetitionModal } from '@/components/SpacedRepetitionModal';
+
 
 function Draggable({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id });
@@ -203,6 +205,8 @@ function SkillPageContent() {
   
   const uploadMicroSkillInputRef = useRef<HTMLInputElement>(null);
   const [uploadSkillAreaInfo, setUploadSkillAreaInfo] = useState<{ coreSkillId: string; skillAreaId: string } | null>(null);
+
+  const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
 
   const allDefinitionsMap = useMemo(() => {
     const map = new Map<string, ExerciseDefinition>();
@@ -1129,12 +1133,18 @@ function SkillPageContent() {
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
-                                                      <Checkbox
-                                                        id={`rep-${micro.id}`}
-                                                        checked={micro.isReadyForRepetition}
-                                                        onCheckedChange={(checked) => handleToggleMicroSkillRepetition(selectedCoreSkill.id, area.id, micro.id, !!checked)}
-                                                      />
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => handleSelect(micro, 'microSkill')}>{micro.name}</CardTitle>
+                                                      <div className="flex items-center">
+                                                          <button onClick={() => setRepetitionModalState({ isOpen: true, skill: micro })}>
+                                                              <LineChartIcon className="h-4 w-4 text-muted-foreground hover:text-primary"/>
+                                                          </button>
+                                                          <Checkbox
+                                                            id={`rep-${micro.id}`}
+                                                            checked={micro.isReadyForRepetition}
+                                                            onCheckedChange={(checked) => handleToggleMicroSkillRepetition(selectedCoreSkill.id, area.id, micro.id, !!checked)}
+                                                            className="ml-2"
+                                                          />
+                                                      </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
                                                       <div className="border-r pr-2">
@@ -1381,6 +1391,10 @@ function SkillPageContent() {
             </div>
         </div>
        )}
+      <SpacedRepetitionModal 
+        modalState={repetitionModalState} 
+        onOpenChange={(isOpen) => setRepetitionModalState(prev => ({ ...prev, isOpen }))} 
+      />
     </div>
     </DndContext>
   );
@@ -1393,5 +1407,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
