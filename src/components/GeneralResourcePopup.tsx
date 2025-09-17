@@ -31,7 +31,7 @@ interface GeneralResourcePopupProps {
 }
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
@@ -307,7 +307,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
 }) => {
-    const { setFloatingVideoUrl, openPistonsFor } = useAuth();
+    const { setFloatingVideoUrl, setSettings } = useAuth();
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -376,8 +376,12 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     const handleLinkClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (point.text && point.text.startsWith('brainhack://')) {
-            const hackId = point.text.replace('brainhack://', '');
-            openPistonsFor({ view: 'brain-hack', context: { hackId } });
+            // New logic to show the Brain Hacks widget
+            setSettings(prev => ({
+                ...prev,
+                widgetVisibility: { ...prev.widgetVisibility, brainHacks: true },
+                allWidgetsVisible: Object.values({ ...prev.widgetVisibility, brainHacks: true }).some(v => v),
+            }));
         } else if (point.text) {
             setFloatingVideoUrl(point.text);
         }
