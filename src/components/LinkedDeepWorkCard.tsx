@@ -13,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -220,6 +220,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     projects: Project[];
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill') => void;
     activeProjectIds: Set<string>;
     currentSlot: string;
 }>(({
@@ -242,6 +243,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     projects,
     handleOpenLinkProjectModal,
     handleCreateAndLinkChild,
+    handleCreateBrainHack,
     activeProjectIds,
     currentSlot,
 }, ref) => {
@@ -351,6 +353,9 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         <DropdownMenuContent align="end">
                             <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleCreateBrainHack(deepworkDef.id, 'deepwork')}>
+                                <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
+                            </DropdownMenuItem>
                             {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', deepworkDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
@@ -415,3 +420,5 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     );
 });
 LinkedDeepWorkCard.displayName = 'LinkedDeepWorkCard';
+
+    

@@ -7,7 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
-import { PlusCircle, Trash2, Edit3, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, TrendingUp, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, BookCopy, Briefcase, CheckSquare, GitMerge } from 'lucide-react';
+import { PlusCircle, Trash2, Edit3, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, TrendingUp, Unlink, Flashlight, Focus, Frame, Lightbulb, PictureInPicture, GripVertical, Flag, Bolt, BookCopy, Briefcase, CheckSquare, GitMerge, BrainCircuit } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ExerciseDefinition, Resource, Project, DailySchedule } from '@/types/workout';
@@ -144,6 +144,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   upskillDefinitions: ExerciseDefinition[];
   projectsInDomain: Project[];
   handleCreateAndLinkChild: (parentId: string, type: 'upskill' | 'deepwork') => void;
+  handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill') => void;
   activeProjectIds: Set<string>;
   currentSlot: string;
 }>(({ 
@@ -165,6 +166,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   upskillDefinitions,
   projectsInDomain,
   handleCreateAndLinkChild,
+  handleCreateBrainHack,
   activeProjectIds,
   currentSlot,
 }, ref) => {
@@ -280,6 +282,9 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
             <DropdownMenuItem onSelect={() => onEdit(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onOpenMindMap(upskillDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => handleCreateBrainHack(upskillDef.id, 'upskill')}>
+                <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
+            </DropdownMenuItem>
             <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
         </div>
         <CardHeader className="pb-3" onDoubleClick={() => setIsEditingName(true)}>
@@ -348,3 +353,5 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   );
 });
 LinkedUpskillCard.displayName = 'LinkedUpskillCard';
+
+    
