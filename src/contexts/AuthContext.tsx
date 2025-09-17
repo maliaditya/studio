@@ -467,8 +467,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
 
   // Resources State
-  const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
+  const [resources, setResources] = useState<Resource[]>([]);
   const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
   const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
@@ -1762,11 +1762,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setOpenPopups(new Map());
   }, []);
   
-  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
-    const parentRect = (event.currentTarget as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
-    openGeneralPopup(resourceId, event, parentPopupState, parentRect);
-  }, []);
-
   const closeGeneralPopup = useCallback((resourceId: string) => {
     setGeneralPopups(prev => {
         const newPopups = new Map(prev);
@@ -1811,6 +1806,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [resources]);
 
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+    const parentRect = (event.currentTarget as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
+    openGeneralPopup(resourceId, event, parentPopupState, parentRect);
+  }, [openGeneralPopup]);
 
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const resource = resources.find(r => r.id === popupState.resourceId);
@@ -1823,7 +1822,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onOpenNestedPopup={handleOpenNestedPopup}
       />
     )
-  }, [resources, closeGeneralPopup]);
+  }, [resources, closeGeneralPopup, handleUpdateResource, handleOpenNestedPopup]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -2318,9 +2317,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const newPoint: ResourcePoint = {
               id: `point_${Date.now()}`,
               type: 'link',
-              text: 'Brain Hack Link',
-              displayText: newHack.text,
-              url: `brainhack://${newHack.id}`
+              text: `brainhack://${newHack.id}`,
+              displayText: newHack.text
             };
             return {
               ...r,
@@ -2723,6 +2721,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedResourceFolderId, setSelectedResourceFolderId,
     habitCards, mechanismCards,
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
+    createResourceWithHierarchy,
     handleDeleteStopper, handleDeleteStrength,
     logStopperEncounter,
     openPopups,
@@ -2732,7 +2731,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     intentionPopups, openIntentionPopup, closeIntentionPopup,
     generalPopups, openGeneralPopup, closeGeneralPopup,
     handleUpdateResource, handleOpenNestedPopup,
-    createResourceWithHierarchy,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
@@ -2881,5 +2879,9 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
+    
+
+
 
     
