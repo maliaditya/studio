@@ -84,7 +84,7 @@ interface AuthContextType {
   dateOfBirth: string | null;
   setDateOfBirth: React.Dispatch<React.SetStateAction<string | null>>;
   gender: Gender | null;
-  setGender: React.Dispatch<React.SetStateAction<Gender | null>>;
+  setGender: React.Dispatch<React.SetStateAction<gender | null>>;
   dietPlan: UserDietPlan;
   setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
   
@@ -2699,7 +2699,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             delete newPopups[hackId];
             return newPopups;
         }
-        const parentRect = (event.currentTarget as HTMLElement).closest('.group')?.getBoundingClientRect();
+        const targetElement = event.currentTarget as HTMLElement;
+        const parentRect = targetElement ? targetElement.closest('.group')?.getBoundingClientRect() : null;
+
         const initialX = parentRect ? parentRect.right + 20 : event.clientX + 20;
         const initialY = parentRect ? parentRect.top : event.clientY;
         return { ...prev, [hackId]: { x: initialX, y: initialY } };
@@ -2903,11 +2905,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-    
-
-
-
-    
 
     
