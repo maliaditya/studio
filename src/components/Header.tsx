@@ -22,6 +22,11 @@ import {
 
 function NavigationMenu() {
   const pathname = usePathname();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
@@ -40,6 +45,11 @@ function NavigationMenu() {
     { href: '/personal-branding', label: 'Branding' },
     { href: '/workout-tracker', label: 'Workout' },
   ];
+
+  if (!isClient) {
+    // Render nothing on the server and during the initial client-side render
+    return null;
+  }
 
   return (
     <nav className="hidden md:flex items-center gap-4">
@@ -84,13 +94,8 @@ export function Header() {
     pushDemoDataWithToken,
   } = useAuth();
   const router = useRouter();
-  const [isClient, setIsClient] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   return (
     <>
@@ -104,7 +109,7 @@ export function Header() {
           </div>
           
           <div className="flex-grow flex items-center justify-center">
-            {isClient && currentUser && <NavigationMenu />}
+            {currentUser && <NavigationMenu />}
           </div>
           
           <div className="flex items-center gap-4">
