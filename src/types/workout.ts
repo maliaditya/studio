@@ -302,6 +302,7 @@ export interface Resource {
   githubLink?: string;
   demoLink?: string;
   linkedResourceId?: string;
+  linkedBrainHackIds?: string[];
 
   // For 'card' type
   points?: ResourcePoint[];
@@ -574,6 +575,8 @@ export interface PillarPopupState {
   pillarName: string;
   x: number;
   y: number;
+  level?: number;
+  z?: number;
 }
 
 
@@ -647,6 +650,7 @@ export interface BrainHack {
   displayText?: string;
   linkedUpskillIds?: string[];
   linkedDeepWorkIds?: string[];
+  linkedResourceIds?: string[];
 }
 
 export interface PipState {
@@ -673,7 +677,7 @@ export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
-  dailyProductiveHoursGoal: number; // New setting
+  dailyProductiveHoursGoal?: number;
   carryForwardEssentials: boolean;
   carryForwardNutrition: boolean;
   smartLogging: boolean;
@@ -722,5 +726,3 @@ export interface DailyReviewLog {
     successes: number;
     failures: number;
 }
-
-    

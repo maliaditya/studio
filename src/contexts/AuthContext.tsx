@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Button } from '@/components/ui/button';
 import { X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3 } from 'lucide-react';
 import { DndContext, useDraggable } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent } from 'dnd-kit';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from './ui/scroll-area';
@@ -120,7 +120,7 @@ interface AuthContextType {
   allWorkoutLogs: DatedWorkout[];
   setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   brandingLogs: DatedWorkout[];
-  setBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allMindProgrammingLogs: DatedWorkout[];
@@ -195,7 +195,6 @@ interface AuthContextType {
   
   // Resource Popups (Original system, kept for resources page)
   openPopups: Map<string, PopupState>;
-  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeAllResourcePopups: () => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
@@ -210,6 +209,7 @@ interface AuthContextType {
   openGeneralPopup: (resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeGeneralPopup: (resourceId: string) => void;
   handleUpdateResource: (resource: Resource) => void;
+  handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
 
   // Meta Rule Popup
   ruleDetailPopup: RuleDetailPopupState | null;
@@ -367,6 +367,7 @@ interface AuthContextType {
   setSpacedRepetitionData: React.Dispatch<React.SetStateAction<Record<string, RepetitionData>>>;
   dailyReviewLogs: DailyReviewLog[];
   setDailyReviewLogs: React.Dispatch<React.SetStateAction<DailyReviewLog[]>>;
+  handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill' | 'resource', resourceId?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -422,6 +423,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       brainHacks: true,
       ruleEquations: true,
       visualizationTechniques: true,
+      spacedRepetition: true,
     },
     allWidgetsVisible: true,
     agendaShowCurrentSlotOnly: false,
@@ -468,7 +470,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [resources, setResources] = useState<Resource[]>([]);
   const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
-  const [activeResourceTabIds, setActiveTabIds] = useState<string[]>([]);
+  const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
   const [lastSelectedHabitFolder, setLastSelectedHabitFolder] = useState<string | null>(null);
 
@@ -1041,7 +1043,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // UI State
     setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
-    setActiveTabIds(uiData.activeResourceTabIds || []);
+    setActiveResourceTabIds(uiData.activeResourceTabIds || []);
     setSelectedResourceFolderId(uiData.selectedResourceFolderId || null);
     setLastSelectedHabitFolder(uiData.lastSelectedHabitFolder || null);
     setSelectedUpskillTask(uiData.selectedUpskillTask || null);
@@ -1074,7 +1076,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         smartLogging: false, defaultHabitLinks: {}, routines: [],
         workoutScheduling: 'day-of-week',
         slotRules: {},
-        widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true },
+        widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
     };
@@ -1756,64 +1758,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const handleClosePopup = useCallback((resourceId: string) => {
-    setOpenPopups(prev => {
-      const newPopups = new Map(prev);
-      const popupsToDelete = new Set<string>();
-      function findChildren(parentId: string) {
-        popupsToDelete.add(parentId);
-        for (const [id, popup] of newPopups.entries()) {
-          if (popup.parentId === parentId) findChildren(id);
-        }
-      }
-      findChildren(resourceId);
-      for (const id of popupsToDelete) {
-        if (playingAudio?.id === id) setPlayingAudio(null);
-        newPopups.delete(id);
-      }
-      return newPopups;
-    });
-  }, [playingAudio]);
+  const closeAllResourcePopups = useCallback(() => {
+    setOpenPopups(new Map());
+  }, []);
+  
+  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
+    const parentRect = (event.currentTarget as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
+    openGeneralPopup(resourceId, event, parentPopupState, parentRect);
+  }, []);
 
-  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState, parentRect?: DOMRect) => {
-    setOpenPopups(prev => {
+  const closeGeneralPopup = useCallback((resourceId: string) => {
+    setGeneralPopups(prev => {
         const newPopups = new Map(prev);
-        const resource = resources.find(r => r.id === resourceId);
-        if (!resource) return newPopups;
-        
-        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 896 : 512;
-    
-        let x, y, level, parentId;
-    
-        if (parentPopupState && parentRect) {
-            level = parentPopupState.level + 1;
-            parentId = parentPopupState.resourceId;
-            const screenWidth = window.innerWidth;
-            if (parentRect.x + parentRect.width + popupWidth + 20 < screenWidth) {
-                x = parentRect.x + parentRect.width + 20;
-            } else {
-                x = parentRect.x - popupWidth - 20;
-            }
-            y = parentRect.y;
-        } else {
-            level = 0;
-            parentId = undefined;
-            if (hasMarkdown) {
-                x = window.innerWidth / 2 - popupWidth / 2;
-                y = window.innerHeight / 2 - Math.min(window.innerHeight * 0.7, 700) / 2;
-            } else {
-                x = event.clientX;
-                y = event.clientY;
-            }
-        }
-        
-        newPopups.set(resourceId, { 
-            resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level
-        });
+        newPopups.delete(resourceId);
         return newPopups;
     });
-  }, [resources]);
+  }, []);
   
   const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setGeneralPopups(prev => {
@@ -1852,38 +1812,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [resources]);
 
 
-  const closeAllResourcePopups = useCallback(() => {
-    setOpenPopups(new Map());
-  }, []);
-  
-  const closeGeneralPopup = useCallback((resourceId: string) => {
-    setGeneralPopups(prev => {
-      const newPopups = new Map(prev);
-      const popupsToDelete = new Set<string>();
-      function findChildren(parentId: string) {
-        popupsToDelete.add(parentId);
-        for (const [id, popup] of newPopups.entries()) {
-          if (popup.parentId === parentId) findChildren(id);
-        }
-      }
-      findChildren(resourceId);
-      for (const id of popupsToDelete) newPopups.delete(id);
-      return newPopups;
-    });
-  }, []);
-
   const ResourcePopup: React.FC<ResourcePopupProps> = useCallback(({ popupState }) => {
     const resource = resources.find(r => r.id === popupState.resourceId);
     if (!resource) return null;
     return (
       <GeneralResourcePopup 
         popupState={popupState} 
-        onClose={handleClosePopup}
+        onClose={closeGeneralPopup}
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
       />
     )
-  }, [resources, handleClosePopup, handleOpenNestedPopup]);
+  }, [resources, closeGeneralPopup]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -2360,114 +2300,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const createResourceWithHierarchy = (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
-    let path: string[];
-    let newResourceName = pointToConvert ? pointToConvert.text : 'New Card';
-  
-    // Check if the parent is a mind programming technique
-    if ('category' in parent && mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
-        path = ["Mindset Techniques", parent.name];
-    } else if ('category' in parent) { // Parent is a standard ExerciseDefinition
-      const microSkill = Array.from(microSkillMap.entries()).find(([,v]) => v.microSkillName === parent.category);
-      if (!microSkill) {
-        toast({ title: "Error", description: "Could not find the skill hierarchy for this task.", variant: "destructive" });
-        return undefined;
-      }
-      const microSkillInfo = microSkill[1];
-      const { coreSkillName, skillAreaName } = microSkillInfo;
-      const coreSkill = coreSkills.find(cs => cs.name === coreSkillName);
-      if (!coreSkill) return undefined;
-      const domain = skillDomains.find(d => d.id === coreSkill.domainId);
-      if (!domain) return undefined;
-      path = ["Skills & Project Resources", domain.name, coreSkill.name, skillAreaName, parent.name];
-    } else { // Parent is a Resource
-      const folderPath: string[] = [];
-      let currentFolderId: string | null = parent.folderId;
-      while(currentFolderId) {
-        const folder = resourceFolders.find(f => f.id === currentFolderId);
-        if (folder) {
-          folderPath.unshift(folder.name);
-          currentFolderId = folder.parentId;
-        } else {
-          currentFolderId = null;
-        }
-      }
-      path = [...folderPath, parent.name];
-    }
-
-    let parentFolderId: string | null = null;
-    let finalFolders = [...resourceFolders];
-  
-    path.forEach(folderName => {
-      let folder = finalFolders.find(f => f.name === folderName && f.parentId === parentFolderId);
-      if (!folder) {
-        folder = {
-          id: `folder_${Date.now()}_${Math.random()}`,
-          name: folderName,
-          parentId: parentFolderId,
-        };
-        finalFolders.push(folder);
-      }
-      parentFolderId = folder.id;
-    });
-  
-    setResourceFolders(finalFolders);
-  
-    const newResource: Resource = {
-      id: `res_card_${Date.now()}`,
-      name: newResourceName,
-      folderId: parentFolderId!,
-      type: type,
-      createdAt: new Date().toISOString(),
-      points: []
+  const handleCreateBrainHack = (linkedTaskId: string, taskType: 'deepwork' | 'upskill' | 'resource', resourceId?: string) => {
+    const newHack: BrainHack = {
+      id: `hack_${Date.now()}`,
+      text: "New Brain Hack",
+      parentId: null,
+      type: 'hack',
+      linkedUpskillIds: taskType === 'upskill' ? [linkedTaskId] : [],
+      linkedDeepWorkIds: taskType === 'deepwork' ? [linkedTaskId] : [],
     };
-    
-    setResources(prev => [...prev, newResource]);
-  
-    let updatedParent: ExerciseDefinition | Resource | undefined;
-    
-    const updateParent = (
-      setDefs: React.Dispatch<React.SetStateAction<any[]>>,
-      isPointConversion: boolean,
-      isMindset: boolean = false
-    ) => {
-      setDefs(prev => prev.map(def => {
-        if (def.id === parent.id) {
-            const linkKey = isMindset ? 'linkedResourceIds' : 'linkedResourceIds'; // Future-proofing if mindsets link differently
-            let updatedPoints = def.points || def.decompositionData || [];
-            if (isPointConversion) {
-                updatedPoints = updatedPoints.map((p: any) =>
-                p.id === pointToConvert!.id
-                    ? { id: `point_${Date.now()}`, type: 'card', text: newResource.name, resourceId: newResource.id }
-                    : p
-                );
-            }
-            updatedParent = { 
-                ...def, 
-                [linkKey]: [...(def[linkKey] || []), newResource.id],
-                ...(isMindset ? { decompositionData: updatedPoints } : { points: updatedPoints })
+
+    setBrainHacks(prev => [...prev, newHack]);
+
+    if (taskType === 'resource' && resourceId) {
+      setResources(prev => prev.map(r => {
+          if (r.id === resourceId) {
+            const newPoint: ResourcePoint = {
+              id: `point_${Date.now()}`,
+              type: 'link',
+              text: 'Brain Hack Link',
+              displayText: newHack.text,
+              url: `brainhack://${newHack.id}`
             };
-            return updatedParent;
-        }
-        return def;
+            return {
+              ...r,
+              points: [...(r.points || []), newPoint]
+            };
+          }
+          return r;
       }));
-    };
-
-    if ('category' in parent) {
-      if (mindProgrammingCategories.includes(parent.category as ExerciseCategory)) {
-        updateParent(setMindProgrammingDefinitions, !!pointToConvert, true);
-      } else if (upskillDefinitions.some(d => d.id === parent.id)) {
-        updateParent(setUpskillDefinitions, !!pointToConvert);
-      } else if (deepWorkDefinitions.some(d => d.id === parent.id)) {
-        updateParent(setDeepWorkDefinitions, !!pointToConvert);
-      }
-    } else {
-        updateParent(setResources, !!pointToConvert);
     }
-  
-    toast({ title: 'Resource Created', description: `A new resource card has been created and linked.` });
     
-    return updatedParent;
+    toast({ title: 'New Brain Hack Created', description: 'A new hack was created and linked to the source.' });
   };
   
   const deleteResource = (resourceId: string) => {
@@ -2505,6 +2369,72 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return r;
       }));
   };
+  
+  const createResourceWithHierarchy = useCallback((parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
+    const parentFolder = resourceFolders.find(f => f.id === ('folderId' in parent ? parent.folderId : ''));
+    const path = parentFolder ? [parentFolder.name, parent.name] : [parent.name];
+  
+    let currentParentId: string | null = null;
+    let updatedFolders = [...resourceFolders];
+  
+    for (const folderName of path) {
+      let folder = updatedFolders.find(f => f.name === folderName && f.parentId === currentParentId);
+      if (!folder) {
+        folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderName, parentId: currentParentId, icon: 'Folder' };
+        updatedFolders.push(folder);
+      }
+      currentParentId = folder.id;
+    }
+  
+    const newResource: Resource = {
+      id: `res_${Date.now()}`,
+      name: pointToConvert ? pointToConvert.text : 'New Card',
+      folderId: currentParentId!,
+      type: type,
+      points: [],
+      icon: 'Library',
+      createdAt: new Date().toISOString(),
+    };
+  
+    setResourceFolders(updatedFolders);
+    setResources(prev => [...prev, newResource]);
+  
+    let updatedParent;
+    if (pointToConvert) {
+      updatedParent = {
+        ...parent,
+        points: (parent.points || []).map(p => 
+          p.id === pointToConvert.id 
+            ? { ...p, type: 'card', resourceId: newResource.id } 
+            : p
+        ),
+      };
+    } else {
+      const linkPoint: ResourcePoint = {
+        id: `point_${Date.now()}`,
+        type: 'card',
+        text: newResource.name,
+        resourceId: newResource.id
+      };
+      updatedParent = {
+        ...parent,
+        linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id]
+      };
+    }
+  
+    if ('category' in parent) { // It's an ExerciseDefinition
+      const isUpskill = upskillDefinitions.some(d => d.id === parent.id);
+      if (isUpskill) {
+        setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
+      } else {
+        setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
+      }
+    } else { // It's a Resource
+      setResources(prev => prev.map(res => res.id === parent.id ? updatedParent as Resource : res));
+    }
+  
+    return updatedParent;
+  }, [resourceFolders, setResourceFolders, setResources, setDeepWorkDefinitions, setUpskillDefinitions]);
   
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
@@ -2789,20 +2719,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     resourceFolders, setResourceFolders,
     resources, setResources, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
-    activeResourceTabIds, setActiveTabIds,
+    activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
     habitCards, mechanismCards,
     createHabitFromThought, lastSelectedHabitFolder, setLastSelectedHabitFolder,
-    createResourceWithHierarchy,
     handleDeleteStopper, handleDeleteStrength,
     logStopperEncounter,
-    openPopups, handleOpenNestedPopup, 
+    openPopups,
     closeAllResourcePopups,
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
     generalPopups, openGeneralPopup, closeGeneralPopup,
-    handleUpdateResource,
+    handleUpdateResource, handleOpenNestedPopup,
+    createResourceWithHierarchy,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
@@ -2865,6 +2795,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     getUpskillLoggedMinutesRecursive,
     spacedRepetitionData, setSpacedRepetitionData,
     dailyReviewLogs, setDailyReviewLogs,
+    handleCreateBrainHack,
   };
 
   useEffect(() => {
@@ -2950,3 +2881,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
+    
