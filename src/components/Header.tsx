@@ -25,7 +25,6 @@ function NavigationMenu() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // This runs only on the client, after hydration
     setActivePath(pathname);
   }, [pathname]);
 
@@ -82,7 +81,6 @@ function NavigationMenu() {
   );
 }
 
-
 export function Header() {
   const { 
     currentUser, 
@@ -97,7 +95,6 @@ export function Header() {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    // This effect runs only on the client, after initial render
     setIsClient(true);
   }, []);
 
