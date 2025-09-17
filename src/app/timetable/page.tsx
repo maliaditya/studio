@@ -188,14 +188,10 @@ function TimetablePageContent() {
                                                 <div key={act.id} className="text-xs bg-card p-1.5 rounded-md shadow-sm group relative">
                                                     <div className="flex items-start gap-1.5">
                                                         <button onClick={() => handleToggleComplete(date, slot, act.id, !act.completed)} className="pt-0.5">
-                                                            {act.completed 
-                                                                ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                                                : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
-                                                            }
+                                                            <span className={cn("mt-0.5", act.completed && "text-green-500")}>{activityIcons[act.type]}</span>
                                                         </button>
                                                         <div className="flex-grow min-w-0">
                                                             <p className={cn("font-medium truncate", act.completed && "line-through text-muted-foreground")} title={act.details}>{act.details}</p>
-                                                            <span className={cn("mt-0.5", act.completed && "text-green-500")}>{activityIcons[act.type]}</span>
                                                         </div>
                                                         <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={() => handleRemoveActivity(date, slot, act.id)}>
                                                             <Trash2 className="h-3 w-3 text-destructive"/>
