@@ -150,7 +150,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
 
     const handleCreateAndLinkBrainHack = () => {
-        handleCreateBrainHack(resource.id, 'resource', resource.id);
+        handleCreateBrainHack(resource.id, 'resource');
     };
 
     const renderContent = () => {
@@ -311,7 +311,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
 }) => {
-    const { setFloatingVideoUrl } = useAuth();
+    const { setFloatingVideoUrl, openPistonsFor } = useAuth();
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -377,6 +377,16 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         )
     }
 
+    const handleLinkClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (point.text && point.text.startsWith('brainhack://')) {
+            const hackId = point.text.replace('brainhack://', '');
+            openPistonsFor({ view: 'brain-hack', context: { hackId } });
+        } else if (point.text) {
+            setFloatingVideoUrl(point.text);
+        }
+    };
+
     return (
         <li className="flex items-start gap-3 group/item w-full">
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
@@ -408,7 +418,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                      <div className="flex-grow min-w-0 flex items-center gap-1">
                         <span 
                             className="cursor-pointer text-primary hover:underline" 
-                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onClick={handleLinkClick}
                         >
                             {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
                         </span>
