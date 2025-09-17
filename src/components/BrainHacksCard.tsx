@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,24 +7,27 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, BookCopy, Briefcase } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { BrainHack } from '@/types/workout';
+import { BrainHack, ExerciseDefinition } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
+import { Checkbox } from './ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 
-const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
+const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText, onLinkTasks }: {
     hack: BrainHack;
     onUpdate: (id: string, newText: string) => void;
     onDelete: (id: string) => void;
     onOpenNested: (hack: BrainHack, event: React.MouseEvent) => void;
     onOpenLink: (url: string) => void;
     onEditLinkText: (hack: BrainHack) => void;
+    onLinkTasks: (hack: BrainHack) => void;
 }) => {
     const [text, setText] = useState(hack.text);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -116,6 +120,9 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 )}
             </div>
             <div className="flex items-center flex-shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onLinkTasks(hack); }}>
+                    <LinkIcon className="h-3 w-3 text-primary" />
+                </Button>
                 {hack.type !== 'link' && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onOpenNested(hack, e)}>
                         <GitBranch className="h-3 w-3 text-blue-500" />
@@ -131,7 +138,11 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 EditableBrainHack.displayName = 'EditableBrainHack';
 
 export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?: string | null, initialPosition?: { x: number, y: number } }) {
-    const { brainHacks, setBrainHacks, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
+    const { 
+        brainHacks, setBrainHacks, 
+        setFloatingVideoUrl, setFloatingVideoPlaylist,
+        upskillDefinitions, deepWorkDefinitions 
+    } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
@@ -142,6 +153,10 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     
     const [linkTextDialog, setLinkTextDialog] = useState<{hack: BrainHack} | null>(null);
     const [currentDisplayText, setCurrentDisplayText] = useState('');
+
+    const [linkTaskModal, setLinkTaskModal] = useState<{ isOpen: boolean; hack: BrainHack | null }>({ isOpen: false, hack: null });
+    const [tempLinkedUpskillIds, setTempLinkedUpskillIds] = useState<string[]>([]);
+    const [tempLinkedDeepWorkIds, setTempLinkedDeepWorkIds] = useState<string[]>([]);
 
     const cardRef = useRef<HTMLDivElement>(null);
     
@@ -325,6 +340,21 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         setLinkTextDialog(null);
         setCurrentDisplayText('');
     };
+
+    const openLinkTaskModal = (hack: BrainHack) => {
+        setLinkTaskModal({ isOpen: true, hack });
+        setTempLinkedUpskillIds(hack.linkedUpskillIds || []);
+        setTempLinkedDeepWorkIds(hack.linkedDeepWorkIds || []);
+    };
+    
+    const handleSaveTaskLinks = () => {
+        if (!linkTaskModal.hack) return;
+        setBrainHacks(prev => prev.map(h => 
+            h.id === linkTaskModal.hack?.id ? { ...h, linkedUpskillIds: tempLinkedUpskillIds, linkedDeepWorkIds: tempLinkedDeepWorkIds } : h
+        ));
+        setLinkTaskModal({ isOpen: false, hack: null });
+        toast({ title: 'Tasks Linked!' });
+    };
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -384,6 +414,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                             onOpenNested={handleHackClick}
                                             onOpenLink={handleOpenLink}
                                             onEditLinkText={handleEditLinkText}
+                                            onLinkTasks={openLinkTaskModal}
                                         />
                                     </li>
                                 ))}
@@ -419,6 +450,56 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
                         <Button onClick={handleSaveLinkText}>Save</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={linkTaskModal.isOpen} onOpenChange={(isOpen) => setLinkTaskModal({ isOpen, hack: null })}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Link Tasks to "{linkTaskModal.hack?.text}"</DialogTitle>
+                        <DialogDescription>Select the tasks this brain hack applies to.</DialogDescription>
+                    </DialogHeader>
+                    <Tabs defaultValue="deepwork">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="deepwork"><Briefcase className="mr-2 h-4 w-4"/>Deep Work</TabsTrigger>
+                            <TabsTrigger value="upskill"><BookCopy className="mr-2 h-4 w-4"/>Upskill</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="deepwork">
+                            <ScrollArea className="h-72">
+                                <div className="space-y-2 p-1">
+                                    {deepWorkDefinitions.map(def => (
+                                        <div key={def.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`dw-${def.id}`}
+                                                checked={tempLinkedDeepWorkIds.includes(def.id)}
+                                                onCheckedChange={() => setTempLinkedDeepWorkIds(prev => prev.includes(def.id) ? prev.filter(id => id !== def.id) : [...prev, def.id])}
+                                            />
+                                            <Label htmlFor={`dw-${def.id}`} className="font-normal">{def.name}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </TabsContent>
+                        <TabsContent value="upskill">
+                             <ScrollArea className="h-72">
+                                <div className="space-y-2 p-1">
+                                    {upskillDefinitions.map(def => (
+                                        <div key={def.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`us-${def.id}`}
+                                                checked={tempLinkedUpskillIds.includes(def.id)}
+                                                onCheckedChange={() => setTempLinkedUpskillIds(prev => prev.includes(def.id) ? prev.filter(id => id !== def.id) : [...prev, def.id])}
+                                            />
+                                            <Label htmlFor={`us-${def.id}`} className="font-normal">{def.name}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setLinkTaskModal({ isOpen: false, hack: null })}>Cancel</Button>
+                        <Button onClick={handleSaveTaskLinks}>Save Links</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

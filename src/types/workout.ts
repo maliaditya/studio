@@ -645,6 +645,8 @@ export interface BrainHack {
   type?: 'hack' | 'link';
   link?: string;
   displayText?: string;
+  linkedUpskillIds?: string[];
+  linkedDeepWorkIds?: string[];
 }
 
 export interface PipState {
