@@ -132,6 +132,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     stopperProgressPopup,
     setStopperProgressPopup,
     isAllResistancesPopupOpen,
+    openBrainHackPopups,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -502,6 +503,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
+            {Object.entries(openBrainHackPopups).map(([hackId, pos]) => (
+                <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
+            ))}
             {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
               <ResourcePopup key={popupState.resourceId} popupState={popupState} />
             ))}
@@ -612,3 +616,6 @@ export default function RootLayout({
   );
 }
 
+
+
+    

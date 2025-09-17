@@ -38,6 +38,7 @@ import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { deleteAudio } from '@/lib/audioDB';
 import { PillarPopup } from '@/components/PillarPopup';
+import { BrainHacksCard } from '@/components/BrainHacksCard';
 
 
 interface ResourcePopupProps {
@@ -120,7 +121,7 @@ interface AuthContextType {
   allWorkoutLogs: DatedWorkout[];
   setAllWorkoutLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   brandingLogs: DatedWorkout[];
-  setAllBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  setBrandingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allLeadGenLogs: DatedWorkout[];
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allMindProgrammingLogs: DatedWorkout[];
@@ -368,6 +369,11 @@ interface AuthContextType {
   dailyReviewLogs: DailyReviewLog[];
   setDailyReviewLogs: React.Dispatch<React.SetStateAction<DailyReviewLog[]>>;
   handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill' | 'resource', resourceId?: string) => void;
+  
+  // Brain Hack Popups
+  openBrainHackPopups: Record<string, { x: number, y: number }>;
+  setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, { x: number, y: number }>>>;
+  openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -574,6 +580,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [spacedRepetitionData, setSpacedRepetitionData] = useState<Record<string, RepetitionData>>({});
   const [dailyReviewLogs, setDailyReviewLogs] = useState<DailyReviewLog[]>([]);
   
+  // Brain Hack Popups
+  const [openBrainHackPopups, setOpenBrainHackPopups] = useState<Record<string, {x: number, y: number}>>({});
+
   const prevUser = usePrevious(currentUser);
   
   const setTheme = useCallback((newTheme: string) => {
@@ -2683,6 +2692,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setStopperProgressPopup({ isOpen: true, stopper, habitName });
   };
   
+  const openBrainHackPopup = useCallback((hackId: string, event: React.MouseEvent) => {
+    setOpenBrainHackPopups(prev => {
+        const newPopups = {...prev};
+        if (newPopups[hackId]) {
+            delete newPopups[hackId];
+            return newPopups;
+        }
+        const parentRect = (event.currentTarget as HTMLElement).closest('.group')?.getBoundingClientRect();
+        const initialX = parentRect ? parentRect.right + 20 : event.clientX + 20;
+        const initialY = parentRect ? parentRect.top : event.clientY;
+        return { ...prev, [hackId]: { x: initialX, y: initialY } };
+    });
+  }, []);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2794,6 +2817,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     spacedRepetitionData, setSpacedRepetitionData,
     dailyReviewLogs, setDailyReviewLogs,
     handleCreateBrainHack,
+    openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
   };
 
   useEffect(() => {
@@ -2883,5 +2907,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
 
+
+    
 
     

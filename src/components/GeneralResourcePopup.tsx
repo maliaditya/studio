@@ -1,4 +1,5 @@
 
+
       "use client";
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -31,7 +32,7 @@ interface GeneralResourcePopupProps {
 }
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, openBrainHackPopup } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
@@ -307,7 +308,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
 }) => {
-    const { setFloatingVideoUrl, setSettings } = useAuth();
+    const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -376,12 +377,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     const handleLinkClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (point.text && point.text.startsWith('brainhack://')) {
-            // New logic to show the Brain Hacks widget
-            setSettings(prev => ({
-                ...prev,
-                widgetVisibility: { ...prev.widgetVisibility, brainHacks: true },
-                allWidgetsVisible: Object.values({ ...prev.widgetVisibility, brainHacks: true }).some(v => v),
-            }));
+            const hackId = point.text.replace('brainhack://', '');
+            openBrainHackPopup(hackId, e);
         } else if (point.text) {
             setFloatingVideoUrl(point.text);
         }
@@ -440,3 +437,5 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
+
+    
