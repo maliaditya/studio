@@ -22,15 +22,9 @@ import {
 
 function NavigationMenu() {
   const pathname = usePathname();
-  const [activePath, setActivePath] = useState('');
-
-  useEffect(() => {
-    setActivePath(pathname);
-  }, [pathname]);
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
-    { href: '/workout-tracker', label: 'Workout' },
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/strategic-planning', label: 'Planning' },
@@ -44,6 +38,7 @@ function NavigationMenu() {
     { href: '/patterns', label: 'Patterns' },
     { href: '/mind-programming', label: 'Mind Programming' },
     { href: '/personal-branding', label: 'Branding' },
+    { href: '/workout-tracker', label: 'Workout' },
   ];
 
   return (
@@ -54,7 +49,7 @@ function NavigationMenu() {
           href={link.href}
           className={cn(
             "text-sm font-medium transition-colors hover:text-primary",
-            activePath === link.href ? "text-primary" : "text-muted-foreground"
+            pathname === link.href ? "text-primary" : "text-muted-foreground"
           )}
         >
           {link.label}
@@ -78,6 +73,7 @@ function NavigationMenu() {
     </nav>
   );
 }
+
 
 export function Header() {
   const { 
