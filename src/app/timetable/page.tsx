@@ -12,6 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import type { Activity, ActivityType, DailySchedule, SlotName } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -31,20 +33,48 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
 };
 
-const AddActivityPopover = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => (
-    <PopoverContent className="w-56 p-2">
-        <div className="space-y-1">
-            <p className="font-medium text-sm p-2">Select Activity</p>
-            {Object.entries(activityIcons).map(([type, icon]) => (
-                <Button key={type} variant="ghost" className="w-full justify-start" onClick={() => onAddActivity(type as ActivityType, `New ${type.replace('-', ' ')}`)}>
-                    {icon}
-                    <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
-                </Button>
-            ))}
-        </div>
-    </PopoverContent>
-);
+const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
+    const { coreSkills } = useAuth();
+    const specializations = coreSkills.filter(s => s.type === 'Specialization');
 
+    return (
+        <DropdownMenuContent className="w-56 p-2">
+            <p className="font-medium text-sm p-2">Select Activity</p>
+            {Object.entries(activityIcons).map(([type, icon]) => {
+                const activityType = type as ActivityType;
+                if (activityType === 'upskill' || activityType === 'deepwork') {
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                                <ScrollArea className="h-48">
+                                    {specializations.length > 0 ? (
+                                        specializations.map(spec => (
+                                            <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                {spec.name}
+                                            </DropdownMenuItem>
+                                        ))
+                                    ) : (
+                                        <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                    )}
+                                </ScrollArea>
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                    );
+                }
+                return (
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, `New ${type.replace('-', ' ')}`)}>
+                        {icon}
+                        <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                    </DropdownMenuItem>
+                );
+            })}
+        </DropdownMenuContent>
+    );
+};
 
 function TimetablePageContent() {
     const { schedule, setSchedule, settings } = useAuth();
@@ -143,14 +173,14 @@ function TimetablePageContent() {
                                                     </div>
                                                 </div>
                                             ))}
-                                            <Popover>
-                                                <PopoverTrigger asChild>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" size="sm" className="mt-auto w-full h-8">
                                                         <PlusCircle className="h-4 w-4" />
                                                     </Button>
-                                                </PopoverTrigger>
-                                                <AddActivityPopover onAddActivity={handleAddActivity(date, slot)} />
-                                            </Popover>
+                                                </DropdownMenuTrigger>
+                                                <AddActivityMenu onAddActivity={handleAddActivity(date, slot)} />
+                                            </DropdownMenu>
                                         </div>
                                     );
                                 })}
