@@ -141,6 +141,7 @@ function MyPlatePageContent() {
     getDescendantLeafNodes,
     settings,
     activeFocusSession,
+    onOpenFocusModal,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
