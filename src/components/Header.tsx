@@ -20,24 +20,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export function Header() {
-  const { 
-    currentUser, 
-    loading, 
-    isDemoTokenModalOpen, 
-    setIsDemoTokenModalOpen, 
-    pushDemoDataWithToken,
-  } = useAuth();
-  const router = useRouter();
+function NavigationMenu() {
   const pathname = usePathname();
-  const [isClient, setIsClient] = useState(false);
-  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [activePath, setActivePath] = useState('');
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
+    setActivePath(pathname);
+  }, [pathname]);
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
@@ -58,6 +47,56 @@ export function Header() {
   ];
 
   return (
+    <nav className="hidden md:flex items-center gap-4">
+      {navLinks.map(link => (
+        <Link
+          key={link.href}
+          href={link.href}
+          className={cn(
+            "text-sm font-medium transition-colors hover:text-primary",
+            activePath === link.href ? "text-primary" : "text-muted-foreground"
+          )}
+        >
+          {link.label}
+        </Link>
+      ))}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="text-sm font-medium text-muted-foreground hover:text-primary focus:text-primary data-[state=open]:text-primary gap-1">
+            Strategy
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          {dropdownLinks.map(link => (
+            <DropdownMenuItem key={link.href} asChild>
+              <Link href={link.href}>{link.label}</Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </nav>
+  );
+}
+
+export function Header() {
+  const { 
+    currentUser, 
+    loading, 
+    isDemoTokenModalOpen, 
+    setIsDemoTokenModalOpen, 
+    pushDemoDataWithToken,
+  } = useAuth();
+  const router = useRouter();
+  const [isClient, setIsClient] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  return (
     <>
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -69,35 +108,7 @@ export function Header() {
           </div>
           
           <div className="flex-grow flex items-center justify-center">
-            <nav className={cn("hidden md:flex items-center gap-4", !currentUser && "hidden")}>
-                {navLinks.map(link => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={cn(
-                      "text-sm font-medium transition-colors hover:text-primary",
-                      (isClient && pathname === link.href) ? "text-primary" : "text-muted-foreground"
-                    )}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="text-sm font-medium text-muted-foreground hover:text-primary focus:text-primary data-[state=open]:text-primary gap-1">
-                      Strategy
-                      <ChevronDown className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {dropdownLinks.map(link => (
-                       <DropdownMenuItem key={link.href} asChild>
-                         <Link href={link.href}>{link.label}</Link>
-                       </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-            </nav>
+            {isClient && currentUser && <NavigationMenu />}
           </div>
           
           <div className="flex items-center gap-4">
