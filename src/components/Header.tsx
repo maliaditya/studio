@@ -21,15 +21,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 function NavigationMenu() {
+  const [isClient, setIsClient] = useState(false);
   const [activePath, setActivePath] = useState('');
   const pathname = usePathname();
 
   useEffect(() => {
+    setIsClient(true);
     setActivePath(pathname);
   }, [pathname]);
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
+    { href: '/workout-tracker', label: 'Workout' },
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/strategic-planning', label: 'Planning' },
@@ -43,10 +46,13 @@ function NavigationMenu() {
     { href: '/patterns', label: 'Patterns' },
     { href: '/mind-programming', label: 'Mind Programming' },
     { href: '/personal-branding', label: 'Branding' },
-    { href: '/workout-tracker', label: 'Workout' },
     { href: '/charts', label: 'Charts' },
     { href: '/timesheet', label: 'Timesheet' },
   ];
+  
+  if (!isClient) {
+    return null; // Don't render on the server
+  }
 
   return (
     <nav className="hidden md:flex items-center gap-4">
@@ -81,6 +87,7 @@ function NavigationMenu() {
   );
 }
 
+
 export function Header() {
   const { 
     currentUser, 
@@ -92,12 +99,7 @@ export function Header() {
   const router = useRouter();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
+  
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -110,7 +112,7 @@ export function Header() {
           </div>
           
           <div className="flex-grow flex items-center justify-center">
-            {isClient && currentUser && <NavigationMenu />}
+            {currentUser && <NavigationMenu />}
           </div>
           
           <div className="flex items-center gap-4">
