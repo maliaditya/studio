@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { format, startOfWeek, addDays, isSameDay, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, CheckCircle2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -77,7 +77,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 };
 
 function TimetablePageContent() {
-    const { schedule, setSchedule, settings } = useAuth();
+    const { schedule, setSchedule, settings, handleToggleComplete: authToggleComplete } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
@@ -126,6 +126,28 @@ function TimetablePageContent() {
         });
     };
 
+    const handleToggleComplete = (date: Date, slot: SlotName, activityId: string, completed: boolean) => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        setSchedule(prev => {
+            const newSchedule = { ...prev };
+            const daySchedule = { ...(newSchedule[dateKey] || {}) };
+            const activities = (daySchedule[slot] as Activity[] || []);
+            const activityIndex = activities.findIndex(a => a.id === activityId);
+
+            if (activityIndex > -1) {
+                const updatedActivities = [...activities];
+                updatedActivities[activityIndex] = { 
+                    ...updatedActivities[activityIndex], 
+                    completed,
+                    completedAt: completed ? Date.now() : undefined
+                };
+                daySchedule[slot] = updatedActivities;
+                newSchedule[dateKey] = daySchedule;
+            }
+            return newSchedule;
+        });
+    };
+
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
             <Card>
@@ -165,8 +187,16 @@ function TimetablePageContent() {
                                             {activities.map(act => (
                                                 <div key={act.id} className="text-xs bg-card p-1.5 rounded-md shadow-sm group relative">
                                                     <div className="flex items-start gap-1.5">
-                                                        <span className="mt-0.5">{activityIcons[act.type]}</span>
-                                                        <p className="font-medium truncate flex-grow" title={act.details}>{act.details}</p>
+                                                        <button onClick={() => handleToggleComplete(date, slot, act.id, !act.completed)} className="pt-0.5">
+                                                            {act.completed 
+                                                                ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                                                : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
+                                                            }
+                                                        </button>
+                                                        <div className="flex-grow min-w-0">
+                                                            <p className={cn("font-medium truncate", act.completed && "line-through text-muted-foreground")} title={act.details}>{act.details}</p>
+                                                            <span className={cn("mt-0.5", act.completed && "text-green-500")}>{activityIcons[act.type]}</span>
+                                                        </div>
                                                         <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={() => handleRemoveActivity(date, slot, act.id)}>
                                                             <Trash2 className="h-3 w-3 text-destructive"/>
                                                         </Button>
