@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -12,7 +10,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -108,7 +106,7 @@ interface AuthContextType {
   setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   focusActivity: Activity | null;
   focusDuration: number;
-  onOpenFocusModal: (activity: Activity) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
   activeFocusSession: ActiveFocusSession | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
@@ -2884,6 +2882,61 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [activeFocusSession?.state, setActiveFocusSession]);
 
+  useEffect(() => {
+    if (isLoadingState || !currentUser) return;
+  
+    const allDates = Object.keys(schedule).map(parseISO).filter(isValid);
+    if (allDates.length === 0) return;
+  
+    const latestDate = max(allDates);
+    const today = startOfDay(new Date());
+  
+    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+    const startOfLatestWeek = startOfWeek(latestDate, { weekStartsOn: 1 });
+  
+    if (isAfter(startOfThisWeek, startOfLatestWeek)) {
+      const newSchedule = { ...schedule };
+      let scheduleUpdated = false;
+      const daysToCarryOver = eachDayOfInterval({ start: startOfThisWeek, end: addDays(startOfThisWeek, 6) });
+  
+      daysToCarryOver.forEach(day => {
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const lastWeekDayKey = format(subDays(day, 7), 'yyyy-MM-dd');
+        const lastWeekSchedule = schedule[lastWeekDayKey];
+  
+        if (lastWeekSchedule && !newSchedule[dayKey]) {
+          const newDaySchedule: DailySchedule = {};
+          Object.keys(lastWeekSchedule).forEach(key => {
+            const slotName = key as SlotName;
+            const activities = lastWeekSchedule[slotName] as Activity[] | undefined;
+            if (Array.isArray(activities)) {
+              newDaySchedule[slotName] = activities.map(act => ({
+                ...act,
+                id: `${act.type}-${Date.now()}-${Math.random()}`,
+                completed: false,
+                completedAt: undefined,
+                focusSessionInitialStartTime: undefined,
+                focusSessionStartTime: undefined,
+                focusSessionEndTime: undefined,
+                focusSessionPauses: [],
+              }));
+            }
+          });
+          newSchedule[dayKey] = newDaySchedule;
+          scheduleUpdated = true;
+        }
+      });
+  
+      if (scheduleUpdated) {
+        setSchedule(newSchedule);
+        toast({
+          title: "New Week, New Plan!",
+          description: "Your schedule from last week has been carried over.",
+        });
+      }
+    }
+  }, [isLoadingState, currentUser, schedule, setSchedule, toast]);
+
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -2905,5 +2958,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-    
