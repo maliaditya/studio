@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings, Eye, EyeOff, ChevronDown } from 'lucide-react';
+import { BrainCircuit, Heart, Settings, ChevronDown } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 function NavigationMenu() {
+  const [activePath, setActivePath] = useState('');
   const pathname = usePathname();
-  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    // This runs only on the client, after hydration
+    setActivePath(pathname);
+  }, [pathname]);
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
@@ -44,12 +45,9 @@ function NavigationMenu() {
     { href: '/mind-programming', label: 'Mind Programming' },
     { href: '/personal-branding', label: 'Branding' },
     { href: '/workout-tracker', label: 'Workout' },
+    { href: '/charts', label: 'Charts' },
+    { href: '/timesheet', label: 'Timesheet' },
   ];
-
-  if (!isClient) {
-    // Render nothing on the server and during the initial client-side render
-    return null;
-  }
 
   return (
     <nav className="hidden md:flex items-center gap-4">
@@ -59,7 +57,7 @@ function NavigationMenu() {
           href={link.href}
           className={cn(
             "text-sm font-medium transition-colors hover:text-primary",
-            pathname === link.href ? "text-primary" : "text-muted-foreground"
+            activePath === link.href ? "text-primary" : "text-muted-foreground"
           )}
         >
           {link.label}
@@ -96,6 +94,12 @@ export function Header() {
   const router = useRouter();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // This effect runs only on the client, after initial render
+    setIsClient(true);
+  }, []);
 
   return (
     <>
@@ -109,7 +113,7 @@ export function Header() {
           </div>
           
           <div className="flex-grow flex items-center justify-center">
-            {currentUser && <NavigationMenu />}
+            {isClient && currentUser && <NavigationMenu />}
           </div>
           
           <div className="flex items-center gap-4">
