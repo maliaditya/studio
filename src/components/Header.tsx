@@ -32,14 +32,15 @@ function NavigationMenu() {
 
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
+    { href: '/timetable', label: 'Timetable' },
     { href: '/workout-tracker', label: 'Workout' },
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
-    { href: '/strategic-planning', label: 'Planning' },
     { href: '/resources', label: 'Resources' },
   ];
 
   const dropdownLinks = [
+    { href: '/strategic-planning', label: 'Planning' },
     { href: '/path', label: 'Path' },
     { href: '/portfolio', label: 'Portfolio' },
     { href: '/purpose', label: 'Purpose' },
