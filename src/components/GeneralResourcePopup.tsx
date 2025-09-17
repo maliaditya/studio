@@ -1,11 +1,10 @@
 
-
       "use client";
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2 } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -32,7 +31,7 @@ interface GeneralResourcePopupProps {
 }
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
@@ -150,6 +149,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         setPlayingAudio(prev => !prev);
     };
 
+    const handleOpenBrainHack = () => {
+      openPistonsFor({ view: 'quick-access', context: {} });
+    };
+
     const renderContent = () => {
         switch (resource.type) {
             case 'card':
@@ -249,6 +252,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenBrainHack}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                     </TooltipProvider>
                     {resource.hasLocalAudio ? (
                          <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
@@ -426,4 +430,3 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
-
