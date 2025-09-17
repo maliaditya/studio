@@ -13,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -67,6 +67,7 @@ import { useRouter } from 'next/navigation';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { LinkedUpskillCard } from '@/components/LinkedUpskillCard';
+import { LinkedDeepWorkCard } from '@/components/LinkedDeepWorkCard';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -209,233 +210,6 @@ function AddToSessionPopover({ definition, onSelectSlot, disabled = false, curre
     </Popover>
   );
 }
-
-const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
-    deepworkDef: ExerciseDefinition;
-    getDeepWorkNodeType: (def: ExerciseDefinition) => string;
-    getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
-    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
-    handleCardClick: (def: ExerciseDefinition) => void;
-    handleToggleReadyForBranding: (id: string) => void;
-    handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
-    handleDeleteFocusArea: (id: string) => void;
-    handleViewProgress: (def: ExerciseDefinition, type: 'deepwork' | 'upskill') => void;
-    deepWorkDefinitions: ExerciseDefinition[];
-    formatDuration: (minutes: number) => string;
-    calculatedEstimate: number;
-    upskillDefinitions: ExerciseDefinition[];
-    resources: Resource[];
-    onOpenMindMap: (id: string) => void;
-    onUpdateName: (id: string, newName: string) => void;
-    projects: Project[];
-    handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
-    handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
-    activeProjectIds: Set<string>;
-    currentSlot: string;
-}>(({
-    deepworkDef,
-    getDeepWorkNodeType,
-    getDeepWorkLoggedMinutes,
-    handleAddTaskToSession,
-    handleCardClick,
-    handleToggleReadyForBranding,
-    handleUnlinkItem,
-    handleDeleteFocusArea,
-    handleViewProgress,
-    deepWorkDefinitions,
-    formatDuration,
-    calculatedEstimate,
-    upskillDefinitions,
-    resources,
-    onOpenMindMap,
-    onUpdateName,
-    projects,
-    handleOpenLinkProjectModal,
-    handleCreateAndLinkChild,
-    activeProjectIds,
-    currentSlot,
-}, ref) => {
-    const { getDescendantLeafNodes, settings, permanentlyLoggedTaskIds } = useAuth();
-    const { schedulingLevel = 3 } = settings;
-
-    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-        id: `card-deepwork-${deepworkDef.id}`,
-        data: { type: 'card', itemType: 'deepwork', definition: deepworkDef, id: deepworkDef.id }
-    });
-    const { isOver, setNodeRef: setDroppableNodeRef } = useDroppable({ id: `card-deepwork-${deepworkDef.id}`, data: { type: 'card', itemType: 'deepwork', definition: deepworkDef, id: deepworkDef.id } });
-    const [isEditingName, setIsEditingName] = useState(false);
-    const [currentName, setCurrentName] = useState(deepworkDef.name);
-
-    const setCombinedRefs = (node: HTMLDivElement | null) => {
-        if (typeof ref === 'function') {
-            ref(node);
-        } else if (ref) {
-            ref.current = node;
-        }
-        setDroppableNodeRef(node);
-        setNodeRef(node);
-    };
-    
-    const nodeType = getDeepWorkNodeType(deepworkDef);
-
-    const leafNodes = useMemo(() => {
-        if (nodeType === 'Objective' || nodeType === 'Intention') {
-            return getDescendantLeafNodes(deepworkDef.id, 'deepwork');
-        }
-        return [];
-    }, [deepworkDef.id, nodeType, getDescendantLeafNodes]);
-    
-    const completedCount = useMemo(() => {
-        return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
-    }, [leafNodes, permanentlyLoggedTaskIds]);
-
-    const isObjectiveComplete = useMemo(() => {
-        if (leafNodes.length === 0) {
-            return permanentlyLoggedTaskIds.has(deepworkDef.id);
-        }
-        return completedCount >= leafNodes.length;
-    }, [leafNodes, completedCount, permanentlyLoggedTaskIds, deepworkDef.id]);
-    
-    const { isEnabled, tooltipContent } = useMemo(() => {
-        const typeLevelMap: Record<string, number> = { 'Intention': 1, 'Objective': 2, 'Action': 3, 'Standalone': 3 };
-        const nodeLevel = typeLevelMap[nodeType];
-    
-        if (nodeLevel !== schedulingLevel) {
-            return { isEnabled: false, tooltipContent: `Can only schedule at Level ${schedulingLevel}.` };
-        }
-        
-        return { isEnabled: true, tooltipContent: '' };
-    
-    }, [nodeType, schedulingLevel]);
-
-    const getIcon = () => {
-      switch (nodeType) {
-        case 'Intention': return <Lightbulb className="h-5 w-5 text-amber-500" />;
-        case 'Objective': return <Flag className="h-5 w-5 text-green-500" />;
-        case 'Action': return <Bolt className="h-5 w-5 text-blue-500" />;
-        case 'Standalone':
-        default:
-            return <Focus className="h-5 w-5 text-purple-500" />;
-      }
-    };
-
-    const isActionable = ['Action', 'Standalone', 'Objective'].includes(nodeType);
-    const isComplete = isActionable ? permanentlyLoggedTaskIds.has(deepworkDef.id) : isObjectiveComplete;
-    const loggedMinutes = getDeepWorkLoggedMinutes(deepworkDef);
-    const estDuration = (nodeType === 'Intention' || nodeType === 'Objective') ? calculatedEstimate : deepworkDef.estimatedDuration;
-
-    const handleNameSave = () => {
-        if (currentName.trim()) {
-            onUpdateName(deepworkDef.id, currentName.trim());
-        } else {
-            setCurrentName(deepworkDef.name);
-        }
-        setIsEditingName(false);
-    };
-
-    const linkedProjects = (deepworkDef.linkedProjectIds || [])
-        .map(pid => projects.find(p => p.id === pid))
-        .filter((p): p is Project => !!p);
-    
-    return (
-        <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-            <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl min-h-[230px]", isComplete && "opacity-70 bg-muted/30")}>
-                 <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <div>
-                                    <AddToSessionPopover 
-                                        definition={deepworkDef} 
-                                        onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} 
-                                        disabled={!isEnabled}
-                                        currentSlot={currentSlot}
-                                    />
-                                </div>
-                            </TooltipTrigger>
-                            {tooltipContent && (
-                                <TooltipContent>
-                                    <p>{tooltipContent}</p>
-                                </TooltipContent>
-                            )}
-                        </Tooltip>
-                    </TooltipProvider>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => handleCardClick(deepworkDef)}><ArrowRight className="h-4 w-4" /></Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => onOpenMindMap(deepworkDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleViewProgress(deepworkDef, 'deepwork')}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-                            {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', deepworkDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleDeleteFocusArea(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-                <CardHeader className="pb-3 flex-grow" onDoubleClick={() => setIsEditingName(true)}>
-                    <div className="flex items-center gap-2">
-                        {getIcon()}
-                        {isEditingName ? (
-                            <Input value={currentName} onChange={(e) => setCurrentName(e.target.value)} onBlur={handleNameSave} onKeyDown={(e) => e.key === 'Enter' && handleNameSave()} autoFocus className="text-base font-semibold h-8" />
-                        ) : (
-                            <CardTitle className="text-base">
-                                <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                                <span className={cn("truncate", isComplete && "line-through text-muted-foreground")} title={deepworkDef.name}>
-                                    {deepworkDef.name.length > 25 ? `${deepworkDef.name.substring(0, 25)}...` : deepworkDef.name}
-                                </span>
-                                </TooltipTrigger><TooltipContent><p>{deepworkDef.name}</p></TooltipContent></Tooltip></TooltipProvider>
-                            </CardTitle>
-                        )}
-                        <Badge variant="outline" className="text-xs flex-shrink-0">{nodeType}</Badge>
-                    </div>
-                     {linkedProjects.length > 0 ? (
-                        <CardDescription className="flex flex-wrap gap-x-2 gap-y-1 text-xs mt-1">
-                            <span>Projects:</span>
-                            {linkedProjects.map(p => <Badge key={p.id} variant="secondary">{p.name}</Badge>)}
-                        </CardDescription>
-                    ) : (
-                        <CardDescription>{deepworkDef.category}</CardDescription>
-                    )}
-                </CardHeader>
-                <CardContent className="flex-grow">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
-                        {(deepworkDef.linkedDeepWorkIds || []).map(childId => {
-                            const childDef = deepWorkDefinitions.find(d => d.id === childId);
-                            if (!childDef) return null;
-                            const isChildLogged = permanentlyLoggedTaskIds.has(childId);
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="deepwork" />;
-                        })}
-                        {(deepworkDef.linkedUpskillIds || []).map(childId => {
-                            const childDef = upskillDefinitions.find(d => d.id === childId);
-                            if (!childDef) return null;
-                            const isChildLogged = permanentlyLoggedTaskIds.has(childId);
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={isChildLogged} type="upskill" />;
-                        })}
-                        {(deepworkDef.linkedResourceIds || []).map(childId => {
-                            const childDef = resources.find(d => d.id === childId);
-                            if (!childDef) return null;
-                            return <DraggableSubtaskItem key={childId} parentId={deepworkDef.id} childId={childId} childName={childDef.name} isLogged={false} type="resource" />;
-                        })}
-                    </div>
-                </CardContent>
-                <CardFooter className="pt-3 flex items-center justify-end">
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                         {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(deepworkDef.id, 'deepwork')}>Add Action</Button>}
-                         {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
-                         {isComplete || loggedMinutes > 0 ? (
-                            <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>
-                         ) : estDuration && estDuration > 0 ? (
-                            <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>
-                         ) : null}
-                    </div>
-                </CardFooter>
-            </Card>
-        </div>
-    );
-});
-LinkedDeepWorkCard.displayName = 'LinkedDeepWorkCard';
 
 function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
   resource: Resource;
@@ -589,6 +363,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap: (id: string) => void;
     handleUpdateFocusAreaName: (id: string, newName: string) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill') => void;
     setEmbedUrl: (url: string | null) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
@@ -623,6 +398,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap,
     handleUpdateFocusAreaName,
     handleCreateAndLinkChild,
+    handleCreateBrainHack,
     setEmbedUrl,
     setFloatingVideoUrl,
     handleOpenNestedPopup,
@@ -746,7 +522,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             </ScrollArea>
                         </DropdownMenuContent>
                     </DropdownMenu>
-
+                    <Button size="sm" variant="outline" onClick={() => handleCreateBrainHack(currentTask.id, currentTask.type)}>
+                        <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
                         <Folder className="mr-2 h-4 w-4" /> Link Resource
                     </Button>
@@ -802,6 +580,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             projects={projectsInDomainForChild}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleCreateBrainHack={handleCreateBrainHack}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -836,6 +615,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={projectsInDomainForChild}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleCreateBrainHack={handleCreateBrainHack}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -918,6 +698,7 @@ function DeepWorkPageContent() {
     activeProjectIds,
     currentSlot,
     permanentlyLoggedTaskIds,
+    handleCreateBrainHack,
   } = useAuth();
   const router = useRouter();
   
@@ -1989,6 +1770,7 @@ function DeepWorkPageContent() {
                                 onOpenMindMap={onOpenMindMap}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
                                 handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                handleCreateBrainHack={handleCreateBrainHack}
                                 setEmbedUrl={setEmbedUrl}
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
@@ -2026,6 +1808,7 @@ function DeepWorkPageContent() {
                                         projects={projects}
                                         handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                        handleCreateBrainHack={handleCreateBrainHack}
                                         activeProjectIds={activeProjectIds}
                                         currentSlot={currentSlot}
                                     />
@@ -2054,6 +1837,7 @@ function DeepWorkPageContent() {
                                             upskillDefinitions={upskillDefinitions}
                                             projectsInDomain={[]}
                                             handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                            handleCreateBrainHack={handleCreateBrainHack}
                                             activeProjectIds={activeProjectIds}
                                             currentSlot={currentSlot}
                                         />
@@ -2368,6 +2152,7 @@ function DeepWorkPageContent() {
                             projects={projects}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleCreateBrainHack={handleCreateBrainHack}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -2392,6 +2177,7 @@ function DeepWorkPageContent() {
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={[]}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
+                            handleCreateBrainHack={handleCreateBrainHack}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -2415,6 +2201,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
