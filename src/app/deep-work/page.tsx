@@ -134,7 +134,7 @@ const DraggableSubtaskItem: React.FC<{
   isLogged: boolean;
   type: 'deepwork' | 'upskill' | 'resource';
   onClick?: () => void;
-}> = ({ childId, parentId, childName, isLogged, type, onClick }) => {
+}> = ({ childId, parentId, childName = '', isLogged, type, onClick }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `subtask-${type}-${childId}-from-${parentId}`,
     data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName, parentId: parentId },
