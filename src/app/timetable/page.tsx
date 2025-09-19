@@ -88,7 +88,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
     const clone = (
         <div
           className={cn(
-            "text-xs bg-card p-1.5 rounded-md shadow-lg w-[150px]", // Use a fixed width for the clone
+            "text-xs bg-card p-1.5 rounded-md shadow-lg w-[150px]", 
           )}
           style={provided.draggableProps.style}
         >
@@ -173,7 +173,7 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
                 <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className={cn("border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2 transition-colors", snapshot.isDraggingOver && "bg-primary/10")}
+                    className={cn("rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2 transition-colors", snapshot.isDraggingOver && "bg-primary/10")}
                 >
                     {activities.map((act, index) => (
                         <DraggableActivity
@@ -210,9 +210,10 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     const handleAddActivity = (date: Date, slot: SlotName) => (type: ActivityType, details: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
+        const activityId = `${type}-${dateKey}-${Math.random()}`;
 
         const newActivity: Activity = {
-            id: `${type}-${dateKey}-${Date.now()}`,
+            id: activityId,
             type,
             details,
             completed: false,
@@ -264,54 +265,35 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
         const { source, destination } = result;
         if (!destination) return;
 
-        const [sourceDateKey, sourceSlotName] = source.droppableId.split('_');
-        const [destDateKey, destSlotName] = destination.droppableId.split('_');
+        const sourceDroppableId = source.droppableId;
+        const destinationDroppableId = destination.droppableId;
+        const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
+        const [destDateKey, destSlotName] = destinationDroppableId.split('_');
         
         setSchedule(currentSchedule => {
-            const newSchedule = JSON.parse(JSON.stringify(currentSchedule)); // Deep copy
+            const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
 
-            // Get source data
-            const sourceDaySchedule = newSchedule[sourceDateKey];
-            if (!sourceDaySchedule) return currentSchedule;
+            const sourceActivities = newSchedule[sourceDateKey]?.[sourceSlotName as SlotName] as Activity[] | undefined;
+            if (!sourceActivities || source.index >= sourceActivities.length) {
+                return currentSchedule;
+            }
             
-            const sourceActivities = sourceDaySchedule[sourceSlotName as SlotName] as Activity[] | undefined;
-            if (!sourceActivities || source.index >= sourceActivities.length) return currentSchedule;
-
-            // Move the item
             const [movedActivity] = sourceActivities.splice(source.index, 1);
             movedActivity.slot = destSlotName as SlotName;
 
-            // Get destination data
-            const destDaySchedule = sourceDateKey === destDateKey ? sourceDaySchedule : (newSchedule[destDateKey] || {});
-            const destActivities = destDaySchedule[destSlotName as SlotName] as Activity[] || [];
-
-            // Insert into destination
+            const destActivities = newSchedule[destDateKey]?.[destSlotName as SlotName] as Activity[] || [];
             destActivities.splice(destination.index, 0, movedActivity);
-            
-            // Update state
-            if (sourceDateKey === destDateKey) {
-                newSchedule[sourceDateKey] = {
-                    ...sourceDaySchedule,
-                    [sourceSlotName]: sourceActivities,
-                    [destSlotName]: destActivities
-                };
-            } else {
-                newSchedule[sourceDateKey] = {
-                    ...sourceDaySchedule,
-                    [sourceSlotName]: sourceActivities
-                };
-                newSchedule[destDateKey] = {
-                    ...destDaySchedule,
-                    [destSlotName]: destActivities
-                };
-            }
 
-            // Cleanup empty slots/days
-            if (newSchedule[sourceDateKey][sourceSlotName as SlotName].length === 0) {
+            if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
+            newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+
+            if (sourceActivities.length === 0) {
                 delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-            }
-            if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
-                delete newSchedule[sourceDateKey];
+                if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
+                    delete newSchedule[sourceDateKey];
+                }
+            } else {
+                newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
             }
             
             return newSchedule;
@@ -361,15 +343,17 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
         return (
             <div className="p-4 overflow-hidden h-full flex flex-col">
               <div className="flex-grow overflow-auto">
-                {timetableGrid}
+                <ScrollArea className="h-full w-full absolute">
+                  {timetableGrid}
+                </ScrollArea>
               </div>
             </div>
         )
     }
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-             <div className="flex justify-between items-center mb-4">
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)] flex flex-col">
+             <div className="flex justify-between items-center mb-4 flex-shrink-0">
                 <div>
                     <h1 className="text-2xl font-bold">Weekly Timetable</h1>
                     <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
@@ -380,7 +364,11 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                     <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
             </div>
-            {timetableGrid}
+            <div className="flex-grow overflow-hidden relative">
+              <ScrollArea className="absolute inset-0">
+                {timetableGrid}
+              </ScrollArea>
+            </div>
         </div>
     );
 }
@@ -392,3 +380,5 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
+
+    
