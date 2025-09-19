@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -255,7 +256,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     };
 
     const timetableGrid = (
-        <div className="grid gap-1 min-w-[1600px]" style={{ gridTemplateColumns: 'auto repeat(7, minmax(0, 1fr))' }}>
+        <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(7, minmax(0, 1fr))' }}>
             <div /> 
             {weekDays.map((day, index) => (
                 <div key={day} className="text-center font-semibold text-sm py-2">
@@ -387,29 +388,25 @@ export default function TimetablePage() {
             const movedActivityDuration = getTaskDuration(movedActivity);
 
             if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-                shouldShowToast = true; // Flag to show toast outside of this pure function
-            } else {
-                 destActivities.splice(destination.index, 0, movedActivity);
-            
-                if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
-                newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
-                
-                if (sourceActivities.length === 0) {
-                    delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-                    if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
-                        delete newSchedule[sourceDateKey];
-                    }
-                } else {
-                    newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
-                }
-            }
-            
-             if (shouldShowToast) {
                 toast({
                     title: "Slot Full",
                     description: "Cannot move task. This would exceed the 4-hour slot limit.",
                     variant: "destructive"
                 });
+                return currentSchedule; // Revert the change by returning the original state
+            }
+             destActivities.splice(destination.index, 0, movedActivity);
+        
+            if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
+            newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+            
+            if (sourceActivities.length === 0) {
+                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
+                if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
+                    delete newSchedule[sourceDateKey];
+                }
+            } else {
+                newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
             }
 
             return newSchedule;

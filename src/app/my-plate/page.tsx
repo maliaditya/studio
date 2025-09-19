@@ -1013,85 +1013,51 @@ function MyPlatePageContent() {
     
     if (!destination) return;
   
+    const sourceDroppableId = source.droppableId;
+    const destinationDroppableId = destination.droppableId;
+
+    if (sourceDroppableId === destinationDroppableId && source.index === destination.index) {
+        return;
+    }
+
+    const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
+    const [destDateKey, destSlotName] = destinationDroppableId.split('_');
+
+    if (sourceDateKey !== selectedDateKey || destDateKey !== selectedDateKey) {
+        // For now, only support reordering within the same day
+        toast({ title: 'Move Not Supported', description: 'Please use the timetable view to move tasks between days.', variant: 'default'});
+        return;
+    }
+
     setSchedule(currentSchedule => {
-        let shouldShowToast = false;
-        const sourceIdParts = source.droppableId.split('_');
-        const destIdParts = destination.droppableId.split('_');
-        const sourceDateKey = sourceIdParts[0];
-        const sourceSlotName = sourceIdParts[1];
-        const destDateKey = destIdParts[0];
-        const destSlotName = destIdParts[1];
-  
-        const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
-  
-        const sourceDaySchedule = newSchedule[sourceDateKey];
-        const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
-  
-        if (!sourceActivities || source.index >= sourceActivities.length) {
+        const daySchedule = currentSchedule[selectedDateKey] ? JSON.parse(JSON.stringify(currentSchedule[selectedDateKey])) : {};
+        
+        const sourceActivities = (daySchedule[sourceSlotName as SlotName] as Activity[] | undefined) || [];
+        if (source.index >= sourceActivities.length) {
             return currentSchedule;
         }
         
         const [movedActivity] = sourceActivities.splice(source.index, 1);
-        movedActivity.slot = destSlotName as SlotName;
-  
-        const destDaySchedule = newSchedule[destDateKey] || {};
-        const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
         
-        const SLOT_CAPACITY_MINUTES = 240;
-        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-        const getTaskDuration = (act: Activity) => {
-            let duration = 0;
-            if (act.completed) {
-                duration = parseDurationToMinutes(activityDurations[act.id]);
-            } else {
-                if (act.taskIds && act.taskIds.length > 0) {
-                    const mainDefId = act.taskIds[0].split('-')[0];
-                    const taskDef = allDefs.get(mainDefId);
-                    if (taskDef) duration = calculateTotalEstimate(taskDef);
-                } else if (act.duration) {
-                    duration = act.duration;
-                } else {
-                    switch(act.type) {
-                        case 'workout': duration = 90; break;
-                        case 'mindset': duration = 15; break;
-                        case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
-                        case 'planning': case 'tracking': duration = 30; break;
-                        case 'lead-generation': duration = 45; break;
-                        default: duration = 0;
-                    }
-                }
-            }
-            return duration;
-        };
-
-        const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
-        const movedActivityDuration = getTaskDuration(movedActivity);
-        
-        if (source.droppableId !== destination.droppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-            shouldShowToast = true;
+        if (sourceSlotName === destSlotName) {
+            sourceActivities.splice(destination.index, 0, movedActivity);
+            daySchedule[sourceSlotName as SlotName] = sourceActivities;
         } else {
-             destActivities.splice(destination.index, 0, movedActivity);
-        
-            if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
-            newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+            const destActivities = (daySchedule[destSlotName as SlotName] as Activity[] | undefined) || [];
+            destActivities.splice(destination.index, 0, movedActivity);
+            daySchedule[destSlotName as SlotName] = destActivities;
             
             if (sourceActivities.length === 0) {
-                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-                if (Object.keys(newSchedule[sourceDateKey]).length === 0) delete newSchedule[sourceDateKey];
+                delete daySchedule[sourceSlotName as SlotName];
             } else {
-                newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
+                daySchedule[sourceSlotName as SlotName] = sourceActivities;
             }
         }
         
-         if (shouldShowToast) {
-            toast({
-                title: "Slot Full",
-                description: "Cannot move task. This would exceed the 4-hour slot limit.",
-                variant: "destructive"
-            });
-        }
-
-        return newSchedule;
+        return {
+            ...currentSchedule,
+            [selectedDateKey]: daySchedule
+        };
     });
   };
 
@@ -1245,7 +1211,7 @@ function MyPlatePageContent() {
                 setIsLearningModalOpen(isOpen);
             }}
             availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
-            initialSelectedIds={activity.taskIds || []}
+            initialSelectedIds={editingActivity.activity.taskIds || []}
             onSave={handleSaveTaskSelection}
             pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
             disabledTaskIds={[]}
@@ -1299,7 +1265,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] max-w-full flex flex-col p-0">
+        <DialogContent className="h-[90vh] max-w-[98vw] w-[98vw] flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
