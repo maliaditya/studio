@@ -172,6 +172,7 @@ export function TimeSlots({
                         <AgendaWidgetItem
                           key={activity.id}
                           activity={{...activity, slot: slot.name as SlotName}}
+                          date={date}
                           onToggleComplete={onToggleComplete}
                           onActivityClick={onActivityClick}
                           linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
@@ -324,29 +325,59 @@ const AgendaWidgetItem = ({
   onLinkHabit: (habitId: string) => void;
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
 }) => {
-  const { workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes, activityDurations } = useAuth();
+  const { toast } = useToast();
+  
+  const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
+  
+  const parentTaskDefinition = useMemo(() => {
+    if (!activity.taskIds || activity.taskIds.length === 0) return null;
+    const mainDefId = activity.taskIds[0].split('-')[0];
+    return allDefs.get(mainDefId);
+  }, [activity.taskIds, allDefs]);
+  
+  const { isHighLevelTask, allSubTasksCompleted, totalLoggedMinutes } = useMemo(() => {
+    if (!parentTaskDefinition || (activity.type !== 'deepwork' && activity.type !== 'upskill')) {
+      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
+    }
+
+    const nodeType = activity.type === 'deepwork' 
+      ? getDeepWorkNodeType(parentTaskDefinition)
+      : getUpskillNodeType(parentTaskDefinition);
+    
+    const isHighLevel = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
+    if (!isHighLevel) {
+      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
+    }
+
+    const leafNodes = getDescendantLeafNodes(parentTaskDefinition.id, activity.type);
+    const areAllComplete = leafNodes.length > 0 && leafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
+
+    const totalMinutes = activity.type === 'deepwork' 
+      ? getDeepWorkLoggedMinutes(parentTaskDefinition)
+      : getUpskillLoggedMinutesRecursive(parentTaskDefinition);
+
+    return { 
+      isHighLevelTask: true, 
+      allSubTasksCompleted: areAllComplete,
+      totalLoggedMinutes: totalMinutes,
+    };
+  }, [parentTaskDefinition, activity.type, getDescendantLeafNodes, permanentlyLoggedTaskIds, getDeepWorkNodeType, getUpskillNodeType, getDeepWorkLoggedMinutes, getUpskillLoggedMinutesRecursive]);
+
+  useEffect(() => {
+    if (isHighLevelTask && allSubTasksCompleted && !activity.completed) {
+      onToggleComplete(activity.slot, activity.id, true);
+    }
+  }, [isHighLevelTask, allSubTasksCompleted, activity.completed, activity.slot, activity.id, onToggleComplete]);
   
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
     const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
     displayDetails = description.split(' for ')[1] || "Workout";
   }
+  
+  const duration = activityDurations[activity.id];
 
-  const [customDays, setCustomDays] = useState(7);
-
-  const handleRoutineSelect = (rule: RecurrenceRule | null) => {
-    setRoutine(activity, rule);
-  };
-  
-  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const days = parseInt(e.target.value, 10);
-    setCustomDays(isNaN(days) ? 1 : days);
-  };
-  
-  const handleCustomDaysSave = () => {
-    handleRoutineSelect({ type: 'custom', days: customDays });
-  };
-  
   const handleTitleClick = (event: React.MouseEvent) => {
     if (activity.completed) {
       onToggleComplete(activity.slot, activity.id, false);
@@ -354,13 +385,24 @@ const AgendaWidgetItem = ({
     }
     
     if (linkedHabit) {
-      // Logic to handle clicking when a habit is linked
-      // onOpenHabitPopup(linkedHabit.id, event);
-      return;
+        onOpenHabitPopup(linkedHabit.id, event);
+        return;
     }
 
     onActivityClick(activity.slot, activity, event);
   };
+  
+  const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onActivityClick(activity.slot, activity, e);
+  };
+  
+  let displayDuration = duration;
+  if (isHighLevelTask && totalLoggedMinutes > 0) {
+    const h = Math.floor(totalLoggedMinutes / 60);
+    const m = Math.round(totalLoggedMinutes % 60);
+    displayDuration = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + ' logged';
+  }
   
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
@@ -388,14 +430,24 @@ const AgendaWidgetItem = ({
         </div>
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
-        {!activity.completed && activity.type !== 'interrupt' ? (
+        {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
+        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' ? (
             <Button
                 variant="ghost"
                 size="icon"
                 className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => onActivityClick(activity.slot, activity, e)}
+                onClick={handleFocusClick}
             >
                 <Timer className="h-4 w-4" />
+            </Button>
+        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => onOpenTaskContext(activity.id, e)}
+            >
+                <GitBranch className="h-4 w-4" />
             </Button>
         ) : null}
         <DropdownMenu>
@@ -412,26 +464,13 @@ const AgendaWidgetItem = ({
               </DropdownMenuSubTrigger>
               <DropdownMenuPortal>
                 <DropdownMenuSubContent>
-                  <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'daily' })}>Daily</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'weekly' })}>Weekly</DropdownMenuItem>
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Custom</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        <div className="p-2 space-y-2">
-                            <Label htmlFor="custom-days">Repeat every X days</Label>
-                            <div className="flex gap-2">
-                                <Input id="custom-days" type="number" value={customDays} onChange={handleCustomDaysChange} className="w-20 h-8" />
-                                <Button size="sm" onClick={handleCustomDaysSave}>Set</Button>
-                            </div>
-                        </div>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
+                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                  
                   {activity.routine && (
                     <>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => handleRoutineSelect(null)} className="text-destructive">Remove Routine</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
                     </>
                   )}
                 </DropdownMenuSubContent>
@@ -450,3 +489,5 @@ const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
