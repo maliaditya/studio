@@ -321,10 +321,8 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     if (isModal) {
         return (
-            <div className="p-4">
-                <ScrollArea className="w-full whitespace-nowrap">
-                  {timetableGrid}
-                </ScrollArea>
+            <div className="p-4 overflow-auto">
+              {timetableGrid}
             </div>
         )
     }
@@ -356,5 +354,3 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
-
-    
