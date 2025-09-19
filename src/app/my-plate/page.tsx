@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay } from 'date-fns';
+import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay, startOfWeek } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide, Expand, LayoutDashboard } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -178,6 +178,8 @@ function MyPlatePageContent() {
   // Meal selection modal
   const [isMealModalOpen, setIsMealModalOpen] = useState(false);
   const [currentSlotForMeal, setCurrentSlotForMeal] = useState<string | null>(null);
+
+  const [currentTimetableWeek, setCurrentTimetableWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
 
   // State for Modal content
@@ -1235,15 +1237,22 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="w-[98vw] max-w-[120rem] h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-4 border-b">
-                <DialogTitle>Weekly Timetable</DialogTitle>
-                <DialogDescription>
-                    Plan your week at a glance.
-                </DialogDescription>
+        <DialogContent className="max-w-[120rem] h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
+                <div>
+                    <DialogTitle>Weekly Timetable</DialogTitle>
+                    <DialogDescription>
+                        Plan your week at a glance.
+                    </DialogDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" onClick={() => setCurrentTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
             </DialogHeader>
             <div className="flex-grow min-h-0 overflow-hidden">
-                <TimetablePageContent isModal={true} />
+                <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} />
             </div>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -85,24 +86,6 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
   }, []);
 
   const renderDraggable = (provided: any, snapshot: any) => {
-    const clone = (
-        <div
-          className={cn(
-            "text-xs bg-card p-1.5 rounded-md shadow-lg w-[150px]", 
-          )}
-          style={provided.draggableProps.style}
-        >
-          <div className="flex items-start gap-1.5">
-            {activityIcons[activity.type]}
-            <div className="flex-grow min-w-0">
-              <p className="font-medium truncate" title={activity.details}>
-                {activity.details}
-              </p>
-            </div>
-          </div>
-        </div>
-    );
-
     const item = (
       <div
         ref={provided.innerRef}
@@ -149,7 +132,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
     if (snapshot.isDragging) {
       const portal = document.getElementById('global-popup-root');
       if (portal) {
-        return ReactDOM.createPortal(clone, portal);
+        return ReactDOM.createPortal(item, portal);
       }
     }
     return item;
@@ -199,10 +182,17 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
 });
 DroppableSlot.displayName = 'DroppableSlot';
 
-export function TimetablePageContent({ isModal = false }: { isModal?: boolean }) {
+export function TimetablePageContent({ isModal = false, currentWeek: currentWeekProp, onWeekChange }: { 
+    isModal?: boolean;
+    currentWeek?: Date;
+    onWeekChange?: (date: Date) => void; 
+}) {
     const { schedule, setSchedule, settings } = useAuth();
     const { toast } = useToast();
-    const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+    
+    const [internalCurrentWeek, setInternalCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+    const currentWeek = currentWeekProp || internalCurrentWeek;
+    const setCurrentWeek = onWeekChange || setInternalCurrentWeek;
 
     const weekDates = React.useMemo(() => {
         return Array.from({ length: 7 }).map((_, i) => addDays(currentWeek, i));
@@ -210,7 +200,19 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     const handleAddActivity = (date: Date, slot: SlotName) => (type: ActivityType, details: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
-        const activityId = `${type}-${dateKey}-${Math.random()}`;
+        
+        const daySchedule = schedule[dateKey] || {};
+        const activitiesInSlot = daySchedule[slot] as Activity[] || [];
+        if (activitiesInSlot.length >= 2) {
+          toast({
+              title: "Slot Full",
+              description: "Cannot add more than two activities to a single time slot.",
+              variant: "destructive"
+          });
+          return;
+        }
+
+        const activityId = `${type}-${dateKey}-${slot}-${Math.random()}`;
 
         const newActivity: Activity = {
             id: activityId,
@@ -267,26 +269,36 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
         const sourceDroppableId = source.droppableId;
         const destinationDroppableId = destination.droppableId;
-        const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
-        const [destDateKey, destSlotName] = destinationDroppableId.split('_');
         
         setSchedule(currentSchedule => {
+            const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
+            const [destDateKey, destSlotName] = destinationDroppableId.split('_');
+            
             const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
 
-            const sourceActivities = newSchedule[sourceDateKey]?.[sourceSlotName as SlotName] as Activity[] | undefined;
+            const sourceDaySchedule = newSchedule[sourceDateKey];
+            const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
+            
             if (!sourceActivities || source.index >= sourceActivities.length) {
-                return currentSchedule;
+                return currentSchedule; // Dragged item not found
             }
             
             const [movedActivity] = sourceActivities.splice(source.index, 1);
             movedActivity.slot = destSlotName as SlotName;
 
-            const destActivities = newSchedule[destDateKey]?.[destSlotName as SlotName] as Activity[] || [];
-            destActivities.splice(destination.index, 0, movedActivity);
+            const destDaySchedule = newSchedule[destDateKey] || {};
+            const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
+            
+            if (destActivities.length >= 2) {
+                toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
+                return currentSchedule; // Revert if slot is full
+            }
 
+            destActivities.splice(destination.index, 0, movedActivity);
+            
             if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
             newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
-
+            
             if (sourceActivities.length === 0) {
                 delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
                 if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
@@ -298,7 +310,7 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
             
             return newSchedule;
         });
-    }, [setSchedule]);
+    }, [setSchedule, toast]);
 
 
     const timetableGrid = (
@@ -342,8 +354,8 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     if (isModal) {
         return (
             <div className="p-4 overflow-hidden h-full flex flex-col">
-              <div className="flex-grow overflow-auto">
-                <ScrollArea className="h-full w-full absolute">
+              <div className="flex-grow min-h-0 relative">
+                <ScrollArea className="absolute inset-0">
                   {timetableGrid}
                 </ScrollArea>
               </div>
@@ -364,10 +376,10 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                     <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
             </div>
-            <div className="flex-grow overflow-hidden relative">
-              <ScrollArea className="absolute inset-0">
-                {timetableGrid}
-              </ScrollArea>
+            <div className="flex-grow min-h-0 relative">
+                <ScrollArea className="absolute inset-0">
+                    {timetableGrid}
+                </ScrollArea>
             </div>
         </div>
     );
@@ -380,5 +392,3 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
-
-    
