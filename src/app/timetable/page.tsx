@@ -289,14 +289,19 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
                     <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
-                        const activities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
                         const isPastDay = isBefore(date, startOfToday());
+                        
+                        const activitiesToDisplay = isPastDay
+                            ? allActivities.filter(act => act.completed)
+                            : allActivities;
+
                         return (
                             <div key={dateKey} className={cn(isPastDay && "opacity-60")}>
                                 <DroppableSlot 
                                     date={date}
                                     slot={slot}
-                                    activities={activities}
+                                    activities={activitiesToDisplay}
                                     onAddActivity={handleAddActivity(date, slot)}
                                     onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
                                     onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
@@ -463,5 +468,6 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
     return totalMinutes;
 };
+
 
 
