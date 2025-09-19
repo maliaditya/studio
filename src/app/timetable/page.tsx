@@ -255,7 +255,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     };
 
     const timetableGrid = (
-        <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
+        <div className="grid grid-cols-8 gap-1 min-w-[1600px]">
             <div /> 
             {weekDays.map((day, index) => (
                 <div key={day} className="text-center font-semibold text-sm py-2">
@@ -333,6 +333,8 @@ export default function TimetablePage() {
         const sourceDroppableId = source.droppableId;
         const destinationDroppableId = destination.droppableId;
         
+        let shouldShowToast = false;
+        
         setSchedule(currentSchedule => {
             const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
             const [destDateKey, destSlotName] = destinationDroppableId.split('_');
@@ -361,8 +363,11 @@ export default function TimetablePage() {
                     duration = parseDurationToMinutes(activityDurations[act.id]);
                 } else {
                     if (act.taskIds && act.taskIds.length > 0) {
-                        const mainDef = allDefs.get(act.taskIds[0]);
-                        if (mainDef) duration = calculateTotalEstimate(mainDef);
+                        const mainDefId = act.taskIds[0].split('-')[0];
+                        const taskDef = allDefs.get(mainDefId);
+                        if (taskDef) {
+                            duration = calculateTotalEstimate(taskDef);
+                        }
                     } else if (act.duration) {
                         duration = act.duration;
                     } else {
@@ -383,12 +388,8 @@ export default function TimetablePage() {
             const movedActivityDuration = getTaskDuration(movedActivity);
 
             if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-                toast({
-                    title: "Slot Full",
-                    description: "Cannot move task. This would exceed the 4-hour slot limit.",
-                    variant: "destructive"
-                });
-                return currentSchedule; // Revert
+                shouldShowToast = true;
+                return currentSchedule;
             }
 
             destActivities.splice(destination.index, 0, movedActivity);
@@ -407,6 +408,14 @@ export default function TimetablePage() {
             
             return newSchedule;
         });
+
+        if (shouldShowToast) {
+            toast({
+                title: "Slot Full",
+                description: "Cannot move task. This would exceed the 4-hour slot limit.",
+                variant: "destructive"
+            });
+        }
     };
     
     return (
