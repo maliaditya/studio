@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,11 +79,16 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 };
 
 const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity: Activity, date: Date, slot: SlotName, index: number, onRemove: (id: string) => void }) => {
-  const portal = React.useRef<HTMLElement | null>(
-    typeof document !== 'undefined'
-      ? document.getElementById('global-popup-root')
-      : null
-  ).current;
+  const portalRef = React.useRef<HTMLElement | null>(null);
+  const [isBrowser, setIsBrowser] = React.useState(false);
+
+  React.useEffect(() => {
+    setIsBrowser(true);
+    if (typeof document !== 'undefined') {
+        portalRef.current = document.getElementById('global-popup-root');
+    }
+  }, []);
+
 
   const renderDraggable = (provided: any, snapshot: any) => {
     const child = (
@@ -96,7 +100,7 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
           "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
           snapshot.isDragging && "opacity-80 shadow-lg"
         )}
-        style={{...provided.draggableProps.style, opacity: snapshot.isDragging ? 0.5 : 1}} // Hide original item
+        style={{...provided.draggableProps.style}}
       >
         <div className="flex items-start gap-1.5">
           {activityIcons[activity.type]}
@@ -110,15 +114,18 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
       </div>
     );
 
-    if (snapshot.isDragging && portal) {
-      return ReactDOM.createPortal(
-        // Render a simpler clone for performance
-        <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]">
-          {activityIcons[activity.type]}
-          <p className="font-medium truncate">{activity.details}</p>
-        </div>,
-        portal
-      );
+    if (!isBrowser) {
+        return child;
+    }
+
+    if (snapshot.isDragging && portalRef.current) {
+        return ReactDOM.createPortal(
+            <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={provided.draggableProps.style}>
+                {activityIcons[activity.type]}
+                <p className="font-medium truncate">{activity.details}</p>
+            </div>,
+            portalRef.current
+        );
     }
     return child;
   };
@@ -189,40 +196,55 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
         const [destDateKey, destSlotName] = destination.droppableId.split('_');
     
         setSchedule(prevSchedule => {
-            const newSchedule = JSON.parse(JSON.stringify(prevSchedule));
+            const newSchedule = JSON.parse(JSON.stringify(prevSchedule)); // Deep copy
     
             const sourceDaySchedule = newSchedule[sourceDateKey] || {};
             const sourceSlotActivities = (sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [];
-            if (!sourceSlotActivities[source.index]) return prevSchedule;
+            
+            if (!sourceSlotActivities[source.index]) return prevSchedule; // Item not found
             
             const [movedTask] = sourceSlotActivities.splice(source.index, 1);
-            if (!movedTask) return prevSchedule;
+            if (!movedTask) return prevSchedule; // Should not happen if index is valid
+            
+            movedTask.slot = destSlotName;
     
-            // If source slot becomes empty, remove it
+            const destDaySchedule = sourceDateKey === destDateKey ? sourceDaySchedule : (newSchedule[destDateKey] || {});
+            const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
+            
+            destSlotActivities.splice(destination.index, 0, movedTask);
+    
+            // Update source day
             if (sourceSlotActivities.length === 0) {
                 delete sourceDaySchedule[sourceSlotName as SlotName];
-            } else {
-                sourceDaySchedule[sourceSlotName as SlotName] = sourceSlotActivities;
             }
-            // If day becomes empty, remove it
             if (Object.keys(sourceDaySchedule).length === 0) {
                 delete newSchedule[sourceDateKey];
             } else {
                 newSchedule[sourceDateKey] = sourceDaySchedule;
             }
-    
-            // Now handle destination
-            const destDaySchedule = newSchedule[destDateKey] || {};
-            const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
-            destSlotActivities.splice(destination.index, 0, { ...movedTask, slot: destSlotName as SlotName });
-            
-            destDaySchedule[destSlotName as SlotName] = destSlotActivities;
-            newSchedule[destDateKey] = destDaySchedule;
+
+            // Update destination day (only if different from source)
+            if (sourceDateKey !== destDateKey) {
+                destDaySchedule[destSlotName as SlotName] = destSlotActivities;
+                 newSchedule[destDateKey] = destDaySchedule;
+            }
     
             return newSchedule;
         });
     };
 
+    const activitiesByDroppable = useMemo(() => {
+        const map = new Map<string, Activity[]>();
+        weekDates.forEach(date => {
+            const dateKey = format(date, 'yyyy-MM-dd');
+            slotOrder.forEach(slot => {
+                const droppableId = `${dateKey}_${slot}`;
+                const activities = (schedule[dateKey]?.[slot] as Activity[] || []);
+                map.set(droppableId, activities);
+            });
+        });
+        return map;
+    }, [schedule, weekDates]);
 
     const timetableGrid = (
         <DragDropContext onDragEnd={onDragEnd}>
@@ -243,7 +265,7 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                         {weekDates.map(date => {
                             const dateKey = format(date, 'yyyy-MM-dd');
                             const droppableId = `${dateKey}_${slot}`;
-                            const activities = (schedule[dateKey]?.[slot] as Activity[] || []);
+                            const activities = activitiesByDroppable.get(droppableId) || [];
                             
                             return (
                                 <Droppable droppableId={droppableId} key={droppableId}>
