@@ -132,36 +132,42 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
         if (!destination) return;
 
-        const [sourceDateKey, sourceSlot] = source.droppableId.split('_');
-        const [destDateKey, destSlot] = destination.droppableId.split('_');
-        
-        setSchedule(prev => {
-            const newSchedule = { ...prev };
-            const sourceDaySchedule = { ...(newSchedule[sourceDateKey] || {}) };
-            const sourceSlotActivities = Array.from(sourceDaySchedule[sourceSlot as SlotName] as Activity[] || []);
-            
+        const [sourceDateKey, sourceSlotName] = source.droppableId.split('_');
+        const [destDateKey, destSlotName] = destination.droppableId.split('_');
+
+        setSchedule(prevSchedule => {
+            const newSchedule = JSON.parse(JSON.stringify(prevSchedule)); // Deep copy to avoid mutation issues
+
+            const sourceDaySchedule = newSchedule[sourceDateKey] || {};
+            const sourceSlotActivities = (sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [];
+
             const [movedTask] = sourceSlotActivities.splice(source.index, 1);
-            if (!movedTask) return prev;
+            if (!movedTask) return prevSchedule; // Should not happen
 
-            // Update source
-            if (sourceSlotActivities.length > 0) {
-              sourceDaySchedule[sourceSlot as SlotName] = sourceSlotActivities;
+            if (sourceSlotActivities.length === 0) {
+                delete sourceDaySchedule[sourceSlotName as SlotName];
             } else {
-              delete sourceDaySchedule[sourceSlot as SlotName];
+                sourceDaySchedule[sourceSlotName as SlotName] = sourceSlotActivities;
             }
-            newSchedule[sourceDateKey] = sourceDaySchedule;
 
-            // Update destination
-            const destDaySchedule = sourceDateKey === destDateKey ? sourceDaySchedule : { ...(newSchedule[destDateKey] || {}) };
-            const destSlotActivities = Array.from(destDaySchedule[destSlot as SlotName] as Activity[] || []);
-            destSlotActivities.splice(destination.index, 0, { ...movedTask, slot: destSlot as SlotName });
+            if (Object.keys(sourceDaySchedule).length === 0) {
+                delete newSchedule[sourceDateKey];
+            } else {
+                newSchedule[sourceDateKey] = sourceDaySchedule;
+            }
             
-            destDaySchedule[destSlot as SlotName] = destSlotActivities;
+            const destDaySchedule = newSchedule[destDateKey] || {};
+            const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
+            
+            destSlotActivities.splice(destination.index, 0, { ...movedTask, slot: destSlotName as SlotName });
+            
+            destDaySchedule[destSlotName as SlotName] = destSlotActivities;
             newSchedule[destDateKey] = destDaySchedule;
             
             return newSchedule;
         });
     };
+
 
     const timetableGrid = (
         <DragDropContext onDragEnd={onDragEnd}>
@@ -244,24 +250,20 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     return (
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <CardHeader>
-                <div className="flex justify-between items-center">
-                    <div>
-                        <CardTitle>Weekly Timetable</CardTitle>
-                        <CardDescription>Plan your week at a glance. Drag and drop tasks to reschedule.</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                        <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                    </div>
+             <div className="flex justify-between items-center mb-4">
+                <div>
+                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
+                    <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
                 </div>
-            </CardHeader>
-            <CardContent>
-                <div className="overflow-x-auto">
-                    {timetableGrid}
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
-            </CardContent>
+            </div>
+            <div className="overflow-x-auto">
+                {timetableGrid}
+            </div>
         </div>
     );
 }
