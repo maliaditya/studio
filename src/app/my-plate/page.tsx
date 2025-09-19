@@ -1235,7 +1235,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="w-[98vw] max-w-[98vw] h-[90vh] flex flex-col p-0">
+        <DialogContent className="w-[98vw] max-w-[120rem] h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 border-b">
                 <DialogTitle>Weekly Timetable</DialogTitle>
                 <DialogDescription>
