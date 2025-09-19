@@ -399,34 +399,9 @@ function MyPlatePageContent() {
         }
 
         const SLOT_CAPACITY_MINUTES = 240;
-        const activitiesInSlot = schedule[selectedDateKey]?.[slotName] || [];
         
-        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+        const currentSlotDuration = slotDurations[slotName]?.total || 0;
         
-        const currentSlotDuration = (Array.isArray(activitiesInSlot) ? activitiesInSlot : []).reduce((sum, act) => {
-            let duration = 0;
-            if (act.completed) {
-                duration = parseDurationToMinutes(activityDurations[act.id]);
-            } else {
-                if (act.taskIds && act.taskIds.length > 0) {
-                    const mainDef = allDefs.get(act.taskIds[0]);
-                    if (mainDef) duration = calculateTotalEstimate(mainDef);
-                } else if (act.duration) {
-                    duration = act.duration;
-                } else {
-                    switch(act.type) {
-                        case 'workout': duration = 90; break;
-                        case 'mindset': duration = 15; break;
-                        case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
-                        case 'planning': case 'tracking': duration = 30; break;
-                        case 'lead-generation': duration = 45; break;
-                        default: duration = 0;
-                    }
-                }
-            }
-            return sum + duration;
-        }, 0);
-
         let details = '';
         let newActivityDuration = 0;
 
@@ -1037,7 +1012,7 @@ function MyPlatePageContent() {
   
   const selectedDaySchedule = schedule[selectedDateKey] || {};
   
-  const onDragEnd = useCallback((result: DropResult) => {
+  const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
   
@@ -1065,10 +1040,19 @@ function MyPlatePageContent() {
         const destDaySchedule = newSchedule[destDateKey] || {};
         const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
         
-        if (destActivities.length >= 2 && sourceDroppableId !== destinationDroppableId) {
-            shouldShowToast = true;
-            return currentSchedule;
+        const SLOT_CAPACITY_MINUTES = 240;
+        const destSlotDuration = destActivities.reduce((sum, act) => sum + (parseDurationToMinutes(activityDurations[act.id]) || 60), 0);
+        const movedActivityDuration = parseDurationToMinutes(activityDurations[movedActivity.id]) || 60;
+
+        if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
+            toast({
+                title: "Slot Full",
+                description: "Cannot move task. This would exceed the 4-hour slot limit.",
+                variant: "destructive"
+            });
+            return currentSchedule; // Revert
         }
+
   
         destActivities.splice(destination.index, 0, movedActivity);
         
@@ -1086,11 +1070,7 @@ function MyPlatePageContent() {
         
         return newSchedule;
     });
-
-    if (shouldShowToast) {
-        toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
-    }
-  }, [setSchedule, toast]);
+  };
 
 
   return (

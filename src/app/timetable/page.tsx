@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -202,16 +203,8 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
         
         const daySchedule = schedule[dateKey] || {};
         const activitiesInSlot = (daySchedule[slot] as Activity[] | undefined) || [];
-        if (activitiesInSlot.length >= 2) {
-          toast({
-              title: "Slot Full",
-              description: "Cannot add more than two activities to a single time slot.",
-              variant: "destructive"
-          });
-          return;
-        }
         
-        const newActivityId = `${type.toLowerCase()}-${dateKey}-${Math.random()}`;
+        const newActivityId = `essentials-${dateKey}-${Math.random()}`;
 
         const newActivity: Activity = {
             id: newActivityId,
@@ -331,12 +324,12 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 }
 
 export default function TimetablePage() {
-    const { setSchedule, toast } = useAuth();
+    const { setSchedule, toast, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
 
-    const onDragEnd = useCallback((result: DropResult) => {
+    const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
         if (!destination) return;
-
+    
         const sourceDroppableId = source.droppableId;
         const destinationDroppableId = destination.droppableId;
         
@@ -345,7 +338,7 @@ export default function TimetablePage() {
             const [destDateKey, destSlotName] = destinationDroppableId.split('_');
             
             const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
-
+    
             const sourceDaySchedule = newSchedule[sourceDateKey];
             const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
             
@@ -355,13 +348,47 @@ export default function TimetablePage() {
             
             const [movedActivity] = sourceActivities.splice(source.index, 1);
             movedActivity.slot = destSlotName as SlotName;
-
+    
             const destDaySchedule = newSchedule[destDateKey] || {};
             const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
             
-            if (destActivities.length >= 2) {
-                toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
-                return currentSchedule; // Revert if slot is full
+            const SLOT_CAPACITY_MINUTES = 240;
+            const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+
+            const getTaskDuration = (act: Activity) => {
+                let duration = 0;
+                if (act.completed) {
+                    duration = parseDurationToMinutes(activityDurations[act.id]);
+                } else {
+                    if (act.taskIds && act.taskIds.length > 0) {
+                        const mainDef = allDefs.get(act.taskIds[0]);
+                        if (mainDef) duration = calculateTotalEstimate(mainDef);
+                    } else if (act.duration) {
+                        duration = act.duration;
+                    } else {
+                        switch(act.type) {
+                            case 'workout': duration = 90; break;
+                            case 'mindset': duration = 15; break;
+                            case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
+                            case 'planning': case 'tracking': duration = 30; break;
+                            case 'lead-generation': duration = 45; break;
+                            default: duration = 0;
+                        }
+                    }
+                }
+                return duration;
+            };
+
+            const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
+            const movedActivityDuration = getTaskDuration(movedActivity);
+
+            if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
+                toast({
+                    title: "Slot Full",
+                    description: "Cannot move task. This would exceed the 4-hour slot limit.",
+                    variant: "destructive"
+                });
+                return currentSchedule; // Revert
             }
 
             destActivities.splice(destination.index, 0, movedActivity);
@@ -380,7 +407,7 @@ export default function TimetablePage() {
             
             return newSchedule;
         });
-    }, [setSchedule, toast]);
+    };
     
     return (
         <AuthGuard>
@@ -391,4 +418,25 @@ export default function TimetablePage() {
     )
 }
 
+const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
     
+    let totalMinutes = 0;
+    const trimmedStr = durationStr.trim();
+    
+    const hourMatch = trimmedStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = trimmedStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+        totalMinutes += parseInt(minMatch[1], 10);
+    }
+
+    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
+        totalMinutes += parseInt(trimmedStr, 10);
+    }
+
+    return totalMinutes;
+};
