@@ -35,7 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1290,23 +1290,23 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
-            <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
-                <div>
-                    <DialogTitle>Weekly Timetable</DialogTitle>
-                    <DialogDescription>
-                        Plan your week at a glance.
-                    </DialogDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                    <Button variant="outline" onClick={() => setCurrentTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-            </DialogHeader>
-            <div className="flex-grow min-h-0 overflow-hidden">
-                <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} />
-            </div>
+        <DialogContent className="max-w-[120rem] h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
+              <div>
+                  <DialogTitle>Weekly Timetable</DialogTitle>
+                  <DialogDescription>
+                      Plan your week at a glance.
+                  </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button variant="outline" onClick={() => setCurrentTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+          </DialogHeader>
+          <div className="flex-grow min-h-0 overflow-hidden">
+              <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} onWeekChange={setCurrentTimetableWeek} />
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1416,4 +1416,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
