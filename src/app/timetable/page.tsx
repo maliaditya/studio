@@ -201,7 +201,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
         const dateKey = format(date, 'yyyy-MM-dd');
         
         const daySchedule = schedule[dateKey] || {};
-        const activitiesInSlot = daySchedule[slot] as Activity[] || [];
+        const activitiesInSlot = (daySchedule[slot] as Activity[] | undefined) || [];
         if (activitiesInSlot.length >= 2) {
           toast({
               title: "Slot Full",
@@ -210,11 +210,11 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
           });
           return;
         }
-
-        const activityId = `essentials-2025-09-18-${Math.random()}`;
+        
+        const newActivityId = `${type.toLowerCase()}-${dateKey}-${Math.random()}`;
 
         const newActivity: Activity = {
-            id: activityId,
+            id: newActivityId,
             type,
             details,
             completed: false,
@@ -244,7 +244,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
             if (!newSchedule[dateKey] || !newSchedule[dateKey][slot]) return prev;
 
             const daySchedule = { ...newSchedule[dateKey] };
-            const slotActivities = (daySchedule[slot] as Activity[] || []).filter(act => act.id !== activityId);
+            const slotActivities = ((daySchedule[slot] as Activity[] | undefined) || []).filter(act => act.id !== activityId);
             
             if (slotActivities.length > 0) {
                 daySchedule[slot] = slotActivities;
@@ -261,7 +261,78 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
             return newSchedule;
         });
     };
-    
+
+    const timetableGrid = (
+        <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
+            <div /> 
+            {weekDays.map((day, index) => (
+                <div key={day} className="text-center font-semibold text-sm py-2">
+                    {day}
+                    <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
+                        {format(weekDates[index], 'MMM d')}
+                    </div>
+                </div>
+            ))}
+
+            {slotOrder.map(slot => (
+                <React.Fragment key={slot}>
+                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
+                    {weekDates.map(date => {
+                        const dateKey = format(date, 'yyyy-MM-dd');
+                        const activities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        return (
+                            <DroppableSlot 
+                                key={`${dateKey}_${slot}`}
+                                date={date}
+                                slot={slot}
+                                activities={activities}
+                                onAddActivity={handleAddActivity(date, slot)}
+                                onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                            />
+                        );
+                    })}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+
+    if (isModal) {
+        return (
+            <div className="h-full flex flex-col overflow-hidden">
+                <ScrollArea className="flex-grow">
+                    <div className="p-4">
+                        {timetableGrid}
+                    </div>
+                </ScrollArea>
+            </div>
+        )
+    }
+
+    return (
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)] flex flex-col">
+             <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                <div>
+                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
+                    <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+            </div>
+            <div className="flex-grow min-h-0 relative">
+                <ScrollArea className="absolute inset-0">
+                    {timetableGrid}
+                </ScrollArea>
+            </div>
+        </div>
+    );
+}
+
+export default function TimetablePage() {
+    const { setSchedule, toast } = useAuth();
+
     const onDragEnd = useCallback((result: DropResult) => {
         const { source, destination } = result;
         if (!destination) return;
@@ -310,80 +381,14 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
             return newSchedule;
         });
     }, [setSchedule, toast]);
-
-
-    const timetableGrid = (
-        <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
-            <div /> 
-            {weekDays.map((day, index) => (
-                <div key={day} className="text-center font-semibold text-sm py-2">
-                    {day}
-                    <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
-                        {format(weekDates[index], 'MMM d')}
-                    </div>
-                </div>
-            ))}
-
-            {slotOrder.map(slot => (
-                <React.Fragment key={slot}>
-                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
-                    {weekDates.map(date => {
-                        const dateKey = format(date, 'yyyy-MM-dd');
-                        const activities = schedule[dateKey]?.[slot] || [];
-                        return (
-                            <DroppableSlot 
-                                key={`${dateKey}_${slot}`}
-                                date={date}
-                                slot={slot}
-                                activities={activities as Activity[]}
-                                onAddActivity={handleAddActivity(date, slot)}
-                                onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
-                            />
-                        );
-                    })}
-                </React.Fragment>
-            ))}
-        </div>
-    );
-
-    if (isModal) {
-        return (
-            <div className="h-full flex flex-col overflow-hidden">
-                <ScrollArea className="flex-grow">
-                    <div className="p-4">
-                        {timetableGrid}
-                    </div>
-                </ScrollArea>
-            </div>
-        )
-    }
-
-    return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)] flex flex-col">
-             <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
-                    <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                    <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-            </div>
-            <div className="flex-grow min-h-0 relative">
-                <ScrollArea className="absolute inset-0">
-                    {timetableGrid}
-                </ScrollArea>
-            </div>
-        </div>
-    );
-}
-
-export default function TimetablePage() {
+    
     return (
         <AuthGuard>
-            <TimetablePageContent />
+            <DragDropContext onDragEnd={onDragEnd}>
+                <TimetablePageContent />
+            </DragDropContext>
         </AuthGuard>
     )
 }
+
+    
