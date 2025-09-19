@@ -11,6 +11,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
+import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -34,7 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1035,111 +1036,163 @@ function MyPlatePageContent() {
   };
   
   const selectedDaySchedule = schedule[selectedDateKey] || {};
+  
+  const onDragEnd = useCallback((result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+  
+    const sourceDroppableId = source.droppableId;
+    const destinationDroppableId = destination.droppableId;
+    
+    setSchedule(currentSchedule => {
+        const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
+        const [destDateKey, destSlotName] = destinationDroppableId.split('_');
+        
+        const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
+  
+        const sourceDaySchedule = newSchedule[sourceDateKey];
+        const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
+        
+        if (!sourceActivities || source.index >= sourceActivities.length) {
+            return currentSchedule;
+        }
+        
+        const [movedActivity] = sourceActivities.splice(source.index, 1);
+        movedActivity.slot = destSlotName as SlotName;
+  
+        const destDaySchedule = newSchedule[destDateKey] || {};
+        const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
+        
+        if (destActivities.length >= 2 && sourceDroppableId !== destinationDroppableId) {
+            toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
+            return currentSchedule;
+        }
+  
+        destActivities.splice(destination.index, 0, movedActivity);
+        
+        if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
+        newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+        
+        if (sourceActivities.length === 0) {
+            delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
+            if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
+                delete newSchedule[sourceDateKey];
+            }
+        } else {
+            newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
+        }
+        
+        return newSchedule;
+    });
+  }, [setSchedule, toast]);
+
 
   return (
     <>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
-          <CardHeader className="flex flex-row items-center justify-between text-center py-4">
-              <div className="flex-grow">
-                <p className="text-sm text-muted-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+          <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
+            <CardHeader className="flex flex-row items-center justify-between text-center py-4">
+                <div className="flex-grow">
+                  <p className="text-sm text-muted-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
+                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {format(selectedDate, "MMM d")}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                    </PopoverContent>
+                </Popover>
+            </CardHeader>
+            <CardContent>
+              <DashboardStats stats={dashboardStats} />
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
+                <div className="space-y-6 lg:col-span-3">
+                    <ProductivitySnapshot 
+                      stats={dashboardStats} 
+                      timeAllocationData={timeAllocationData}
+                      onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
+                      todaysSchedule={schedule[selectedDateKey] || {}}
+                      activityDurations={activityDurations}
+                      showTimeAllocation={isAgendaDocked}
+                  />
+                </div>
+                 <div className="lg:col-span-2 space-y-6">
+                  {isAgendaDocked ? (
+                      <TodaysScheduleCard
+                          schedule={schedule}
+                          date={selectedDate}
+                          activityDurations={activityDurations}
+                          isAgendaDocked={isAgendaDocked}
+                          onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+                          onLogLearning={handleLogLearning}
+                          onStartWorkoutLog={handleStartWorkoutLog}
+                          onStartLeadGenLog={handleStartLeadGenLog}
+                          onToggleComplete={handleToggleComplete}
+                          onOpenFocusModal={onOpenFocusModal}
+                          onOpenTaskContext={openTaskContextPopup}
+                          onOpenHabitPopup={openRuleDetailPopup}
+                          currentSlot={currentSlot}
+                      />
+                  ) : (
+                      <Card>
+                          <CardHeader className="flex flex-row items-center justify-between">
+                              <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
+                               <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
+                                  <Expand className="h-4 w-4" />
+                                  <span className="sr-only">Open Time Allocation in Modal</span>
+                              </Button>
+                          </CardHeader>
+                          <CardContent>
+                              <TimeAllocationChart timeAllocationData={timeAllocationData} />
+                          </CardContent>
+                      </Card>
+                  )}
+                  <WeightGoalCard 
+                    weightLogs={weightLogs}
+                    goalWeight={goalWeight}
+                    onLogWeight={handleLogWeight}
+                    height={height}
+                    dateOfBirth={dateOfBirth}
+                    gender={gender}
+                    onSetHeight={setHeight}
+                    onSetDateOfBirth={setDateOfBirth}
+                    onSetGender={setGender}
+                    onSetGoalWeight={setGoalWeight}
+                    dietPlan={dietPlan}
+                    onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                    deepWorkDefinitions={deepWorkDefinitions}
+                    upskillDefinitions={upskillDefinitions}
+                    onOpenIntentionPopup={onOpenIntentionPopup}
+                    metaRules={metaRules}
+                    offerizationPlans={offerizationPlans}
+                    productizationPlans={productizationPlans}
+                    projects={projects}
+                  />
+                </div>
               </div>
-              <Popover>
-                  <PopoverTrigger asChild>
-                  <Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(selectedDate, "MMM d")}
-                  </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                  <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
-                  </PopoverContent>
-              </Popover>
-          </CardHeader>
-          <CardContent>
-            <DashboardStats stats={dashboardStats} />
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
-              <div className="space-y-6 lg:col-span-3">
-                  <ProductivitySnapshot 
-                    stats={dashboardStats} 
-                    timeAllocationData={timeAllocationData}
-                    onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
-                    todaysSchedule={schedule[selectedDateKey] || {}}
-                    activityDurations={activityDurations}
-                    showTimeAllocation={isAgendaDocked}
-                />
-              </div>
-               <div className="lg:col-span-2 space-y-6">
-                {isAgendaDocked ? (
-                    <TodaysScheduleCard
-                        schedule={schedule}
-                        date={selectedDate}
-                        activityDurations={activityDurations}
-                        isAgendaDocked={isAgendaDocked}
-                        onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                        onLogLearning={handleLogLearning}
-                        onStartWorkoutLog={handleStartWorkoutLog}
-                        onStartLeadGenLog={handleStartLeadGenLog}
-                        onToggleComplete={handleToggleComplete}
-                        onOpenFocusModal={onOpenFocusModal}
-                        onOpenTaskContext={openTaskContextPopup}
-                        onOpenHabitPopup={openRuleDetailPopup}
-                        currentSlot={currentSlot}
-                    />
-                ) : (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
-                             <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
-                                <Expand className="h-4 w-4" />
-                                <span className="sr-only">Open Time Allocation in Modal</span>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
-                        </CardContent>
-                    </Card>
-                )}
-                <WeightGoalCard 
-                  weightLogs={weightLogs}
-                  goalWeight={goalWeight}
-                  onLogWeight={handleLogWeight}
-                  height={height}
-                  dateOfBirth={dateOfBirth}
-                  gender={gender}
-                  onSetHeight={setHeight}
-                  onSetDateOfBirth={setDateOfBirth}
-                  onSetGender={setGender}
-                  onSetGoalWeight={setGoalWeight}
-                  dietPlan={dietPlan}
-                  onEditDietClick={() => setIsDietPlanModalOpen(true)}
-                  deepWorkDefinitions={deepWorkDefinitions}
-                  upskillDefinitions={upskillDefinitions}
-                  onOpenIntentionPopup={onOpenIntentionPopup}
-                  metaRules={metaRules}
-                  offerizationPlans={offerizationPlans}
-                  productizationPlans={productizationPlans}
-                  projects={projects}
-                />
-              </div>
-            </div>
-            <TimeSlots 
-              date={selectedDate}
-              schedule={selectedDaySchedule}
-              currentSlot={currentSlot}
-              remainingTime={remainingTime}
-              onAddActivity={handleAddActivity}
-              onRemoveActivity={handleRemoveActivity}
-              onToggleComplete={handleToggleComplete}
-              onActivityClick={handleActivityClick}
-              slotDurations={slotDurations}
-              setRoutine={toggleRoutine}
-            />
-          </CardContent>
-        </Card>
-        
-        <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
-      </div>
+              <TimeSlots 
+                date={selectedDate}
+                schedule={selectedDaySchedule}
+                currentSlot={currentSlot}
+                remainingTime={remainingTime}
+                onAddActivity={handleAddActivity}
+                onRemoveActivity={handleRemoveActivity}
+                onToggleComplete={handleToggleComplete}
+                onActivityClick={handleActivityClick}
+                slotDurations={slotDurations}
+                setRoutine={toggleRoutine}
+              />
+            </CardContent>
+          </Card>
+          
+          <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
+        </div>
+      </DragDropContext>
       
       {currentUser && (
         <TodaysWorkoutModal
@@ -1183,7 +1236,7 @@ function MyPlatePageContent() {
                 setIsLearningModalOpen(isOpen);
             }}
             availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
-            initialSelectedIds={editingActivity.activity.taskIds || []}
+            initialSelectedIds={activity.taskIds || []}
             onSave={handleSaveTaskSelection}
             pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
             disabledTaskIds={[]}
@@ -1237,7 +1290,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="max-w-[120rem] h-[90vh] flex flex-col p-0">
+        <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
                 <div>
                     <DialogTitle>Weekly Timetable</DialogTitle>
@@ -1363,3 +1416,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
