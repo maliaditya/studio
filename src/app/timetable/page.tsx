@@ -83,45 +83,56 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
     React.useEffect(() => {
       setIsBrowser(true);
     }, []);
-  
+
     const renderDraggable = (provided: any, snapshot: any) => {
         const item = (
-            <div
-                ref={provided.innerRef}
-                {...provided.draggableProps}
-                {...provided.dragHandleProps}
-                style={provided.draggableProps.style}
-                className={cn(
-                    "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
-                    snapshot.isDragging && "opacity-80 shadow-lg"
-                )}
-            >
-                <div className="flex items-start gap-1.5">
-                    {activityIcons[activity.type]}
-                    <div className="flex-grow min-w-0">
-                        <p className={cn("font-medium truncate", activity.completed && "line-through text-muted-foreground")} title={activity.details}>{activity.details}</p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onRemove(activity.id); }}>
-                        <Trash2 className="h-3 w-3 text-destructive"/>
-                    </Button>
-                </div>
+          <div
+            ref={provided.innerRef}
+            {...provided.draggableProps}
+            {...provided.dragHandleProps}
+            style={provided.draggableProps.style}
+            className={cn(
+              "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
+              snapshot.isDragging && "opacity-80 shadow-lg",
+              snapshot.isDropAnimating && "!shadow-none" // Remove shadow during drop animation
+            )}
+          >
+            <div className="flex items-start gap-1.5">
+              {activityIcons[activity.type]}
+              <div className="flex-grow min-w-0">
+                <p
+                  className={cn(
+                    "font-medium truncate",
+                    activity.completed && "line-through text-muted-foreground"
+                  )}
+                  title={activity.details}
+                >
+                  {activity.details}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(activity.id);
+                }}
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
             </div>
+          </div>
         );
-
+    
         if (snapshot.isDragging && isBrowser) {
-            const portal = document.getElementById('global-popup-root');
-            if (portal) {
-                return ReactDOM.createPortal(
-                    <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={{ ...provided.draggableProps.style, top: `calc(${provided.draggableProps.style.top} - 8px)`, left: `calc(${provided.draggableProps.style.left} - 8px)` }}>
-                        {activityIcons[activity.type]}
-                        <p className="font-medium truncate">{activity.details}</p>
-                    </div>,
-                    portal
-                );
-            }
+          const portal = document.getElementById('global-popup-root');
+          if (portal) {
+            return ReactDOM.createPortal(item, portal);
+          }
         }
         return item;
-    };
+      };
       
     return (
         <Draggable draggableId={activity.id} index={index}>
@@ -207,14 +218,25 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     const handleRemoveActivity = (date: Date, slot: SlotName, activityId: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
         setSchedule(prev => {
-            const daySchedule = { ...(prev[dateKey] || {}) };
+            const newSchedule = { ...prev };
+            if (!newSchedule[dateKey] || !newSchedule[dateKey][slot]) return prev;
+
+            const daySchedule = { ...newSchedule[dateKey] };
             const slotActivities = (daySchedule[slot] as Activity[] || []).filter(act => act.id !== activityId);
+            
             if (slotActivities.length > 0) {
                 daySchedule[slot] = slotActivities;
             } else {
                 delete daySchedule[slot];
             }
-            return { ...prev, [dateKey]: daySchedule };
+
+            if (Object.keys(daySchedule).length === 0) {
+                 delete newSchedule[dateKey];
+            } else {
+                 newSchedule[dateKey] = daySchedule;
+            }
+
+            return newSchedule;
         });
     };
     
@@ -228,32 +250,29 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
         setSchedule(currentSchedule => {
             const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
 
-            const sourceDayActivities = newSchedule[sourceDateKey]?.[sourceSlotName] || [];
+            const sourceDayActivities = newSchedule[sourceDateKey]?.[sourceSlotName as SlotName] as Activity[] | undefined;
+            if (!sourceDayActivities) return currentSchedule;
+            
             const [movedActivity] = sourceDayActivities.splice(source.index, 1);
             
-            if (!movedActivity) return currentSchedule; // Should not happen
+            if (!movedActivity) return currentSchedule;
             
             movedActivity.slot = destSlotName;
 
             if (sourceDateKey === destDateKey) {
-                if (sourceSlotName === destSlotName) {
-                    sourceDayActivities.splice(destination.index, 0, movedActivity);
-                } else {
-                    const destDayActivities = newSchedule[destDateKey]?.[destSlotName] || [];
-                    destDayActivities.splice(destination.index, 0, movedActivity);
-                    newSchedule[destDateKey][destSlotName] = destDayActivities;
-                }
+                const destDayActivities = newSchedule[destDateKey]?.[destSlotName as SlotName] as Activity[] || [];
+                destDayActivities.splice(destination.index, 0, movedActivity);
+                newSchedule[destDateKey][destSlotName as SlotName] = destDayActivities;
             } else {
-                const destDayActivities = newSchedule[destDateKey]?.[destSlotName] || [];
+                const destDayActivities = newSchedule[destDateKey]?.[destSlotName as SlotName] as Activity[] || [];
                 destDayActivities.splice(destination.index, 0, movedActivity);
                 
                 if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
-                newSchedule[destDateKey][destSlotName] = destDayActivities;
+                newSchedule[destDateKey][destSlotName as SlotName] = destDayActivities;
             }
             
-            // Clean up empty slots
             if (sourceDayActivities.length === 0) {
-                delete newSchedule[sourceDateKey][sourceSlotName];
+                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
             }
             if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
                 delete newSchedule[sourceDateKey];
@@ -302,8 +321,10 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     if (isModal) {
         return (
-            <div className="p-4 overflow-x-auto">
-                {timetableGrid}
+            <div className="p-4">
+                <ScrollArea className="w-full whitespace-nowrap">
+                  {timetableGrid}
+                </ScrollArea>
             </div>
         )
     }
@@ -335,3 +356,5 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
+
+    
