@@ -342,7 +342,7 @@ function MyPlatePageContent() {
     }
     return newDurations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
-
+  
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
     const daySchedule = schedule[selectedDateKey];
@@ -1240,7 +1240,7 @@ function MyPlatePageContent() {
                     Plan your week at a glance.
                 </DialogDescription>
             </DialogHeader>
-            <div className="flex-grow min-h-0">
+            <div className="flex-grow min-h-0 overflow-hidden">
                 <TimetablePageContent isModal={true} />
             </div>
         </DialogContent>
