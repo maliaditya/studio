@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -212,7 +211,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
           return;
         }
 
-        const activityId = `${type}-${dateKey}-${slot}-${Math.random()}`;
+        const activityId = `essentials-2025-09-18-${Math.random()}`;
 
         const newActivity: Activity = {
             id: activityId,
@@ -314,51 +313,47 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 
 
     const timetableGrid = (
-        <div className="overflow-auto">
-            <DragDropContext onDragEnd={onDragEnd}>
-                <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
-                    <div /> 
-                    {weekDays.map((day, index) => (
-                        <div key={day} className="text-center font-semibold text-sm py-2">
-                            {day}
-                            <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
-                                {format(weekDates[index], 'MMM d')}
-                            </div>
-                        </div>
-                    ))}
-
-                    {slotOrder.map(slot => (
-                        <React.Fragment key={slot}>
-                            <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
-                            {weekDates.map(date => {
-                                const dateKey = format(date, 'yyyy-MM-dd');
-                                const activities = schedule[dateKey]?.[slot] || [];
-                                return (
-                                    <DroppableSlot 
-                                        key={`${dateKey}_${slot}`}
-                                        date={date}
-                                        slot={slot}
-                                        activities={activities as Activity[]}
-                                        onAddActivity={handleAddActivity(date, slot)}
-                                        onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
-                                    />
-                                );
-                            })}
-                        </React.Fragment>
-                    ))}
+        <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
+            <div /> 
+            {weekDays.map((day, index) => (
+                <div key={day} className="text-center font-semibold text-sm py-2">
+                    {day}
+                    <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
+                        {format(weekDates[index], 'MMM d')}
+                    </div>
                 </div>
-            </DragDropContext>
+            ))}
+
+            {slotOrder.map(slot => (
+                <React.Fragment key={slot}>
+                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
+                    {weekDates.map(date => {
+                        const dateKey = format(date, 'yyyy-MM-dd');
+                        const activities = schedule[dateKey]?.[slot] || [];
+                        return (
+                            <DroppableSlot 
+                                key={`${dateKey}_${slot}`}
+                                date={date}
+                                slot={slot}
+                                activities={activities as Activity[]}
+                                onAddActivity={handleAddActivity(date, slot)}
+                                onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                            />
+                        );
+                    })}
+                </React.Fragment>
+            ))}
         </div>
     );
 
     if (isModal) {
         return (
-            <div className="p-4 overflow-hidden h-full flex flex-col">
-              <div className="flex-grow min-h-0 relative">
-                <ScrollArea className="absolute inset-0">
-                  {timetableGrid}
+            <div className="h-full flex flex-col overflow-hidden">
+                <ScrollArea className="flex-grow">
+                    <div className="p-4">
+                        {timetableGrid}
+                    </div>
                 </ScrollArea>
-              </div>
             </div>
         )
     }
