@@ -149,7 +149,7 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     };
 
     const timetableGrid = (
-        <div className="grid grid-cols-8 gap-1">
+        <div className="grid grid-cols-8 gap-1 min-w-[1200px]">
             <div /> 
             {weekDays.map((day, index) => (
                 <div key={day} className="text-center font-semibold text-sm py-2">
@@ -201,7 +201,7 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
 
     if (isModal) {
         return (
-            <div className="p-4">
+            <div className="p-4 overflow-x-auto">
                 {timetableGrid}
             </div>
         )
@@ -224,7 +224,9 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {timetableGrid}
+                    <div className="overflow-x-auto">
+                        {timetableGrid}
+                    </div>
                 </CardContent>
             </Card>
         </div>
