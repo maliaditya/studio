@@ -143,6 +143,7 @@ function MyPlatePageContent() {
     settings,
     activeFocusSession,
     onOpenFocusModal,
+    toggleRoutine,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -935,7 +936,7 @@ function MyPlatePageContent() {
         message,
         subMessage
     };
-}, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
+  }, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
   
   const timeAllocationData = useMemo(() => {
     const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
@@ -1130,6 +1131,7 @@ function MyPlatePageContent() {
               onToggleComplete={handleToggleComplete}
               onActivityClick={handleActivityClick}
               slotDurations={slotDurations}
+              setRoutine={toggleRoutine}
             />
           </CardContent>
         </Card>

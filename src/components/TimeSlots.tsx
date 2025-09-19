@@ -38,6 +38,7 @@ interface TimeSlotsProps {
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
   slotDurations: Record<string, { logged: number; total: number }>;
+  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
 }
 
 const pillars = [
@@ -57,9 +58,10 @@ export function TimeSlots({
   onToggleComplete,
   onActivityClick,
   slotDurations,
+  setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, setRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -325,6 +327,14 @@ const AgendaWidgetItem = ({
   onLinkHabit: (habitId: string) => void;
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
 }) => {
+  const { workoutMode, workoutPlans, exerciseDefinitions } = useAuth();
+  
+  let displayDetails = activity.details;
+  if (activity.type === 'workout') {
+    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+    displayDetails = description.split(' for ')[1] || "Workout";
+  }
+
   const [customDays, setCustomDays] = useState(7);
 
   const handleRoutineSelect = (rule: RecurrenceRule | null) => {
@@ -340,12 +350,27 @@ const AgendaWidgetItem = ({
     handleRoutineSelect({ type: 'custom', days: customDays });
   };
   
+  const handleTitleClick = (event: React.MouseEvent) => {
+    if (activity.completed) {
+      onToggleComplete(activity.slot, activity.id, false);
+      return;
+    }
+    
+    if (linkedHabit) {
+      // Logic to handle clicking when a habit is linked
+      // onOpenHabitPopup(linkedHabit.id, event);
+      return;
+    }
+
+    onActivityClick(activity.slot, activity, event);
+  };
+  
   return (
     <div className="p-2.5 rounded-md bg-card/70 shadow-sm group">
       <div className="flex items-start justify-between gap-3">
-        <div
-          className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && "cursor-pointer")}
-          onClick={(e) => !activity.completed && onActivityClick(activity.slot, activity, e)}
+        <div 
+          className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
+          onClick={handleTitleClick}
         >
           <button
             onClick={(e) => {
@@ -355,7 +380,7 @@ const AgendaWidgetItem = ({
             className="pt-0.5"
           >
             {activity.completed 
-              ? <CheckSquare className="h-5 w-5 text-green-500 flex-shrink-0" />
+              ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
               : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
             }
           </button>
@@ -364,7 +389,7 @@ const AgendaWidgetItem = ({
                 "font-semibold text-foreground", 
                 activity.completed && "line-through"
             )}>
-              {activity.details}
+              {displayDetails}
             </p>
              <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
                 <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
