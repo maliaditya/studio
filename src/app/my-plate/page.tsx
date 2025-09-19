@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide, Expand } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart, Link as LinkIconLucide, Expand, LayoutDashboard } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -44,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { TimetablePageContent } from '@/app/timetable/page';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -156,6 +157,7 @@ function MyPlatePageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
   const [isTimeAllocationModalOpen, setIsTimeAllocationModalOpen] = useState(false);
+  const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
   const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
@@ -1060,6 +1062,7 @@ function MyPlatePageContent() {
                     timeAllocationData={timeAllocationData}
                     onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                     onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
+                    onOpenTimetableModal={() => setIsTimetableModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
                     activityDurations={activityDurations}
                     showTimeAllocation={isAgendaDocked}
@@ -1231,6 +1234,20 @@ function MyPlatePageContent() {
         </DialogContent>
       </Dialog>
       
+      <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
+        <DialogContent className="w-[90vw] max-w-[90vw] h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 border-b">
+                <DialogTitle>Weekly Timetable</DialogTitle>
+                <DialogDescription>
+                    Plan your week at a glance.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <TimetablePageContent isModal={true} />
+            </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ ...interruptModalState, isOpen })}>
           <DialogContent>
               <DialogHeader>
