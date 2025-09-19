@@ -181,6 +181,11 @@ export interface SubTask {
   completed: boolean;
 }
 
+export type RecurrenceRule = {
+  type: 'daily' | 'weekly' | 'custom';
+  days?: number; // for custom type
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;
@@ -189,7 +194,6 @@ export interface Activity {
   completedAt?: number;
   taskIds?: string[];
   slot: string;
-  isRoutine?: boolean;
   habitEquationIds?: string[]; // New field to link rule equations
   focusSessionInitialStartTime?: number;
   focusSessionStartTime?: number; // Tracks start of current segment (or initial start)
@@ -199,6 +203,7 @@ export interface Activity {
   postSessionReview?: PostSessionReview;
   duration?: number; // For interruptions
   subTasks?: SubTask[]; // Added for sub-task functionality
+  routine?: RecurrenceRule | null;
 };
 
 export interface Interrupt {
