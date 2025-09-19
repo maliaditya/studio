@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
@@ -37,6 +38,7 @@ interface AgendaWidgetItemProps {
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
 }
 
 function AgendaWidgetItem({ 
@@ -49,6 +51,7 @@ function AgendaWidgetItem({
     onOpenFocusModal, 
     onOpenTaskContext,
     onOpenHabitPopup,
+    setRoutine,
 }: AgendaWidgetItemProps) {
   const { 
     workoutMode, 
@@ -131,8 +134,10 @@ function AgendaWidgetItem({
         onOpenHabitPopup(linkedHabit.id, event);
         return;
     }
+    
+    onOpenFocusModal(activity);
   };
-
+  
   const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const shouldOpenModal = onOpenFocusModal(activity);
@@ -152,18 +157,18 @@ function AgendaWidgetItem({
   }
   
   const itemContent = (
-    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/50 w-full group">
-      <div className="flex items-start gap-3 min-w-0 flex-grow">
+    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
+      <div 
+        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
+        onClick={handleTitleClick}
+      >
         <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
             {activity.completed 
               ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
               : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
             }
         </button>
-        <div 
-          className={cn("flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
-          onClick={handleTitleClick}
-        >
+        <div className="flex-grow min-w-0">
           <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
             {displayDetails}
           </p>
@@ -178,7 +183,7 @@ function AgendaWidgetItem({
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' ? (
+        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' ? (
             <Button
                 variant="ghost"
                 size="icon"
@@ -197,6 +202,39 @@ function AgendaWidgetItem({
                 <GitBranch className="h-4 w-4" />
             </Button>
         ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Repeat className="mr-2 h-4 w-4" />
+                <span>Repeat</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                  
+                  {activity.routine && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => {}} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
@@ -450,13 +488,14 @@ export function TodaysScheduleCard({
                         activity={activity}
                         duration={activityDurations[activity.id]}
                         date={date}
-                        onLogLearning={() => {}}
+                        onLogLearning={onLogLearning}
                         onStartWorkoutLog={onStartWorkoutLog}
                         onToggleComplete={onToggleComplete}
                         onStartLeadGenLog={onStartLeadGenLog}
                         onOpenFocusModal={onOpenFocusModal}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
+                        setRoutine={toggleRoutine}
                     />
                     ))}
                 </ul>

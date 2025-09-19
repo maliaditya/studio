@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -7,12 +8,12 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { format, startOfWeek, addDays, isToday } from 'date-fns';
-import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -77,7 +78,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
-const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity: Activity, index: number, onRemove: (id: string) => void }) => {
+const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine }: { activity: Activity, index: number, onRemove: (id: string) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
   const [isBrowser, setIsBrowser] = React.useState(false);
 
   React.useEffect(() => {
@@ -91,7 +92,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
         {...provided.draggableProps}
         {...provided.dragHandleProps}
         className={cn(
-          "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
+          "bg-card p-1.5 rounded-md shadow-sm group relative",
           snapshot.isDragging && "opacity-80 shadow-lg",
         )}
         style={provided.draggableProps.style}
@@ -109,6 +110,18 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
               {activity.details}
             </p>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                    <Repeat className="h-3 w-3" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'daily' })}>Daily</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'weekly' })}>Weekly</DropdownMenuItem>
+                {activity.routine && <DropdownMenuItem onSelect={() => onSetRoutine(null)} className="text-destructive">No Repeat</DropdownMenuItem>}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             variant="ghost"
             size="icon"
@@ -146,7 +159,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
 DraggableActivity.displayName = 'DraggableActivity';
 
 
-const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity }: { date: Date, slot: SlotName, activities: Activity[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (id: string) => void }) => {
+const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity, onSetRoutine }: { date: Date, slot: SlotName, activities: Activity[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (id: string) => void, onSetRoutine: (activity: Activity, rule: RecurrenceRule | null) => void }) => {
     const droppableId = `${format(date, 'yyyy-MM-dd')}_${slot}`;
 
     return (
@@ -163,6 +176,7 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
                             activity={act}
                             index={index}
                             onRemove={onRemoveActivity}
+                            onSetRoutine={(rule) => onSetRoutine(act, rule)}
                         />
                     ))}
                     {provided.placeholder}
@@ -186,7 +200,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     currentWeek?: Date;
     onWeekChange?: (date: Date) => void; 
 }) {
-    const { schedule, setSchedule, settings } = useAuth();
+    const { schedule, setSchedule, settings, toggleRoutine } = useAuth();
     const { toast } = useToast();
     
     const [internalCurrentWeek, setInternalCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -280,6 +294,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
                                 activities={activities}
                                 onAddActivity={handleAddActivity(date, slot)}
                                 onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                                onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
                             />
                         );
                     })}
@@ -324,7 +339,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 
 export default function TimetablePage() {
     const { setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
-    const { toast } = useToast();
+    const toast = useToast();
 
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
@@ -442,3 +457,4 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
     return totalMinutes;
 };
+
