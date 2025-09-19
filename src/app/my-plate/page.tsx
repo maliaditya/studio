@@ -1060,9 +1060,7 @@ function MyPlatePageContent() {
                   <ProductivitySnapshot 
                     stats={dashboardStats} 
                     timeAllocationData={timeAllocationData}
-                    onOpenKanbanModal={() => setIsKanbanModalOpen(true)}
                     onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
-                    onOpenTimetableModal={() => setIsTimetableModalOpen(true)}
                     todaysSchedule={schedule[selectedDateKey] || {}}
                     activityDurations={activityDurations}
                     showTimeAllocation={isAgendaDocked}
@@ -1235,7 +1233,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="w-[90vw] max-w-[90vw] h-[90vh] flex flex-col p-0">
+        <DialogContent className="w-[95vw] max-w-[95vw] h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-4 border-b">
                 <DialogTitle>Weekly Timetable</DialogTitle>
                 <DialogDescription>
