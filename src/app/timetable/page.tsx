@@ -79,23 +79,41 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 
 const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity: Activity, index: number, onRemove: (id: string) => void }) => {
     const [isBrowser, setIsBrowser] = React.useState(false);
-
+  
     React.useEffect(() => {
       setIsBrowser(true);
     }, []);
   
     const renderDraggable = (provided: any, snapshot: any) => {
+      const clone = (
+          <div
+            className={cn(
+              "text-xs bg-card p-1.5 rounded-md shadow-lg w-[150px]", // Use a fixed width for the clone
+            )}
+            style={provided.draggableProps.style}
+          >
+            <div className="flex items-start gap-1.5">
+              {activityIcons[activity.type]}
+              <div className="flex-grow min-w-0">
+                <p className="font-medium truncate" title={activity.details}>
+                  {activity.details}
+                </p>
+              </div>
+            </div>
+          </div>
+      );
+  
       const item = (
         <div
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          style={provided.draggableProps.style}
           className={cn(
             "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
             snapshot.isDragging && "opacity-80 shadow-lg",
-            snapshot.isDropAnimating && "!shadow-none" // Remove shadow during drop animation
+            snapshot.isDropAnimating && "!shadow-none"
           )}
+          style={provided.draggableProps.style}
         >
           <div className="flex items-start gap-1.5">
             {activityIcons[activity.type]}
@@ -124,40 +142,24 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
           </div>
         </div>
       );
-
-      if (snapshot.isDragging && isBrowser) {
+      
+      if (!isBrowser) {
+        return item;
+      }
+  
+      if (snapshot.isDragging) {
         const portal = document.getElementById('global-popup-root');
         if (portal) {
-          // Clone the item to render in the portal
-          const clone = (
-            <div 
-              style={provided.draggableProps.style}
-              className={cn(
-                "text-xs bg-card p-1.5 rounded-md shadow-lg",
-                "w-[150px]" // Fixed width for the clone
-              )}
-            >
-              <div className="flex items-start gap-1.5">
-                {activityIcons[activity.type]}
-                <div className="flex-grow min-w-0">
-                  <p className="font-medium truncate" title={activity.details}>
-                    {activity.details}
-                  </p>
-                </div>
-              </div>
-            </div>
-          );
           return ReactDOM.createPortal(clone, portal);
         }
       }
-      // Render original item hidden while clone is dragged
-      return <div className={snapshot.isDragging ? 'hidden' : ''}>{item}</div>;
+      return item;
     };
-      
+  
     return (
-        <Draggable draggableId={activity.id} index={index}>
-            {renderDraggable}
-        </Draggable>
+      <Draggable draggableId={activity.id} index={index}>
+        {renderDraggable}
+      </Draggable>
     );
 });
 DraggableActivity.displayName = 'DraggableActivity';
