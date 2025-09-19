@@ -1,6 +1,4 @@
 
-
-      
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -174,7 +172,6 @@ export function TimeSlots({
                         <AgendaWidgetItem
                           key={activity.id}
                           activity={{...activity, slot: slot.name as SlotName}}
-                          date={date}
                           onToggleComplete={onToggleComplete}
                           onActivityClick={onActivityClick}
                           linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
@@ -365,101 +362,91 @@ const AgendaWidgetItem = ({
     onActivityClick(activity.slot, activity, event);
   };
   
-  return (
-    <div className="p-2.5 rounded-md bg-card/70 shadow-sm group">
-      <div className="flex items-start justify-between gap-3">
-        <div 
-          className={cn("flex items-start gap-3 flex-grow min-w-0", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
-          onClick={handleTitleClick}
-        >
-          <button
-            onClick={(e) => {
-                e.stopPropagation();
-                onToggleComplete(activity.slot, activity.id, !activity.completed);
-            }}
-            className="pt-0.5"
-          >
+  const itemContent = (
+    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
+      <div 
+        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
+        onClick={handleTitleClick}
+      >
+        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
             {activity.completed 
               ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
               : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
             }
-          </button>
-          <div className="flex-grow min-w-0">
-            <p className={cn(
-                "font-semibold text-foreground", 
-                activity.completed && "line-through"
-            )}>
-              {displayDetails}
-            </p>
-             <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">
-                <span>{activity.type === 'deepwork' ? 'Deep Work' : activity.type === 'branding' ? 'Personal Branding' : activity.type === 'lead-generation' ? 'Lead Generation' : activity.type.replace('-', ' ')}</span>
-              </div>
-          </div>
+        </button>
+        <div className="flex-grow min-w-0">
+          <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
+            {displayDetails}
+          </p>
+           {linkedHabit && (
+            <div className="min-w-0">
+                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
+                    Habit: {linkedHabit.name}
+                </p>
+            </div>
+          )}
         </div>
-        <div className="flex items-center flex-shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                <Repeat className={cn("h-4 w-4", activity.routine && "text-primary")} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'daily' })}>Daily</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'weekly' })}>Weekly</DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Custom</DropdownMenuSubTrigger>
-                <DropdownMenuPortal>
-                  <DropdownMenuSubContent>
-                    <div className="p-2 space-y-2">
-                        <Label htmlFor="custom-days">Repeat every X days</Label>
-                        <div className="flex gap-2">
-                            <Input id="custom-days" type="number" value={customDays} onChange={handleCustomDaysChange} className="w-20 h-8" />
-                            <Button size="sm" onClick={handleCustomDaysSave}>Set</Button>
+      </div>
+      <div className="flex-shrink-0 flex items-center text-right gap-1">
+        {!activity.completed && activity.type !== 'interrupt' ? (
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => onActivityClick(activity.slot, activity, e)}
+            >
+                <Timer className="h-4 w-4" />
+            </Button>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Repeat className="mr-2 h-4 w-4" />
+                <span>Repeat</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent>
+                  <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'daily' })}>Daily</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleRoutineSelect({ type: 'weekly' })}>Weekly</DropdownMenuItem>
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Custom</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        <div className="p-2 space-y-2">
+                            <Label htmlFor="custom-days">Repeat every X days</Label>
+                            <div className="flex gap-2">
+                                <Input id="custom-days" type="number" value={customDays} onChange={handleCustomDaysChange} className="w-20 h-8" />
+                                <Button size="sm" onClick={handleCustomDaysSave}>Set</Button>
+                            </div>
                         </div>
-                    </div>
-                  </DropdownMenuSubContent>
-                </DropdownMenuPortal>
-              </DropdownMenuSub>
-              {activity.routine && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => handleRoutineSelect(null)} className="text-destructive">Remove Routine</DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-                  <MoreVertical className="h-4 w-4" />
-                  </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onActivityClick(activity.slot, activity, {} as React.MouseEvent)}>
-                  <Timer className="mr-2 h-4 w-4" /> Start Focus Session
-                </DropdownMenuItem>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    <LinkIcon className="mr-2 h-4 w-4" />
-                    <span>Link Habit</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent>
-                      <ScrollArea className="h-48">
-                          {/* ... habit linking logic ... */}
-                      </ScrollArea>
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-        </div>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+                  {activity.routine && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => handleRoutineSelect(null)} className="text-destructive">Remove Routine</DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
+  
+  return <li>{itemContent}</li>;
 };
