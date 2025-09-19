@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -77,6 +78,47 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
+const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity: Activity, date: Date, slot: SlotName, index: number, onRemove: (id: string) => void }) => {
+  const portal = React.useRef<HTMLElement | null>(
+    typeof document !== 'undefined'
+      ? document.getElementById('global-popup-root')
+      : null
+  ).current;
+
+  const renderDraggable = (provided: any, snapshot: any) => {
+    const child = (
+      <div
+        ref={provided.innerRef}
+        {...provided.draggableProps}
+        {...provided.dragHandleProps}
+        className={cn("text-xs bg-card p-1.5 rounded-md shadow-sm group relative", snapshot.isDragging && "opacity-80 shadow-lg")}
+      >
+        <div className="flex items-start gap-1.5">
+          {activityIcons[activity.type]}
+          <div className="flex-grow min-w-0">
+            <p className={cn("font-medium truncate", activity.completed && "line-through text-muted-foreground")} title={activity.details}>{activity.details}</p>
+          </div>
+          <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onRemove(activity.id); }}>
+            <Trash2 className="h-3 w-3 text-destructive"/>
+          </Button>
+        </div>
+      </div>
+    );
+
+    if (snapshot.isDragging && portal) {
+      return ReactDOM.createPortal(child, portal);
+    }
+    return child;
+  };
+    
+    return (
+        <Draggable draggableId={activity.id} index={index}>
+            {renderDraggable}
+        </Draggable>
+    );
+};
+
+
 export function TimetablePageContent({ isModal = false }: { isModal?: boolean }) {
     const { schedule, setSchedule, settings } = useAuth();
     const { toast } = useToast();
@@ -129,41 +171,40 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
-
         if (!destination) return;
-
+    
         const [sourceDateKey, sourceSlotName] = source.droppableId.split('_');
         const [destDateKey, destSlotName] = destination.droppableId.split('_');
-
+    
         setSchedule(prevSchedule => {
-            const newSchedule = JSON.parse(JSON.stringify(prevSchedule)); // Deep copy to avoid mutation issues
-
+            const newSchedule = JSON.parse(JSON.stringify(prevSchedule));
+    
             const sourceDaySchedule = newSchedule[sourceDateKey] || {};
             const sourceSlotActivities = (sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [];
-
             const [movedTask] = sourceSlotActivities.splice(source.index, 1);
-            if (!movedTask) return prevSchedule; // Should not happen
-
+            if (!movedTask) return prevSchedule;
+    
+            // If source slot becomes empty, remove it
             if (sourceSlotActivities.length === 0) {
                 delete sourceDaySchedule[sourceSlotName as SlotName];
             } else {
                 sourceDaySchedule[sourceSlotName as SlotName] = sourceSlotActivities;
             }
-
+            // If day becomes empty, remove it
             if (Object.keys(sourceDaySchedule).length === 0) {
                 delete newSchedule[sourceDateKey];
             } else {
                 newSchedule[sourceDateKey] = sourceDaySchedule;
             }
-            
+    
+            // Now handle destination
             const destDaySchedule = newSchedule[destDateKey] || {};
             const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
-            
             destSlotActivities.splice(destination.index, 0, { ...movedTask, slot: destSlotName as SlotName });
             
             destDaySchedule[destSlotName as SlotName] = destSlotActivities;
             newSchedule[destDateKey] = destDaySchedule;
-            
+    
             return newSchedule;
         });
     };
@@ -199,26 +240,14 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                                             className={cn("border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2 transition-colors", snapshot.isDraggingOver && "bg-primary/10")}
                                         >
                                             {activities.map((act, index) => (
-                                                <Draggable key={act.id} draggableId={act.id} index={index}>
-                                                    {(provided, snapshot) => (
-                                                        <div
-                                                            ref={provided.innerRef}
-                                                            {...provided.draggableProps}
-                                                            {...provided.dragHandleProps}
-                                                            className={cn("text-xs bg-card p-1.5 rounded-md shadow-sm group relative", snapshot.isDragging && "opacity-80 shadow-lg")}
-                                                        >
-                                                            <div className="flex items-start gap-1.5">
-                                                                {activityIcons[act.type]}
-                                                                <div className="flex-grow min-w-0">
-                                                                    <p className={cn("font-medium truncate", act.completed && "line-through text-muted-foreground")} title={act.details}>{act.details}</p>
-                                                                </div>
-                                                                <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); handleRemoveActivity(date, slot, act.id); }}>
-                                                                    <Trash2 className="h-3 w-3 text-destructive"/>
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </Draggable>
+                                                <DraggableActivity
+                                                    key={act.id}
+                                                    activity={act}
+                                                    date={date}
+                                                    slot={slot}
+                                                    index={index}
+                                                    onRemove={(id) => handleRemoveActivity(date, slot, id)}
+                                                />
                                             ))}
                                             {provided.placeholder}
                                              <DropdownMenu>
