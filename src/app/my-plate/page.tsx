@@ -1024,7 +1024,6 @@ function MyPlatePageContent() {
     const [destDateKey, destSlotName] = destinationDroppableId.split('_');
 
     if (sourceDateKey !== selectedDateKey || destDateKey !== selectedDateKey) {
-        // For now, only support reordering within the same day
         toast({ title: 'Move Not Supported', description: 'Please use the timetable view to move tasks between days.', variant: 'default'});
         return;
     }
@@ -1265,7 +1264,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] max-w-[98vw] w-[98vw] flex flex-col p-0">
+        <DialogContent className="h-[90vh] max-w-full w-[98vw] flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
