@@ -7,7 +7,7 @@ import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { format, startOfWeek, addDays, isToday } from 'date-fns';
+import { format, startOfWeek, addDays, isToday, isBefore, startOfToday } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule } from '@/types/workout';
@@ -271,14 +271,18 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     const timetableGrid = (
         <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(7, minmax(0, 1fr))' }}>
             <div /> 
-            {weekDays.map((day, index) => (
-                <div key={day} className="text-center font-semibold text-sm py-2">
-                    {day}
-                    <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
-                        {format(weekDates[index], 'MMM d')}
+            {weekDays.map((day, index) => {
+                const date = weekDates[index];
+                const isPastDay = isBefore(date, startOfToday());
+                return (
+                    <div key={day} className={cn("text-center font-semibold text-sm py-2", isPastDay && "opacity-60")}>
+                        {day}
+                        <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
+                            {format(weekDates[index], 'MMM d')}
+                        </div>
                     </div>
-                </div>
-            ))}
+                )
+            })}
 
             {slotOrder.map(slot => (
                 <React.Fragment key={slot}>
@@ -286,16 +290,18 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
                         const activities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        const isPastDay = isBefore(date, startOfToday());
                         return (
-                            <DroppableSlot 
-                                key={`${dateKey}_${slot}`}
-                                date={date}
-                                slot={slot}
-                                activities={activities}
-                                onAddActivity={handleAddActivity(date, slot)}
-                                onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
-                                onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
-                            />
+                            <div key={dateKey} className={cn(isPastDay && "opacity-60")}>
+                                <DroppableSlot 
+                                    date={date}
+                                    slot={slot}
+                                    activities={activities}
+                                    onAddActivity={handleAddActivity(date, slot)}
+                                    onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                                    onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
+                                />
+                            </div>
                         );
                     })}
                 </React.Fragment>
@@ -339,7 +345,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 
 export default function TimetablePage() {
     const { setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
-    const toast = useToast();
+    const { toast } = useToast();
 
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
@@ -457,4 +463,5 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
     return totalMinutes;
 };
+
 
