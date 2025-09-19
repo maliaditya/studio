@@ -148,73 +148,83 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
         });
     };
 
-    return (
-        <div className={cn("container mx-auto", isModal ? "p-0" : "p-4 sm:p-6 lg:p-8")}>
-            <Card className={cn(isModal && "border-0 shadow-none")}>
-                {!isModal && (
-                    <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <CardTitle>Weekly Timetable</CardTitle>
-                                <CardDescription>Plan your week at a glance. Changes here will reflect on your dashboard.</CardDescription>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                                <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                                <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                            </div>
-                        </div>
-                    </CardHeader>
-                )}
-                <CardContent className={cn(isModal && "p-0")}>
-                    <div className="grid grid-cols-8 gap-1">
-                        <div /> 
-                        {weekDays.map((day, index) => (
-                            <div key={day} className="text-center font-semibold text-sm py-2">
-                                {day}
-                                <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
-                                    {format(weekDates[index], 'MMM d')}
-                                </div>
-                            </div>
-                        ))}
-
-                        {slotOrder.map(slot => (
-                            <React.Fragment key={slot}>
-                                <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
-                                {weekDates.map(date => {
-                                    const dateKey = format(date, 'yyyy-MM-dd');
-                                    const activities = (schedule[dateKey]?.[slot] as Activity[] || []);
-                                    return (
-                                        <div key={`${dateKey}-${slot}`} className="border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2">
-                                            {activities.map(act => (
-                                                <div key={act.id} className="text-xs bg-card p-1.5 rounded-md shadow-sm group relative">
-                                                    <div className="flex items-start gap-1.5">
-                                                        <button onClick={() => handleToggleComplete(date, slot, act.id, !act.completed)} className="pt-0.5">
-                                                            <span className={cn("mt-0.5", act.completed && "text-green-500")}>{activityIcons[act.type]}</span>
-                                                        </button>
-                                                        <div className="flex-grow min-w-0">
-                                                            <p className={cn("font-medium truncate", act.completed && "line-through text-muted-foreground")} title={act.details}>{act.details}</p>
-                                                        </div>
-                                                        <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={() => handleRemoveActivity(date, slot, act.id)}>
-                                                            <Trash2 className="h-3 w-3 text-destructive"/>
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="mt-auto w-full h-8">
-                                                        <PlusCircle className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <AddActivityMenu onAddActivity={handleAddActivity(date, slot)} />
-                                            </DropdownMenu>
-                                        </div>
-                                    );
-                                })}
-                            </React.Fragment>
-                        ))}
+    const timetableGrid = (
+        <div className="grid grid-cols-8 gap-1">
+            <div /> 
+            {weekDays.map((day, index) => (
+                <div key={day} className="text-center font-semibold text-sm py-2">
+                    {day}
+                    <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
+                        {format(weekDates[index], 'MMM d')}
                     </div>
+                </div>
+            ))}
+
+            {slotOrder.map(slot => (
+                <React.Fragment key={slot}>
+                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
+                    {weekDates.map(date => {
+                        const dateKey = format(date, 'yyyy-MM-dd');
+                        const activities = (schedule[dateKey]?.[slot] as Activity[] || []);
+                        return (
+                            <div key={`${dateKey}-${slot}`} className="border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2">
+                                {activities.map(act => (
+                                    <div key={act.id} className="text-xs bg-card p-1.5 rounded-md shadow-sm group relative">
+                                        <div className="flex items-start gap-1.5">
+                                            <button onClick={() => handleToggleComplete(date, slot, act.id, !act.completed)} className="pt-0.5">
+                                                <span className={cn("mt-0.5", act.completed && "text-green-500")}>{activityIcons[act.type]}</span>
+                                            </button>
+                                            <div className="flex-grow min-w-0">
+                                                <p className={cn("font-medium truncate", act.completed && "line-through text-muted-foreground")} title={act.details}>{act.details}</p>
+                                            </div>
+                                            <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={() => handleRemoveActivity(date, slot, act.id)}>
+                                                <Trash2 className="h-3 w-3 text-destructive"/>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="mt-auto w-full h-8">
+                                            <PlusCircle className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <AddActivityMenu onAddActivity={handleAddActivity(date, slot)} />
+                                </DropdownMenu>
+                            </div>
+                        );
+                    })}
+                </React.Fragment>
+            ))}
+        </div>
+    );
+
+    if (isModal) {
+        return (
+            <div className="p-4">
+                {timetableGrid}
+            </div>
+        )
+    }
+
+    return (
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle>Weekly Timetable</CardTitle>
+                            <CardDescription>Plan your week at a glance. Changes here will reflect on your dashboard.</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                            <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {timetableGrid}
                 </CardContent>
             </Card>
         </div>
