@@ -304,34 +304,28 @@ function MyPlatePageContent() {
                     }
                 }
             } else {
-              // For non-completed tasks, calculate estimated duration
-              switch(activity.type) {
-                case 'workout': totalMinutes = 90; break;
-                case 'mindset': totalMinutes = 15; break;
-                case 'upskill':
-                case 'deepwork':
-                case 'branding':
-                  if (activity.taskIds && activity.taskIds.length > 0) {
-                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                    const taskDef = allDefs.get(mainTaskDefId);
-                    if (taskDef) {
-                      totalMinutes = calculateTotalEstimate(taskDef);
-                    } else {
-                      totalMinutes = 120;
-                    }
-                  } else {
-                    totalMinutes = 120;
+              let activityDuration = 0;
+              if (activity.type === 'essentials' || activity.type === 'interrupt' || activity.type === 'distraction') {
+                activityDuration = activity.duration || 0;
+              } else if (activity.taskIds && activity.taskIds.length > 0) {
+                  const mainDefId = activity.taskIds[0].split('-')[0];
+                  const taskDef = allDefs.get(mainDefId);
+                  if (taskDef) {
+                      activityDuration = calculateTotalEstimate(taskDef);
                   }
-                  break;
-                case 'planning':
-                case 'tracking':
-                  totalMinutes = 30; break;
-                case 'lead-generation': totalMinutes = 45; break;
-                case 'essentials':
-                case 'interrupt':
-                case 'distraction':
-                   totalMinutes = activity.duration || 0; break;
-                default: totalMinutes = 0;
+              }
+
+              if (activityDuration > 0) {
+                  totalMinutes = activityDuration;
+              } else {
+                  switch(activity.type) {
+                      case 'workout': totalMinutes = 90; break;
+                      case 'mindset': totalMinutes = 15; break;
+                      case 'upskill': case 'deepwork': case 'branding': totalMinutes = 120; break;
+                      case 'planning': case 'tracking': totalMinutes = 30; break;
+                      case 'lead-generation': totalMinutes = 45; break;
+                      default: totalMinutes = 0;
+                  }
               }
             }
 
@@ -397,27 +391,28 @@ function MyPlatePageContent() {
             setIsMealModalOpen(true);
             return;
         }
-
-        const SLOT_CAPACITY_MINUTES = 240;
         
-        const currentSlotDuration = slotDurations[slotName]?.total || 0;
-        
-        let details = '';
         let newActivityDuration = 0;
+        let details = '';
 
         switch (type) {
-          case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
-          case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
-          case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
-          case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
-          case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
-          case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
-          case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
-          case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
+            case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
+            case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
+            case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
+            case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
+            case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
+            case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
+            case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
+            case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
         }
         
-        if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
-            toast({ title: "Slot Full", description: `This activity would exceed the 4-hour slot limit.`, variant: "destructive" });
+        const currentSlotDuration = slotDurations[slotName]?.total || 0;
+        if (currentSlotDuration + newActivityDuration > 240) {
+            toast({
+                title: "Slot Full",
+                description: `Cannot add task. This would exceed the 4-hour slot limit.`,
+                variant: "destructive"
+            });
             return;
         }
         
@@ -677,7 +672,7 @@ function MyPlatePageContent() {
       definitionSource = deepWorkDefinitions;
       logSource = allDeepWorkLogs;
     } else { // branding
-      logsUpdater = setAllBrandingLogs;
+      logsUpdater = setBrandingLogs;
       definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
       logSource = brandingLogs;
     }
@@ -1041,15 +1036,41 @@ function MyPlatePageContent() {
         const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
         
         const SLOT_CAPACITY_MINUTES = 240;
-        const destSlotDuration = destActivities.reduce((sum, act) => sum + (parseDurationToMinutes(activityDurations[act.id]) || 60), 0);
-        const movedActivityDuration = parseDurationToMinutes(activityDurations[movedActivity.id]) || 60;
+        
+        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+        const getTaskDuration = (act: Activity) => {
+            let duration = 0;
+            if (act.completed) {
+                const estDurationStr = activityDurations[act.id];
+                duration = estDurationStr ? parseDurationToMinutes(estDurationStr) : 0;
+            } else {
+                if (act.type === 'essentials' || act.type === 'interrupt' || act.type === 'distraction') {
+                    duration = act.duration || 0;
+                } else if (act.taskIds && act.taskIds.length > 0) {
+                    const mainDefId = act.taskIds[0].split('-')[0];
+                    const taskDef = allDefs.get(mainDefId);
+                    if (taskDef) {
+                        duration = calculateTotalEstimate(taskDef);
+                    }
+                } else {
+                    switch(act.type) {
+                        case 'workout': duration = 90; break;
+                        case 'mindset': duration = 15; break;
+                        case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
+                        case 'planning': case 'tracking': duration = 30; break;
+                        case 'lead-generation': duration = 45; break;
+                        default: duration = 0;
+                    }
+                }
+            }
+            return duration;
+        };
+
+        const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
+        const movedActivityDuration = getTaskDuration(movedActivity);
 
         if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-            toast({
-                title: "Slot Full",
-                description: "Cannot move task. This would exceed the 4-hour slot limit.",
-                variant: "destructive"
-            });
+            shouldShowToast = true;
             return currentSchedule; // Revert
         }
 
@@ -1070,6 +1091,14 @@ function MyPlatePageContent() {
         
         return newSchedule;
     });
+
+    if (shouldShowToast) {
+        toast({
+            title: "Slot Full",
+            description: "Cannot move task. This would exceed the 4-hour slot limit.",
+            variant: "destructive"
+        });
+    }
   };
 
 
@@ -1276,7 +1305,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="max-w-[120rem] h-[90vh] flex flex-col p-0">
+        <DialogContent className="h-[90vh] w-full max-w-full flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
