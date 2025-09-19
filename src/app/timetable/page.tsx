@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -102,7 +101,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove }: { activity:
           <div className="flex-grow min-w-0">
             <p
               className={cn(
-                "font-medium truncate",
+                "font-medium truncate text-[11px]",
                 activity.completed && "line-through text-muted-foreground"
               )}
               title={activity.details}
@@ -335,7 +334,6 @@ export default function TimetablePage() {
         const destinationDroppableId = destination.droppableId;
         
         setSchedule(currentSchedule => {
-            let shouldShowToast = false;
             const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
             const [destDateKey, destSlotName] = destinationDroppableId.split('_');
             
