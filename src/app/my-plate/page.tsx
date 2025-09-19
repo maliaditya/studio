@@ -645,8 +645,6 @@ function MyPlatePageContent() {
         handleStartWorkoutLog(activity);
     } else if (activity.type === 'mindset') {
         handleStartMindsetLog(activity);
-    } else if (activity.type === 'lead-generation') {
-        handleStartLeadGenLog(activity);
     } else if (activity.type === 'essentials') {
         setEssentialDetails(activity.details);
         setEssentialDuration(activity.duration ? String(activity.duration) : '');
@@ -1016,6 +1014,7 @@ function MyPlatePageContent() {
     if (!destination) return;
   
     setSchedule(currentSchedule => {
+        let shouldShowToast = false;
         const sourceIdParts = source.droppableId.split('_');
         const destIdParts = destination.droppableId.split('_');
         const sourceDateKey = sourceIdParts[0];
@@ -1053,7 +1052,11 @@ function MyPlatePageContent() {
                     duration = act.duration;
                 } else {
                     switch(act.type) {
-                        case 'workout': duration = 90; break; case 'mindset': duration = 15; break; case 'upskill': case 'deepwork': case 'branding': duration = 120; break; case 'planning': case 'tracking': duration = 30; break; case 'lead-generation': duration = 45; break;
+                        case 'workout': duration = 90; break;
+                        case 'mindset': duration = 15; break;
+                        case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
+                        case 'planning': case 'tracking': duration = 30; break;
+                        case 'lead-generation': duration = 45; break;
                         default: duration = 0;
                     }
                 }
@@ -1065,26 +1068,29 @@ function MyPlatePageContent() {
         const movedActivityDuration = getTaskDuration(movedActivity);
         
         if (source.droppableId !== destination.droppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
+            shouldShowToast = true;
+        } else {
+             destActivities.splice(destination.index, 0, movedActivity);
+        
+            if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
+            newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+            
+            if (sourceActivities.length === 0) {
+                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
+                if (Object.keys(newSchedule[sourceDateKey]).length === 0) delete newSchedule[sourceDateKey];
+            } else {
+                newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
+            }
+        }
+        
+         if (shouldShowToast) {
             toast({
                 title: "Slot Full",
                 description: "Cannot move task. This would exceed the 4-hour slot limit.",
                 variant: "destructive"
             });
-            return currentSchedule;
         }
-  
-        destActivities.splice(destination.index, 0, movedActivity);
-        
-        if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
-        newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
-        
-        if (sourceActivities.length === 0) {
-            delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-            if (Object.keys(newSchedule[sourceDateKey]).length === 0) delete newSchedule[sourceDateKey];
-        } else {
-            newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
-        }
-        
+
         return newSchedule;
     });
   };
@@ -1293,7 +1299,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] w-[98vw] flex flex-col p-0">
+        <DialogContent className="h-[90vh] max-w-full flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
@@ -1419,4 +1425,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
