@@ -5,7 +5,6 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { format, startOfWeek, addDays, isToday } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2 } from 'lucide-react';
@@ -14,7 +13,6 @@ import type { Activity, ActivityType, DailySchedule, SlotName } from '@/types/wo
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -78,7 +76,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
-const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity: Activity, date: Date, slot: SlotName, index: number, onRemove: (id: string) => void }) => {
+const DraggableActivity = ({ activity, onRemove }: { activity: Activity, onRemove: (id: string) => void }) => {
   const portalRef = React.useRef<HTMLElement | null>(null);
   const [isBrowser, setIsBrowser] = React.useState(false);
 
@@ -88,7 +86,6 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
         portalRef.current = document.getElementById('global-popup-root');
     }
   }, []);
-
 
   const renderDraggable = (provided: any, snapshot: any) => {
     const child = (
@@ -114,28 +111,57 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
       </div>
     );
 
-    if (!isBrowser) {
-        return child;
-    }
-
-    if (snapshot.isDragging && portalRef.current) {
-        return ReactDOM.createPortal(
-            <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={provided.draggableProps.style}>
-                {activityIcons[activity.type]}
-                <p className="font-medium truncate">{activity.details}</p>
-            </div>,
-            portalRef.current
-        );
+    if (snapshot.isDragging && portalRef.current && isBrowser) {
+      return ReactDOM.createPortal(
+          <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={{...provided.draggableProps.style, top: `calc(${provided.draggableProps.style.top} - 8px)`, left: `calc(${provided.draggableProps.style.left} - 8px)`}}>
+              {activityIcons[activity.type]}
+              <p className="font-medium truncate">{activity.details}</p>
+          </div>,
+          portalRef.current
+      );
     }
     return child;
   };
     
     return (
-        <Draggable draggableId={activity.id} index={index}>
+        <Draggable draggableId={activity.id} index={activity.index}>
             {renderDraggable}
         </Draggable>
     );
 };
+
+const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity }: { date: Date, slot: SlotName, activities: (Activity & {index: number})[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (id: string) => void }) => {
+    const droppableId = `${format(date, 'yyyy-MM-dd')}_${slot}`;
+    return (
+        <Droppable droppableId={droppableId} key={droppableId}>
+            {(provided, snapshot) => (
+                <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={cn("border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2 transition-colors", snapshot.isDraggingOver && "bg-primary/10")}
+                >
+                    {activities.map((act) => (
+                        <DraggableActivity
+                            key={act.id}
+                            activity={act}
+                            onRemove={onRemoveActivity}
+                        />
+                    ))}
+                    {provided.placeholder}
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="mt-auto w-full h-8">
+                                <PlusCircle className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <AddActivityMenu onAddActivity={onAddActivity} />
+                    </DropdownMenu>
+                </div>
+            )}
+        </Droppable>
+    );
+});
+DroppableSlot.displayName = 'DroppableSlot';
 
 
 export function TimetablePageContent({ isModal = false }: { isModal?: boolean }) {
@@ -200,7 +226,6 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     
             const sourceDaySchedule = newSchedule[sourceDateKey] || {};
             const sourceSlotActivities = (sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [];
-            
             if (!sourceSlotActivities[source.index]) return prevSchedule; // Item not found
             
             const [movedTask] = sourceSlotActivities.splice(source.index, 1);
@@ -208,43 +233,23 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
             
             movedTask.slot = destSlotName;
     
-            const destDaySchedule = sourceDateKey === destDateKey ? sourceDaySchedule : (newSchedule[destDateKey] || {});
-            const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
+            if (source.droppableId === destination.droppableId) {
+                sourceSlotActivities.splice(destination.index, 0, movedTask);
+            } else {
+                const destDaySchedule = newSchedule[destDateKey] || {};
+                const destSlotActivities = (destDaySchedule[destSlotName as SlotName] as Activity[]) || [];
+                destSlotActivities.splice(destination.index, 0, movedTask);
+                newSchedule[destDateKey] = {...destDaySchedule, [destSlotName]: destSlotActivities};
+            }
             
-            destSlotActivities.splice(destination.index, 0, movedTask);
-    
-            // Update source day
             if (sourceSlotActivities.length === 0) {
                 delete sourceDaySchedule[sourceSlotName as SlotName];
             }
-            if (Object.keys(sourceDaySchedule).length === 0) {
-                delete newSchedule[sourceDateKey];
-            } else {
-                newSchedule[sourceDateKey] = sourceDaySchedule;
-            }
+            newSchedule[sourceDateKey] = sourceDaySchedule;
 
-            // Update destination day (only if different from source)
-            if (sourceDateKey !== destDateKey) {
-                destDaySchedule[destSlotName as SlotName] = destSlotActivities;
-                 newSchedule[destDateKey] = destDaySchedule;
-            }
-    
             return newSchedule;
         });
     };
-
-    const activitiesByDroppable = useMemo(() => {
-        const map = new Map<string, Activity[]>();
-        weekDates.forEach(date => {
-            const dateKey = format(date, 'yyyy-MM-dd');
-            slotOrder.forEach(slot => {
-                const droppableId = `${dateKey}_${slot}`;
-                const activities = (schedule[dateKey]?.[slot] as Activity[] || []);
-                map.set(droppableId, activities);
-            });
-        });
-        return map;
-    }, [schedule, weekDates]);
 
     const timetableGrid = (
         <DragDropContext onDragEnd={onDragEnd}>
@@ -264,39 +269,16 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
                         <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
                         {weekDates.map(date => {
                             const dateKey = format(date, 'yyyy-MM-dd');
-                            const droppableId = `${dateKey}_${slot}`;
-                            const activities = activitiesByDroppable.get(droppableId) || [];
-                            
+                            const activitiesWithIndex = ((schedule[dateKey]?.[slot] as Activity[]) || []).map((act, index) => ({...act, index}));
                             return (
-                                <Droppable droppableId={droppableId} key={droppableId}>
-                                    {(provided, snapshot) => (
-                                        <div
-                                            ref={provided.innerRef}
-                                            {...provided.droppableProps}
-                                            className={cn("border rounded-md bg-muted/30 p-2 min-h-[120px] flex flex-col gap-2 transition-colors", snapshot.isDraggingOver && "bg-primary/10")}
-                                        >
-                                            {activities.map((act, index) => (
-                                                <DraggableActivity
-                                                    key={act.id}
-                                                    activity={act}
-                                                    date={date}
-                                                    slot={slot}
-                                                    index={index}
-                                                    onRemove={(id) => handleRemoveActivity(date, slot, id)}
-                                                />
-                                            ))}
-                                            {provided.placeholder}
-                                             <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="sm" className="mt-auto w-full h-8">
-                                                        <PlusCircle className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <AddActivityMenu onAddActivity={handleAddActivity(date, slot)} />
-                                            </DropdownMenu>
-                                        </div>
-                                    )}
-                                </Droppable>
+                                <DroppableSlot 
+                                    key={`${dateKey}_${slot}`}
+                                    date={date}
+                                    slot={slot}
+                                    activities={activitiesWithIndex}
+                                    onAddActivity={handleAddActivity(date, slot)}
+                                    onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                                />
                             );
                         })}
                     </React.Fragment>
