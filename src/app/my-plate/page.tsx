@@ -1012,116 +1012,81 @@ function MyPlatePageContent() {
   
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
-    let shouldShowToast = false;
-    if (!destination) {
-        // If dropped outside of a droppable area, check if it's a delete action
-        if (result.reason === 'CANCEL') return;
-        return;
-    }
-
-    const sourceDroppableId = source.droppableId;
-    const destinationDroppableId = destination.droppableId;
-
-    if (sourceDroppableId === destinationDroppableId) {
-        // Reordering within the same slot
-        setSchedule(currentSchedule => {
-            const [dateKey, slotName] = sourceDroppableId.split('_');
-            const daySchedule = currentSchedule[dateKey];
-            if (!daySchedule || !daySchedule[slotName] || !Array.isArray(daySchedule[slotName])) return currentSchedule;
-
-            const activities = Array.from(daySchedule[slotName] as Activity[]);
-            const [reorderedItem] = activities.splice(source.index, 1);
-            activities.splice(destination.index, 0, reorderedItem);
-
-            const newSchedule = { ...currentSchedule };
-            newSchedule[dateKey] = { ...daySchedule, [slotName]: activities };
-            return newSchedule;
-        });
-    } else {
-        // Moving from one slot to another
-        setSchedule(currentSchedule => {
-            const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
-            const [destDateKey, destSlotName] = destinationDroppableId.split('_');
-
-            const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
-
-            const sourceDaySchedule = newSchedule[sourceDateKey];
-            const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
-
-            if (!sourceActivities || source.index >= sourceActivities.length) {
-                return currentSchedule; // Should not happen if dnd is set up correctly
-            }
-            
-            const [movedActivity] = sourceActivities.splice(source.index, 1);
-            movedActivity.slot = destSlotName as SlotName;
-
-            const destDaySchedule = newSchedule[destDateKey] || {};
-            const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
-            
-            const SLOT_CAPACITY_MINUTES = 240;
-            
-            const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-            const getTaskDuration = (act: Activity) => {
-                let duration = 0;
-                if (act.completed) {
-                    const estDurationStr = activityDurations[act.id];
-                    duration = estDurationStr ? parseDurationToMinutes(estDurationStr) : 0;
+    
+    if (!destination) return;
+  
+    setSchedule(currentSchedule => {
+        const sourceIdParts = source.droppableId.split('_');
+        const destIdParts = destination.droppableId.split('_');
+        const sourceDateKey = sourceIdParts[0];
+        const sourceSlotName = sourceIdParts[1];
+        const destDateKey = destIdParts[0];
+        const destSlotName = destIdParts[1];
+  
+        const newSchedule = JSON.parse(JSON.stringify(currentSchedule));
+  
+        const sourceDaySchedule = newSchedule[sourceDateKey];
+        const sourceActivities = sourceDaySchedule?.[sourceSlotName as SlotName] as Activity[] | undefined;
+  
+        if (!sourceActivities || source.index >= sourceActivities.length) {
+            return currentSchedule;
+        }
+        
+        const [movedActivity] = sourceActivities.splice(source.index, 1);
+        movedActivity.slot = destSlotName as SlotName;
+  
+        const destDaySchedule = newSchedule[destDateKey] || {};
+        const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
+        
+        const SLOT_CAPACITY_MINUTES = 240;
+        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+        const getTaskDuration = (act: Activity) => {
+            let duration = 0;
+            if (act.completed) {
+                duration = parseDurationToMinutes(activityDurations[act.id]);
+            } else {
+                if (act.taskIds && act.taskIds.length > 0) {
+                    const mainDefId = act.taskIds[0].split('-')[0];
+                    const taskDef = allDefs.get(mainDefId);
+                    if (taskDef) duration = calculateTotalEstimate(taskDef);
+                } else if (act.duration) {
+                    duration = act.duration;
                 } else {
-                    if (act.taskIds && act.taskIds.length > 0) {
-                        const mainDefId = act.taskIds[0].split('-')[0];
-                        const taskDef = allDefs.get(mainDefId);
-                        if (taskDef) {
-                            duration = calculateTotalEstimate(taskDef);
-                        }
-                    } else if (act.duration) {
-                        duration = act.duration;
-                    } else {
-                        switch(act.type) {
-                            case 'workout': duration = 90; break;
-                            case 'mindset': duration = 15; break;
-                            case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
-                            case 'planning': case 'tracking': duration = 30; break;
-                            case 'lead-generation': duration = 45; break;
-                            default: duration = 0;
-                        }
+                    switch(act.type) {
+                        case 'workout': duration = 90; break; case 'mindset': duration = 15; break; case 'upskill': case 'deepwork': case 'branding': duration = 120; break; case 'planning': case 'tracking': duration = 30; break; case 'lead-generation': duration = 45; break;
+                        default: duration = 0;
                     }
                 }
-                return duration;
-            };
-
-            const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
-            const movedActivityDuration = getTaskDuration(movedActivity);
-            
-            if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-                shouldShowToast = true;
-                return currentSchedule;
             }
+            return duration;
+        };
 
-            destActivities.splice(destination.index, 0, movedActivity);
-            
-            if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
-            newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
-            
-            if (sourceActivities.length === 0) {
-                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-                if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
-                    delete newSchedule[sourceDateKey];
-                }
-            } else {
-                newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
-            }
-            
-            return newSchedule;
-        });
-
-        if (shouldShowToast) {
+        const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
+        const movedActivityDuration = getTaskDuration(movedActivity);
+        
+        if (source.droppableId !== destination.droppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
             toast({
                 title: "Slot Full",
                 description: "Cannot move task. This would exceed the 4-hour slot limit.",
                 variant: "destructive"
             });
+            return currentSchedule;
         }
-    }
+  
+        destActivities.splice(destination.index, 0, movedActivity);
+        
+        if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
+        newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
+        
+        if (sourceActivities.length === 0) {
+            delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
+            if (Object.keys(newSchedule[sourceDateKey]).length === 0) delete newSchedule[sourceDateKey];
+        } else {
+            newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
+        }
+        
+        return newSchedule;
+    });
   };
 
 
@@ -1328,7 +1293,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] w-[98vw] max-w-[98vw] flex flex-col p-0">
+        <DialogContent className="h-[90vh] w-[98vw] flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
