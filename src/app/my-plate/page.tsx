@@ -5,7 +5,7 @@
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay, startOfWeek } from 'date-fns';
+import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay, startOfWeek, max, min, isValid } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -108,7 +108,7 @@ function MyPlatePageContent() {
     allWorkoutLogs,
     allMindProgrammingLogs,
     allLeadGenLogs,
-    brandingLogs, setAllBrandingLogs,
+    brandingLogs, setBrandingLogs,
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
@@ -1044,6 +1044,8 @@ function MyPlatePageContent() {
     const sourceDroppableId = source.droppableId;
     const destinationDroppableId = destination.droppableId;
     
+    let shouldShowToast = false;
+    
     setSchedule(currentSchedule => {
         const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
         const [destDateKey, destSlotName] = destinationDroppableId.split('_');
@@ -1064,7 +1066,7 @@ function MyPlatePageContent() {
         const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
         
         if (destActivities.length >= 2 && sourceDroppableId !== destinationDroppableId) {
-            toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
+            shouldShowToast = true;
             return currentSchedule;
         }
   
@@ -1084,6 +1086,10 @@ function MyPlatePageContent() {
         
         return newSchedule;
     });
+
+    if (shouldShowToast) {
+        toast({ title: "Slot Full", description: "Cannot add more than two activities.", variant: "destructive" });
+    }
   }, [setSchedule, toast]);
 
 
@@ -1416,5 +1422,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
