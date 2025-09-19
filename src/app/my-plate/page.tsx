@@ -1023,13 +1023,8 @@ function MyPlatePageContent() {
     const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
     const [destDateKey, destSlotName] = destinationDroppableId.split('_');
 
-    if (sourceDateKey !== selectedDateKey || destDateKey !== selectedDateKey) {
-        toast({ title: 'Move Not Supported', description: 'Please use the timetable view to move tasks between days.', variant: 'default'});
-        return;
-    }
-
     setSchedule(currentSchedule => {
-        const daySchedule = currentSchedule[selectedDateKey] ? JSON.parse(JSON.stringify(currentSchedule[selectedDateKey])) : {};
+        const daySchedule = currentSchedule[sourceDateKey] ? JSON.parse(JSON.stringify(currentSchedule[sourceDateKey])) : {};
         
         const sourceActivities = (daySchedule[sourceSlotName as SlotName] as Activity[] | undefined) || [];
         if (source.index >= sourceActivities.length) {
@@ -1055,7 +1050,7 @@ function MyPlatePageContent() {
         
         return {
             ...currentSchedule,
-            [selectedDateKey]: daySchedule
+            [sourceDateKey]: daySchedule
         };
     });
   };
@@ -1264,7 +1259,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] max-w-full w-[98vw] flex flex-col p-0">
+        <DialogContent className="h-[90vh] max-w-[120rem] w-[98vw] flex flex-col p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
