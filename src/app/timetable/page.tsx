@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -112,13 +113,13 @@ const DraggableActivity = ({ activity, onRemove }: { activity: Activity, onRemov
     );
 
     if (snapshot.isDragging && portalRef.current && isBrowser) {
-      return ReactDOM.createPortal(
-          <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={{...provided.draggableProps.style, top: `calc(${provided.draggableProps.style.top} - 8px)`, left: `calc(${provided.draggableProps.style.left} - 8px)`}}>
-              {activityIcons[activity.type]}
-              <p className="font-medium truncate">{activity.details}</p>
-          </div>,
-          portalRef.current
-      );
+        return ReactDOM.createPortal(
+            <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]" style={{ ...provided.draggableProps.style, top: `calc(${provided.draggableProps.style.top} - 8px)`, left: `calc(${provided.draggableProps.style.left} - 8px)` }}>
+                {activityIcons[activity.type]}
+                <p className="font-medium truncate">{activity.details}</p>
+            </div>,
+            portalRef.current
+        );
     }
     return child;
   };
