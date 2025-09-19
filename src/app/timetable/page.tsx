@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState } from 'react';
@@ -91,7 +92,11 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
         ref={provided.innerRef}
         {...provided.draggableProps}
         {...provided.dragHandleProps}
-        className={cn("text-xs bg-card p-1.5 rounded-md shadow-sm group relative", snapshot.isDragging && "opacity-80 shadow-lg")}
+        className={cn(
+          "text-xs bg-card p-1.5 rounded-md shadow-sm group relative",
+          snapshot.isDragging && "opacity-80 shadow-lg"
+        )}
+        style={{...provided.draggableProps.style, opacity: snapshot.isDragging ? 0.5 : 1}} // Hide original item
       >
         <div className="flex items-start gap-1.5">
           {activityIcons[activity.type]}
@@ -106,7 +111,14 @@ const DraggableActivity = ({ activity, date, slot, index, onRemove }: { activity
     );
 
     if (snapshot.isDragging && portal) {
-      return ReactDOM.createPortal(child, portal);
+      return ReactDOM.createPortal(
+        // Render a simpler clone for performance
+        <div className="text-xs bg-card p-1.5 rounded-md shadow-lg flex items-start gap-1.5 w-[150px]">
+          {activityIcons[activity.type]}
+          <p className="font-medium truncate">{activity.details}</p>
+        </div>,
+        portal
+      );
     }
     return child;
   };
@@ -181,6 +193,8 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean })
     
             const sourceDaySchedule = newSchedule[sourceDateKey] || {};
             const sourceSlotActivities = (sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [];
+            if (!sourceSlotActivities[source.index]) return prevSchedule;
+            
             const [movedTask] = sourceSlotActivities.splice(source.index, 1);
             if (!movedTask) return prevSchedule;
     
