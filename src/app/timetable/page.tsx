@@ -76,7 +76,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
-function TimetablePageContent() {
+export function TimetablePageContent({ isModal = false }: { isModal?: boolean }) {
     const { schedule, setSchedule, settings, handleToggleComplete: authToggleComplete } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -149,22 +149,24 @@ function TimetablePageContent() {
     };
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <CardTitle>Weekly Timetable</CardTitle>
-                            <CardDescription>Plan your week at a glance. Changes here will reflect on your dashboard.</CardDescription>
+        <div className={cn("container mx-auto", isModal ? "p-0" : "p-4 sm:p-6 lg:p-8")}>
+            <Card className={cn(isModal && "border-0 shadow-none")}>
+                {!isModal && (
+                    <CardHeader>
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <CardTitle>Weekly Timetable</CardTitle>
+                                <CardDescription>Plan your week at a glance. Changes here will reflect on your dashboard.</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                                <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                                <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                            <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                            <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
+                    </CardHeader>
+                )}
+                <CardContent className={cn(isModal && "p-0")}>
                     <div className="grid grid-cols-8 gap-1">
                         <div /> 
                         {weekDays.map((day, index) => (

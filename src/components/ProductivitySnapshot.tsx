@@ -32,6 +32,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
+import { TimetablePageContent } from '@/app/timetable/page';
 
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -269,6 +270,8 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
+  const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
+
 
   const themeColors = useThemeColors();
   
@@ -384,6 +387,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
           <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" onClick={() => setIsTimetableModalOpen(true)}>
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="sr-only">Open Timetable</span>
+            </Button>
             <Button variant="outline" size="icon" onClick={() => setIsTimesheetModalOpen(true)}>
               <Clock className="h-4 w-4" />
               <span className="sr-only">Open Timesheet</span>
@@ -651,6 +658,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           <div className="flex-grow min-h-0">
               <TimesheetPageContent isModal={true} />
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 border-b">
+                <DialogTitle>Weekly Timetable</DialogTitle>
+                <DialogDescription>
+                    Plan your week at a glance.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <TimetablePageContent isModal={true} />
+            </div>
         </DialogContent>
       </Dialog>
     </>
