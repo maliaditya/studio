@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -10,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { format, startOfWeek, addDays, isToday } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { Activity, ActivityType, DailySchedule, SlotName } from '@/types/workout';
+import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -324,7 +323,8 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 }
 
 export default function TimetablePage() {
-    const { setSchedule, toast, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
+    const { setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
+    const { toast } = useToast();
 
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
