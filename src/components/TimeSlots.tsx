@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -238,6 +239,7 @@ export function TimeSlots({
                           linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
                           onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
                           setRoutine={setRoutine}
+                          onRemoveActivity={onRemoveActivity}
                         />
                       ))
                     ) : (
@@ -322,6 +324,7 @@ const AgendaWidgetItem = ({
   onLinkHabit,
   setRoutine,
   onOpenHabitPopup,
+  onRemoveActivity,
 }: {
   activity: Activity & { slot: SlotName };
   date: Date;
@@ -330,7 +333,8 @@ const AgendaWidgetItem = ({
   linkedHabit: any;
   onLinkHabit: (habitId: string) => void;
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+  onOpenHabitPopup?: (habitId: string, event: React.MouseEvent) => void;
+  onRemoveActivity: (slotName: string, activityId: string) => void;
 }) => {
   const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes, activityDurations, onOpenFocusModal, onOpenTaskContext } = useAuth();
   const { toast } = useToast();
@@ -476,7 +480,7 @@ const AgendaWidgetItem = ({
               </DropdownMenuPortal>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => {}} className="text-destructive">
+            <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               <span>Delete</span>
             </DropdownMenuItem>
