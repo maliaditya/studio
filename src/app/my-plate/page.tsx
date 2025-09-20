@@ -1040,27 +1040,39 @@ function MyPlatePageContent() {
     });
   };
 
+  const activityInfo = useMemo(() => {
+    if (!editingActivity) return null;
+    return editingActivity.activity;
+  }, [editingActivity]);
+
   const availableTasksForModal = useMemo(() => {
       if (!editingActivity) return [];
   
       const { type } = editingActivity.activity;
       const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
       
-      const logSource = type === 'upskill' ? allUpskillLogs : type === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+      let logSource, definitionSource;
+      if (type === 'upskill') {
+          logSource = allUpskillLogs;
+          definitionSource = upskillDefinitions;
+      } else if (type === 'deepwork') {
+          logSource = allDeepWorkLogs;
+          definitionSource = deepWorkDefinitions;
+      } else {
+          logSource = brandingLogs;
+          definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+      }
+      
       const logForDay = logSource.find(log => log.date === selectedDateKey);
       
-      // Get IDs of task definitions already in the log for this day
-      const loggedDefIds = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
-      
       // Get IDs of task definitions from the activity itself
-      const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
+      const activityDefIds = new Set((activityInfo?.taskIds || []).map(id => {
           const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
           return instance?.definitionId;
       }).filter(Boolean));
       
       // Combine them and get the full ExerciseDefinition objects
-      const combinedDefIds = new Set([...loggedDefIds, ...activityDefIds]);
-      const definitions = Array.from(combinedDefIds).map(id => allDefs.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
+      const definitions = Array.from(activityDefIds).map(id => allDefs.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
 
       // Now create WorkoutExercise instances. If one exists in the log, use it. Otherwise, create a new one.
       return definitions.map(def => {
@@ -1079,12 +1091,7 @@ function MyPlatePageContent() {
           };
       });
 
-  }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
-
-  const activityInfo = useMemo(() => {
-    if (!editingActivity) return null;
-    return editingActivity.activity;
-  }, [editingActivity]);
+  }, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
 
 
   return (
