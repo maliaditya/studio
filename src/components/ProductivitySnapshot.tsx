@@ -430,7 +430,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
                <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><BarChart3 /> Top Specializations</h4>
                 {topSpecializations.length > 0 && themeColors.length > 0 ? (
-                    <ChartContainer config={{}} className="h-[200px] w-full">
+                    <ChartContainer config={{}} className="h-[250px] w-full">
                         <ResponsiveContainer>
                             <BarChart data={topSpecializations} layout="vertical" margin={{ left: -10, right: 10, top: 5, bottom: 5 }}>
                                 <CartesianGrid horizontal={false} />
