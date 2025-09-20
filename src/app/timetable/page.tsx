@@ -210,6 +210,8 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
         setDeepWorkDefinitions,
         allUpskillLogs,
         allDeepWorkLogs,
+        getUpskillNodeType,
+        getDeepWorkNodeType,
     } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -233,6 +235,22 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
     const handleAddActivity = (date: Date, slot: SlotName) => (type: ActivityType, details: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
+        
+        let taskDefinitionId: string | undefined;
+    
+        if (type === 'upskill' || type === 'deepwork') {
+            const definitionSource = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
+            const definitions = type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+    
+            const newDef: ExerciseDefinition = {
+                id: `def_${Date.now()}_${Math.random()}`,
+                name: details,
+                category: details as any, // Specialization name becomes category
+            };
+            
+            definitionSource(prev => [...prev, newDef]);
+            taskDefinitionId = newDef.id; // We'll link the activity to the definition ID
+        }
     
         const newActivity: Activity = {
             id: `${type}-${Date.now()}-${Math.random()}`,
@@ -241,45 +259,8 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
             completed: false,
             slot,
             habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
+            taskIds: taskDefinitionId ? [taskDefinitionId] : [], // Use the definition ID
         };
-    
-        if (type === 'upskill' || type === 'deepwork') {
-            const definitionSource = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
-            const logSource = type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-            const setLogSource = type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-    
-            const newDef: ExerciseDefinition = {
-                id: `def_${Date.now()}_${Math.random()}`,
-                name: details,
-                category: details as any, // Specialization name becomes category
-            };
-    
-            definitionSource(prev => [...prev, newDef]);
-    
-            const newExerciseInstance: WorkoutExercise = {
-                id: `${newDef.id}-${Date.now()}-${Math.random()}`,
-                definitionId: newDef.id,
-                name: newDef.name,
-                category: newDef.category,
-                loggedSets: [],
-                targetSets: 1,
-                targetReps: '25'
-            };
-            
-            const logIndex = logSource.findIndex(l => l.date === dateKey);
-            const newDatedWorkout: DatedWorkout = logIndex > -1 
-                ? { ...logSource[logIndex], exercises: [...logSource[logIndex].exercises, newExerciseInstance] } 
-                : { id: dateKey, date: dateKey, exercises: [newExerciseInstance] };
-
-            if (type === 'upskill') {
-                setAllUpskillLogs(prev => logIndex > -1 ? prev.map((l, i) => i === logIndex ? newDatedWorkout : l) : [...prev, newDatedWorkout]);
-            } else {
-                setAllDeepWorkLogs(prev => logIndex > -1 ? prev.map((l, i) => i === logIndex ? newDatedWorkout : l) : [...prev, newDatedWorkout]);
-            }
-
-            newActivity.taskIds = [newExerciseInstance.id];
-        }
-
     
         setSchedule(prev => {
             const daySchedule = prev[dateKey] || {};
