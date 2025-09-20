@@ -636,6 +636,21 @@ function MyPlatePageContent() {
     }
   };
 
+  const handleStartWorkoutLog = (activity: Activity) => {
+    setWorkoutActivityToLog(activity);
+    setIsTodaysWorkoutModalOpen(true);
+  };
+
+  const handleStartMindsetLog = (activity: Activity) => {
+    setMindsetActivityToLog(activity);
+    setIsTodaysMindsetModalOpen(true);
+  };
+
+  const handleStartLeadGenLog = (activity: Activity) => {
+    setWorkoutActivityToLog(activity); // Reusing workout activity log state for simplicity
+    setIsLeadGenModalOpen(true);
+  };
+
   const handleSaveTaskSelection = (finalSelectedDefIds: string[]) => {
     if (!editingActivity) return;
     const { slotName, activity } = editingActivity;
@@ -1041,12 +1056,20 @@ function MyPlatePageContent() {
   const availableTasksForModal = useMemo(() => {
     if (!activityInfo) return [];
 
+    const pageType = activityInfo.type;
+
     let definitionSource: ExerciseDefinition[] = [];
-    if (activityInfo.type === 'upskill') {
+    if (pageType === 'upskill') {
         definitionSource = upskillDefinitions;
-    } else if (activityInfo.type === 'deepwork' || activityInfo.type === 'branding') {
+    } else if (pageType === 'deepwork' || pageType === 'branding') {
         definitionSource = deepWorkDefinitions;
     }
+
+    const logForDay = pageType === 'upskill' 
+        ? allUpskillLogs.find(l => l.date === selectedDateKey) 
+        : pageType === 'deepwork' 
+            ? allDeepWorkLogs.find(l => l.date === selectedDateKey)
+            : brandingLogs.find(l => l.date === selectedDateKey);
 
     const taskDefsInActivity = (activityInfo.taskIds || [])
         .map(id => {
@@ -1079,7 +1102,7 @@ function MyPlatePageContent() {
             targetSets: 1,
             targetReps: '25',
         }));
-  }, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions]);
+  }, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey]);
 
 
   return (

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -405,7 +406,7 @@ export const AgendaWidgetItem = ({
         {context === 'timeslot' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -419,14 +420,8 @@ export const AgendaWidgetItem = ({
                   <DropdownMenuSubContent>
                     <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                    {activity.routine && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">
-                          No Repeat
-                        </DropdownMenuItem>
-                      </>
-                    )}
+                    {activity.routine && <DropdownMenuSeparator />}
+                    {activity.routine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">No Repeat</DropdownMenuItem>}
                   </DropdownMenuSubContent>
                 </DropdownMenuPortal>
               </DropdownMenuSub>
