@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -195,11 +194,28 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
 });
 DroppableSlot.displayName = 'DroppableSlot';
 
-export function TimetablePageContent({ isModal = false }: { isModal?: boolean; }) {
+export function TimetablePageContent({ isModal = false, currentWeek: initialWeek, onWeekChange }: { 
+  isModal?: boolean; 
+  currentWeek?: Date;
+  onWeekChange?: (newWeek: Date) => void;
+}) {
     const { schedule, setSchedule, settings, toggleRoutine, currentSlot } = useAuth();
     const { toast } = useToast();
-    const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+    const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
 
+    useEffect(() => {
+        if (initialWeek) {
+            setCurrentWeek(initialWeek);
+        }
+    }, [initialWeek]);
+
+    const handleWeekChange = (newWeek: Date) => {
+        setCurrentWeek(newWeek);
+        if (onWeekChange) {
+            onWeekChange(newWeek);
+        }
+    };
+    
     const weekDates = React.useMemo(() => {
         return Array.from({ length: 7 }).map((_, i) => addDays(currentWeek, i));
     }, [currentWeek]);
@@ -260,101 +276,7 @@ export function TimetablePageContent({ isModal = false }: { isModal?: boolean; }
             return newSchedule;
         });
     };
-
-    const timetableGrid = (
-        <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(7, 1fr)' }}>
-            <div /> 
-            {weekDays.map((day, index) => {
-                const date = weekDates[index];
-                const isPastDay = isBefore(date, startOfToday());
-                return (
-                    <div key={day} className={cn("text-center font-semibold text-sm py-2", isPastDay && "opacity-60")}>
-                        {day}
-                        <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
-                            {format(weekDates[index], 'MMM d')}
-                        </div>
-                    </div>
-                )
-            })}
-
-            {slotOrder.map(slot => (
-                <React.Fragment key={slot}>
-                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
-                    {weekDates.map(date => {
-                        const dateKey = format(date, 'yyyy-MM-dd');
-                        const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
-                        const isPastDay = isBefore(date, startOfToday());
-                        
-                        const activitiesToDisplay = isPastDay
-                            ? allActivities.filter(act => act.completed)
-                            : allActivities;
-                        
-                        const isCurrentSlot = isToday(date) && slot === currentSlot;
-
-                        return (
-                            <div key={dateKey} className={cn("p-1 rounded-lg", isPastDay && "opacity-60", isCurrentSlot && "bg-primary/10")}>
-                                <DroppableSlot 
-                                    date={date}
-                                    slot={slot}
-                                    activities={activitiesToDisplay}
-                                    onAddActivity={handleAddActivity(date, slot)}
-                                    onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
-                                    onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
-                                />
-                            </div>
-                        );
-                    })}
-                </React.Fragment>
-            ))}
-        </div>
-    );
-
-    if (isModal) {
-        return (
-            <div className="h-full flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center mb-4 flex-shrink-0 px-4 pt-4">
-                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                        <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                    </div>
-                </div>
-                <ScrollArea className="flex-grow">
-                    <div className="p-4 pt-0">
-                        {timetableGrid}
-                    </div>
-                </ScrollArea>
-            </div>
-        )
-    }
-
-    return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)] flex flex-col">
-             <div className="flex justify-between items-center mb-4 flex-shrink-0">
-                <div>
-                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
-                    <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                    <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-            </div>
-            <div className="flex-grow min-h-0 relative">
-                <ScrollArea className="absolute inset-0">
-                    {timetableGrid}
-                </ScrollArea>
-            </div>
-        </div>
-    );
-}
-
-export default function TimetablePage() {
-    const { schedule, setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
-    const { toast } = useToast();
-
+    
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
         if (!destination) return;
@@ -381,57 +303,13 @@ export default function TimetablePage() {
             const destDaySchedule = newSchedule[destDateKey] || {};
             const destActivities = (destDaySchedule[destSlotName as SlotName] as Activity[] || []);
             
-            const SLOT_CAPACITY_MINUTES = 240;
-            const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
-            const getTaskDuration = (act: Activity) => {
-                let duration = 0;
-                if (act.completed) {
-                    duration = parseDurationToMinutes(activityDurations[act.id]);
-                } else {
-                    if (act.taskIds && act.taskIds.length > 0) {
-                        const mainDefId = act.taskIds[0].split('-')[0];
-                        const taskDef = allDefs.get(mainDefId);
-                        if (taskDef) {
-                            duration = calculateTotalEstimate(taskDef);
-                        }
-                    } else if (act.duration) {
-                        duration = act.duration;
-                    } else {
-                        switch(act.type) {
-                            case 'workout': duration = 90; break;
-                            case 'mindset': duration = 15; break;
-                            case 'upskill': case 'deepwork': case 'branding': duration = 120; break;
-                            case 'planning': case 'tracking': duration = 30; break;
-                            case 'lead-generation': duration = 45; break;
-                            default: duration = 0;
-                        }
-                    }
-                }
-                return duration;
-            };
-
-            const destSlotDuration = destActivities.reduce((sum, act) => sum + getTaskDuration(act), 0);
-            const movedActivityDuration = getTaskDuration(movedActivity);
-
-            if (sourceDroppableId !== destinationDroppableId && (destSlotDuration + movedActivityDuration > SLOT_CAPACITY_MINUTES)) {
-                toast({
-                    title: "Slot Full",
-                    description: "Cannot move task. This would exceed the 4-hour slot limit.",
-                    variant: "destructive"
-                });
-                return currentSchedule; // Revert the change by returning the original state
-            }
-             destActivities.splice(destination.index, 0, movedActivity);
+            destActivities.splice(destination.index, 0, movedActivity);
         
             if (!newSchedule[destDateKey]) newSchedule[destDateKey] = {};
             newSchedule[destDateKey][destSlotName as SlotName] = destActivities;
             
             if (sourceActivities.length === 0) {
-                delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
-                if (Object.keys(newSchedule[sourceDateKey]).length === 0) {
-                    delete newSchedule[sourceDateKey];
-                }
+                if(newSchedule[sourceDateKey]) delete newSchedule[sourceDateKey][sourceSlotName as SlotName];
             } else {
                 newSchedule[sourceDateKey][sourceSlotName as SlotName] = sourceActivities;
             }
@@ -439,36 +317,148 @@ export default function TimetablePage() {
             return newSchedule;
         });
     };
-    
+
+    const timetableGrid = (
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="grid grid-cols-8 gap-1">
+            <div /> 
+            {weekDays.map((day, index) => {
+                const date = weekDates[index];
+                const isPastDay = isBefore(date, startOfToday());
+                return (
+                    <div key={day} className={cn("text-center font-semibold text-sm py-2 col-span-1", isPastDay && "opacity-60")}>
+                        {day.substring(0,3)}
+                        <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
+                            {format(weekDates[index], 'd')}
+                        </div>
+                    </div>
+                )
+            })}
+
+            {slotOrder.map(slot => (
+                <React.Fragment key={slot}>
+                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2 col-span-1">{slot}</div>
+                    {weekDates.map(date => {
+                        const dateKey = format(date, 'yyyy-MM-dd');
+                        const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        const isPastDay = isBefore(date, startOfToday());
+                        
+                        const activitiesToDisplay = isPastDay
+                            ? allActivities.filter(act => act.completed)
+                            : allActivities;
+                        
+                        const isCurrentSlot = isToday(date) && slot === currentSlot;
+
+                        return (
+                            <div key={dateKey} className={cn("p-1 rounded-lg col-span-1", isPastDay && "opacity-60", isCurrentSlot && "bg-primary/10")}>
+                                <DroppableSlot 
+                                    date={date}
+                                    slot={slot}
+                                    activities={activitiesToDisplay}
+                                    onAddActivity={handleAddActivity(date, slot)}
+                                    onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                                    onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
+                                />
+                            </div>
+                        );
+                    })}
+                </React.Fragment>
+            ))}
+        </div>
+      </DragDropContext>
+    );
+
+    if (isModal) {
+        return (
+            <div className="h-full flex flex-col overflow-hidden">
+                <ScrollArea className="flex-grow">
+                    <div className="p-4 pt-0">
+                        {timetableGrid}
+                    </div>
+                </ScrollArea>
+            </div>
+        )
+    }
+
+    return (
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)] flex flex-col">
+             <div className="flex justify-between items-center mb-4 flex-shrink-0">
+                <div>
+                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
+                    <p className="text-muted-foreground">Plan your week at a glance. Drag and drop tasks to reschedule.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={() => handleWeekChange(addDays(currentWeek, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Button variant="outline" onClick={() => handleWeekChange(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                    <Button variant="outline" size="icon" onClick={() => handleWeekChange(addDays(currentWeek, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+            </div>
+            <div className="flex-grow min-h-0 relative">
+                <ScrollArea className="absolute inset-0">
+                    {timetableGrid}
+                </ScrollArea>
+            </div>
+        </div>
+    );
+}
+
+export default function TimetablePage() {
     return (
         <AuthGuard>
-            <DragDropContext onDragEnd={onDragEnd}>
-                <TimetablePageContent />
-            </DragDropContext>
+            <TimetablePageContent />
         </AuthGuard>
     )
 }
 
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-    let totalMinutes = 0;
-    const trimmedStr = durationStr.trim();
-    
-    const hourMatch = trimmedStr.match(/(\d+(?:\.\d+)?)\s*h/);
-    const minMatch = trimmedStr.match(/(\d+)\s*m/);
+```
+- src/hooks/use-local-storage-state.ts:
+```ts
+"use client";
 
-    if (hourMatch) {
-        totalMinutes += parseFloat(hourMatch[1]) * 60;
+import { useState, useEffect, useCallback } from 'react';
+
+export function useLocalStorageState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const [state, setState] = useState<T>(() => {
+    if (typeof window === 'undefined') {
+      return defaultValue;
     }
-    if (minMatch) {
-        totalMinutes += parseInt(minMatch[1], 10);
+    try {
+      const storedValue = localStorage.getItem(key);
+      return storedValue ? JSON.parse(storedValue) : defaultValue;
+    } catch (error) {
+      console.error(`Error reading localStorage key “${key}”:`, error);
+      return defaultValue;
     }
+  });
 
-    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
-        totalMinutes += parseInt(trimmedStr, 10);
-    }
+  const setLocalStorageState = useCallback((newState: T | ((prevState: T) => T)) => {
+    setState(prevState => {
+      const valueToStore = newState instanceof Function ? newState(prevState) : newState;
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(key, JSON.stringify(valueToStore));
+        }
+      } catch (error) {
+        console.error(`Error setting localStorage key “${key}”:`, error);
+      }
+      return valueToStore;
+    });
+  }, [key]);
 
-    return totalMinutes;
-};
+  return [state, setLocalStorageState];
+}
 
+```
+- src/services/auto-suggestion-flow.ts:
+```ts
+// This AI flow has been integrated into the Pistons of Intention feature (PistonsHead.tsx).
+// This file is no longer used and can be safely deleted.
+
+```
+- src/services/openaiService.ts:
+```ts
+// This file has been intentionally left blank.
+// The project has been migrated to use a local, keyword-based service (nutritionService.ts) for nutritional analysis
+// to improve performance and reduce reliance on external APIs.
+
+```
