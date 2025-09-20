@@ -666,21 +666,21 @@ function MyPlatePageContent() {
     }
     
     const logForDay = logSource.find(log => log.date === selectedDateKey);
-    const existingDefIdsForDay = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
-    const defIdsToCreate = finalSelectedDefIds.filter(id => !existingDefIdsForDay.has(id));
+    
+    // Find definitions for the selected IDs.
+    const selectedDefinitions = finalSelectedDefIds.map(id => definitionSource.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d);
 
-    const newExercises: WorkoutExercise[] = defIdsToCreate.map((defId) => {
-      const def = definitionSource.find(d => d.id === defId)!;
-      return {
-        id: `${def.id}-${Date.now()}-${Math.random()}`,
-        definitionId: def.id,
-        name: def.name,
-        category: def.category,
-        loggedSets: [],
-        targetSets: 1,
-        targetReps: pageType === 'branding' ? '4 stages' : '25',
-      };
-    });
+    const newExercises: WorkoutExercise[] = selectedDefinitions
+      .filter(def => !(logForDay?.exercises.some(ex => ex.definitionId === def.id))) // Only create instances for new defs
+      .map((def) => ({
+          id: `${def.id}-${Date.now()}-${Math.random()}`,
+          definitionId: def.id,
+          name: def.name,
+          category: def.category,
+          loggedSets: [],
+          targetSets: 1,
+          targetReps: pageType === 'branding' ? '4 stages' : '25',
+      }));
 
     const finalExercisesForDay = [...(logForDay?.exercises || []), ...newExercises];
     const updatedLogForDay: DatedWorkout = { id: selectedDateKey, date: selectedDateKey, exercises: finalExercisesForDay };
@@ -699,9 +699,7 @@ function MyPlatePageContent() {
       .filter(ex => finalSelectedDefIds.includes(ex.definitionId))
       .map(t => t.id);
 
-    const newDetails = updatedLogForDay.exercises
-      .filter(ex => finalInstanceIds.includes(ex.id))
-      .map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
+    const newDetails = selectedDefinitions.map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
     
     setSchedule(prev => {
       const newSchedule = { ...prev };
@@ -1042,6 +1040,52 @@ function MyPlatePageContent() {
     });
   };
 
+  const availableTasksForModal = useMemo(() => {
+      if (!editingActivity) return [];
+  
+      const { type } = editingActivity.activity;
+      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+      
+      const logSource = type === 'upskill' ? allUpskillLogs : type === 'deepwork' ? allDeepWorkLogs : brandingLogs;
+      const logForDay = logSource.find(log => log.date === selectedDateKey);
+      
+      // Get IDs of task definitions already in the log for this day
+      const loggedDefIds = new Set(logForDay?.exercises.map(ex => ex.definitionId) || []);
+      
+      // Get IDs of task definitions from the activity itself
+      const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
+          const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
+          return instance?.definitionId;
+      }).filter(Boolean));
+      
+      // Combine them and get the full ExerciseDefinition objects
+      const combinedDefIds = new Set([...loggedDefIds, ...activityDefIds]);
+      const definitions = Array.from(combinedDefIds).map(id => allDefs.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
+
+      // Now create WorkoutExercise instances. If one exists in the log, use it. Otherwise, create a new one.
+      return definitions.map(def => {
+          const existingInstance = logForDay?.exercises.find(ex => ex.definitionId === def.id);
+          if (existingInstance) {
+              return existingInstance;
+          }
+          return {
+              id: `${def.id}-${Date.now()}-${Math.random()}`,
+              definitionId: def.id,
+              name: def.name,
+              category: def.category,
+              loggedSets: [],
+              targetSets: 1,
+              targetReps: '25',
+          };
+      });
+
+  }, [editingActivity, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
+
+  const activityInfo = useMemo(() => {
+    if (!editingActivity) return null;
+    return editingActivity.activity;
+  }, [editingActivity]);
+
 
   return (
     <>
@@ -1191,7 +1235,7 @@ function MyPlatePageContent() {
                 if (!isOpen) setEditingActivity(null);
                 setIsLearningModalOpen(isOpen);
             }}
-            availableTasks={editingActivity.activity.type === 'upskill' ? allUpskillLogs.find(log => log.date === selectedDateKey)?.exercises || [] : editingActivity.activity.type === 'deepwork' ? allDeepWorkLogs.find(log => log.date === selectedDateKey)?.exercises || [] : brandingLogs.find(log => log.date === selectedDateKey)?.exercises || []}
+            availableTasks={availableTasksForModal}
             initialSelectedIds={editingActivity.activity.taskIds || []}
             onSave={handleSaveTaskSelection}
             pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
