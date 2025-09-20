@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -25,6 +24,66 @@ import { Progress } from './ui/progress';
 import { Badge } from '@/components/ui/badge';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
+const activityIcons: Record<ActivityType, React.ReactNode> = {
+    workout: <Dumbbell className="h-4 w-4" />,
+    upskill: <BookOpenCheck className="h-4 w-4" />,
+    deepwork: <Briefcase className="h-4 w-4" />,
+    planning: <ClipboardList className="h-4 w-4" />,
+    tracking: <ClipboardCheck className="h-4 w-4" />,
+    branding: <Share2 className="h-4 w-4" />,
+    'lead-generation': <Magnet className="h-4 w-4" />,
+    essentials: <CheckSquare className="h-4 w-4" />,
+    nutrition: <Utensils className="h-4 w-4" />,
+    interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
+    distraction: <Wind className="h-4 w-4 text-yellow-500" />,
+    mindset: <Brain className="h-4 w-4" />,
+};
+
+const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
+    const { coreSkills } = useAuth();
+    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+
+    return (
+        <DropdownMenuContent className="w-56 p-2">
+            <p className="font-medium text-sm p-2">Select Activity</p>
+            {Object.entries(activityIcons).map(([type, icon]) => {
+                const activityType = type as ActivityType;
+                if (activityType === 'upskill' || activityType === 'deepwork') {
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    <ScrollArea className="h-48">
+                                        {specializations.length > 0 ? (
+                                            specializations.map(spec => (
+                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                    {spec.name}
+                                                </DropdownMenuItem>
+                                            ))
+                                        ) : (
+                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                        )}
+                                    </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                return (
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, `New ${type.replace('-', ' ')}`)}>
+                        {icon}
+                        <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                    </DropdownMenuItem>
+                );
+            })}
+        </DropdownMenuContent>
+    );
+};
 
 interface TimeSlotsProps {
   date: Date;
@@ -234,70 +293,15 @@ export function TimeSlots({
                                 </ScrollArea>
                             </PopoverContent>
                         </Popover>
-                        <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                            <PlusCircle className="h-4 w-4" />
-                            <span className="sr-only">Add Activity</span>
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-52 p-2" align="end" side="top">
-                            <div className="grid gap-1">
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'workout')}>
-                                <Dumbbell className="h-4 w-4 mr-2" />
-                                Add Workout
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'mindset')}>
-                                <Brain className="h-4 w-4 mr-2" />
-                                Add Mindset
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'upskill')}>
-                                <BookOpenCheck className="h-4 w-4 mr-2" />
-                                Add Upskill
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'deepwork')}>
-                                <Briefcase className="h-4 w-4 mr-2" />
-                                Add Deep Work
-                            </Button>
-                             <Separator className="my-1" />
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'planning')}>
-                                <ClipboardList className="h-4 w-4 mr-2" />
-                                Add Planning
-                            </Button>
-                             <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'tracking')}>
-                                <ClipboardCheck className="h-4 w-4 mr-2" />
-                                Add Tracking
-                            </Button>
-                            <Separator className="my-1" />
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'essentials')}>
-                                <CheckSquare className="h-4 w-4 mr-2" />
-                                Add Daily Essentials
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'nutrition')}>
-                                <Utensils className="h-4 w-4 mr-2" />
-                                Add Nutrition
-                            </Button>
-                            <Separator className="my-1" />
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'branding')}>
-                                <Share2 className="h-4 w-4 mr-2" />
-                                Add Branding
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start" onClick={() => onAddActivity(slot.name as string, 'lead-generation')}>
-                                <Magnet className="h-4 w-4 mr-2" />
-                                Add Lead Gen
-                            </Button>
-                            <Separator className="my-1" />
-                            <Button variant="ghost" size="sm" className="justify-start text-destructive hover:text-destructive" onClick={() => onAddActivity(slot.name as string, 'interrupt')}>
-                                <AlertCircle className="h-4 w-4 mr-2" />
-                                Add Interrupt
-                            </Button>
-                            <Button variant="ghost" size="sm" className="justify-start text-yellow-600 hover:text-yellow-600" onClick={() => onAddActivity(slot.name as string, 'distraction')}>
-                                <Wind className="h-4 w-4 mr-2" />
-                                Add Distraction
-                            </Button>
-                            </div>
-                        </PopoverContent>
-                        </Popover>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
+                                    <PlusCircle className="h-4 w-4" />
+                                    <span className="sr-only">Add Activity</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <AddActivityMenu onAddActivity={(type, details) => onAddActivity(slot.name, type, details)} />
+                        </DropdownMenu>
                     </div>
                 </div>
               </div>
@@ -498,5 +502,3 @@ const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
-    
