@@ -65,13 +65,9 @@ export function TodaysLearningModal({
   const [newBundleName, setNewBundleName] = useState('');
   const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<string[]>([]);
   
-  // State for deep work selection flow
-  const [deepWorkSelectionStep, setDeepWorkSelectionStep] = useState<'project' | 'intention'>('project');
-  const [selectedDeepWorkProject, setSelectedDeepWorkProject] = useState<Project | null>(null);
-
-  // State for upskill selection flow
-  const [upskillSelectionStep, setUpskillSelectionStep] = useState<'project' | 'curiosity'>('project');
-  const [selectedUpskillProject, setSelectedUpskillProject] = useState<Project | null>(null);
+  // State for selection flow
+  const [selectionStep, setSelectionStep] = useState<'project' | 'task'>('project');
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   const schedulingLevel = settings.schedulingLevel || 3;
   
@@ -86,33 +82,23 @@ export function TodaysLearningModal({
   
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
-
+  
     const microSkillInfo = Array.from(microSkillMap.values()).find(info => info.microSkillName === currentSpecializationName);
     if (!microSkillInfo) return [];
-
+  
     const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName && cs.type === 'Specialization');
     if (!coreSkill) return [];
-
+  
     const domainId = coreSkill.domainId;
     return projects.filter(p => p.domainId === domainId);
-
   }, [currentSpecializationName, coreSkills, projects, microSkillMap]);
-
 
   useEffect(() => {
     if (isOpen) {
-      if (pageType === 'deepwork') {
-        setDeepWorkSelectionStep('project');
-        setSelectedDeepWorkProject(null);
+        // Reset state on open
+        setSelectionStep('project');
+        setSelectedProject(null);
         setSelectedRadioDefId(initialSelectedIds.length > 0 ? availableTasks.find(t => initialSelectedIds.includes(t.id))?.definitionId || null : null);
-      } else if (pageType === 'upskill') {
-        setUpskillSelectionStep('project');
-        setSelectedUpskillProject(null);
-        setSelectedRadioDefId(initialSelectedIds.length > 0 ? availableTasks.find(t => initialSelectedIds.includes(t.id))?.definitionId || null : null);
-      }
-      else {
-        setSelectedRadioDefId(initialSelectedIds.length > 0 ? availableTasks.find(t => initialSelectedIds.includes(t.id))?.definitionId || null : null);
-      }
     }
   }, [isOpen, pageType, initialSelectedIds, availableTasks]);
   
@@ -174,21 +160,17 @@ export function TodaysLearningModal({
     setSelectedFocusAreaIds([]);
   };
 
-  const intentionsForProject = useMemo(() => {
-    if (!selectedDeepWorkProject || pageType !== 'deepwork') return [];
-    return (deepWorkDefinitions || []).filter(def => {
-        if (getDeepWorkNodeType(def) !== 'Intention') return false;
-        return (def.linkedProjectIds || []).includes(selectedDeepWorkProject.id);
-    });
-  }, [deepWorkDefinitions, selectedDeepWorkProject, pageType, getDeepWorkNodeType]);
+  const tasksForProject = useMemo(() => {
+    if (!selectedProject || (pageType !== 'deepwork' && pageType !== 'upskill')) return [];
+    const sourceDefs = pageType === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const getNodeType = pageType === 'deepwork' ? getDeepWorkNodeType : getUpskillNodeType;
+    const targetType = pageType === 'deepwork' ? 'Intention' : 'Curiosity';
 
-  const curiositiesForProject = useMemo(() => {
-    if (!selectedUpskillProject || pageType !== 'upskill') return [];
-    return (upskillDefinitions || []).filter(def => {
-        if (getUpskillNodeType(def) !== 'Curiosity') return false;
-        return (def.linkedProjectIds || []).includes(selectedUpskillProject.id);
+    return (sourceDefs || []).filter(def => {
+        if (getNodeType(def) !== targetType) return false;
+        return (def.linkedProjectIds || []).includes(selectedProject.id);
     });
-  }, [upskillDefinitions, selectedUpskillProject, pageType, getUpskillNodeType]);
+  }, [deepWorkDefinitions, upskillDefinitions, selectedProject, pageType, getDeepWorkNodeType, getUpskillNodeType]);
 
   const pageInfo = {
     upskill: {
@@ -226,23 +208,23 @@ export function TodaysLearningModal({
 
         <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
-            {pageType === 'deepwork' ? (
+            {(pageType === 'deepwork' || pageType === 'upskill') ? (
                 <div className="space-y-4">
                     <div className="flex items-center text-sm text-muted-foreground mb-4">
                         {currentSpecializationName || 'Projects'}
-                        {selectedDeepWorkProject && (
+                        {selectedProject && (
                             <>
                                 <ChevronRight className="h-4 w-4 mx-1" />
-                                <span className="font-medium text-foreground truncate max-w-[200px]" title={selectedDeepWorkProject.name}>
-                                    {selectedDeepWorkProject.name}
+                                <span className="font-medium text-foreground truncate max-w-[200px]" title={selectedProject.name}>
+                                    {selectedProject.name}
                                 </span>
                             </>
                         )}
                     </div>
-                    {deepWorkSelectionStep === 'project' && (
+                    {selectionStep === 'project' && (
                         <div className="space-y-2">
                             {projectsForSpecialization.map(project => ( 
-                                <button key={project.id} onClick={() => { setSelectedDeepWorkProject(project); setDeepWorkSelectionStep('intention'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                <button key={project.id} onClick={() => { setSelectedProject(project); setSelectionStep('task'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
                                     <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
@@ -250,57 +232,18 @@ export function TodaysLearningModal({
                             {projectsForSpecialization.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No projects found for this specialization. Go to the Skill page to link them.</p>}
                         </div>
                     )}
-                    {deepWorkSelectionStep === 'intention' && (
+                    {selectionStep === 'task' && (
                         <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                           {intentionsForProject.map(task => (
+                           {tasksForProject.map(task => (
                                 <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
                                     <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
                                     <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                        <Lightbulb className="h-4 w-4 text-amber-500"/>
+                                        {pageType === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500"/> : <Flashlight className="h-4 w-4 text-amber-500"/>}
                                         {task.name}
                                     </Label>
                                 </div>
                             ))}
-                            {intentionsForProject.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No intentions linked to this project.</p>}
-                        </RadioGroup>
-                    )}
-                </div>
-            ) : pageType === 'upskill' ? (
-                <div className="space-y-4">
-                    <div className="flex items-center text-sm text-muted-foreground mb-4">
-                        {currentSpecializationName || 'Projects'}
-                        {selectedUpskillProject && (
-                            <>
-                                <ChevronRight className="h-4 w-4 mx-1" />
-                                <span className="font-medium text-foreground truncate max-w-[200px]" title={selectedUpskillProject.name}>
-                                    {selectedUpskillProject.name}
-                                </span>
-                            </>
-                        )}
-                    </div>
-                     {upskillSelectionStep === 'project' && (
-                        <div className="space-y-2">
-                            {projectsForSpecialization.map(project => ( 
-                                <button key={project.id} onClick={() => { setSelectedUpskillProject(project); setUpskillSelectionStep('curiosity'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
-                                    <span className="font-medium">{project.name}</span>
-                                    <ChevronRight className="h-4 w-4" />
-                                </button>
-                            ))}
-                             {projectsForSpecialization.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No projects found for this specialization. Go to the Skill page to link them.</p>}
-                        </div>
-                    )}
-                    {upskillSelectionStep === 'curiosity' && (
-                         <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
-                           {curiositiesForProject.map(task => (
-                                <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                    <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
-                                    <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
-                                        <Flashlight className="h-4 w-4 text-amber-500"/>
-                                        {task.name}
-                                    </Label>
-                                </div>
-                            ))}
-                             {curiositiesForProject.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No curiosities linked to this project.</p>}
+                            {tasksForProject.length === 0 && <p className="text-sm text-center text-muted-foreground py-4">No high-level tasks (Intentions/Curiosities) are linked to this project.</p>}
                         </RadioGroup>
                     )}
                 </div>

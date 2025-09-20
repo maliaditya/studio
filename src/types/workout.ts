@@ -204,6 +204,7 @@ export interface Activity {
   duration?: number; // For interruptions
   subTasks?: SubTask[]; // Added for sub-task functionality
   routine?: RecurrenceRule | null;
+  linkedEntityType?: 'specialization' | 'intention' | 'curiosity';
 };
 
 export interface Interrupt {

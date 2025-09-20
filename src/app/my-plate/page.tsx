@@ -394,19 +394,20 @@ function MyPlatePageContent() {
             return;
         }
         
-        const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
         const SLOT_CAPACITY_MINUTES = 240;
         const currentSlotDuration = slotDurations[slotName]?.total || 0;
 
         let newActivityDuration = 0;
         let details = detailsOverride || '';
         let taskIds: string[] = [];
+        let linkedEntityType: Activity['linkedEntityType'] = undefined;
 
         if ((type === 'upskill' || type === 'deepwork') && detailsOverride) {
             const newDef: ExerciseDefinition = {
                 id: `def_${Date.now()}_${Math.random()}`,
                 name: detailsOverride,
                 category: detailsOverride as ExerciseCategory,
+                ...(type === 'upskill' ? { linkedUpskillIds: [] } : { linkedDeepWorkIds: [] })
             };
 
             if (type === 'upskill') {
@@ -415,25 +416,8 @@ function MyPlatePageContent() {
                 setDeepWorkDefinitions(prev => [...prev, newDef]);
             }
             
-            const newWorkoutExercise: WorkoutExercise = {
-                id: `${newDef.id}-${Date.now()}`,
-                definitionId: newDef.id, name: newDef.name, category: newDef.category,
-                loggedSets: [], targetSets: 1, targetReps: '25',
-            };
-            
-            const logsUpdater = type === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
-            
-            logsUpdater(prevLogs => {
-                const logIndex = prevLogs.findIndex(l => l.date === selectedDateKey);
-                if (logIndex > -1) {
-                    const newLogs = [...prevLogs];
-                    newLogs[logIndex].exercises.push(newWorkoutExercise);
-                    return newLogs;
-                }
-                return [...prevLogs, { id: selectedDateKey, date: selectedDateKey, exercises: [newWorkoutExercise] }];
-            });
-            
-            taskIds = [newWorkoutExercise.id];
+            taskIds = [newDef.id];
+            linkedEntityType = type === 'upskill' ? 'curiosity' : 'intention';
         }
 
 
@@ -441,8 +425,8 @@ function MyPlatePageContent() {
           switch (type) {
               case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
               case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
-              case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
-              case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
+              case 'upskill': details = 'Learning Session'; newActivityDuration = 120; linkedEntityType = 'specialization'; break;
+              case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; linkedEntityType = 'specialization'; break;
               case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
               case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
               case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
@@ -469,6 +453,7 @@ function MyPlatePageContent() {
           taskIds: taskIds,
           slot: slotName,
           habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
+          linkedEntityType,
         };
         
         setSchedule(prev => ({ ...prev, [selectedDateKey]: { ...(prev[selectedDateKey] || {}), [slotName]: [...(Array.isArray(prev[selectedDateKey]?.[slotName]) ? prev[selectedDateKey]?.[slotName] as Activity[] : []), newActivity] } }));
@@ -739,11 +724,13 @@ function MyPlatePageContent() {
 
     const newDetails = selectedDefinitions.map(t => t.name).join(', ') || (pageType === 'upskill' ? 'Learning Session' : pageType === 'deepwork' ? 'Deep Work Session' : 'Branding Session');
     
+    const linkedEntityType = (pageType === 'upskill' ? 'curiosity' : 'intention');
+
     setSchedule(prev => {
       const newSchedule = { ...prev };
       const daySchedule = { ...(newSchedule[selectedDateKey] || {}) };
       const activitiesInSlot = (Array.isArray(daySchedule[slotName]) ? daySchedule[slotName] as Activity[] : []).map(act =>
-        act.id === activity.id ? { ...act, taskIds: finalInstanceIds, details: newDetails } : act
+        act.id === activity.id ? { ...act, taskIds: finalInstanceIds, details: newDetails, linkedEntityType } : act
       );
       daySchedule[slotName] = activitiesInSlot;
       newSchedule[selectedDateKey] = daySchedule;
@@ -797,7 +784,7 @@ function MyPlatePageContent() {
     };
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
-    const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
+    const totalYesterdayMinutes = yesterdayUpskillMinutes + totalYesterdayMinutes;
 
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
@@ -1085,59 +1072,35 @@ function MyPlatePageContent() {
 
   const availableTasksForModal = useMemo(() => {
     if (!activityInfo) return [];
-
-    const { type } = activityInfo;
-    let definitionSource, logSource;
-
-    if (type === 'upskill') {
-      logSource = allUpskillLogs;
-      definitionSource = upskillDefinitions;
-    } else if (type === 'deepwork') {
-      logSource = allDeepWorkLogs;
-      definitionSource = deepWorkDefinitions;
-    } else {
-      logSource = brandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+    
+    let definitionSource: ExerciseDefinition[] = [];
+    if (activityInfo.type === 'upskill') {
+        definitionSource = upskillDefinitions;
+    } else if (activityInfo.type === 'deepwork' || activityInfo.type === 'branding') {
+        definitionSource = deepWorkDefinitions;
     }
+  
+    const linkedTaskDefIds = (activityInfo.taskIds || [])
+      .map(instanceId => {
+        const defId = instanceId.split('-')[0];
+        return defId;
+      });
+  
+    const definitions = definitionSource.filter(def => 
+        (activityInfo.linkedEntityType === 'specialization' && def.category === activityInfo.details) ||
+        (linkedTaskDefIds.includes(def.id))
+    );
     
-    const logForDay = logSource.find(log => log.date === selectedDateKey);
-    
-    // Get IDs of task definitions from the activity itself
-    const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
-        const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
-        return instance?.definitionId;
-    }).filter(Boolean));
-
-    // Also include any other definitions that match the category for Upskill/Deepwork
-    if (type === 'upskill' || type === 'deepwork') {
-        const category = activityInfo.details; // Specialization name is stored in details
-        definitionSource.forEach(def => {
-            if (def.category === category) {
-                activityDefIds.add(def.id);
-            }
-        });
-    }
-    
-    // Combine them and get the full ExerciseDefinition objects
-    const definitions = Array.from(activityDefIds).map(id => definitionSource.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
-
-    // Now create WorkoutExercise instances. If one exists in the log, use it. Otherwise, create a new one.
-    return definitions.map(def => {
-        const existingInstance = logForDay?.exercises.find(ex => ex.definitionId === def.id);
-        if (existingInstance) {
-            return existingInstance;
-        }
-        return {
-            id: `${def.id}-${Date.now()}-${Math.random()}`,
-            definitionId: def.id,
-            name: def.name,
-            category: def.category,
-            loggedSets: [],
-            targetSets: 1,
-            targetReps: '25',
-        };
-    });
-}, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
+    return definitions.map(def => ({
+        id: `${def.id}-${Date.now()}`,
+        definitionId: def.id,
+        name: def.name,
+        category: def.category,
+        loggedSets: [],
+        targetSets: 1,
+        targetReps: '25',
+    }));
+  }, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
 
 
   return (
