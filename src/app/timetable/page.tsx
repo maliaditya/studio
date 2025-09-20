@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { format, startOfWeek, addDays, isToday, isBefore, startOfToday } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule } from '@/types/workout';
+import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -202,11 +202,19 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
   currentWeek?: Date;
   onWeekChange?: (newWeek: Date) => void;
 }) {
-    const { schedule, setSchedule, settings, toggleRoutine, currentSlot } = useAuth();
+    const { 
+        schedule, setSchedule, 
+        settings, toggleRoutine, 
+        currentSlot, 
+        setUpskillDefinitions, 
+        setDeepWorkDefinitions,
+        upskillDefinitions,
+        deepWorkDefinitions,
+    } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (initialWeek) {
             setCurrentWeek(initialWeek);
         }
@@ -226,19 +234,30 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
     const handleAddActivity = (date: Date, slot: SlotName) => (type: ActivityType, details: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
         
-        const daySchedule = schedule[dateKey] || {};
-        const activitiesInSlot = (daySchedule[slot] as Activity[] | undefined) || [];
-        
-        const newActivityId = `essentials-${dateKey}-${Math.random()}`;
-
-        const newActivity: Activity = {
-            id: newActivityId,
+        let newActivity: Activity = {
+            id: `${type}-${Date.now()}-${Math.random()}`,
             type,
             details,
             completed: false,
             slot,
             habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
         };
+
+        if (type === 'upskill' || type === 'deepwork') {
+            const newDef: ExerciseDefinition = {
+                id: `def_${Date.now()}`,
+                name: details,
+                category: details as any, // The specialization name becomes the category
+            };
+
+            if (type === 'upskill') {
+                setUpskillDefinitions(prev => [...prev, newDef]);
+            } else {
+                setDeepWorkDefinitions(prev => [...prev, newDef]);
+            }
+            
+            newActivity.taskIds = [newDef.id];
+        }
 
         setSchedule(prev => {
             const daySchedule = prev[dateKey] || {};
@@ -254,6 +273,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
         toast({ title: "Activity Added", description: `Added "${details}" to ${format(date, 'MMM d')}, ${slot}.` });
     };
+
 
     const handleRemoveActivity = (date: Date, slot: SlotName, activityId: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
@@ -412,3 +432,5 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
+
+    
