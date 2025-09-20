@@ -147,7 +147,6 @@ function MyPlatePageContent() {
     activeFocusSession,
     onOpenFocusModal,
     toggleRoutine,
-    onRemoveActivity,
     activeProjectIds,
   } = useAuth();
   const { toast } = useToast();
@@ -1050,6 +1049,20 @@ function MyPlatePageContent() {
         };
     });
   };
+  
+  const onRemoveActivity = (slotName: string, activityId: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[selectedDateKey]) {
+            const daySchedule = { ...newSchedule[selectedDateKey] };
+            if (daySchedule[slotName]) {
+                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                newSchedule[selectedDateKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
+  };
 
   const activityInfo = editingActivity?.activity;
 
@@ -1057,52 +1070,44 @@ function MyPlatePageContent() {
     if (!activityInfo) return [];
 
     const pageType = activityInfo.type;
-
-    let definitionSource: ExerciseDefinition[] = [];
-    if (pageType === 'upskill') {
-        definitionSource = upskillDefinitions;
-    } else if (pageType === 'deepwork' || pageType === 'branding') {
-        definitionSource = deepWorkDefinitions;
-    }
-
     const logForDay = pageType === 'upskill' 
-        ? allUpskillLogs.find(l => l.date === selectedDateKey) 
-        : pageType === 'deepwork' 
-            ? allDeepWorkLogs.find(l => l.date === selectedDateKey)
-            : brandingLogs.find(l => l.date === selectedDateKey);
+      ? allUpskillLogs.find(l => l.date === selectedDateKey) 
+      : pageType === 'deepwork' 
+          ? allDeepWorkLogs.find(l => l.date === selectedDateKey)
+          : brandingLogs.find(l => l.date === selectedDateKey);
 
-    const taskDefsInActivity = (activityInfo.taskIds || [])
-        .map(id => {
-            const defId = id.split('-')[0];
-            return definitionSource.find(def => def.id === defId);
-        })
-        .filter((d): d is ExerciseDefinition => !!d);
+    const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
 
-    if (taskDefsInActivity.length > 0) {
-        return taskDefsInActivity.map(def => ({
-            id: `${def.id}-${Date.now()}`,
-            definitionId: def.id,
-            name: def.name,
-            category: def.category,
-            loggedSets: [],
-            targetSets: 1,
-            targetReps: '25',
-        }));
-    }
+    // This part is the critical fix. `activityInfo` may not have task details yet.
+    // We need to look at the specialization/category from `activityInfo.details` and find all
+    // top-level tasks (Intentions/Curiosities) for it.
+    const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activityInfo.details || ms.microSkillName === activityInfo.details);
+    
+    if (!microSkillInfo) return [];
 
-    // Fallback if no taskIds but it's a learn/deepwork task
-    return definitionSource
-        .filter(def => def.category === activityInfo.details)
-        .map(def => ({
-            id: `${def.id}-${Date.now()}`,
-            definitionId: def.id,
-            name: def.name,
-            category: def.category,
-            loggedSets: [],
-            targetSets: 1,
-            targetReps: '25',
-        }));
-  }, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey]);
+    const getNodeType = pageType === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
+    const targetNodeType = pageType === 'upskill' ? 'Curiosity' : 'Intention';
+    
+    const tasks = definitionSource
+      .filter(def => {
+        const nodeType = getNodeType(def);
+        return def.category === microSkillInfo.microSkillName && nodeType === targetNodeType;
+      })
+      .map(def => {
+        const existingTask = logForDay?.exercises.find(ex => ex.definitionId === def.id);
+        return existingTask || {
+          id: `${def.id}-${Date.now()}`,
+          definitionId: def.id,
+          name: def.name,
+          category: def.category,
+          loggedSets: [],
+          targetSets: 1,
+          targetReps: '25',
+        };
+    });
+
+    return tasks;
+}, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, microSkillMap, getUpskillNodeType, getDeepWorkNodeType]);
 
 
   return (

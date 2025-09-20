@@ -372,7 +372,7 @@ export const AgendaWidgetItem = ({
         className={cn("flex items-start gap-3 min-w-0 flex-grow", (linkedHabit || (activity.type !== 'interrupt' && activity.type !== 'distraction')) && "cursor-pointer")}
         onClick={handleTitleClick}
       >
-        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
+        <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id, !activity.completed); }} className="pt-0.5">
             {activity.completed 
               ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
               : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
