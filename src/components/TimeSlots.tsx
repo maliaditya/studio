@@ -119,7 +119,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, onOpenFocusModal, onOpenHabitPopup } = useAuth();
   
   const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
     // This logic should now be in AuthContext
@@ -458,7 +458,7 @@ export const AgendaWidgetItem = ({
                 <Timer className="h-4 w-4" />
             </Button>
         )}
-        {context !== 'agenda' && (
+        {context === 'timeslot' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
@@ -475,11 +475,12 @@ export const AgendaWidgetItem = ({
                   <DropdownMenuSubContent>
                     <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                    
                     {activity.routine && (
                       <>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">
+                          No Repeat
+                        </DropdownMenuItem>
                       </>
                     )}
                   </DropdownMenuSubContent>
