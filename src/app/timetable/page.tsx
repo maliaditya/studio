@@ -195,17 +195,10 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
 });
 DroppableSlot.displayName = 'DroppableSlot';
 
-export function TimetablePageContent({ isModal = false, currentWeek: currentWeekProp, onWeekChange }: { 
-    isModal?: boolean;
-    currentWeek?: Date;
-    onWeekChange?: (date: Date) => void; 
-}) {
+export function TimetablePageContent({ isModal = false }: { isModal?: boolean; }) {
     const { schedule, setSchedule, settings, toggleRoutine, currentSlot } = useAuth();
     const { toast } = useToast();
-    
-    const [internalCurrentWeek, setInternalCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-    const currentWeek = currentWeekProp || internalCurrentWeek;
-    const setCurrentWeek = onWeekChange || setInternalCurrentWeek;
+    const [currentWeek, setCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
     const weekDates = React.useMemo(() => {
         return Array.from({ length: 7 }).map((_, i) => addDays(currentWeek, i));
@@ -319,8 +312,16 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     if (isModal) {
         return (
             <div className="h-full flex flex-col overflow-hidden">
+                <div className="flex justify-between items-center mb-4 flex-shrink-0 px-4 pt-4">
+                    <h1 className="text-2xl font-bold">Weekly Timetable</h1>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
+                        <Button variant="outline" onClick={() => setCurrentWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
+                        <Button variant="outline" size="icon" onClick={() => setCurrentWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                    </div>
+                </div>
                 <ScrollArea className="flex-grow">
-                    <div className="p-4">
+                    <div className="p-4 pt-0">
                         {timetableGrid}
                     </div>
                 </ScrollArea>
@@ -351,7 +352,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
 }
 
 export default function TimetablePage() {
-    const { setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
+    const { schedule, setSchedule, activityDurations, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate } = useAuth();
     const { toast } = useToast();
 
     const onDragEnd = (result: DropResult) => {
@@ -470,7 +471,4 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
     return totalMinutes;
 };
-
-
-
 
