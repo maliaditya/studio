@@ -623,24 +623,10 @@ function MyPlatePageContent() {
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (activity.completed) return;
   
-    // High-level tasks (Objectives, Intentions, Curiosities) should always open the selection modal
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-    if (mainDefId) {
-        const mainDef = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === mainDefId);
-        if (mainDef) {
-            const isUpskill = upskillDefinitions.some(d => d.id === mainDefId);
-            const nodeType = isUpskill ? getUpskillNodeType(mainDef) : getDeepWorkNodeType(mainDef);
-            if (['Objective', 'Intention', 'Curiosity'].includes(nodeType)) {
-                 setEditingActivity({ slotName, activity });
-                 setIsLearningModalOpen(true);
-                 return;
-            }
-        }
-    }
-    
     // For specific, schedulable tasks, start the focus timer directly.
     if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
-        onOpenFocusModal(activity);
+        setEditingActivity({ slotName, activity });
+        setIsLearningModalOpen(true);
     } else if (activity.type === 'workout') {
         handleStartWorkoutLog(activity);
     } else if (activity.type === 'mindset') {
@@ -1259,7 +1245,7 @@ function MyPlatePageContent() {
       </Dialog>
       
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] max-w-[120rem] w-[98vw] flex flex-col p-0">
+        <DialogContent className="h-[90vh] max-w-full w-full grid grid-rows-[auto,1fr] p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
               <div>
                   <DialogTitle>Weekly Timetable</DialogTitle>
@@ -1273,7 +1259,7 @@ function MyPlatePageContent() {
                   <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
               </div>
           </DialogHeader>
-          <div className="flex-grow min-h-0 overflow-hidden">
+          <div className="min-h-0">
               <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} onWeekChange={setCurrentTimetableWeek} />
           </div>
         </DialogContent>
