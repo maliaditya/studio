@@ -114,7 +114,9 @@ function MyPlatePageContent() {
     workoutMode, workoutPlans, exerciseDefinitions,
     workoutPlanRotation,
     strengthTrainingMode,
-    upskillDefinitions, topicGoals, deepWorkDefinitions, setDeepWorkDefinitions,
+    upskillDefinitions, setUpskillDefinitions,
+    topicGoals, 
+    deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
     projects,
     productizationPlans,
@@ -398,6 +400,42 @@ function MyPlatePageContent() {
 
         let newActivityDuration = 0;
         let details = detailsOverride || '';
+        let taskIds: string[] = [];
+
+        if ((type === 'upskill' || type === 'deepwork') && detailsOverride) {
+            const newDef: ExerciseDefinition = {
+                id: `def_${Date.now()}_${Math.random()}`,
+                name: detailsOverride,
+                category: detailsOverride as ExerciseCategory,
+            };
+
+            if (type === 'upskill') {
+                setUpskillDefinitions(prev => [...prev, newDef]);
+            } else {
+                setDeepWorkDefinitions(prev => [...prev, newDef]);
+            }
+            
+            const newWorkoutExercise: WorkoutExercise = {
+                id: `${newDef.id}-${Date.now()}`,
+                definitionId: newDef.id, name: newDef.name, category: newDef.category,
+                loggedSets: [], targetSets: 1, targetReps: '25',
+            };
+            
+            const logsUpdater = type === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
+            
+            logsUpdater(prevLogs => {
+                const logIndex = prevLogs.findIndex(l => l.date === selectedDateKey);
+                if (logIndex > -1) {
+                    const newLogs = [...prevLogs];
+                    newLogs[logIndex].exercises.push(newWorkoutExercise);
+                    return newLogs;
+                }
+                return [...prevLogs, { id: selectedDateKey, date: selectedDateKey, exercises: [newWorkoutExercise] }];
+            });
+            
+            taskIds = [newWorkoutExercise.id];
+        }
+
 
         if (!details) {
           switch (type) {
@@ -428,7 +466,7 @@ function MyPlatePageContent() {
           type, 
           details, 
           completed: false,
-          taskIds: [],
+          taskIds: taskIds,
           slot: slotName,
           habitEquationIds: defaultHabitId ? [defaultHabitId] : [],
         };
@@ -1046,52 +1084,60 @@ function MyPlatePageContent() {
   }, [editingActivity]);
 
   const availableTasksForModal = useMemo(() => {
-      if (!editingActivity) return [];
-  
-      const { type } = editingActivity.activity;
-      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-      
-      let logSource, definitionSource;
-      if (type === 'upskill') {
-          logSource = allUpskillLogs;
-          definitionSource = upskillDefinitions;
-      } else if (type === 'deepwork') {
-          logSource = allDeepWorkLogs;
-          definitionSource = deepWorkDefinitions;
-      } else {
-          logSource = brandingLogs;
-          definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
-      }
-      
-      const logForDay = logSource.find(log => log.date === selectedDateKey);
-      
-      // Get IDs of task definitions from the activity itself
-      const activityDefIds = new Set((activityInfo?.taskIds || []).map(id => {
-          const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
-          return instance?.definitionId;
-      }).filter(Boolean));
-      
-      // Combine them and get the full ExerciseDefinition objects
-      const definitions = Array.from(activityDefIds).map(id => allDefs.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
+    if (!activityInfo) return [];
 
-      // Now create WorkoutExercise instances. If one exists in the log, use it. Otherwise, create a new one.
-      return definitions.map(def => {
-          const existingInstance = logForDay?.exercises.find(ex => ex.definitionId === def.id);
-          if (existingInstance) {
-              return existingInstance;
-          }
-          return {
-              id: `${def.id}-${Date.now()}-${Math.random()}`,
-              definitionId: def.id,
-              name: def.name,
-              category: def.category,
-              loggedSets: [],
-              targetSets: 1,
-              targetReps: '25',
-          };
-      });
+    const { type } = activityInfo;
+    let definitionSource, logSource;
 
-  }, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
+    if (type === 'upskill') {
+      logSource = allUpskillLogs;
+      definitionSource = upskillDefinitions;
+    } else if (type === 'deepwork') {
+      logSource = allDeepWorkLogs;
+      definitionSource = deepWorkDefinitions;
+    } else {
+      logSource = brandingLogs;
+      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+    }
+    
+    const logForDay = logSource.find(log => log.date === selectedDateKey);
+    
+    // Get IDs of task definitions from the activity itself
+    const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
+        const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
+        return instance?.definitionId;
+    }).filter(Boolean));
+
+    // Also include any other definitions that match the category for Upskill/Deepwork
+    if (type === 'upskill' || type === 'deepwork') {
+        const category = activityInfo.details; // Specialization name is stored in details
+        definitionSource.forEach(def => {
+            if (def.category === category) {
+                activityDefIds.add(def.id);
+            }
+        });
+    }
+    
+    // Combine them and get the full ExerciseDefinition objects
+    const definitions = Array.from(activityDefIds).map(id => definitionSource.find(def => def.id === id)).filter((d): d is ExerciseDefinition => !!d);
+
+    // Now create WorkoutExercise instances. If one exists in the log, use it. Otherwise, create a new one.
+    return definitions.map(def => {
+        const existingInstance = logForDay?.exercises.find(ex => ex.definitionId === def.id);
+        if (existingInstance) {
+            return existingInstance;
+        }
+        return {
+            id: `${def.id}-${Date.now()}-${Math.random()}`,
+            definitionId: def.id,
+            name: def.name,
+            category: def.category,
+            loggedSets: [],
+            targetSets: 1,
+            targetReps: '25',
+        };
+    });
+}, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
 
 
   return (

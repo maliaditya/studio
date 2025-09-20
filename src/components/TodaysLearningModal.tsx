@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -85,23 +86,16 @@ export function TodaysLearningModal({
   
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
-  
-    const microSkillInfo = Array.from(microSkillMap.values()).find(
-      (info) => info.microSkillName === currentSpecializationName
-    );
-  
+
+    const microSkillInfo = Array.from(microSkillMap.values()).find(info => info.microSkillName === currentSpecializationName);
     if (!microSkillInfo) return [];
-  
-    const specialization = coreSkills.find(
-      (cs) => cs.name === microSkillInfo.coreSkillName && cs.type === 'Specialization'
-    );
-  
-    if (!specialization) return [];
-  
-    const domainId = specialization.domainId;
-  
+
+    const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName && cs.type === 'Specialization');
+    if (!coreSkill) return [];
+
+    const domainId = coreSkill.domainId;
     return projects.filter(p => p.domainId === domainId);
-  
+
   }, [currentSpecializationName, coreSkills, projects, microSkillMap]);
 
 
