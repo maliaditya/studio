@@ -200,7 +200,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     currentWeek?: Date;
     onWeekChange?: (date: Date) => void; 
 }) {
-    const { schedule, setSchedule, settings, toggleRoutine } = useAuth();
+    const { schedule, setSchedule, settings, toggleRoutine, currentSlot } = useAuth();
     const { toast } = useToast();
     
     const [internalCurrentWeek, setInternalCurrentWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
@@ -269,7 +269,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
     };
 
     const timetableGrid = (
-        <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(7, minmax(0, 1fr))' }}>
+        <div className="grid gap-1" style={{ gridTemplateColumns: 'auto repeat(7, 1fr)' }}>
             <div /> 
             {weekDays.map((day, index) => {
                 const date = weekDates[index];
@@ -295,9 +295,11 @@ export function TimetablePageContent({ isModal = false, currentWeek: currentWeek
                         const activitiesToDisplay = isPastDay
                             ? allActivities.filter(act => act.completed)
                             : allActivities;
+                        
+                        const isCurrentSlot = isToday(date) && slot === currentSlot;
 
                         return (
-                            <div key={dateKey} className={cn(isPastDay && "opacity-60")}>
+                            <div key={dateKey} className={cn("p-1 rounded-lg", isPastDay && "opacity-60", isCurrentSlot && "bg-primary/10")}>
                                 <DroppableSlot 
                                     date={date}
                                     slot={slot}
@@ -468,6 +470,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
 
     return totalMinutes;
 };
+
 
 
 
