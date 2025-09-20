@@ -367,7 +367,7 @@ function MyPlatePageContent() {
   }, [schedule, selectedDateKey, activityDurations]);
 
 
-    const handleAddActivity = (slotName: string, type: ActivityType) => {
+    const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
         if (!currentUser?.username) return;
 
         if (type === 'interrupt' || type === 'distraction') {
@@ -397,17 +397,19 @@ function MyPlatePageContent() {
         const currentSlotDuration = slotDurations[slotName]?.total || 0;
 
         let newActivityDuration = 0;
-        let details = '';
+        let details = detailsOverride || '';
 
-        switch (type) {
-            case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
-            case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
-            case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
-            case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
-            case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
-            case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
-            case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
-            case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
+        if (!details) {
+          switch (type) {
+              case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
+              case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
+              case 'upskill': details = 'Learning Session'; newActivityDuration = 120; break;
+              case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; break;
+              case 'planning': details = 'Planning Session'; newActivityDuration = 30; break;
+              case 'tracking': details = 'Tracking Session'; newActivityDuration = 30; break;
+              case 'branding': details = 'Branding Session'; newActivityDuration = 120; break;
+              case 'lead-generation': details = 'Lead Generation Session'; newActivityDuration = 45; break;
+          }
         }
         
         if (currentSlotDuration + newActivityDuration > SLOT_CAPACITY_MINUTES) {
@@ -623,7 +625,6 @@ function MyPlatePageContent() {
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (activity.completed) return;
   
-    // For specific, schedulable tasks, start the focus timer directly.
     if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
         setEditingActivity({ slotName, activity });
         setIsLearningModalOpen(true);
