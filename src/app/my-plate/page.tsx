@@ -410,14 +410,11 @@ function MyPlatePageContent() {
                 ...(type === 'upskill' ? { linkedUpskillIds: [] } : { linkedDeepWorkIds: [] })
             };
 
-            if (type === 'upskill') {
-                setUpskillDefinitions(prev => [...prev, newDef]);
-            } else {
-                setDeepWorkDefinitions(prev => [...prev, newDef]);
-            }
+            const setDefinitions = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
+            setDefinitions(prev => [...prev, newDef]);
             
-            taskIds = [newDef.id];
-            linkedEntityType = type === 'upskill' ? 'curiosity' : 'intention';
+            taskIds = [`${newDef.id}-${Date.now()}`]; // Create a new instance ID format.
+            linkedEntityType = 'specialization'; // It starts as a specialization link.
         }
 
 
@@ -784,7 +781,7 @@ function MyPlatePageContent() {
     };
 
     const totalTodayMinutes = todayUpskillMinutes + todayDeepWorkMinutes;
-    const totalYesterdayMinutes = yesterdayUpskillMinutes + totalYesterdayMinutes;
+    const totalYesterdayMinutes = yesterdayUpskillMinutes + yesterdayDeepWorkMinutes;
 
     const learningStats: Record<string, { logged: number; estimated: number }> = {};
     const specializations = coreSkills.filter(cs => cs.type === 'Specialization');
@@ -1072,24 +1069,31 @@ function MyPlatePageContent() {
 
   const availableTasksForModal = useMemo(() => {
     if (!activityInfo) return [];
-    
+
     let definitionSource: ExerciseDefinition[] = [];
+    const logForDay = activityInfo.type === 'upskill' 
+        ? allUpskillLogs.find(log => log.date === selectedDateKey)
+        : allDeepWorkLogs.find(log => log.date === selectedDateKey);
+
     if (activityInfo.type === 'upskill') {
         definitionSource = upskillDefinitions;
     } else if (activityInfo.type === 'deepwork' || activityInfo.type === 'branding') {
         definitionSource = deepWorkDefinitions;
     }
-  
-    const linkedTaskDefIds = (activityInfo.taskIds || [])
-      .map(instanceId => {
-        const defId = instanceId.split('-')[0];
-        return defId;
-      });
-  
-    const definitions = definitionSource.filter(def => 
-        (activityInfo.linkedEntityType === 'specialization' && def.category === activityInfo.details) ||
-        (linkedTaskDefIds.includes(def.id))
-    );
+    
+    // Get IDs of task definitions from the activity itself
+    const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
+        const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
+        return instance?.definitionId;
+    }).filter(Boolean));
+
+
+    const definitions = definitionSource.filter(def => {
+        if (activityInfo.linkedEntityType === 'specialization') {
+            return def.category === activityInfo.details;
+        }
+        return activityDefIds.has(def.id);
+    });
     
     return definitions.map(def => ({
         id: `${def.id}-${Date.now()}`,
@@ -1432,3 +1436,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
