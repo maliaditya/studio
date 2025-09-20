@@ -50,19 +50,21 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                                 {icon}
                                 <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                             </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                                <ScrollArea className="h-48">
-                                    {specializations.length > 0 ? (
-                                        specializations.map(spec => (
-                                            <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
-                                                {spec.name}
-                                            </DropdownMenuItem>
-                                        ))
-                                    ) : (
-                                        <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
-                                    )}
-                                </ScrollArea>
-                            </DropdownMenuSubContent>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    <ScrollArea className="h-48">
+                                        {specializations.length > 0 ? (
+                                            specializations.map(spec => (
+                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                    {spec.name}
+                                                </DropdownMenuItem>
+                                            ))
+                                        ) : (
+                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                        )}
+                                    </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
                         </DropdownMenuSub>
                     );
                 }
@@ -118,6 +120,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
             <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'daily' })}>Daily</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'weekly' })}>Weekly</DropdownMenuItem>
+                {activity.routine && <DropdownMenuSeparator />}
                 {activity.routine && <DropdownMenuItem onSelect={() => onSetRoutine(null)} className="text-destructive">No Repeat</DropdownMenuItem>}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -203,7 +206,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (initialWeek) {
             setCurrentWeek(initialWeek);
         }
