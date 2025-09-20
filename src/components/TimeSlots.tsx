@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -90,7 +91,7 @@ interface TimeSlotsProps {
   schedule: DailySchedule;
   currentSlot: string;
   remainingTime: string;
-  onAddActivity: (slotName: string, type: ActivityType) => void;
+  onAddActivity: (slotName: string, type: ActivityType, details: string) => void;
   onRemoveActivity: (slotName: string, activityId: string) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
@@ -237,7 +238,6 @@ export function TimeSlots({
                           linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
                           onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
                           setRoutine={setRoutine}
-                          onOpenHabitPopup={openRuleDetailPopup}
                         />
                       ))
                     ) : (
@@ -385,20 +385,6 @@ const AgendaWidgetItem = ({
   
   const duration = activityDurations[activity.id];
 
-  const handleTitleClick = (event: React.MouseEvent) => {
-    if (activity.completed) {
-      onToggleComplete(activity.slot, activity.id, false);
-      return;
-    }
-    
-    if (linkedHabit) {
-        onOpenHabitPopup(linkedHabit.id, event);
-        return;
-    }
-    
-    onActivityClick(activity.slot, activity, event);
-  };
-  
   const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const shouldOpenModal = onOpenFocusModal(activity);
@@ -420,8 +406,8 @@ const AgendaWidgetItem = ({
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
       <div 
-        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
-        onClick={handleTitleClick}
+        className={cn("flex items-start gap-3 min-w-0 flex-grow cursor-pointer")}
+        onClick={(e) => onActivityClick(activity.slot, activity, e)}
       >
         <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
             {activity.completed 
