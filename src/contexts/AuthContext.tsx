@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -339,7 +340,7 @@ interface AuthContextType {
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
   handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
-  toggleRoutine: (activity: Activity) => void;
+  toggleRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
   
@@ -2207,7 +2208,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openTodaysDietPopup = (event: React.MouseEvent) => {
     const popupWidth = 420;
     const popupHeight = 500;
-    let x = event.clientY;
+    let x = event.clientX;
+    let y = event.clientY;
 
     if (x + popupWidth > window.innerWidth) x = window.innerWidth - popupWidth - 20;
     if (y + popupHeight > window.innerHeight) y = window.innerHeight - 20;
@@ -2605,23 +2607,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
   
-  const toggleRoutine = (activity: Activity) => {
-    const isCurrentlyRoutine = settings.routines.some(r => r.details === activity.details && r.type === activity.type && r.slot === activity.slot);
-
-    const newRoutines = isCurrentlyRoutine
-        ? settings.routines.filter(r => !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot))
-        : [...settings.routines, {
-            id: `routine_${activity.details.replace(/\s/g, '')}`, // Create a stable ID
-            type: activity.type,
-            details: activity.details,
-            slot: activity.slot,
-            duration: activity.duration,
-            taskIds: activity.taskIds,
-            habitEquationIds: activity.habitEquationIds,
+  const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null) => {
+    const newRoutines = (settings.routines || []).filter(r => 
+        !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot)
+    );
+    if (rule) {
+        newRoutines.push({
+            ...activity,
+            id: `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`,
             completed: false,
+            routine: rule,
             isRoutine: true,
-        }];
-    
+        });
+    }
     setSettings(prev => ({...prev, routines: newRoutines}));
   };
   
