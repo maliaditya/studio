@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -236,10 +235,8 @@ export function TimeSlots({
                           date={date}
                           onToggleComplete={onToggleComplete}
                           onActivityClick={onActivityClick}
-                          linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
-                          onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
-                          setRoutine={setRoutine}
                           onRemoveActivity={onRemoveActivity}
+                          context="timeslot"
                         />
                       ))
                     ) : (
@@ -315,28 +312,22 @@ export function TimeSlots({
   );
 }
 
-const AgendaWidgetItem = ({
+export const AgendaWidgetItem = ({
   activity,
   date,
   onToggleComplete,
   onActivityClick,
-  linkedHabit,
-  onLinkHabit,
-  setRoutine,
-  onOpenHabitPopup,
   onRemoveActivity,
+  context = 'timeslot'
 }: {
   activity: Activity & { slot: SlotName };
   date: Date;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
-  linkedHabit: any;
-  onLinkHabit: (habitId: string) => void;
-  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-  onOpenHabitPopup?: (habitId: string, event: React.MouseEvent) => void;
   onRemoveActivity: (slotName: string, activityId: string) => void;
+  context?: 'timeslot' | 'agenda';
 }) => {
-  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes, activityDurations, onOpenFocusModal, onOpenTaskContext } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, handleLinkHabit, habitCards, setRoutine, onOpenFocusModal, onOpenTaskContext, onOpenHabitPopup, activityDurations, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes } = useAuth();
   const { toast } = useToast();
   
   const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
@@ -387,8 +378,27 @@ const AgendaWidgetItem = ({
     displayDetails = description.split(' for ')[1] || "Workout";
   }
   
-  const duration = activityDurations[activity.id];
-
+  const linkedHabit = useMemo(() => {
+    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
+      return habitCards.find(h => h.id === activity.habitEquationIds![0]);
+    }
+    return null;
+  }, [activity.habitEquationIds, habitCards]);
+  
+  const handleTitleClick = (event: React.MouseEvent) => {
+    if (activity.completed) {
+      onToggleComplete(activity.slot, activity.id, false);
+      return;
+    }
+    
+    if (linkedHabit && onOpenHabitPopup) {
+        onOpenHabitPopup(linkedHabit.id, event);
+        return;
+    }
+    
+    onActivityClick(activity.slot, activity, event);
+  };
+  
   const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     const shouldOpenModal = onOpenFocusModal(activity);
@@ -400,6 +410,7 @@ const AgendaWidgetItem = ({
     }
   };
   
+  const duration = activityDurations[activity.id];
   let displayDuration = duration;
   if (isHighLevelTask && totalLoggedMinutes > 0) {
     const h = Math.floor(totalLoggedMinutes / 60);
@@ -410,8 +421,8 @@ const AgendaWidgetItem = ({
   const itemContent = (
     <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
       <div 
-        className={cn("flex items-start gap-3 min-w-0 flex-grow cursor-pointer")}
-        onClick={(e) => onActivityClick(activity.slot, activity, e)}
+        className={cn("flex items-start gap-3 min-w-0 flex-grow", (linkedHabit || (activity.type !== 'interrupt' && activity.type !== 'distraction')) && "cursor-pointer")}
+        onClick={handleTitleClick}
       >
         <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
             {activity.completed 
@@ -434,7 +445,7 @@ const AgendaWidgetItem = ({
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' ? (
+        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' && context !== 'timeslot' ? (
             <Button
                 variant="ghost"
                 size="icon"
@@ -453,42 +464,46 @@ const AgendaWidgetItem = ({
                 <GitBranch className="h-4 w-4" />
             </Button>
         ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Repeat className="mr-2 h-4 w-4" />
-                <span>Repeat</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                  
-                  {activity.routine && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {context !== 'agenda' && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <Repeat className="mr-2 h-4 w-4" />
+                  <span>Repeat</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                    
+                    {activity.routine && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+              </DropdownMenuSub>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
   
   return <li>{itemContent}</li>;
 };
+
+    

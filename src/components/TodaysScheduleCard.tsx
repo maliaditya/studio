@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,225 +22,10 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from './ui/badge';
+import { AgendaWidgetItem } from './TimeSlots';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
-
-interface AgendaWidgetItemProps {
-  activity: Activity & { slot: keyof DailySchedule };
-  duration: string | undefined;
-  date: Date;
-  onLogLearning: (activity: Activity, progress: number, duration: number) => void;
-  onStartWorkoutLog: (activity: Activity) => void;
-  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  onStartLeadGenLog: (activity: Activity) => void;
-  onOpenFocusModal: (activity: Activity) => boolean;
-  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
-  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-}
-
-function AgendaWidgetItem({ 
-    activity, 
-    duration, 
-    date,
-    onStartWorkoutLog, 
-    onToggleComplete, 
-    onStartLeadGenLog, 
-    onOpenFocusModal, 
-    onOpenTaskContext,
-    onOpenHabitPopup,
-    setRoutine,
-}: AgendaWidgetItemProps) {
-  const { 
-    workoutMode, 
-    workoutPlans, 
-    exerciseDefinitions, 
-    habitCards, 
-    deepWorkDefinitions, 
-    upskillDefinitions, 
-    getDeepWorkNodeType,
-    getUpskillNodeType,
-    getDescendantLeafNodes,
-    permanentlyLoggedTaskIds,
-    getUpskillLoggedMinutesRecursive,
-    getDeepWorkLoggedMinutes,
-  } = useAuth();
-  const { toast } = useToast();
-  
-  const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
-  
-  const parentTaskDefinition = useMemo(() => {
-    if (!activity.taskIds || activity.taskIds.length === 0) return null;
-    const mainDefId = activity.taskIds[0].split('-')[0];
-    return allDefs.get(mainDefId);
-  }, [activity.taskIds, allDefs]);
-  
-  const { isHighLevelTask, allSubTasksCompleted, totalLoggedMinutes } = useMemo(() => {
-    if (!parentTaskDefinition || (activity.type !== 'deepwork' && activity.type !== 'upskill')) {
-      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
-    }
-
-    const nodeType = activity.type === 'deepwork' 
-      ? getDeepWorkNodeType(parentTaskDefinition)
-      : getUpskillNodeType(parentTaskDefinition);
-    
-    const isHighLevel = ['Intention', 'Curiosity', 'Objective'].includes(nodeType);
-    if (!isHighLevel) {
-      return { isHighLevelTask: false, allSubTasksCompleted: false, totalLoggedMinutes: 0 };
-    }
-
-    const leafNodes = getDescendantLeafNodes(parentTaskDefinition.id, activity.type);
-    const areAllComplete = leafNodes.length > 0 && leafNodes.every(node => permanentlyLoggedTaskIds.has(node.id));
-
-    const totalMinutes = activity.type === 'deepwork' 
-      ? getDeepWorkLoggedMinutes(parentTaskDefinition)
-      : getUpskillLoggedMinutesRecursive(parentTaskDefinition);
-
-    return { 
-      isHighLevelTask: true, 
-      allSubTasksCompleted: areAllComplete,
-      totalLoggedMinutes: totalMinutes,
-    };
-  }, [parentTaskDefinition, activity.type, getDescendantLeafNodes, permanentlyLoggedTaskIds, getDeepWorkNodeType, getUpskillNodeType, getDeepWorkLoggedMinutes, getUpskillLoggedMinutesRecursive]);
-
-  useEffect(() => {
-    if (isHighLevelTask && allSubTasksCompleted && !activity.completed) {
-      onToggleComplete(activity.slot, activity.id, true);
-    }
-  }, [isHighLevelTask, allSubTasksCompleted, activity.completed, activity.slot, activity.id, onToggleComplete]);
-  
-  let displayDetails = activity.details;
-  if (activity.type === 'workout') {
-    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
-    displayDetails = description.split(' for ')[1] || "Workout";
-  }
-
-  const linkedHabit = useMemo(() => {
-    if (activity.habitEquationIds && activity.habitEquationIds.length > 0) {
-      return habitCards.find(h => h.id === activity.habitEquationIds![0]);
-    }
-    return null;
-  }, [activity.habitEquationIds, habitCards]);
-
-  const handleTitleClick = (event: React.MouseEvent) => {
-    if (activity.completed) {
-      onToggleComplete(activity.slot, activity.id, false);
-      return;
-    }
-    
-    if (linkedHabit) {
-        onOpenHabitPopup(linkedHabit.id, event);
-        return;
-    }
-    
-    onOpenFocusModal(activity);
-  };
-  
-  const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    const shouldOpenModal = onOpenFocusModal(activity);
-    if (!shouldOpenModal) {
-      toast({
-        title: "Objective Already Complete",
-        description: `All sub-tasks for '${activity.details}' are already logged.`,
-      });
-    }
-  };
-  
-  let displayDuration = duration;
-  if (isHighLevelTask && totalLoggedMinutes > 0) {
-    const h = Math.floor(totalLoggedMinutes / 60);
-    const m = Math.round(totalLoggedMinutes % 60);
-    displayDuration = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + ' logged';
-  }
-  
-  const itemContent = (
-    <div className="flex items-center justify-between gap-4 p-2 rounded-md bg-muted/30 w-full group">
-      <div 
-        className={cn("flex items-start gap-3 min-w-0 flex-grow", !activity.completed && (activity.type === 'essentials' || linkedHabit) && "cursor-pointer")}
-        onClick={handleTitleClick}
-      >
-        <button onClick={() => onToggleComplete(activity.slot, activity.id, !activity.completed)} className="pt-0.5">
-            {activity.completed 
-              ? <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-              : <div className="h-5 w-5 border-2 rounded-sm mt-0.5 flex-shrink-0" />
-            }
-        </button>
-        <div className="flex-grow min-w-0">
-          <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
-            {displayDetails}
-          </p>
-          {linkedHabit && (
-            <div className="min-w-0">
-                <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
-                    Habit: {linkedHabit.name}
-                </p>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex-shrink-0 flex items-center text-right gap-1">
-        {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' ? (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={handleFocusClick}
-            >
-                <Timer className="h-4 w-4" />
-            </Button>
-        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => onOpenTaskContext(activity.id, e)}
-            >
-                <GitBranch className="h-4 w-4" />
-            </Button>
-        ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <Repeat className="mr-2 h-4 w-4" />
-                <span>Repeat</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                  
-                  {activity.routine && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>
-                    </>
-                  )}
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => {}} className="text-destructive">
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
-  );
-  
-  return <li>{itemContent}</li>;
-}
-
 
 interface TodaysScheduleCardProps {
   schedule: FullSchedule;
@@ -274,7 +58,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit } = useAuth();
+  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, onRemoveActivity } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState('');
@@ -488,14 +272,14 @@ export function TodaysScheduleCard({
                         activity={activity}
                         duration={activityDurations[activity.id]}
                         date={date}
-                        onLogLearning={onLogLearning}
-                        onStartWorkoutLog={onStartWorkoutLog}
                         onToggleComplete={onToggleComplete}
-                        onStartLeadGenLog={onStartLeadGenLog}
-                        onOpenFocusModal={onOpenFocusModal}
-                        onOpenTaskContext={onOpenTaskContext}
-                        onOpenHabitPopup={onOpenHabitPopup}
+                        onActivityClick={() => {}}
+                        linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
+                        onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
                         setRoutine={toggleRoutine}
+                        onOpenHabitPopup={onOpenHabitPopup}
+                        onRemoveActivity={onRemoveActivity}
+                        context="agenda"
                     />
                     ))}
                 </ul>
@@ -525,6 +309,8 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+    
+
     
 
     
