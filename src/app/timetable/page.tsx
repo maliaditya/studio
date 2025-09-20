@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -235,57 +236,17 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
     const handleAddActivity = (date: Date, slot: SlotName) => (type: ActivityType, details: string) => {
         const dateKey = format(date, 'yyyy-MM-dd');
-        
-        let newActivity: Activity;
     
-        if (type === 'upskill' || type === 'deepwork') {
-            const definitionSource = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
-            const newDef: ExerciseDefinition = {
-                id: `def_${Date.now()}_${Math.random()}`,
-                name: details,
-                category: details as any, // Specialization name becomes category
-            };
-            definitionSource(prev => [...prev, newDef]);
-
-            const logSource = type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-            let todaysLog = logSource.find(log => log.date === dateKey);
-
-            if (!todaysLog) {
-                todaysLog = { id: dateKey, date: dateKey, exercises: [] };
-            }
-
-            const newWorkoutExercise: WorkoutExercise = {
-                id: `${newDef.id}-${Date.now()}`,
-                definitionId: newDef.id,
-                name: newDef.name,
-                category: newDef.category,
-                loggedSets: [],
-                targetSets: 1, 
-                targetReps: '25',
-            };
-            todaysLog.exercises.push(newWorkoutExercise);
-            const logsUpdater = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
-
-            newActivity = { 
-                id: `${type}-${Date.now()}-${Math.random()}`, 
-                type, 
-                details, 
-                completed: false,
-                slot,
-                habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
-                taskIds: [newWorkoutExercise.id],
-            };
-        } else {
-             newActivity = { 
-                id: `${type}-${Date.now()}-${Math.random()}`, 
-                type, 
-                details, 
-                completed: false,
-                slot,
-                habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
-                taskIds: [],
-            };
-        }
+        const newActivity: Activity = { 
+            id: `${type}-${Date.now()}-${Math.random()}`, 
+            type, 
+            details, 
+            completed: false,
+            slot,
+            habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
+            taskIds: [],
+            linkedEntityType: (type === 'deepwork' || type === 'upskill') ? 'specialization' : undefined,
+        };
     
         setSchedule(prev => {
             const daySchedule = prev[dateKey] || {};
@@ -371,7 +332,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
     const timetableGrid = (
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-8 gap-1">
+        <div className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1">
             <div /> 
             {weekDays.map((day, index) => {
                 const date = weekDates[index];

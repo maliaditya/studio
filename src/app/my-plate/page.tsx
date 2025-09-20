@@ -413,8 +413,8 @@ function MyPlatePageContent() {
             const setDefinitions = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
             setDefinitions(prev => [...prev, newDef]);
             
-            taskIds = [`${newDef.id}-${Date.now()}`]; // Create a new instance ID format.
-            linkedEntityType = 'specialization'; // It starts as a specialization link.
+            taskIds = [`${newDef.id}-${Date.now()}`];
+            linkedEntityType = type === 'upskill' ? 'curiosity' : 'intention';
         }
 
 
@@ -1062,49 +1062,50 @@ function MyPlatePageContent() {
     });
   };
 
-  const activityInfo = useMemo(() => {
-    if (!editingActivity) return null;
-    return editingActivity.activity;
-  }, [editingActivity]);
+  const activityInfo = editingActivity?.activity;
 
   const availableTasksForModal = useMemo(() => {
     if (!activityInfo) return [];
 
     let definitionSource: ExerciseDefinition[] = [];
-    const logForDay = activityInfo.type === 'upskill' 
-        ? allUpskillLogs.find(log => log.date === selectedDateKey)
-        : allDeepWorkLogs.find(log => log.date === selectedDateKey);
-
     if (activityInfo.type === 'upskill') {
         definitionSource = upskillDefinitions;
     } else if (activityInfo.type === 'deepwork' || activityInfo.type === 'branding') {
         definitionSource = deepWorkDefinitions;
     }
-    
-    // Get IDs of task definitions from the activity itself
-    const activityDefIds = new Set((activityInfo.taskIds || []).map(id => {
-        const instance = (logForDay?.exercises || []).find(ex => ex.id === id);
-        return instance?.definitionId;
-    }).filter(Boolean));
 
+    const taskDefsInActivity = (activityInfo.taskIds || [])
+        .map(id => {
+            const defId = id.split('-')[0];
+            return definitionSource.find(def => def.id === defId);
+        })
+        .filter((d): d is ExerciseDefinition => !!d);
 
-    const definitions = definitionSource.filter(def => {
-        if (activityInfo.linkedEntityType === 'specialization') {
-            return def.category === activityInfo.details;
-        }
-        return activityDefIds.has(def.id);
-    });
-    
-    return definitions.map(def => ({
-        id: `${def.id}-${Date.now()}`,
-        definitionId: def.id,
-        name: def.name,
-        category: def.category,
-        loggedSets: [],
-        targetSets: 1,
-        targetReps: '25',
-    }));
-  }, [editingActivity, activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, deepWorkDefinitions, upskillDefinitions]);
+    if (taskDefsInActivity.length > 0) {
+        return taskDefsInActivity.map(def => ({
+            id: `${def.id}-${Date.now()}`,
+            definitionId: def.id,
+            name: def.name,
+            category: def.category,
+            loggedSets: [],
+            targetSets: 1,
+            targetReps: '25',
+        }));
+    }
+
+    // Fallback if no taskIds but it's a learn/deepwork task
+    return definitionSource
+        .filter(def => def.category === activityInfo.details)
+        .map(def => ({
+            id: `${def.id}-${Date.now()}`,
+            definitionId: def.id,
+            name: def.name,
+            category: def.category,
+            loggedSets: [],
+            targetSets: 1,
+            targetReps: '25',
+        }));
+  }, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions]);
 
 
   return (
@@ -1436,4 +1437,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
