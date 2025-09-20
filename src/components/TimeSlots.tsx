@@ -178,6 +178,7 @@ export function TimeSlots({
                           linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
                           onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
                           setRoutine={setRoutine}
+                          onOpenHabitPopup={openRuleDetailPopup}
                         />
                       ))
                     ) : (
@@ -316,6 +317,7 @@ const AgendaWidgetItem = ({
   linkedHabit,
   onLinkHabit,
   setRoutine,
+  onOpenHabitPopup,
 }: {
   activity: Activity & { slot: SlotName };
   date: Date;
@@ -324,8 +326,9 @@ const AgendaWidgetItem = ({
   linkedHabit: any;
   onLinkHabit: (habitId: string) => void;
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
+  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
 }) => {
-  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes, activityDurations } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, habitCards, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes, activityDurations, onOpenFocusModal, onOpenTaskContext } = useAuth();
   const { toast } = useToast();
   
   const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
@@ -388,13 +391,19 @@ const AgendaWidgetItem = ({
         onOpenHabitPopup(linkedHabit.id, event);
         return;
     }
-
+    
     onActivityClick(activity.slot, activity, event);
   };
   
   const handleFocusClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
-    onActivityClick(activity.slot, activity, e);
+    const shouldOpenModal = onOpenFocusModal(activity);
+    if (!shouldOpenModal) {
+      toast({
+        title: "Objective Already Complete",
+        description: `All sub-tasks for '${activity.details}' are already logged.`,
+      });
+    }
   };
   
   let displayDuration = duration;
@@ -420,7 +429,7 @@ const AgendaWidgetItem = ({
           <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
             {displayDetails}
           </p>
-           {linkedHabit && (
+          {linkedHabit && (
             <div className="min-w-0">
                 <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
                     Habit: {linkedHabit.name}
@@ -477,7 +486,7 @@ const AgendaWidgetItem = ({
               </DropdownMenuPortal>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
+            <DropdownMenuItem onClick={() => {}} className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
               <span>Delete</span>
             </DropdownMenuItem>
