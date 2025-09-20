@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
