@@ -270,15 +270,15 @@ export function TodaysScheduleCard({
                     <AgendaWidgetItem
                         key={activity.id}
                         activity={activity}
-                        duration={activityDurations[activity.id]}
                         date={date}
                         onToggleComplete={onToggleComplete}
-                        onActivityClick={() => {}}
-                        linkedHabit={habitCards.find(h => activity.habitEquationIds?.includes(h.id))}
-                        onLinkHabit={(habitId) => handleLinkHabit(activity.id, habitId, date)}
-                        setRoutine={toggleRoutine}
-                        onOpenHabitPopup={onOpenHabitPopup}
+                        onActivityClick={(slot, act, e) => {
+                            if (act.type === 'deepwork' || act.type === 'upskill' || act.type === 'branding') {
+                                onOpenFocusModal(act);
+                            }
+                        }}
                         onRemoveActivity={onRemoveActivity}
+                        setRoutine={toggleRoutine}
                         context="agenda"
                     />
                     ))}
@@ -309,8 +309,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-    
-
-    
-
-    

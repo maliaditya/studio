@@ -22,7 +22,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from './ui/badge';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -236,6 +236,7 @@ export function TimeSlots({
                           onToggleComplete={onToggleComplete}
                           onActivityClick={onActivityClick}
                           onRemoveActivity={onRemoveActivity}
+                          setRoutine={setRoutine}
                           context="timeslot"
                         />
                       ))
@@ -318,6 +319,7 @@ export const AgendaWidgetItem = ({
   onToggleComplete,
   onActivityClick,
   onRemoveActivity,
+  setRoutine,
   context = 'timeslot'
 }: {
   activity: Activity & { slot: SlotName };
@@ -325,9 +327,10 @@ export const AgendaWidgetItem = ({
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
   onRemoveActivity: (slotName: string, activityId: string) => void;
+  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
   context?: 'timeslot' | 'agenda';
 }) => {
-  const { workoutMode, workoutPlans, exerciseDefinitions, handleLinkHabit, habitCards, setRoutine, onOpenFocusModal, onOpenTaskContext, onOpenHabitPopup, activityDurations, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, handleLinkHabit, habitCards, onOpenFocusModal, onOpenHabitPopup, activityDurations, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType, getDescendantLeafNodes, permanentlyLoggedTaskIds, getUpskillLoggedMinutesRecursive, getDeepWorkLoggedMinutes } = useAuth();
   const { toast } = useToast();
   
   const allDefs = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
@@ -445,7 +448,7 @@ export const AgendaWidgetItem = ({
       </div>
       <div className="flex-shrink-0 flex items-center text-right gap-1">
         {displayDuration && <p className="text-xs font-semibold whitespace-nowrap text-muted-foreground">{displayDuration}</p>}
-        {!activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' && context !== 'timeslot' ? (
+        {context === 'agenda' && !activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction' && (
             <Button
                 variant="ghost"
                 size="icon"
@@ -454,16 +457,7 @@ export const AgendaWidgetItem = ({
             >
                 <Timer className="h-4 w-4" />
             </Button>
-        ) : (activity.taskIds && activity.taskIds.length > 0) ? (
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => onOpenTaskContext(activity.id, e)}
-            >
-                <GitBranch className="h-4 w-4" />
-            </Button>
-        ) : null}
+        )}
         {context !== 'agenda' && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -505,5 +499,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
-    
