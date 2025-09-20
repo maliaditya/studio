@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -58,7 +57,7 @@ export function TodaysLearningModal({
   productizationPlans = {},
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
-  const { coreSkills, skillDomains, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, settings } = useAuth();
+  const { coreSkills, skillDomains, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, settings, updateActivity } = useAuth();
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for bundle creation
@@ -73,25 +72,20 @@ export function TodaysLearningModal({
   
   const currentSpecializationName = useMemo(() => {
     if (availableTasks.length > 0) {
-      const taskDefId = availableTasks[0].definitionId;
-      const definition = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === taskDefId);
-      return definition?.category || null;
+      return availableTasks[0].category;
     }
     return null;
-  }, [availableTasks, deepWorkDefinitions, upskillDefinitions]);
+  }, [availableTasks]);
   
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
-  
-    const microSkillInfo = Array.from(microSkillMap.values()).find(info => info.microSkillName === currentSpecializationName);
-    if (!microSkillInfo) return [];
-  
-    const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName && cs.type === 'Specialization');
+
+    const coreSkill = coreSkills.find(cs => cs.name === currentSpecializationName && cs.type === 'Specialization');
     if (!coreSkill) return [];
   
     const domainId = coreSkill.domainId;
     return projects.filter(p => p.domainId === domainId);
-  }, [currentSpecializationName, coreSkills, projects, microSkillMap]);
+  }, [currentSpecializationName, coreSkills, projects]);
 
   useEffect(() => {
     if (isOpen) {
@@ -103,6 +97,14 @@ export function TodaysLearningModal({
   }, [isOpen, pageType, initialSelectedIds, availableTasks]);
   
   const handleSaveChanges = () => {
+    const activityToUpdate = availableTasks[0];
+    if (activityToUpdate && selectedRadioDefId) {
+      updateActivity({
+        ...activityToUpdate,
+        linkedEntityType: activityToUpdate.type === 'deepwork' ? 'intention' : 'curiosity'
+      });
+    }
+
     onSave(selectedRadioDefId ? [selectedRadioDefId] : []);
     onOpenChange(false);
   };
@@ -236,7 +238,7 @@ export function TodaysLearningModal({
                         <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
                            {tasksForProject.map(task => (
                                 <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                    <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
+                                    <RadioGroupItem value={task.definitionId} id={`task-radio-${task.id}`} />
                                     <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
                                         {pageType === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500"/> : <Flashlight className="h-4 w-4 text-amber-500"/>}
                                         {task.name}
