@@ -320,13 +320,13 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
     const timetableGrid = (
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-8 gap-1">
+        <div className="grid grid-cols-[auto_repeat(7,minmax(0,1fr))] gap-1">
             <div /> 
             {weekDays.map((day, index) => {
                 const date = weekDates[index];
                 const isPastDay = isBefore(date, startOfToday());
                 return (
-                    <div key={day} className={cn("text-center font-semibold text-sm py-2 col-span-1", isPastDay && "opacity-60")}>
+                    <div key={day} className={cn("text-center font-semibold text-sm py-2", isPastDay && "opacity-60")}>
                         {day.substring(0,3)}
                         <div className={cn("text-xs font-normal", isToday(weekDates[index]) && "text-primary font-bold")}>
                             {format(weekDates[index], 'd')}
@@ -337,7 +337,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
             {slotOrder.map(slot => (
                 <React.Fragment key={slot}>
-                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2 col-span-1">{slot}</div>
+                    <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
                         const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
@@ -350,7 +350,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                         const isCurrentSlot = isToday(date) && slot === currentSlot;
 
                         return (
-                            <div key={dateKey} className={cn("p-1 rounded-lg col-span-1", isPastDay && "opacity-60", isCurrentSlot && "bg-primary/10")}>
+                            <div key={dateKey} className={cn("p-1 rounded-lg", isPastDay && "opacity-60", isCurrentSlot && "bg-primary/10")}>
                                 <DroppableSlot 
                                     date={date}
                                     slot={slot}
@@ -409,56 +409,3 @@ export default function TimetablePage() {
         </AuthGuard>
     )
 }
-
-```
-- src/hooks/use-local-storage-state.ts:
-```ts
-"use client";
-
-import { useState, useEffect, useCallback } from 'react';
-
-export function useLocalStorageState<T>(key: string, defaultValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const [state, setState] = useState<T>(() => {
-    if (typeof window === 'undefined') {
-      return defaultValue;
-    }
-    try {
-      const storedValue = localStorage.getItem(key);
-      return storedValue ? JSON.parse(storedValue) : defaultValue;
-    } catch (error) {
-      console.error(`Error reading localStorage key “${key}”:`, error);
-      return defaultValue;
-    }
-  });
-
-  const setLocalStorageState = useCallback((newState: T | ((prevState: T) => T)) => {
-    setState(prevState => {
-      const valueToStore = newState instanceof Function ? newState(prevState) : newState;
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(key, JSON.stringify(valueToStore));
-        }
-      } catch (error) {
-        console.error(`Error setting localStorage key “${key}”:`, error);
-      }
-      return valueToStore;
-    });
-  }, [key]);
-
-  return [state, setLocalStorageState];
-}
-
-```
-- src/services/auto-suggestion-flow.ts:
-```ts
-// This AI flow has been integrated into the Pistons of Intention feature (PistonsHead.tsx).
-// This file is no longer used and can be safely deleted.
-
-```
-- src/services/openaiService.ts:
-```ts
-// This file has been intentionally left blank.
-// The project has been migrated to use a local, keyword-based service (nutritionService.ts) for nutritional analysis
-// to improve performance and reduce reliance on external APIs.
-
-```
