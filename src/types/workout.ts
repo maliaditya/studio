@@ -204,6 +204,7 @@ export interface Activity {
   duration?: number; // For interruptions
   subTasks?: SubTask[]; // Added for sub-task functionality
   routine?: RecurrenceRule | null;
+  isRoutine?: boolean;
   linkedEntityType?: 'specialization' | 'intention' | 'curiosity';
 };
 
@@ -216,7 +217,6 @@ export interface Interrupt {
 export type SlotName = 'Late Night' | 'Dawn' | 'Morning' | 'Afternoon' | 'Evening' | 'Night';
 
 export interface DailySchedule {
-  purpose?: string;
   [slotName: string]: Activity[] | string | Interrupt[] | undefined;
 }
 
@@ -695,6 +695,7 @@ export interface UserSettings {
   widgetVisibility: WidgetVisibility;
   allWidgetsVisible: boolean;
   agendaShowCurrentSlotOnly: boolean;
+  currentPurpose?: string;
 }
 
 export interface ActiveFocusSession {

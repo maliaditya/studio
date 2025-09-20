@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -41,6 +42,7 @@ interface TodaysScheduleCardProps {
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
+  onRemoveActivity: (slotName: string, activityId: string) => void;
 }
 
 export function TodaysScheduleCard({ 
@@ -57,19 +59,20 @@ export function TodaysScheduleCard({
   onOpenTaskContext,
   onOpenHabitPopup,
   currentSlot,
+  onRemoveActivity,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, dailyPurposes, setDailyPurposes, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, onRemoveActivity } = useAuth();
+  const { currentUser, carryForwardTask, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
-  const [purposeText, setPurposeText] = useState('');
+  const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
 
   useEffect(() => {
-    setPurposeText(dailyPurposes[dayKey] || '');
-  }, [dailyPurposes, dayKey]);
+    setPurposeText(settings.currentPurpose || '');
+  }, [settings.currentPurpose]);
 
   const handleSavePurpose = () => {
-    setDailyPurposes(prev => ({...prev, [dayKey]: purposeText}));
+    setSettings(prev => ({...prev, currentPurpose: purposeText}));
     setPurposePopoverOpen(false);
   };
 
@@ -251,8 +254,8 @@ export function TodaysScheduleCard({
                     <PopoverContent className="w-80">
                         <div className="grid gap-4">
                             <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Daily Purpose</h4>
-                                <p className="text-sm text-muted-foreground">Set your main intention for today.</p>
+                                <h4 className="font-medium leading-none">Current Purpose</h4>
+                                <p className="text-sm text-muted-foreground">Set your main intention for the day.</p>
                             </div>
                             <div className="space-y-2">
                                 <Input value={purposeText} onChange={(e) => setPurposeText(e.target.value)} />
@@ -279,6 +282,8 @@ export function TodaysScheduleCard({
                         }}
                         onRemoveActivity={onRemoveActivity}
                         setRoutine={toggleRoutine}
+                        onOpenTaskContext={onOpenTaskContext}
+                        onOpenHabitPopup={onOpenHabitPopup}
                         context="agenda"
                     />
                     ))}
