@@ -57,7 +57,8 @@ export function TodaysLearningModal({
   productizationPlans = {},
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
-  const { coreSkills, skillDomains, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, settings, updateActivity } = useAuth();
+  const { coreSkills, skillDomains, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, updateActivity } = useAuth();
+  
   const [selectedRadioDefId, setSelectedRadioDefId] = useState<string | null>(null);
 
   // State for bundle creation
@@ -68,24 +69,34 @@ export function TodaysLearningModal({
   const [selectionStep, setSelectionStep] = useState<'project' | 'task'>('project');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const schedulingLevel = settings.schedulingLevel || 3;
-  
   const currentSpecializationName = useMemo(() => {
     if (availableTasks.length > 0) {
-      return availableTasks[0].category;
+        const firstTask = availableTasks[0];
+        // If a specific task instance is already linked, get its category
+        if (initialSelectedIds.length > 0) {
+            const initialTask = availableTasks.find(t => initialSelectedIds.includes(t.id));
+            if (initialTask) {
+                return initialTask.category;
+            }
+        }
+        // Fallback to the activity's detail, which holds the specialization name
+        return firstTask.category;
     }
     return null;
-  }, [availableTasks]);
-  
+  }, [availableTasks, initialSelectedIds]);
+
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
 
+    // Find the core skill that matches the specialization name
     const coreSkill = coreSkills.find(cs => cs.name === currentSpecializationName && cs.type === 'Specialization');
     if (!coreSkill) return [];
   
+    // Use the domainId from that core skill to filter projects
     const domainId = coreSkill.domainId;
     return projects.filter(p => p.domainId === domainId);
   }, [currentSpecializationName, coreSkills, projects]);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -134,7 +145,7 @@ export function TodaysLearningModal({
       return;
     }
     if (selectedFocusAreaIds.length === 0) {
-      toast({ title: "Error", description: "Please select at least one focus area.", variant: "destructive" });
+      toast({ title: "Error", description: "Please select at least one focus area for the bundle.", variant: "destructive" });
       return;
     }
 
@@ -213,7 +224,9 @@ export function TodaysLearningModal({
             {(pageType === 'deepwork' || pageType === 'upskill') ? (
                 <div className="space-y-4">
                     <div className="flex items-center text-sm text-muted-foreground mb-4">
-                        {currentSpecializationName || 'Projects'}
+                        <button onClick={() => setSelectionStep('project')} disabled={selectionStep === 'project'} className={cn(selectionStep !== 'project' && 'hover:underline')}>
+                          {currentSpecializationName || 'Projects'}
+                        </button>
                         {selectedProject && (
                             <>
                                 <ChevronRight className="h-4 w-4 mx-1" />
@@ -223,7 +236,7 @@ export function TodaysLearningModal({
                             </>
                         )}
                     </div>
-                    {selectionStep === 'project' && (
+                    {selectionStep === 'project' ? (
                         <div className="space-y-2">
                             {projectsForSpecialization.map(project => ( 
                                 <button key={project.id} onClick={() => { setSelectedProject(project); setSelectionStep('task'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
@@ -233,12 +246,11 @@ export function TodaysLearningModal({
                             ))}
                             {projectsForSpecialization.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">No projects found for this specialization. Go to the Skill page to link them.</p>}
                         </div>
-                    )}
-                    {selectionStep === 'task' && (
+                    ) : (
                         <RadioGroup value={selectedRadioDefId ?? ''} onValueChange={setSelectedRadioDefId} className="space-y-2">
                            {tasksForProject.map(task => (
                                 <div key={task.id} className="flex items-center space-x-3 p-3 rounded-md border bg-muted/20 has-[[data-state=checked]]:bg-accent transition-colors">
-                                    <RadioGroupItem value={task.definitionId} id={`task-radio-${task.id}`} />
+                                    <RadioGroupItem value={task.id} id={`task-radio-${task.id}`} />
                                     <Label htmlFor={`task-radio-${task.id}`} className="font-normal w-full cursor-pointer flex items-center gap-2">
                                         {pageType === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500"/> : <Flashlight className="h-4 w-4 text-amber-500"/>}
                                         {task.name}
