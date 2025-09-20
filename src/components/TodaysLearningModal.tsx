@@ -86,24 +86,20 @@ export function TodaysLearningModal({
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
   
-    // Find the microSkill info from the map using the task's category (which is the micro-skill name)
     const microSkillInfo = Array.from(microSkillMap.values()).find(
       (info) => info.microSkillName === currentSpecializationName
     );
   
     if (!microSkillInfo) return [];
   
-    // Find the core skill (specialization) using the name from the map
     const specialization = coreSkills.find(
       (cs) => cs.name === microSkillInfo.coreSkillName && cs.type === 'Specialization'
     );
   
     if (!specialization) return [];
   
-    // Get the domain ID from the found specialization
     const domainId = specialization.domainId;
   
-    // Filter projects based on the correct domain ID
     return projects.filter(p => p.domainId === domainId);
   
   }, [currentSpecializationName, coreSkills, projects, microSkillMap]);
