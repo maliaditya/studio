@@ -147,6 +147,8 @@ function MyPlatePageContent() {
     activeFocusSession,
     onOpenFocusModal,
     toggleRoutine,
+    onRemoveActivity,
+    activeProjectIds,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -306,28 +308,34 @@ function MyPlatePageContent() {
                     }
                 }
             } else {
-              let activityDuration = 0;
-              if (activity.type === 'essentials' || activity.type === 'interrupt' || activity.type === 'distraction') {
-                activityDuration = activity.duration || 0;
-              } else if (activity.taskIds && activity.taskIds.length > 0) {
-                  const mainDefId = activity.taskIds[0].split('-')[0];
-                  const taskDef = allDefs.get(mainDefId);
-                  if (taskDef) {
-                      activityDuration = calculateTotalEstimate(taskDef);
+              // For non-completed tasks, calculate estimated duration
+              switch(activity.type) {
+                case 'workout': totalMinutes = 90; break;
+                case 'mindset': totalMinutes = 15; break;
+                case 'upskill':
+                case 'deepwork':
+                case 'branding':
+                  if (activity.taskIds && activity.taskIds.length > 0) {
+                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                    const taskDef = allDefs.get(mainTaskDefId);
+                    if (taskDef) {
+                      totalMinutes = calculateTotalEstimate(taskDef);
+                    } else {
+                      totalMinutes = 120;
+                    }
+                  } else {
+                    totalMinutes = 120;
                   }
-              }
-
-              if (activityDuration > 0) {
-                  totalMinutes = activityDuration;
-              } else {
-                  switch(activity.type) {
-                      case 'workout': totalMinutes = 90; break;
-                      case 'mindset': totalMinutes = 15; break;
-                      case 'upskill': case 'deepwork': case 'branding': totalMinutes = 120; break;
-                      case 'planning': case 'tracking': totalMinutes = 30; break;
-                      case 'lead-generation': totalMinutes = 45; break;
-                      default: totalMinutes = 0;
-                  }
+                  break;
+                case 'planning':
+                case 'tracking':
+                  totalMinutes = 30; break;
+                case 'lead-generation': totalMinutes = 45; break;
+                case 'essentials':
+                case 'interrupt':
+                case 'distraction':
+                   totalMinutes = activity.duration || 0; break;
+                default: totalMinutes = 0;
               }
             }
 
@@ -414,7 +422,7 @@ function MyPlatePageContent() {
             setDefinitions(prev => [...prev, newDef]);
             
             taskIds = [`${newDef.id}-${Date.now()}`];
-            linkedEntityType = type === 'upskill' ? 'curiosity' : 'intention';
+            linkedEntityType = 'specialization';
         }
 
 
@@ -607,40 +615,6 @@ function MyPlatePageContent() {
     setCurrentSlotForMeal(null);
   };
 
-
-  const handleRemoveActivity = (slotName: string, activityId: string) => {
-    setSchedule(prev => {
-      const newTodaySchedule = { ...(prev[selectedDateKey] || {}) };
-      const activities = Array.isArray(newTodaySchedule[slotName]) ? newTodaySchedule[slotName] as Activity[] : [];
-      const updatedActivities = activities.filter(act => act.id !== activityId);
-      if (updatedActivities.length > 0) { newTodaySchedule[slotName] = updatedActivities; } else { delete newTodaySchedule[slotName]; }
-      return { ...prev, [selectedDateKey]: newTodaySchedule };
-    });
-  };
-
-  const getTodaysWorkout = () => {
-    const { exercises, description } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation);
-    const muscleGroups = Array.from(new Set(exercises.map(ex => ex.category)));
-    return { exercises, muscleGroups };
-  };
-
-  const handleStartWorkoutLog = (activity: Activity) => {
-    const { exercises, muscleGroups } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions);
-    setTodaysExercises(exercises);
-    setTodaysMuscleGroups(muscleGroups);
-    setWorkoutActivityToLog(activity);
-    setIsTodaysWorkoutModalOpen(true);
-  };
-
-  const handleStartMindsetLog = (activity: Activity) => {
-    setMindsetActivityToLog(activity);
-    setIsTodaysMindsetModalOpen(true);
-  };
-  
-  const handleStartLeadGenLog = (activity: Activity) => {
-    setWorkoutActivityToLog(activity); // Reusing state for simplicity
-    setIsLeadGenModalOpen(true);
-  };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (activity.completed) return;
@@ -1158,6 +1132,7 @@ function MyPlatePageContent() {
                           onOpenTaskContext={openTaskContextPopup}
                           onOpenHabitPopup={openRuleDetailPopup}
                           currentSlot={currentSlot}
+                          onRemoveActivity={onRemoveActivity}
                       />
                   ) : (
                       <Card>
@@ -1202,7 +1177,7 @@ function MyPlatePageContent() {
                 currentSlot={currentSlot}
                 remainingTime={remainingTime}
                 onAddActivity={handleAddActivity}
-                onRemoveActivity={handleRemoveActivity}
+                onRemoveActivity={onRemoveActivity}
                 onToggleComplete={handleToggleComplete}
                 onActivityClick={handleActivityClick}
                 slotDurations={slotDurations}
@@ -1267,6 +1242,7 @@ function MyPlatePageContent() {
             projects={projects}
             offerizationPlans={offerizationPlans}
             productizationPlans={productizationPlans}
+            activeProjectIds={activeProjectIds}
         />
       )}
 

@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -39,6 +40,7 @@ interface TodaysLearningModalProps {
   projects?: Project[];
   offerizationPlans?: Record<string, ProductizationPlan>;
   productizationPlans?: Record<string, ProductizationPlan>;
+  activeProjectIds?: Set<string>;
 }
 
 export function TodaysLearningModal({
@@ -55,6 +57,7 @@ export function TodaysLearningModal({
   projects = [],
   offerizationPlans = {},
   productizationPlans = {},
+  activeProjectIds = new Set(),
 }: TodaysLearningModalProps) {
   const { toast } = useToast();
   const { coreSkills, skillDomains, microSkillMap, getDeepWorkNodeType, getUpskillNodeType, updateActivity } = useAuth();
@@ -88,14 +91,22 @@ export function TodaysLearningModal({
   const projectsForSpecialization = useMemo(() => {
     if (!currentSpecializationName) return [];
 
-    // Find the core skill that matches the specialization name
     const coreSkill = coreSkills.find(cs => cs.name === currentSpecializationName && cs.type === 'Specialization');
-    if (!coreSkill) return [];
+    if (!coreSkill) {
+      // Fallback for when details might be the category name directly
+      const foundInMap = Array.from(microSkillMap.values()).find(info => info.microSkillName === currentSpecializationName);
+      if (foundInMap) {
+        const parentCoreSkill = coreSkills.find(cs => cs.name === foundInMap.coreSkillName);
+        if (parentCoreSkill) {
+            return projects.filter(p => p.domainId === parentCoreSkill.domainId);
+        }
+      }
+      return [];
+    }
   
-    // Use the domainId from that core skill to filter projects
     const domainId = coreSkill.domainId;
     return projects.filter(p => p.domainId === domainId);
-  }, [currentSpecializationName, coreSkills, projects]);
+  }, [currentSpecializationName, coreSkills, projects, microSkillMap]);
 
 
   useEffect(() => {
@@ -239,7 +250,10 @@ export function TodaysLearningModal({
                     {selectionStep === 'project' ? (
                         <div className="space-y-2">
                             {projectsForSpecialization.map(project => ( 
-                                <button key={project.id} onClick={() => { setSelectedProject(project); setSelectionStep('task'); }} className="flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors">
+                                <button key={project.id} onClick={() => { setSelectedProject(project); setSelectionStep('task'); }} className={cn(
+                                    "flex items-center justify-between w-full text-left p-3 rounded-md border bg-muted/20 hover:bg-accent transition-colors",
+                                    activeProjectIds.has(project.id) && "bg-primary/10 border-primary/50"
+                                )}>
                                     <span className="font-medium">{project.name}</span>
                                     <ChevronRight className="h-4 w-4" />
                                 </button>
