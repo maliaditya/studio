@@ -71,10 +71,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
      useEffect(() => {
         const audioEl = audioRef.current;
-        if (!audioEl || !resource?.id) return;
+        if (!audioEl || !resource?.id || !resource.hasLocalAudio) return;
 
         const handleAudioPlayback = async () => {
-            if (playingAudio && resource.hasLocalAudio) {
+            if (playingAudio) {
                 const audioBlob = await getAudio(resource.id);
                 if (audioBlob) {
                     const audioUrl = URL.createObjectURL(audioBlob);
@@ -92,7 +92,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         };
 
         handleAudioPlayback();
+    }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
 
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+        
         const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
         const handleDurationChange = () => setDuration(audioEl.duration);
 
@@ -101,12 +106,11 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 
         return () => {
             if (audioEl) {
-                URL.revokeObjectURL(audioEl.src);
                 audioEl.removeEventListener('timeupdate', handleTimeUpdate);
                 audioEl.removeEventListener('durationchange', handleDurationChange);
             }
         };
-    }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
+    }, []);
 
     useEffect(() => {
       const audioEl = audioRef.current;
@@ -127,7 +131,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         if (playbackRequest.endTime) {
             audioEl.addEventListener('timeupdate', checkEndTime);
             return () => {
-              audioEl.removeEventListener('timeupdate', checkEndTime);
+              if (audioEl) { // Check if audioEl still exists
+                audioEl.removeEventListener('timeupdate', checkEndTime);
+              }
             };
         } else {
             setPlaybackRequest(null);
@@ -152,7 +158,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
           newPoint = { id: `point_${Date.now()}`, text: 'New step...', type };
         }
         
-        const updatedPoints = [...(resource.points || []), newPoint].sort((a,b) => (a.timestamp || Infinity) - (b.timestamp || Infinity));
+        const updatedPoints = [...(resource.points || []), newPoint];
         
         onUpdate({ ...resource, points: updatedPoints });
     };
@@ -216,7 +222,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             case 'card':
                 return (
                     <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).sort((a, b) => (a.timestamp || Infinity) - (b.timestamp || Infinity)).map(point => (
+                        {(resource.points || []).sort((a, b) => (a.timestamp === undefined ? Infinity : a.timestamp) - (b.timestamp === undefined ? Infinity : b.timestamp)).map(point => (
                             <EditableResourcePoint 
                                 key={point.id}
                                 point={point}
@@ -227,7 +233,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
                                 onSeekTo={handleSeekTo}
                                 currentTime={currentTime}
-                                onSetEndTime={() => handleUpdatePoint(point.id, { endTime: Math.max(0, currentTime - 30) })}
+                                onSetEndTime={() => handleUpdatePoint(point.id, { endTime: Math.max(0, currentTime) })}
                                 onClearEndTime={() => handleUpdatePoint(point.id, { endTime: undefined })}
                             />
                         ))}

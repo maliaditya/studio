@@ -403,7 +403,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     size: { width: 448, height: 252 },
   });
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const [globalVolume, setGlobalVolume] = useState(0.2);
+  const [globalVolume, setGlobalVolumeState] = useState(0.2);
   const [playbackRequest, setPlaybackRequest] = useState<PlaybackRequest | null>(null);
   const router = useRouter();
   const { toast } = useToast();
@@ -593,6 +593,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setThemeState(newTheme);
     if (typeof window !== 'undefined') {
       localStorage.setItem('lifeos_theme', newTheme);
+    }
+  }, []);
+
+  const setGlobalVolume = useCallback((newVolume: number) => {
+    setGlobalVolumeState(newVolume);
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('lifeos_global_volume', String(newVolume));
     }
   }, []);
 
@@ -2901,6 +2908,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
     setThemeState(savedTheme);
+
+    const savedVolume = typeof window !== 'undefined' ? localStorage.getItem('lifeos_global_volume') : null;
+    if (savedVolume !== null) {
+        setGlobalVolumeState(parseFloat(savedVolume));
+    }
   }, [loadState]);
   
    useEffect(() => {
