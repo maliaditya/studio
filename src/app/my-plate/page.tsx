@@ -35,7 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -275,29 +275,26 @@ function MyPlatePageContent() {
           if (activity.completed) {
             if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
               let definition: ExerciseDefinition | undefined;
-              const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
               
               if (activity.taskIds && activity.taskIds.length > 0) {
                 const mainLogInstanceId = activity.taskIds[0];
                 let mainDefId: string | undefined;
-  
+
                 const upskillLog = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
                 if (upskillLog) mainDefId = upskillLog.definitionId;
                 else {
                     const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
                     if (deepWorkLog) mainDefId = deepWorkLog.definitionId;
+                    else {
+                         const brandingLog = brandingLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                         if(brandingLog) mainDefId = brandingLog.definitionId;
+                    }
                 }
                 if (mainDefId) {
                   definition = allDefs.get(mainDefId);
                 }
               }
-  
-              if (!definition) {
-                const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-                const category = microSkill ? microSkill.microSkillName : activity.details;
-                definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
-              }
-  
+
               if (definition) {
                 const leafNodes = getDescendantLeafNodes(definition.id, activity.type === 'upskill' ? 'upskill' : 'deepwork');
                 
@@ -329,12 +326,20 @@ function MyPlatePageContent() {
               case 'deepwork':
               case 'branding':
                 if (activity.taskIds && activity.taskIds.length > 0) {
-                  const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                  const taskDef = allDefs.get(mainTaskDefId);
-                  if (taskDef) {
-                    totalMinutes = calculateTotalEstimate(taskDef);
+                  const mainLogInstanceId = activity.taskIds[0];
+                  let mainTaskDefId: string | undefined;
+                  const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
+                  mainTaskDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+
+                  if (mainTaskDefId) {
+                    const taskDef = allDefs.get(mainTaskDefId);
+                    if (taskDef) {
+                      totalMinutes = calculateTotalEstimate(taskDef);
+                    } else {
+                      totalMinutes = 120;
+                    }
                   } else {
-                    totalMinutes = 120;
+                     totalMinutes = 120;
                   }
                 } else {
                   totalMinutes = 120;
@@ -361,7 +366,7 @@ function MyPlatePageContent() {
       }
     }
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, calculateTotalEstimate, microSkillMap, getDescendantLeafNodes]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, calculateTotalEstimate, getDescendantLeafNodes]);
 
 
   const slotDurations = useMemo(() => {
@@ -808,7 +813,7 @@ function MyPlatePageContent() {
         allTasks.forEach(task => {
             if (microSkillNames.has(task.category)) {
                 totalSpecLoggedMinutes += task.loggedDuration || 0;
-                totalSpecEstimatedMinutes += task.estimatedDuration || 0;
+                totalSpecEstimatedMinutes += calculateTotalEstimate(task);
             }
         });
         
@@ -827,7 +832,7 @@ function MyPlatePageContent() {
       learningStats,
       productivityLevel,
     };
-  }, [upskillDefinitions, deepWorkDefinitions, coreSkills, selectedDate, settings.dailyProductiveHoursGoal]);
+  }, [upskillDefinitions, deepWorkDefinitions, coreSkills, selectedDate, settings.dailyProductiveHoursGoal, calculateTotalEstimate]);
   
   const upcomingReleases = useMemo(() => {
     const allReleases: { topic: string, release: Release, type: 'product' | 'service' }[] = [];
@@ -1111,7 +1116,7 @@ function MyPlatePageContent() {
     
     const tasks = definitionSource
       .filter(def => {
-        const nodeType = getNodeType(def);
+        const nodeType = getNodeType(def as ExerciseDefinition);
         return def.category === microSkillName && nodeType === targetNodeType;
       })
       .map(def => {
@@ -1462,6 +1467,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
