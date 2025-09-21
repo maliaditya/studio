@@ -164,13 +164,13 @@ function NavigationMenu() {
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
     { href: '/timetable', label: 'Timetable' },
-    { href: '/workout-tracker', label: 'Workout' },
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/resources', label: 'Resources' },
   ];
 
   const dropdownLinks = [
+    { href: '/workout-tracker', label: 'Workout' },
     { href: '/strategic-planning', label: 'Planning' },
     { href: '/path', label: 'Path' },
     { href: '/portfolio', label: 'Portfolio' },
