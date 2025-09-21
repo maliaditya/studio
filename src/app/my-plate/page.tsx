@@ -272,16 +272,15 @@ function MyPlatePageContent() {
                     let suffix = '';
 
                     if (activity.completed) {
-                        let mainDefId = activity.taskIds?.[0];
-                        if (mainDefId?.includes('-')) {
-                            mainDefId = mainDefId.split('-')[0];
-                        }
-                        
                         let definition: ExerciseDefinition | undefined;
-                        if (activity.type === 'upskill') {
-                            definition = upskillDefinitions.find(d => d.id === mainDefId);
-                        } else if (activity.type === 'deepwork' || activity.type === 'branding') {
-                            definition = deepWorkDefinitions.find(d => d.id === mainDefId);
+                        if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
+                            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+                            definition = sourceDefs.find(d => d.name === activity.details && d.category === microSkillMap.get(
+                                coreSkills.find(cs => cs.name === activity.details)?.id || ''
+                            )?.microSkillName);
+                            if (!definition) {
+                                definition = sourceDefs.find(d => d.id === activity.taskIds?.[0]?.split('-')[0]);
+                            }
                         }
 
                         if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
@@ -310,6 +309,14 @@ function MyPlatePageContent() {
                                 case 'lead-generation':
                                     logs = allLeadGenLogs;
                                     durationField = 'weight';
+                                    break;
+                                case 'upskill': // Corrected fallback
+                                    logs = allUpskillLogs;
+                                    durationField = 'reps'; // Duration is in reps for upskill
+                                    break;
+                                case 'deepwork': // Corrected fallback
+                                    logs = allDeepWorkLogs;
+                                    durationField = 'weight'; // Duration is in weight for deepwork
                                     break;
                              }
                               if (logs && durationField) {
@@ -365,7 +372,7 @@ function MyPlatePageContent() {
         }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode, microSkillMap, coreSkills]);
   
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
