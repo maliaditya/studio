@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -630,6 +629,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let definitionUpdated = false;
+
+    const findAndUpdate = (defs: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
+        const index = defs.findIndex(d => d.id === subTaskId);
+        if (index > -1) {
+            setter(prev => {
+                const newDefs = [...prev];
+                const newDef = {
+                    ...newDefs[index],
+                    loggedDuration: (newDefs[index].loggedDuration || 0) + durationMinutes,
+                    last_logged_date: todayKey,
+                };
+                newDefs[index] = newDef;
+                return newDefs;
+            });
+            definitionUpdated = true;
+        }
+    };
+    
+    findAndUpdate(deepWorkDefinitions, setDeepWorkDefinitions);
+    if (!definitionUpdated) {
+        findAndUpdate(upskillDefinitions, setUpskillDefinitions);
+    }
+  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
+
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
   
@@ -657,7 +683,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!definition) {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
         const category = microSkill ? microSkill.microSkillName : activity.details;
-        definition = definitions.find(def => def.name === activity.details && d.category === category);
+        definition = definitions.find(def => def.name === activity.details && def.category === category);
       }
       
       if (definition) {
@@ -689,33 +715,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity, allUpskillLogs, allDeepWorkLogs]);
   
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    let definitionUpdated = false;
-
-    const findAndUpdate = (defs: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
-        const index = defs.findIndex(d => d.id === subTaskId);
-        if (index > -1) {
-            setter(prev => {
-                const newDefs = [...prev];
-                const newDef = {
-                    ...newDefs[index],
-                    loggedDuration: (newDefs[index].loggedDuration || 0) + durationMinutes,
-                    last_logged_date: todayKey,
-                };
-                newDefs[index] = newDef;
-                return newDefs;
-            });
-            definitionUpdated = true;
-        }
-    };
-    
-    findAndUpdate(deepWorkDefinitions, setDeepWorkDefinitions);
-    if (!definitionUpdated) {
-        findAndUpdate(upskillDefinitions, setUpskillDefinitions);
-    }
-  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-
   const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
 
   const childToParentMap = useMemo(() => {
@@ -744,7 +743,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = childToParentMap.has(def.id);
     
-    if(isParent) {
+    if (isParent) {
         return isChild ? 'Objective' : 'Curiosity';
     }
     return isChild ? 'Visualization' : 'Standalone';
@@ -814,22 +813,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
-  
+
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-  
+
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
       if (!daySchedule) continue;
-  
+
       for (const slotName in daySchedule) {
         const activities = (daySchedule as any)[slotName] || [];
         if (Array.isArray(activities)) {
           for (const activity of activities) {
             if (!activity || !activity.id) continue;
-  
+
             let totalMinutes = 0;
             let suffix = '';
-            
+
             if (activity.completed) {
               if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
                   let definition: ExerciseDefinition | undefined;
@@ -850,7 +849,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
                     const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
                     const category = microSkill ? microSkill.microSkillName : activity.details;
-                    definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
+                    definition = sourceDefs.find(def => def.name === activity.details && def.category === category);
                   }
 
                   if (definition) {
@@ -3017,6 +3016,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
 
     
