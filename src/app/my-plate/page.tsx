@@ -279,7 +279,7 @@ function MyPlatePageContent() {
                         switch (activity.type) {
                             case 'upskill':
                                 logs = allUpskillLogs;
-                                durationField = 'weight'; // <-- This was the bug, it should be 'weight' not 'reps' for duration
+                                durationField = 'weight'; 
                                 break;
                             case 'deepwork':
                                 logs = allDeepWorkLogs;
