@@ -275,7 +275,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={() => onConvertToCard(point)}
+                                        onConvertToCard={onConvertToCard}
                                     />
                                 ))}
                             </ul>
@@ -1391,7 +1391,14 @@ function ResourcesPageContent() {
                       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                           {filteredResources.map(res => {
                                const markdownOrCodeCount = (res.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
-                               const cardClassName = markdownOrCodeCount > 1 ? "lg:col-span-3" : markdownOrCodeCount > 0 ? "lg:col-span-2" : "";
+                               const pointCount = (res.points || []).length;
+                               let cardClassName = "";
+                               
+                               if (markdownOrCodeCount > 1 || pointCount > 15) {
+                                   cardClassName = "lg:col-span-3";
+                               } else if (markdownOrCodeCount > 0 || pointCount > 5) {
+                                   cardClassName = "lg:col-span-2";
+                               }
    
                               let cardContent: React.ReactNode;
                               
@@ -1797,7 +1804,7 @@ function ResourcesPageContent() {
 
 const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
-    onUpdate: (updatedText: string) => void, 
+    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
@@ -1944,6 +1951,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
