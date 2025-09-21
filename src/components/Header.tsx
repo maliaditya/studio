@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -36,26 +35,23 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
     const addedCardIds = new Set<string>();
 
     resources.forEach(resource => {
-      if (resource.type === 'card' || resource.type === 'habit' || resource.type === 'mechanism') {
-        // Search card name
-        if (resource.name.toLowerCase().includes(lowerCaseQuery) && !addedCardIds.has(resource.id)) {
-          cardResults.push({ resource });
-          addedCardIds.add(resource.id);
-        }
+      if (resource.name && resource.name.toLowerCase().includes(lowerCaseQuery) && !addedCardIds.has(resource.id)) {
+        cardResults.push({ resource });
+        addedCardIds.add(resource.id);
+      }
 
-        // Search card points
-        if (resource.points) {
-          resource.points.forEach(point => {
-            if (point.text.toLowerCase().includes(lowerCaseQuery)) {
-              if (point.type === 'timestamp') {
-                audioResults.push({ resource, annotation: point });
-              } else if (!addedCardIds.has(resource.id)) {
-                cardResults.push({ resource, point });
-                addedCardIds.add(resource.id);
-              }
+      // Search card points
+      if (resource.points) {
+        resource.points.forEach(point => {
+          if (point.text && point.text.toLowerCase().includes(lowerCaseQuery)) {
+            if (point.type === 'timestamp') {
+              audioResults.push({ resource, annotation: point });
+            } else if (!addedCardIds.has(resource.id)) {
+              cardResults.push({ resource, point });
+              addedCardIds.add(resource.id);
             }
-          });
-        }
+          }
+        });
       }
     });
 
