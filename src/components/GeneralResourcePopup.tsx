@@ -354,10 +354,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
                             </div>
                             <div className="space-y-2">
-                                <div className="flex gap-2">
-                                    <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note..." className="h-8 text-xs" />
-                                    <Button size="sm" onClick={handleAddAnnotation}>Add Note</Button>
-                                </div>
                                 <ScrollArea className="h-24">
                                     <ul className="space-y-1 pr-2">
                                         {(resource.audioAnnotations || []).sort((a,b) => a.timestamp - b.timestamp).map(anno => (
@@ -373,6 +369,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                         ))}
                                     </ul>
                                 </ScrollArea>
+                                <div className="flex gap-2">
+                                    <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note..." className="h-8 text-xs" />
+                                    <Button size="sm" onClick={handleAddAnnotation}>Add Note</Button>
+                                </div>
                             </div>
                         </div>
                     </CardFooter>
