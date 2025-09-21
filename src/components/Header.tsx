@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library } from 'lucide-react';
 import { UserProfile } from './UserProfile';
@@ -22,9 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const GlobalSearch = () => {
+const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
   const { resources, openGeneralPopup, setPlaybackRequest } = useAuth();
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
 
   const searchResults = useMemo(() => {
@@ -56,6 +55,17 @@ const GlobalSearch = () => {
     const secs = Math.floor(seconds % 60);
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [setOpen])
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
@@ -190,8 +200,11 @@ export function Header() {
                 <Button variant="outline" className="gap-2 text-muted-foreground" onClick={() => setIsSearchOpen(true)}>
                   <Search className="h-4 w-4" />
                   Search Notes...
+                  <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+                    <span className="text-xs">⌘</span>K
+                  </kbd>
                 </Button>
-                <GlobalSearch />
+                <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
               </>
             )}
           </div>
