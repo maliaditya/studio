@@ -51,6 +51,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [newAnnotation, setNewAnnotation] = useState('');
     
     const resource = resources.find(r => r.id === popupState.resourceId);
+    const [audioSrc, setAudioSrc] = useState<string | null>(null);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `general-popup-${popupState.resourceId}`,
@@ -71,28 +72,38 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
      useEffect(() => {
         const audioEl = audioRef.current;
-        if (!audioEl || !resource?.id || !resource.hasLocalAudio) return;
-
-        const handleAudioPlayback = async () => {
-            if (playingAudio) {
-                const audioBlob = await getAudio(resource.id);
-                if (audioBlob) {
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    if (audioEl.src !== audioUrl) {
-                        audioEl.src = audioUrl;
-                    }
-                    audioEl.volume = globalVolume;
-                    audioEl.play().catch(e => console.error("Audio play failed:", e));
-                } else {
-                    setPlayingAudio(false);
-                }
-            } else {
-                audioEl.pause();
+        if (!audioEl || !resource?.id) return;
+        
+        const loadAudio = async () => {
+          if (resource.hasLocalAudio) {
+            const audioBlob = await getAudio(resource.id);
+            if (audioBlob) {
+              const url = URL.createObjectURL(audioBlob);
+              setAudioSrc(url);
+              return () => URL.revokeObjectURL(url);
             }
+          }
+          setAudioSrc(null);
         };
+        
+        loadAudio();
+     }, [resource?.id, resource?.hasLocalAudio]);
 
-        handleAudioPlayback();
-    }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl || !audioSrc) return;
+    
+        if (audioEl.src !== audioSrc) {
+          audioEl.src = audioSrc;
+        }
+    
+        if (playingAudio) {
+          audioEl.volume = globalVolume;
+          audioEl.play().catch(e => console.error("Audio play failed:", e));
+        } else {
+          audioEl.pause();
+        }
+    }, [playingAudio, audioSrc, globalVolume]);
 
     useEffect(() => {
         const audioEl = audioRef.current;
@@ -477,7 +488,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             </li>
         )
     }
-
+    
     const handleLinkClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (point.text && point.text.startsWith('brainhack://')) {
