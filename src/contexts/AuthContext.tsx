@@ -2469,9 +2469,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const createResourceWithHierarchy = useCallback((parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
-    const parentFolder = resourceFolders.find(f => f.id === ('folderId' in parent ? parent.folderId : ''));
-    const path = parentFolder ? [parentFolder.name, parent.name] : [parent.name];
+    let path: string[] = ["Skills & Project Resources"];
   
+    if ('category' in parent) { // It's an ExerciseDefinition
+      const microSkillName = parent.category;
+      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === microSkillName);
+  
+      if (microSkillInfo) {
+        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+        if (coreSkill) {
+          const domain = skillDomains.find(d => d.id === coreSkill.domainId);
+          if (domain) {
+            path.push(domain.name);
+          }
+          path.push(coreSkill.name);
+          path.push(microSkillInfo.skillAreaName);
+          path.push(microSkillName);
+        }
+      }
+    } else { // It's a Resource
+        const parentFolder = resourceFolders.find(f => f.id === parent.folderId);
+        if (parentFolder) {
+            path = [parentFolder.name];
+        }
+    }
+    
+    path.push(parent.name);
+
     let currentParentId: string | null = null;
     let updatedFolders = [...resourceFolders];
   
@@ -2532,7 +2556,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   
     return updatedParent;
-  }, [resourceFolders, setResourceFolders, setResources, setDeepWorkDefinitions, setUpskillDefinitions]);
+  }, [resourceFolders, setResourceFolders, setResources, setDeepWorkDefinitions, setUpskillDefinitions, coreSkills, skillDomains, microSkillMap]);
   
   const habitCards = useMemo(() => {
     return resources.filter(r => r.type === 'habit');
