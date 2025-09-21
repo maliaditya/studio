@@ -170,7 +170,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
         onUpdate({ ...resource, points: updatedPoints });
     };
     
-    const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    const markdownOrCodeCount = (resource.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
     
     const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -222,7 +222,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                         )}
                    </div>
                    <div className="flex items-center">
-                        {hasMarkdownContent && !isPopup && (
+                        {markdownOrCodeCount > 0 && !isPopup && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
                                 <Expand className="h-4 w-4" />
                             </Button>
@@ -258,7 +258,7 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
                 )}
             </CardHeader>
             <CardContent className="flex-grow min-h-0">
-              <div className={cn(hasMarkdownContent ? 'h-[450px]' : '')}>
+              <div className={cn(markdownOrCodeCount > 0 ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
                     <DndContext onDragEnd={handleDragEnd}>
                         <SortableContext items={(resource.points || []).map(p => p.id)}>
@@ -1390,8 +1390,8 @@ function ResourcesPageContent() {
                   <SortableContext items={filteredResources.map(r => r.id)}>
                       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                           {filteredResources.map(res => {
-                               const hasMarkdownContent = res.type === 'card' && (res.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-                               const cardClassName = hasMarkdownContent ? "lg:col-span-3" : "";
+                               const markdownOrCodeCount = (res.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
+                               const cardClassName = markdownOrCodeCount > 1 ? "lg:col-span-3" : markdownOrCodeCount > 0 ? "lg:col-span-2" : "";
    
                               let cardContent: React.ReactNode;
                               
@@ -1682,7 +1682,7 @@ function ResourcesPageContent() {
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <div className="flex-grow min-h-0">
-                  <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
+                  <MindMapViewer showControls={false} rootFolderId={mindMapRootFolderId} />
                 </div>
             </DialogContent>
         </Dialog>
@@ -1944,6 +1944,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
