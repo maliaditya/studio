@@ -19,7 +19,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, Trash2, RefreshCw } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
@@ -45,7 +45,7 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
 ];
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes } = useAuth();
   const { toast } = useToast();
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -81,14 +81,12 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleDefaultHabitChange = (activityType: ActivityType, habitId: string) => {
     const newHabitId = habitId === 'none' ? null : habitId;
 
-    // 1. Update settings
     const newDefaultHabitLinks = {
         ...settings.defaultHabitLinks,
         [activityType]: newHabitId,
     };
     handleSettingChange('defaultHabitLinks', newDefaultHabitLinks);
 
-    // 2. Update all existing non-completed tasks in the schedule
     setSchedule(currentSchedule => {
       const updatedSchedule = { ...currentSchedule };
       
@@ -578,6 +576,18 @@ ${JSON.stringify(finalTemplate, null, 2)}
                     <Button id="reset-landing" variant="outline" size="sm" onClick={handleResetLandingPage}>
                       Reset
                     </Button>
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                     <h3 className="font-semibold">Data Integrity</h3>
+                     <div className="flex items-center justify-between">
+                        <Label htmlFor="recalculate-types" className="font-normal text-sm text-muted-foreground">
+                          Fix misclassified tasks (e.g., tasks showing as "Objective" that shouldn't be).
+                        </Label>
+                        <Button id="recalculate-types" variant="outline" size="sm" onClick={recalculateAndFixTaskTypes}>
+                          <RefreshCw className="mr-2 h-4 w-4" /> Recalculate
+                        </Button>
+                      </div>
                   </div>
                   <Separator />
                    <div className="flex items-center justify-between">

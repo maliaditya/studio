@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -373,6 +374,7 @@ interface AuthContextType {
   openBrainHackPopups: Record<string, { x: number, y: number }>;
   setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, { x: number, y: number }>>>;
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
+  recalculateAndFixTaskTypes: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -666,7 +668,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let definition: ExerciseDefinition | undefined;
       let definitionFound = false;
 
-      // Prioritize finding by linked task IDs first
       if (activity.taskIds && activity.taskIds.length > 0) {
         const mainLogInstanceId = activity.taskIds[0];
         let mainDefId: string | undefined;
@@ -679,7 +680,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Fallback to name/category matching if no definition found via taskIds
       if (!definition) {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
         const category = microSkill ? microSkill.microSkillName : activity.details;
@@ -720,7 +720,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const childToParentMap = useMemo(() => {
     const map = new Map<string, string[]>();
     allDefinitionMap.forEach(def => {
-      const children = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+      const children = [
+        ...(def.linkedDeepWorkIds || []), 
+        ...(def.linkedUpskillIds || []),
+      ];
       children.forEach(childId => {
         if (!map.has(childId)) map.set(childId, []);
         map.get(childId)!.push(def.id);
@@ -833,7 +836,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
                   let definition: ExerciseDefinition | undefined;
 
-                  // Find definition via taskIds or fallback to name/category
                   if (activity.taskIds && activity.taskIds.length > 0) {
                       const mainLogInstanceId = activity.taskIds[0];
                       let mainDefId: string | undefined;
@@ -875,7 +877,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   suffix = ' logged';
               }
             } else {
-              // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
                 case 'workout': totalMinutes = 90; break;
                 case 'mindset': totalMinutes = 15; break;
@@ -1050,7 +1051,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [localChangeCount, isLoadingState, saveState, settings.autoPush, settings.autoPushLimit, currentUser]);
 
-  // Special effect to save state on unload
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
         if (localChangeCount > 0) {
@@ -1184,7 +1184,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [loadImportedData, toast]);
 
   const populatedSchedule = useMemo(() => {
-    const newSchedule = JSON.parse(JSON.stringify(schedule)); // Deep copy
+    const newSchedule = JSON.parse(JSON.stringify(schedule));
   
     if (!settings.routines || settings.routines.length === 0) {
       return schedule;
@@ -1193,7 +1193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const today = startOfDay(new Date());
     const scheduleDates = Object.keys(newSchedule)
         .map(key => parseISO(key))
-        .filter(isValid); // Filter out invalid dates
+        .filter(isValid);
     
     const earliestDateInSchedule = scheduleDates.length > 0 ? min(scheduleDates) : today;
     const latestDateInSchedule = scheduleDates.length > 0 ? max(scheduleDates) : today;
@@ -1285,7 +1285,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     toast({ title: "Syncing...", description: "Pushing demo data to the cloud." });
     try {
-        const allUserData = getAllUserData().main; // Only push main data for demo
+        const allUserData = getAllUserData().main;
         const requestBody = { username, data: allUserData, demo_override_token: token };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
@@ -1335,7 +1335,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
-        setLocalChangeCount(0); // Reset change count on successful push
+        setLocalChangeCount(0);
 
     } catch (error) {
         console.error("Push to cloud failed:", error);
@@ -1734,7 +1734,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     let workoutLog = allWorkoutLogs.find(log => log.id === dateKey);
   
-    // If the log for the day doesn't exist, create it.
     if (!workoutLog) {
       const { exercises } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
       const newLog = { id: dateKey, date: dateKey, exercises };
@@ -1778,7 +1777,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       workoutPlans,
       exerciseDefinitions,
       workoutPlanRotation,
-      'day-of-week', // Force day-of-week for override
+      'day-of-week',
       allWorkoutLogs,
       undefined,
       newCategories
@@ -1819,12 +1818,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const nameHasChanged = oldResource && oldResource.name !== updatedResource.name;
     
         return prev.map(res => {
-            // Update the resource itself
             if (res.id === updatedResource.id) {
                 res = updatedResource;
             }
     
-            // Update any links pointing to it if the name changed
             if (nameHasChanged && res.points) {
                 res = {
                     ...res,
@@ -1861,7 +1858,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!resource) return newPopups;
         
         const popupWidth = 512;
-        const popupHeight = 400; // Approximate height for centering
+        const popupHeight = 400;
         let x, y, level, parentId;
 
         if (parentPopupState && parentRect) {
@@ -2061,7 +2058,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIntentionPopups(prev => {
         const newPopups = new Map(prev);
         const popupsPerRow = 3;
-        const xOffset = (newPopups.size % popupsPerRow) * 400 + 100; // 400 = width + margin
+        const xOffset = (newPopups.size % popupsPerRow) * 400 + 100;
         const yOffset = Math.floor(newPopups.size / popupsPerRow) * 400 + 100;
 
         newPopups.set(intentionId, { 
@@ -2179,7 +2176,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTaskContextPopups(prev => {
         const newPopups = new Map(prev);
         const CONTEXT_POPUP_WIDTH = 600;
-        const CONTEXT_POPUP_HEIGHT = 400; // Estimated height for centering
+        const CONTEXT_POPUP_HEIGHT = 400;
         const MARGIN = 16;
         let x = (window.innerWidth - CONTEXT_POPUP_WIDTH) / 2;
         let y = (window.innerHeight - CONTEXT_POPUP_HEIGHT) / 2;
@@ -2326,7 +2323,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return {
                 ...act,
                 details: mealDetails,
-                taskIds: [sourceMeal] // Store which meal it is
+                taskIds: [sourceMeal]
               };
             }
             return act;
@@ -2335,7 +2332,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if(updated) {
-        toast({ title: "Meal Swapped!", description: `Updated your agenda with ${MEAL_NAMES[sourceMeal]} from ${sourceDay}.` });
+        toast({ title: "Meal Swapped!", description: `Updated your agenda with Meal from ${sourceDay}.` });
       }
       return newSchedule;
     });
@@ -2418,10 +2415,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const deleteResource = (resourceId: string) => {
-    // Remove the resource itself
     setResources(prev => prev.filter(r => r.id !== resourceId));
   
-    // Unlink from any parent tasks
     const unlinkFromDefs = (definitions: ExerciseDefinition[]) => 
         definitions.map(def => ({
             ...def,
@@ -2431,7 +2426,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDeepWorkDefinitions(unlinkFromDefs);
     setUpskillDefinitions(unlinkFromDefs);
     
-    // Also remove any audio from IndexedDB
     deleteAudio(resourceId).catch(err => console.error("Failed to delete audio from DB:", err));
   };
   
@@ -2505,14 +2499,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
     }
   
-    if ('category' in parent) { // It's an ExerciseDefinition
+    if ('category' in parent) {
       const isUpskill = upskillDefinitions.some(d => d.id === parent.id);
       if (isUpskill) {
         setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
       } else {
         setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
       }
-    } else { // It's a Resource
+    } else {
       setResources(prev => prev.map(res => res.id === parent.id ? updatedParent as Resource : res));
     }
   
@@ -2567,13 +2561,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const today = startOfDay(new Date());
 
     (projects || []).forEach(project => {
-        // Check productization plans
         if (productizationPlans && productizationPlans[project.name]) {
             activeIds.add(project.id);
             return;
         }
 
-        // Check offerization plans
         const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
             plan.releases?.some(release => {
                 if (release.name !== project.name) return false;
@@ -2684,8 +2676,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
-    const popupWidth = 384; // w-96
-    const popupHeight = 400; // Estimated height
+    const popupWidth = 384;
+    const popupHeight = 400;
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     
     let x = rect.right + 10;
@@ -2763,6 +2755,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { ...prev, [hackId]: { x: initialX, y: initialY } };
     });
   }, []);
+  
+  const recalculateAndFixTaskTypes = () => {
+    setDeepWorkDefinitions(prev => [...prev]);
+    setUpskillDefinitions(prev => [...prev]);
+    toast({ title: "Success", description: "Task classifications have been recalculated." });
+  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -2876,6 +2874,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     dailyReviewLogs, setDailyReviewLogs,
     handleCreateBrainHack,
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
+    recalculateAndFixTaskTypes,
   };
 
   useEffect(() => {
@@ -2899,9 +2898,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
       else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
       else setCurrentSlot('Night');
-    }, 60000); // Update every minute
+    }, 60000);
 
-    // Initial call
     const now = new Date();
     const currentHour = now.getHours();
     if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
@@ -3016,5 +3014,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-    
