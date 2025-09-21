@@ -272,68 +272,28 @@ function MyPlatePageContent() {
             let suffix = '';
             
             if (activity.completed) {
-                let definition: ExerciseDefinition | undefined;
                 if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
-                    // First, try to find by ID from taskIds if they exist
+                    let definition: ExerciseDefinition | undefined;
                     const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+                    
                     if (mainDefId) {
                       definition = allDefs.get(mainDefId);
                     }
                     
-                    // If not found by ID (e.g., for directly created/edited tasks), find by name
                     if (!definition) {
-                      const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-                      const coreSkill = coreSkills.find(cs => cs.name === activity.details);
-                      const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : activity.details;
-                      definition = sourceDefs.find(d => d.name === activity.details && d.category === microSkillName);
+                        const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+                        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+                        const category = microSkill ? microSkill.microSkillName : activity.details;
+                        definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
                     }
-                }
 
-                if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
-                    totalMinutes = definition.loggedDuration;
-                    suffix = ' logged';
+                    if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
+                        totalMinutes = definition.loggedDuration;
+                        suffix = ' logged';
+                    }
                 } else if (activity.duration) {
                     totalMinutes = activity.duration;
                     suffix = ' logged';
-                } else {
-                     let logs;
-                     let durationField: 'reps' | 'weight' | undefined;
-                     let multiplier = 1;
-    
-                     switch (activity.type) {
-                        case 'workout':
-                            logs = allWorkoutLogs;
-                            durationField = 'reps';
-                            multiplier = 15;
-                            break;
-                        case 'mindset':
-                            logs = allMindProgrammingLogs;
-                            durationField = 'reps';
-                            multiplier = 15;
-                            break;
-                        case 'lead-generation':
-                            logs = allLeadGenLogs;
-                            durationField = 'weight';
-                            break;
-                        case 'upskill':
-                            logs = allUpskillLogs;
-                            durationField = 'reps'; // reps for upskill duration
-                            break;
-                        case 'deepwork':
-                            logs = allDeepWorkLogs;
-                            durationField = 'weight'; // weight for deepwork duration
-                            break;
-                     }
-                      if (logs && durationField) {
-                        const loggedDuration = (logs.find(log => log.date === dateKey)
-                            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField!] || 0), 0), 0) || 0);
-
-                        if (loggedDuration > 0) {
-                            totalMinutes = loggedDuration * multiplier;
-                            suffix = ' logged';
-                        }
-                      }
                 }
             } else {
               // For non-completed tasks, calculate estimated duration
@@ -377,7 +337,7 @@ function MyPlatePageContent() {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, coreSkills, microSkillMap]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, microSkillMap]);
 
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};

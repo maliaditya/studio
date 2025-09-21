@@ -592,6 +592,125 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const microSkillMap = useMemo(() => {
+    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
+    coreSkills.forEach(coreSkill => {
+        coreSkill.skillAreas.forEach(skillArea => {
+            skillArea.microSkills.forEach(microSkill => {
+                map.set(microSkill.id, {
+                    coreSkillName: coreSkill.name,
+                    skillAreaName: skillArea.name,
+                    microSkillName: microSkill.name
+                });
+            });
+        });
+    });
+    return map;
+  }, [coreSkills]);
+
+  const updateActivity = useCallback((updatedActivity: Activity) => {
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let found = false;
+      for (const dateKey in newSchedule) {
+        for (const slotName in newSchedule[dateKey]) {
+          const activities = (newSchedule[dateKey][slotName as SlotName] as Activity[]) || [];
+          const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+          if (activityIndex > -1) {
+            const newActivities = [...activities];
+            newActivities[activityIndex] = updatedActivity;
+            newSchedule[dateKey][slotName as SlotName] = newActivities;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+      return newSchedule;
+    });
+  }, [setSchedule]);
+
+  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let definitionUpdated = false;
+
+    const findAndUpdate = (defs: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
+        const index = defs.findIndex(d => d.id === subTaskId);
+        if (index > -1) {
+            setter(prev => {
+                const newDefs = [...prev];
+                const newDef = {
+                    ...newDefs[index],
+                    loggedDuration: (newDefs[index].loggedDuration || 0) + durationMinutes,
+                    last_logged_date: todayKey,
+                };
+                newDefs[index] = newDef;
+                return newDefs;
+            });
+            definitionUpdated = true;
+        }
+    };
+    
+    findAndUpdate(deepWorkDefinitions, setDeepWorkDefinitions);
+    if (!definitionUpdated) {
+        findAndUpdate(upskillDefinitions, setUpskillDefinitions);
+    }
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
+  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+  
+    const findAndUpdateDefinition = (
+      definitions: ExerciseDefinition[], 
+      setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
+    ) => {
+      let definition: ExerciseDefinition | undefined;
+      let definitionFound = false;
+
+      // 1. Try to find by taskIds (most reliable)
+      if (activity.taskIds && activity.taskIds.length > 0) {
+        const mainDefId = activity.taskIds[0].split('-')[0];
+        definition = definitions.find(d => d.id === mainDefId);
+      }
+      
+      // 2. Fallback to name/category matching
+      if (!definition) {
+        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+        const category = microSkill ? microSkill.microSkillName : activity.details;
+        definition = definitions.find(d => d.name === activity.details && d.category === category);
+      }
+      
+      if (definition) {
+        setter(prevDefs => prevDefs.map(def =>
+          def.id === definition!.id ? {
+            ...def,
+            loggedDuration: (def.loggedDuration || 0) + duration,
+            last_logged_date: todayKey,
+          } : def
+        ));
+        definitionFound = true;
+      }
+      return definitionFound;
+    };
+  
+    let updated = false;
+    if (activity.type === 'upskill') {
+      updated = findAndUpdateDefinition(upskillDefinitions, setUpskillDefinitions);
+    } else if (activity.type === 'deepwork' || activity.type === 'branding') {
+      updated = findAndUpdateDefinition(deepWorkDefinitions, setDeepWorkDefinitions);
+    }
+  
+    // 3. Final fallback: update activity itself if no definition was found/updated
+    if (!updated) {
+        console.warn("Could not find a matching definition to log time against. Storing duration on activity.");
+        updateActivity({ ...activity, duration: (activity.duration || 0) + duration });
+    }
+    
+    // Mark activity as complete
+    updateActivity({ ...activity, completed: true, completedAt: Date.now() });
+  
+  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity]);
+
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0;
     const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
@@ -673,22 +792,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
 
-  const microSkillMap = useMemo(() => {
-    const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
-    coreSkills.forEach(coreSkill => {
-        coreSkill.skillAreas.forEach(skillArea => {
-            skillArea.microSkills.forEach(microSkill => {
-                map.set(microSkill.id, {
-                    coreSkillName: coreSkill.name,
-                    skillAreaName: skillArea.name,
-                    microSkillName: microSkill.name
-                });
-            });
-        });
-    });
-    return map;
-  }, [coreSkills]);
-  
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
@@ -709,30 +812,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             let suffix = '';
             
             if (activity.completed) {
-                let definition: ExerciseDefinition | undefined;
-                
-                // First, try to find by ID from taskIds if they exist
-                const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-                if (mainDefId) {
-                  definition = allDefs.get(mainDefId);
-                }
-                
-                // If not found by ID, find by name and category
-                if (!definition) {
-                  const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-                  // Use microSkillMap for a more reliable category lookup
-                  const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-                  const category = microSkill ? microSkill.microSkillName : activity.details;
-                  definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
-                }
+              if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
+                  let definition: ExerciseDefinition | undefined;
 
-                if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
-                    totalMinutes = definition.loggedDuration;
-                    suffix = ' logged';
-                } else if (activity.duration) {
-                    totalMinutes = activity.duration;
-                    suffix = ' logged';
-                }
+                  // First try to find definition via taskIds, which links to a log instance
+                  if (activity.taskIds && activity.taskIds.length > 0) {
+                      const mainLogInstanceId = activity.taskIds[0];
+                      let mainDefId: string | undefined;
+
+                      const upskillLog = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                      if (upskillLog) mainDefId = upskillLog.definitionId;
+                      else {
+                          const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                          if (deepWorkLog) mainDefId = deepWorkLog.definitionId;
+                      }
+
+                      if (mainDefId) {
+                        definition = allDefs.get(mainDefId);
+                      }
+                  }
+
+                  // Fallback for directly scheduled tasks without log instances yet
+                  if (!definition) {
+                      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+                      const category = microSkill ? microSkill.microSkillName : activity.details;
+                      const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+                      definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
+                  }
+                  
+                  if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
+                      totalMinutes = definition.loggedDuration;
+                      suffix = ' logged';
+                  }
+              } else if (activity.duration) {
+                  totalMinutes = activity.duration;
+                  suffix = ' logged';
+              }
             } else {
               // For non-completed tasks, calculate estimated duration
               switch(activity.type) {
@@ -775,7 +890,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode, microSkillMap]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, microSkillMap, allUpskillLogs, allDeepWorkLogs]);
   
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -832,86 +947,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusSessionModalOpen(true);
     return true;
   }, [activityDurations]);
-  
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const isUpskill = upskillDefinitions.some(def => def.id === subTaskId);
-    const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
-    
-    setDefinitions(prevDefs => prevDefs.map(def => {
-        if (def.id === subTaskId) {
-            return {
-                ...def,
-                loggedDuration: (def.loggedDuration || 0) + durationMinutes,
-                last_logged_date: today,
-            };
-        }
-        return def;
-    }));
-  }, [setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions]);
-
-  const updateActivity = useCallback((updatedActivity: Activity) => {
-    setSchedule(prevSchedule => {
-      const newSchedule = { ...prevSchedule };
-      for (const dateKey in newSchedule) {
-        if (newSchedule[dateKey]) {
-          for (const slotName in newSchedule[dateKey]) {
-            const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
-            if (Array.isArray(activities)) {
-              const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-              if (activityIndex > -1) {
-                const updatedActivities = [...activities];
-                updatedActivities[activityIndex] = updatedActivity;
-                newSchedule[dateKey] = { ...newSchedule[dateKey], [slotName]: updatedActivities };
-                return newSchedule; 
-              }
-            }
-          }
-        }
-      }
-      return newSchedule;
-    });
-  }, [setSchedule]);
-
-  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-  
-    const updateDef = (definitions: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>, defId: string) => {
-      setter(prevDefs => prevDefs.map(def =>
-        def.id === defId ? {
-          ...def,
-          loggedDuration: (def.loggedDuration || 0) + duration,
-          last_logged_date: todayKey,
-        } : def
-      ));
-    };
-  
-    let definition: ExerciseDefinition | undefined;
-    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
-  
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-  
-    if (mainDefId) {
-      definition = allDefs.get(mainDefId);
-    }
-  
-    if (!definition) {
-      const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-      const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-      const category = microSkill ? microSkill.microSkillName : activity.details;
-      definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
-    }
-  
-    if (definition) {
-      const setDefs = activity.type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
-      const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-      updateDef(sourceDefs, setDefs, definition.id);
-    }
-  
-    // Mark activity as complete
-    updateActivity({ ...activity, completed: true, duration, completedAt: Date.now() });
-  
-  }, [deepWorkDefinitions, upskillDefinitions, updateActivity, microSkillMap, setDeepWorkDefinitions, setUpskillDefinitions]);
   
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
