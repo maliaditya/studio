@@ -667,6 +667,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let definition: ExerciseDefinition | undefined;
       let definitionFound = false;
 
+      // Prioritize finding by linked task IDs first
       if (activity.taskIds && activity.taskIds.length > 0) {
         const mainLogInstanceId = activity.taskIds[0];
         let mainDefId: string | undefined;
@@ -682,6 +683,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
+      // Fallback to name/category matching if no definition found via taskIds
       if (!definition) {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
         const category = microSkill ? microSkill.microSkillName : activity.details;
@@ -709,7 +711,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   
     if (!updated) {
-        console.warn("Could not find a matching definition to log time against. Storing duration on activity.");
+        console.warn("Could not find a matching definition to log time against for activity:", activity.details);
+        // Fallback: update the activity itself if no definition is found
         updateActivity({ ...activity, duration: (activity.duration || 0) + duration });
     }
     
@@ -802,7 +805,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
   
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [d.id, def]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
@@ -826,11 +829,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       const mainLogInstanceId = activity.taskIds[0];
                       let mainDefId: string | undefined;
 
-                      const upskillLog = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                      if (upskillLog) mainDefId = upskillLog.definitionId;
-                      else {
+                      if (activity.type === 'upskill') {
+                          mainDefId = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+                      } else {
                           const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                          if (deepWorkLog) mainDefId = deepWorkLog.definitionId;
+                          if(deepWorkLog) mainDefId = deepWorkLog.definitionId;
+                          else { // Check branding logs
+                              const brandingLog = brandingLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                              if (brandingLog) mainDefId = brandingLog.definitionId;
+                          }
                       }
                       if (mainDefId) {
                         definition = allDefs.get(mainDefId);
@@ -839,11 +846,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   
                   if (!definition) {
                     const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-                    definition = sourceDefs.find(d => d.name === activity.details);
+                    const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+                    const category = microSkill ? microSkill.microSkillName : activity.details;
+                    definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
                   }
 
                   if (definition) {
                     const leafNodes = getDescendantLeafNodes(definition.id, activity.type === 'upskill' ? 'upskill' : 'deepwork');
+                    
                     if (leafNodes.length > 0) {
                         totalMinutes = leafNodes.reduce((sum, node) => {
                             if (node.last_logged_date === dateKey) {
@@ -905,7 +915,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, allUpskillLogs, allDeepWorkLogs, getDescendantLeafNodes]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, allUpskillLogs, allDeepWorkLogs, getDescendantLeafNodes, microSkillMap, brandingLogs]);
   
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -2959,7 +2969,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (Array.isArray(activities)) {
               newDaySchedule[slotName] = activities.map(act => ({
                 ...act,
-                id: `${act.type}-${Date.now()}-${Math.random()}`,
+                id: `${act.type}-${dateKey}-${Math.random()}`,
                 completed: false,
                 completedAt: undefined,
                 focusSessionInitialStartTime: undefined,
@@ -3005,3 +3015,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
+    
