@@ -607,7 +607,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return map;
   }, [coreSkills]);
-
+  
   const updateActivity = useCallback((updatedActivity: Activity) => {
     setSchedule(prevSchedule => {
       const newSchedule = { ...prevSchedule };
@@ -630,6 +630,65 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
+  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+  
+    const findAndUpdateDefinition = (
+      definitions: ExerciseDefinition[], 
+      setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
+    ) => {
+      let definition: ExerciseDefinition | undefined;
+      let definitionFound = false;
+
+      // Prioritize finding by linked task IDs first
+      if (activity.taskIds && activity.taskIds.length > 0) {
+        const mainLogInstanceId = activity.taskIds[0];
+        let mainDefId: string | undefined;
+
+        const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+        mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+        
+        if (mainDefId) {
+          definition = definitions.find(d => d.id === mainDefId);
+        }
+      }
+      
+      // Fallback to name/category matching if no definition found via taskIds
+      if (!definition) {
+        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+        const category = microSkill ? microSkill.microSkillName : activity.details;
+        definition = definitions.find(def => def.name === activity.details && d.category === category);
+      }
+      
+      if (definition) {
+        setter(prevDefs => prevDefs.map(def =>
+          def.id === definition!.id ? {
+            ...def,
+            loggedDuration: (def.loggedDuration || 0) + duration,
+            last_logged_date: todayKey,
+          } : def
+        ));
+        definitionFound = true;
+      }
+      return definitionFound;
+    };
+  
+    let updated = false;
+    if (activity.type === 'upskill') {
+      updated = findAndUpdateDefinition(upskillDefinitions, setUpskillDefinitions);
+    } else if (activity.type === 'deepwork' || activity.type === 'branding') {
+      updated = findAndUpdateDefinition(deepWorkDefinitions, setDeepWorkDefinitions);
+    }
+  
+    if (!updated) {
+        console.warn("Could not find a matching definition to log time against for activity:", activity.details);
+        updateActivity({ ...activity, duration: (activity.duration || 0) + duration });
+    }
+    
+    updateActivity({ ...activity, completed: true, completedAt: Date.now() });
+  
+  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity, allUpskillLogs, allDeepWorkLogs]);
+  
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let definitionUpdated = false;
@@ -656,89 +715,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         findAndUpdate(upskillDefinitions, setUpskillDefinitions);
     }
   }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-  
-  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-  
-    const findAndUpdateDefinition = (
-      definitions: ExerciseDefinition[], 
-      setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
-    ) => {
-      let definition: ExerciseDefinition | undefined;
-      let definitionFound = false;
 
-      // Prioritize finding by linked task IDs first
-      if (activity.taskIds && activity.taskIds.length > 0) {
-        const mainLogInstanceId = activity.taskIds[0];
-        let mainDefId: string | undefined;
+  const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
 
-        if (activity.type === 'upskill') {
-          mainDefId = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-        } else {
-          mainDefId = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-        }
-        
-        if (mainDefId) {
-          definition = definitions.find(d => d.id === mainDefId);
-        }
-      }
-      
-      // Fallback to name/category matching if no definition found via taskIds
-      if (!definition) {
-        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-        const category = microSkill ? microSkill.microSkillName : activity.details;
-        definition = definitions.find(d => d.name === activity.details && d.category === category);
-      }
-      
-      if (definition) {
-        setter(prevDefs => prevDefs.map(def =>
-          def.id === definition!.id ? {
-            ...def,
-            loggedDuration: (def.loggedDuration || 0) + duration,
-            last_logged_date: todayKey,
-          } : def
-        ));
-        definitionFound = true;
-      }
-      return definitionFound;
-    };
-  
-    let updated = false;
-    if (activity.type === 'upskill') {
-      updated = findAndUpdateDefinition(upskillDefinitions, setUpskillDefinitions);
-    } else if (activity.type === 'deepwork' || activity.type === 'branding') {
-      updated = findAndUpdateDefinition(deepWorkDefinitions, setDeepWorkDefinitions);
-    }
-  
-    if (!updated) {
-        console.warn("Could not find a matching definition to log time against for activity:", activity.details);
-        // Fallback: update the activity itself if no definition is found
-        updateActivity({ ...activity, duration: (activity.duration || 0) + duration });
-    }
-    
-    updateActivity({ ...activity, completed: true, completedAt: Date.now() });
-  
-  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity, allUpskillLogs, allDeepWorkLogs]);
+  const childToParentMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    allDefinitionMap.forEach(def => {
+      const children = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+      children.forEach(childId => {
+        if (!map.has(childId)) map.set(childId, []);
+        map.get(childId)!.push(def.id);
+      });
+    });
+    return map;
+  }, [allDefinitionMap]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
+    const isChild = childToParentMap.has(def.id);
     
     if (isParent) {
         return isChild ? 'Objective' : 'Intention';
     }
     return isChild ? 'Action' : 'Standalone';
-  }, [deepWorkDefinitions]);
+  }, [childToParentMap]);
   
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
     const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
-    const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
+    const isChild = childToParentMap.has(def.id);
     
     if(isParent) {
         return isChild ? 'Objective' : 'Curiosity';
     }
     return isChild ? 'Visualization' : 'Standalone';
-  }, [upskillDefinitions]);
+  }, [childToParentMap]);
 
   const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
     const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
@@ -828,17 +838,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   if (activity.taskIds && activity.taskIds.length > 0) {
                       const mainLogInstanceId = activity.taskIds[0];
                       let mainDefId: string | undefined;
-
-                      if (activity.type === 'upskill') {
-                          mainDefId = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-                      } else {
-                          const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                          if(deepWorkLog) mainDefId = deepWorkLog.definitionId;
-                          else { // Check branding logs
-                              const brandingLog = brandingLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                              if (brandingLog) mainDefId = brandingLog.definitionId;
-                          }
-                      }
+                      const allLogs = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'branding' ? brandingLogs : allDeepWorkLogs;
+                      mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+                      
                       if (mainDefId) {
                         definition = allDefs.get(mainDefId);
                       }
