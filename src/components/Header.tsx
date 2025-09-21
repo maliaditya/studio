@@ -15,7 +15,7 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, AudioAnnotation } from '@/types/workout';
+import type { Resource, AudioAnnotation, ResourcePoint } from '@/types/workout';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,33 +27,53 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
   const { resources, openGeneralPopup, setPlaybackRequest } = useAuth();
   const [query, setQuery] = useState('');
 
-  const searchResults = useMemo(() => {
-    if (!query) return [];
+  const { audioResults, cardResults } = useMemo(() => {
+    if (!query) return { audioResults: [], cardResults: [] };
     
-    const results: { resource: Resource, annotation: ResourcePoint }[] = [];
-    
+    const lowerCaseQuery = query.toLowerCase();
+    const audioResults: { resource: Resource, annotation: ResourcePoint }[] = [];
+    const cardResults: { resource: Resource, point?: ResourcePoint }[] = [];
+    const addedCardIds = new Set<string>();
+
     resources.forEach(resource => {
-      if (resource.points) {
-        resource.points.forEach(point => {
-          if (point.type === 'timestamp' && point.text.toLowerCase().includes(query.toLowerCase())) {
-            results.push({ resource, annotation: point });
-          }
-        });
+      if (resource.type === 'card' || resource.type === 'habit' || resource.type === 'mechanism') {
+        // Search card name
+        if (resource.name.toLowerCase().includes(lowerCaseQuery) && !addedCardIds.has(resource.id)) {
+          cardResults.push({ resource });
+          addedCardIds.add(resource.id);
+        }
+
+        // Search card points
+        if (resource.points) {
+          resource.points.forEach(point => {
+            if (point.text.toLowerCase().includes(lowerCaseQuery)) {
+              if (point.type === 'timestamp') {
+                audioResults.push({ resource, annotation: point });
+              } else if (!addedCardIds.has(resource.id)) {
+                cardResults.push({ resource, point });
+                addedCardIds.add(resource.id);
+              }
+            }
+          });
+        }
       }
     });
 
-    return results;
+    return { audioResults, cardResults };
   }, [query, resources]);
 
-  const handleSelect = (resource: Resource, annotation: ResourcePoint, e: React.MouseEvent) => {
-    if (annotation.timestamp !== undefined) {
+  const handleSelect = (item: { resource: Resource, annotation?: ResourcePoint }, e: React.MouseEvent) => {
+    const { resource, annotation } = item;
+    
+    if (annotation && annotation.timestamp !== undefined) {
       setPlaybackRequest({
         resourceId: resource.id,
         timestamp: annotation.timestamp,
         endTime: annotation.endTime,
       });
-      openGeneralPopup(resource.id, e);
     }
+    openGeneralPopup(resource.id, e);
+    
     setOpen(false);
     setQuery('');
   };
@@ -78,33 +98,57 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
       <CommandInput 
-        placeholder="Search audio notes..." 
+        placeholder="Search notes and cards..." 
         value={query}
         onValueChange={setQuery}
       />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
-        <CommandGroup heading="Audio Annotations">
-          {searchResults.map(({ resource, annotation }) => (
-            <CommandItem 
-              key={annotation.id}
-              onSelect={(e) => handleSelect(resource, annotation, e as any)}
-              className="flex justify-between items-center"
-            >
-              <div className="flex-grow min-w-0">
-                <p className="font-medium truncate">{annotation.text}</p>
-                <p className="text-xs text-muted-foreground truncate">{resource.name}</p>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                <span className="text-xs text-muted-foreground font-mono">
-                  {formatTime(annotation.timestamp || 0)}
-                  {annotation.endTime && ` - ${formatTime(annotation.endTime)}`}
-                </span>
-                <Play className="h-4 w-4 text-primary" />
-              </div>
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        
+        {cardResults.length > 0 && (
+          <CommandGroup heading="Resource Cards">
+            {cardResults.map(({ resource, point }) => (
+              <CommandItem 
+                key={resource.id + (point?.id || '')}
+                onSelect={(e) => handleSelect({ resource }, e as any)}
+                className="flex justify-between items-center"
+              >
+                <div className="flex-grow min-w-0">
+                  <p className="font-medium truncate">{resource.name}</p>
+                  {point && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      <span className='font-semibold'>Match:</span> {point.text}
+                    </p>
+                  )}
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {audioResults.length > 0 && (
+          <CommandGroup heading="Audio Annotations">
+            {audioResults.map(({ resource, annotation }) => (
+              <CommandItem 
+                key={annotation.id}
+                onSelect={(e) => handleSelect({ resource, annotation }, e as any)}
+                className="flex justify-between items-center"
+              >
+                <div className="flex-grow min-w-0">
+                  <p className="font-medium truncate">{annotation.text}</p>
+                  <p className="text-xs text-muted-foreground truncate">{resource.name}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {formatTime(annotation.timestamp || 0)}
+                    {annotation.endTime && ` - ${formatTime(annotation.endTime)}`}
+                  </span>
+                  <Play className="h-4 w-4 text-primary" />
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
       </CommandList>
     </CommandDialog>
   );
