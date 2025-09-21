@@ -742,4 +742,12 @@ export interface DailyReviewLog {
 export interface PlaybackRequest {
   resourceId: string;
   timestamp: number;
+  endTime?: number;
+}
+
+export interface AudioAnnotation {
+    id: string;
+    note: string;
+    timestamp: number;
+    endTime?: number;
 }

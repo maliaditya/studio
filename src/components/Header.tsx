@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -29,13 +30,13 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
   const searchResults = useMemo(() => {
     if (!query) return [];
     
-    const results: { resource: Resource, annotation: AudioAnnotation }[] = [];
+    const results: { resource: Resource, annotation: ResourcePoint }[] = [];
     
     resources.forEach(resource => {
-      if (resource.audioAnnotations) {
-        resource.audioAnnotations.forEach(annotation => {
-          if (annotation.note.toLowerCase().includes(query.toLowerCase())) {
-            results.push({ resource, annotation });
+      if (resource.points) {
+        resource.points.forEach(point => {
+          if (point.type === 'timestamp' && point.text.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ resource, annotation: point });
           }
         });
       }
@@ -44,10 +45,17 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
     return results;
   }, [query, resources]);
 
-  const handleSelect = (resource: Resource, annotation: AudioAnnotation, e: React.MouseEvent) => {
-    setPlaybackRequest({ resourceId: resource.id, timestamp: annotation.timestamp });
-    openGeneralPopup(resource.id, e);
+  const handleSelect = (resource: Resource, annotation: ResourcePoint, e: React.MouseEvent) => {
+    if (annotation.timestamp !== undefined) {
+      setPlaybackRequest({
+        resourceId: resource.id,
+        timestamp: annotation.timestamp,
+        endTime: annotation.endTime,
+      });
+      openGeneralPopup(resource.id, e);
+    }
     setOpen(false);
+    setQuery('');
   };
   
   const formatTime = (seconds: number): string => {
@@ -84,11 +92,14 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
               className="flex justify-between items-center"
             >
               <div className="flex-grow min-w-0">
-                <p className="font-medium truncate">{annotation.note}</p>
+                <p className="font-medium truncate">{annotation.text}</p>
                 <p className="text-xs text-muted-foreground truncate">{resource.name}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 ml-4">
-                <span className="text-xs text-muted-foreground font-mono">{formatTime(annotation.timestamp)}</span>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {formatTime(annotation.timestamp || 0)}
+                  {annotation.endTime && ` - ${formatTime(annotation.endTime)}`}
+                </span>
                 <Play className="h-4 w-4 text-primary" />
               </div>
             </CommandItem>
@@ -204,7 +215,6 @@ export function Header() {
                     <span className="text-xs">⌘</span>K
                   </kbd>
                 </Button>
-                <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
               </>
             )}
           </div>
@@ -244,6 +254,7 @@ export function Header() {
         onSubmit={pushDemoDataWithToken}
       />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
+      <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
     </>
   );
 }

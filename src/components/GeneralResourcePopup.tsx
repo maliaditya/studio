@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
-import type { Resource, ResourcePoint, PopupState, AudioAnnotation } from '@/types/workout';
+import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
 import { useDraggable } from '@dnd-kit/core';
@@ -111,10 +111,31 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       }, [playingAudio, resource, globalVolume]);
 
     useEffect(() => {
-      if (playbackRequest && playbackRequest.resourceId === resource?.id && audioRef.current) {
-        audioRef.current.currentTime = playbackRequest.timestamp;
+      const audioEl = audioRef.current;
+      if (!audioEl) return;
+
+      if (playbackRequest && playbackRequest.resourceId === resource?.id) {
+        audioEl.currentTime = playbackRequest.timestamp;
         setPlayingAudio(true);
-        setPlaybackRequest(null); // Clear the request
+        
+        // Handle auto-stopping
+        const checkEndTime = () => {
+          if (playbackRequest.endTime && audioEl.currentTime >= playbackRequest.endTime) {
+            audioEl.pause();
+            setPlayingAudio(false);
+            setPlaybackRequest(null);
+          }
+        };
+        
+        if (playbackRequest.endTime) {
+            audioEl.addEventListener('timeupdate', checkEndTime);
+            return () => {
+              audioEl.removeEventListener('timeupdate', checkEndTime);
+            };
+        } else {
+            // If there's no end time, just play and clear the request
+            setPlaybackRequest(null);
+        }
       }
     }, [playbackRequest, resource?.id, setPlaybackRequest]);
 
@@ -356,19 +377,19 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </CardContent>
                 </div>
                  <CardFooter className="p-3 border-t">
-                    <div className="flex gap-2 w-full">
-                       {resource.hasLocalAudio && (
-                         <div className="flex gap-2 w-full">
-                            <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note at current time..." className="h-8 text-xs" />
-                            <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
-                        </div>
-                       )}
-                       {!resource.hasLocalAudio && (
-                           <Button variant="outline" size="sm" className="w-full" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
-                               <Upload className="mr-2 h-4 w-4" />Upload Audio
-                           </Button>
-                       )}
-                    </div>
+                     <div className="flex gap-2 w-full">
+                        {resource.hasLocalAudio && (
+                          <div className="flex gap-2 w-full">
+                             <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
+                             <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
+                         </div>
+                        )}
+                        {!resource.hasLocalAudio && (
+                            <Button variant="outline" size="sm" className="w-full" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
+                                <Upload className="mr-2 h-4 w-4" />Upload Audio
+                            </Button>
+                        )}
+                     </div>
                  </CardFooter>
             </Card>
         </div>
@@ -391,7 +412,6 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     const [editText, setEditText] = useState(point.text);
     const [isFetchingMeta, setIsFetchingMeta] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [endTimeInput, setEndTimeInput] = useState(point.endTime ? point.endTime.toString() : '');
 
     const handleSave = async () => {
         if (editText.trim() === '') {
@@ -540,5 +560,3 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
-
-    
