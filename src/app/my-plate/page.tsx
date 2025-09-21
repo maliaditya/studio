@@ -279,11 +279,11 @@ function MyPlatePageContent() {
                         switch (activity.type) {
                             case 'upskill':
                                 logs = allUpskillLogs;
-                                durationField = 'weight'; 
+                                durationField = 'reps'; // Use 'reps' for minutes in upskill logs
                                 break;
                             case 'deepwork':
                                 logs = allDeepWorkLogs;
-                                durationField = 'weight';
+                                durationField = 'weight'; // Use 'weight' for minutes in deepwork logs
                                 break;
                             case 'branding':
                                 logs = brandingLogs;
@@ -295,12 +295,12 @@ function MyPlatePageContent() {
                                 break;
                             case 'workout':
                                 logs = allWorkoutLogs;
-                                durationField = 'reps'; 
+                                durationField = 'reps';
                                 multiplier = 15; // Placeholder duration for workout sets
                                 break;
                             case 'mindset':
                                 logs = allMindProgrammingLogs;
-                                durationField = 'reps'; 
+                                durationField = 'reps';
                                 multiplier = 15;
                                 break;
                             case 'interrupt':
