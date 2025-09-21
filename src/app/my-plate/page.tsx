@@ -272,57 +272,56 @@ function MyPlatePageContent() {
                     let suffix = '';
 
                     if (activity.completed) {
-                        let logs;
-                        let durationField: 'reps' | 'weight' | undefined;
-                        let multiplier = 1;
-
-                        switch (activity.type) {
-                            case 'upskill':
-                                logs = allUpskillLogs;
-                                durationField = 'reps'; // Use 'reps' for minutes in upskill logs
-                                break;
-                            case 'deepwork':
-                                logs = allDeepWorkLogs;
-                                durationField = 'weight'; // Use 'weight' for minutes in deepwork logs
-                                break;
-                            case 'branding':
-                                logs = brandingLogs;
-                                durationField = 'weight';
-                                break;
-                            case 'lead-generation':
-                                logs = allLeadGenLogs;
-                                durationField = 'weight';
-                                break;
-                            case 'workout':
-                                logs = allWorkoutLogs;
-                                durationField = 'reps';
-                                multiplier = 15; // Placeholder duration for workout sets
-                                break;
-                            case 'mindset':
-                                logs = allMindProgrammingLogs;
-                                durationField = 'reps';
-                                multiplier = 15;
-                                break;
-                            case 'interrupt':
-                            case 'distraction':
-                            case 'essentials':
-                            case 'nutrition':
-                                totalMinutes = activity.duration || 0;
-                                break;
+                        let mainDefId = activity.taskIds?.[0];
+                        if (mainDefId?.includes('-')) {
+                            mainDefId = mainDefId.split('-')[0];
+                        }
+                        
+                        let definition: ExerciseDefinition | undefined;
+                        if (activity.type === 'upskill') {
+                            definition = upskillDefinitions.find(d => d.id === mainDefId);
+                        } else if (activity.type === 'deepwork' || activity.type === 'branding') {
+                            definition = deepWorkDefinitions.find(d => d.id === mainDefId);
                         }
 
-                        if (logs && durationField) {
-                            const loggedDuration = (logs.find(log => log.date === dateKey)
-                                ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField!] || 0), 0), 0) || 0);
-
-                            if (loggedDuration > 0) {
-                                totalMinutes = loggedDuration * multiplier;
-                                suffix = ' logged';
-                            }
-                        } else if (activity.duration) { // Fallback for other completed types
+                        if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
+                            totalMinutes = definition.loggedDuration;
+                            suffix = ' logged';
+                        } else if (activity.duration) { // Fallback for other completed types like essentials, interrupts
                             totalMinutes = activity.duration;
                             suffix = ' logged';
+                        } else {
+                            // Fallback logic for older data structure if needed, or other activity types
+                             let logs;
+                             let durationField: 'reps' | 'weight' | undefined;
+                             let multiplier = 1;
+    
+                             switch (activity.type) {
+                                case 'workout':
+                                    logs = allWorkoutLogs;
+                                    durationField = 'reps';
+                                    multiplier = 15;
+                                    break;
+                                case 'mindset':
+                                    logs = allMindProgrammingLogs;
+                                    durationField = 'reps';
+                                    multiplier = 15;
+                                    break;
+                                case 'lead-generation':
+                                    logs = allLeadGenLogs;
+                                    durationField = 'weight';
+                                    break;
+                             }
+                              if (logs && durationField) {
+                                const loggedDuration = (logs.find(log => log.date === dateKey)
+                                    ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField!] || 0), 0), 0) || 0);
+
+                                if (loggedDuration > 0) {
+                                    totalMinutes = loggedDuration * multiplier;
+                                    suffix = ' logged';
+                                }
+                            }
                         }
                     } else {
                       // For non-completed tasks, calculate estimated duration
