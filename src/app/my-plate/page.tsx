@@ -255,125 +255,130 @@ function MyPlatePageContent() {
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
-
+  
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
+  
     for (const dateKey in schedule) {
-        const daySchedule = schedule[dateKey];
-        if (!daySchedule) continue;
-
-        for (const slotName in daySchedule) {
-            const activities = (daySchedule as any)[slotName] || [];
-            if (Array.isArray(activities)) {
-                for (const activity of activities) {
-                    if (!activity || !activity.id) continue;
-
-                    let totalMinutes = 0;
-                    let suffix = '';
-
-                    if (activity.completed) {
-                        let definition: ExerciseDefinition | undefined;
-                        if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
-                            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-                            definition = sourceDefs.find(d => d.name === activity.details && d.category === microSkillMap.get(
-                                coreSkills.find(cs => cs.name === activity.details)?.id || ''
-                            )?.microSkillName);
-                            if (!definition) {
-                                definition = sourceDefs.find(d => d.id === activity.taskIds?.[0]?.split('-')[0]);
-                            }
-                        }
-
-                        if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
-                            totalMinutes = definition.loggedDuration;
-                            suffix = ' logged';
-                        } else if (activity.duration) { // Fallback for other completed types like essentials, interrupts
-                            totalMinutes = activity.duration;
-                            suffix = ' logged';
-                        } else {
-                            // Fallback logic for older data structure if needed, or other activity types
-                             let logs;
-                             let durationField: 'reps' | 'weight' | undefined;
-                             let multiplier = 1;
-    
-                             switch (activity.type) {
-                                case 'workout':
-                                    logs = allWorkoutLogs;
-                                    durationField = 'reps';
-                                    multiplier = 15;
-                                    break;
-                                case 'mindset':
-                                    logs = allMindProgrammingLogs;
-                                    durationField = 'reps';
-                                    multiplier = 15;
-                                    break;
-                                case 'lead-generation':
-                                    logs = allLeadGenLogs;
-                                    durationField = 'weight';
-                                    break;
-                                case 'upskill': // Corrected fallback
-                                    logs = allUpskillLogs;
-                                    durationField = 'reps'; // Duration is in reps for upskill
-                                    break;
-                                case 'deepwork': // Corrected fallback
-                                    logs = allDeepWorkLogs;
-                                    durationField = 'weight'; // Duration is in weight for deepwork
-                                    break;
-                             }
-                              if (logs && durationField) {
-                                const loggedDuration = (logs.find(log => log.date === dateKey)
-                                    ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
-                                    .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField!] || 0), 0), 0) || 0);
-
-                                if (loggedDuration > 0) {
-                                    totalMinutes = loggedDuration * multiplier;
-                                    suffix = ' logged';
-                                }
-                            }
-                        }
-                    } else {
-                      // For non-completed tasks, calculate estimated duration
-                      switch(activity.type) {
-                        case 'workout': totalMinutes = 90; break;
-                        case 'mindset': totalMinutes = 15; break;
-                        case 'upskill':
-                        case 'deepwork':
-                        case 'branding':
-                          if (activity.taskIds && activity.taskIds.length > 0) {
-                            const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                            const taskDef = allDefs.get(mainTaskDefId);
-                            if (taskDef) {
-                              totalMinutes = calculateTotalEstimate(taskDef);
-                            } else {
-                              totalMinutes = 120;
-                            }
-                          } else {
-                            totalMinutes = 120;
-                          }
-                          break;
-                        case 'planning':
-                        case 'tracking':
-                          totalMinutes = 30; break;
-                        case 'lead-generation': totalMinutes = 45; break;
-                        case 'essentials':
-                        case 'interrupt':
-                        case 'distraction':
-                           totalMinutes = activity.duration || 0; break;
-                        default: totalMinutes = 0;
-                      }
+      const daySchedule = schedule[dateKey];
+      if (!daySchedule) continue;
+  
+      for (const slotName in daySchedule) {
+        const activities = (daySchedule as any)[slotName] || [];
+        if (Array.isArray(activities)) {
+          for (const activity of activities) {
+            if (!activity || !activity.id) continue;
+  
+            let totalMinutes = 0;
+            let suffix = '';
+            
+            if (activity.completed) {
+                let definition: ExerciseDefinition | undefined;
+                if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
+                    // First, try to find by ID from taskIds if they exist
+                    const mainDefId = activity.taskIds?.[0]?.split('-')[0];
+                    if (mainDefId) {
+                      definition = allDefs.get(mainDefId);
                     }
-
-                    if (totalMinutes > 0) {
-                        const h = Math.floor(totalMinutes / 60);
-                        const m = Math.round(totalMinutes % 60);
-                        newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
+                    
+                    // If not found by ID (e.g., for directly created/edited tasks), find by name
+                    if (!definition) {
+                      const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+                      const coreSkill = coreSkills.find(cs => cs.name === activity.details);
+                      const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : activity.details;
+                      definition = sourceDefs.find(d => d.name === activity.details && d.category === microSkillName);
                     }
                 }
+
+                if (definition && definition.last_logged_date === dateKey && definition.loggedDuration) {
+                    totalMinutes = definition.loggedDuration;
+                    suffix = ' logged';
+                } else if (activity.duration) {
+                    totalMinutes = activity.duration;
+                    suffix = ' logged';
+                } else {
+                     let logs;
+                     let durationField: 'reps' | 'weight' | undefined;
+                     let multiplier = 1;
+    
+                     switch (activity.type) {
+                        case 'workout':
+                            logs = allWorkoutLogs;
+                            durationField = 'reps';
+                            multiplier = 15;
+                            break;
+                        case 'mindset':
+                            logs = allMindProgrammingLogs;
+                            durationField = 'reps';
+                            multiplier = 15;
+                            break;
+                        case 'lead-generation':
+                            logs = allLeadGenLogs;
+                            durationField = 'weight';
+                            break;
+                        case 'upskill':
+                            logs = allUpskillLogs;
+                            durationField = 'reps'; // reps for upskill duration
+                            break;
+                        case 'deepwork':
+                            logs = allDeepWorkLogs;
+                            durationField = 'weight'; // weight for deepwork duration
+                            break;
+                     }
+                      if (logs && durationField) {
+                        const loggedDuration = (logs.find(log => log.date === dateKey)
+                            ?.exercises.filter(ex => activity.taskIds?.includes(ex.id))
+                            .reduce((sum, ex) => sum + ex.loggedSets.reduce((setSum, set) => setSum + ((set as any)[durationField!] || 0), 0), 0) || 0);
+
+                        if (loggedDuration > 0) {
+                            totalMinutes = loggedDuration * multiplier;
+                            suffix = ' logged';
+                        }
+                      }
+                }
+            } else {
+              // For non-completed tasks, calculate estimated duration
+              switch(activity.type) {
+                case 'workout': totalMinutes = 90; break;
+                case 'mindset': totalMinutes = 15; break;
+                case 'upskill':
+                case 'deepwork':
+                case 'branding':
+                  if (activity.taskIds && activity.taskIds.length > 0) {
+                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                    const taskDef = allDefs.get(mainTaskDefId);
+                    if (taskDef) {
+                      totalMinutes = calculateTotalEstimate(taskDef);
+                    } else {
+                      totalMinutes = 120;
+                    }
+                  } else {
+                    totalMinutes = 120;
+                  }
+                  break;
+                case 'planning':
+                case 'tracking':
+                  totalMinutes = 30; break;
+                case 'lead-generation': totalMinutes = 45; break;
+                case 'essentials':
+                case 'interrupt':
+                case 'distraction':
+                   totalMinutes = activity.duration || 0; break;
+                default: totalMinutes = 0;
+              }
             }
+
+            if (totalMinutes > 0) {
+              const h = Math.floor(totalMinutes / 60);
+              const m = Math.round(totalMinutes % 60);
+              newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
+            }
+          }
         }
+      }
     }
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, strengthTrainingMode, microSkillMap, coreSkills]);
-  
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, coreSkills, microSkillMap]);
+
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
     const daySchedule = schedule[selectedDateKey];
@@ -434,17 +439,26 @@ function MyPlatePageContent() {
         let linkedEntityType: Activity['linkedEntityType'] = undefined;
 
         if ((type === 'upskill' || type === 'deepwork') && detailsOverride) {
-            const newDef: ExerciseDefinition = {
-                id: `def_${Date.now()}_${Math.random()}`,
-                name: detailsOverride,
-                category: detailsOverride as ExerciseCategory,
-                ...(type === 'upskill' ? { linkedUpskillIds: [] } : { linkedDeepWorkIds: [] })
-            };
+            const sourceDefs = type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+            const coreSkill = coreSkills.find(cs => cs.name === detailsOverride);
+            const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : detailsOverride;
 
-            const setDefinitions = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
-            setDefinitions(prev => [...prev, newDef]);
-            
-            taskIds = [`${newDef.id}-${Date.now()}`];
+            const existingDef = sourceDefs.find(d => d.name === detailsOverride && d.category === microSkillName);
+
+            if (existingDef) {
+                taskIds = [`${existingDef.id}-${Date.now()}`];
+            } else {
+                const newDef: ExerciseDefinition = {
+                    id: `def_${Date.now()}_${Math.random()}`,
+                    name: detailsOverride,
+                    category: microSkillName as ExerciseCategory,
+                    ...(type === 'upskill' ? { linkedUpskillIds: [] } : { linkedDeepWorkIds: [] })
+                };
+    
+                const setDefinitions = type === 'upskill' ? setUpskillDefinitions : setDeepWorkDefinitions;
+                setDefinitions(prev => [...prev, newDef]);
+                taskIds = [`${newDef.id}-${Date.now()}`];
+            }
             linkedEntityType = 'specialization';
         }
 
@@ -1105,9 +1119,10 @@ function MyPlatePageContent() {
     // This part is the critical fix. `activityInfo` may not have task details yet.
     // We need to look at the specialization/category from `activityInfo.details` and find all
     // top-level tasks (Intentions/Curiosities) for it.
-    const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activityInfo.details || ms.microSkillName === activityInfo.details);
+    const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details);
+    const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : activityInfo.details;
     
-    if (!microSkillInfo) return [];
+    if (!microSkillName) return [];
 
     const getNodeType = pageType === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
     const targetNodeType = pageType === 'upskill' ? 'Curiosity' : 'Intention';
@@ -1115,7 +1130,7 @@ function MyPlatePageContent() {
     const tasks = definitionSource
       .filter(def => {
         const nodeType = getNodeType(def);
-        return def.category === microSkillInfo.microSkillName && nodeType === targetNodeType;
+        return def.category === microSkillName && nodeType === targetNodeType;
       })
       .map(def => {
         const existingTask = logForDay?.exercises.find(ex => ex.definitionId === def.id);
@@ -1131,7 +1146,7 @@ function MyPlatePageContent() {
     });
 
     return tasks;
-}, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, microSkillMap, getUpskillNodeType, getDeepWorkNodeType]);
+}, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, microSkillMap, getUpskillNodeType, getDeepWorkNodeType, coreSkills]);
 
 
   return (
@@ -1465,3 +1480,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
