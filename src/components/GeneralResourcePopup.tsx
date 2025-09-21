@@ -69,45 +69,44 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
     
-    useEffect(() => {
+     useEffect(() => {
         const audioEl = audioRef.current;
-        if (!audioEl) return;
-      
-        const loadAndPlayAudio = async () => {
-          if (playingAudio && resource && resource.hasLocalAudio) {
-            const audioBlob = await getAudio(resource.id);
-            if (audioBlob) {
-              const audioUrl = URL.createObjectURL(audioBlob);
-              if (audioEl.src !== audioUrl) {
-                  audioEl.src = audioUrl;
-              }
-              audioEl.volume = globalVolume;
-              audioEl.play().catch(e => console.error("Audio play failed:", e));
+        if (!audioEl || !resource?.id) return;
+
+        const handleAudioPlayback = async () => {
+            if (playingAudio && resource.hasLocalAudio) {
+                const audioBlob = await getAudio(resource.id);
+                if (audioBlob) {
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    if (audioEl.src !== audioUrl) {
+                        audioEl.src = audioUrl;
+                    }
+                    audioEl.volume = globalVolume;
+                    audioEl.play().catch(e => console.error("Audio play failed:", e));
+                } else {
+                    setPlayingAudio(false);
+                }
             } else {
-              setPlayingAudio(false); // Can't find audio to play
+                audioEl.pause();
             }
-          } else {
-            audioEl.pause();
-          }
         };
-      
-        loadAndPlayAudio();
-        
+
+        handleAudioPlayback();
+
         const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
         const handleDurationChange = () => setDuration(audioEl.duration);
-      
+
         audioEl.addEventListener('timeupdate', handleTimeUpdate);
         audioEl.addEventListener('durationchange', handleDurationChange);
-      
-        // Cleanup object URL and event listeners
+
         return () => {
-          if (audioEl) {
-            URL.revokeObjectURL(audioEl.src); // Clean up blob URL
-            audioEl.removeEventListener('timeupdate', handleTimeUpdate);
-            audioEl.removeEventListener('durationchange', handleDurationChange);
-          }
+            if (audioEl) {
+                URL.revokeObjectURL(audioEl.src);
+                audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+                audioEl.removeEventListener('durationchange', handleDurationChange);
+            }
         };
-      }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
+    }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
 
     useEffect(() => {
       const audioEl = audioRef.current;
@@ -146,7 +145,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const handleAddPoint = (type: ResourcePoint['type']) => {
         let newPoint: ResourcePoint;
         if (type === 'timestamp') {
-          newPoint = { id: `point_${Date.now()}`, text: newAnnotation || 'New Note', type, timestamp: currentTime };
+          const newTimestamp = Math.max(0, currentTime - 30);
+          newPoint = { id: `point_${Date.now()}`, text: newAnnotation || 'New Note', type, timestamp: newTimestamp };
           setNewAnnotation('');
         } else {
           newPoint = { id: `point_${Date.now()}`, text: 'New step...', type };
@@ -227,6 +227,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
                                 onSeekTo={handleSeekTo}
                                 currentTime={currentTime}
+                                onSetEndTime={() => handleUpdatePoint(point.id, { endTime: Math.max(0, currentTime - 30) })}
+                                onClearEndTime={() => handleUpdatePoint(point.id, { endTime: undefined })}
                             />
                         ))}
                     </ul>
@@ -392,7 +394,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo, currentTime }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo, currentTime, onSetEndTime, onClearEndTime }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
@@ -401,6 +403,8 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     onConvertToCard: () => void;
     onSeekTo: (timestamp: number) => void;
     currentTime: number;
+    onSetEndTime: () => void;
+    onClearEndTime: () => void;
 }) => {
     const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
@@ -478,16 +482,10 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         }
     };
     
-    const handleSetEndTime = () => {
-        onUpdate(point.id, { endTime: currentTime });
-    };
-
-    const handleClearEndTime = () => {
-        onUpdate(point.id, { endTime: undefined });
-    };
+    const isActiveTimestamp = point.timestamp !== undefined && currentTime >= point.timestamp && (point.endTime === undefined || currentTime <= point.endTime);
 
     return (
-        <li className="flex items-start gap-3 group/item w-full">
+        <li className={cn("flex items-start gap-3 group/item w-full p-1 rounded-md", isActiveTimestamp && "bg-primary/10")}>
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
@@ -532,15 +530,15 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                 )}
             </div>
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                {point.type === 'timestamp' && (
+                 {point.type === 'timestamp' && (
                     <div className="flex items-center gap-1">
                         {point.endTime ? (
                             <>
                                 <span className="font-mono text-primary font-semibold text-xs"> - {formatTime(point.endTime)}</span>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleClearEndTime}><X className="h-3 w-3"/></Button>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClearEndTime}><X className="h-3 w-3"/></Button>
                             </>
                         ) : (
-                            <Button variant="outline" size="sm" className="h-6 text-xs" onClick={handleSetEndTime}>Set End</Button>
+                            <Button variant="outline" size="sm" className="h-6 text-xs" onClick={onSetEndTime}>Set End</Button>
                         )}
                     </div>
                 )}
