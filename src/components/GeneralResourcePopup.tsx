@@ -1,5 +1,4 @@
 
-
       "use client";
 
 import React, { useRef, useState, useEffect } from 'react';
@@ -45,7 +44,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -210,6 +209,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onOpenContentView={(e) => handleOpenContentView(point, e)}
                                 onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
                                 onSeekTo={handleSeekTo}
+                                currentTime={currentTime}
                             />
                         ))}
                     </ul>
@@ -375,7 +375,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo, currentTime }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
@@ -383,6 +383,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
     onSeekTo: (timestamp: number) => void;
+    currentTime: number;
 }) => {
     const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
@@ -461,14 +462,13 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         }
     };
     
-    const handleEndTimeBlur = () => {
-        const newEndTime = parseFloat(endTimeInput);
-        if (!isNaN(newEndTime) && newEndTime > (point.timestamp || 0)) {
-            onUpdate(point.id, { endTime: newEndTime });
-        } else {
-            setEndTimeInput(point.endTime ? point.endTime.toString() : ''); // Revert on invalid
-        }
-    }
+    const handleSetEndTime = () => {
+        onUpdate(point.id, { endTime: currentTime });
+    };
+
+    const handleClearEndTime = () => {
+        onUpdate(point.id, { endTime: undefined });
+    };
 
     return (
         <li className="flex items-start gap-3 group/item w-full">
@@ -478,7 +478,6 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             point.type === 'timestamp' ? (
                 <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
                     {formatTime(point.timestamp || 0)}
-                    {point.endTime && ` - ${formatTime(point.endTime)}`}
                 </button>
             ) :
             <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
@@ -519,15 +518,14 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
                 {point.type === 'timestamp' && (
                     <div className="flex items-center gap-1">
-                        <Input 
-                            type="number" 
-                            value={endTimeInput} 
-                            onChange={(e) => setEndTimeInput(e.target.value)}
-                            onBlur={handleEndTimeBlur}
-                            onKeyDown={(e) => e.key === 'Enter' && handleEndTimeBlur()}
-                            className="w-16 h-6 text-xs" 
-                            placeholder="End"
-                        />
+                        {point.endTime ? (
+                            <>
+                                <span className="font-mono text-primary font-semibold text-xs"> - {formatTime(point.endTime)}</span>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleClearEndTime}><X className="h-3 w-3"/></Button>
+                            </>
+                        ) : (
+                            <Button variant="outline" size="sm" className="h-6 text-xs" onClick={handleSetEndTime}>Set End</Button>
+                        )}
                     </div>
                 )}
                 {point.type === 'text' && (
@@ -542,3 +540,5 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
+
+    
