@@ -1682,7 +1682,7 @@ function ResourcesPageContent() {
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="sr-only"><DialogTitle>Resource Mind Map</DialogTitle></DialogHeader>
-                <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={true} />
+                <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
             </DialogContent>
         </Dialog>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -1794,17 +1794,17 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, dragHandle }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onOpenMarkdownModal: () => void;
+    onOpenContentView: (event: React.MouseEvent) => void;
     onEditLinkText: (point: ResourcePoint) => void;
     onConvertToCard: () => void;
     dragHandle?: { attributes: any; listeners: any };
 }) => {
-    const { setFloatingVideoUrl } = useAuth();
+    const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
@@ -1869,9 +1869,19 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             </li>
         )
     }
+    
+    const handleLinkClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (point.text && point.text.startsWith('brainhack://')) {
+            const hackId = point.text.replace('brainhack://', '');
+            openBrainHackPopup(hackId, e);
+        } else if (point.text) {
+            setFloatingVideoUrl(point.text);
+        }
+    };
 
     return (
-        <li className="flex items-start gap-3 group/item w-full">
+        <li className={cn("flex items-start gap-3 group/item w-full p-1 rounded-md")}>
             <div className="pt-0.5" {...dragHandle?.attributes} {...dragHandle?.listeners}>
                 {point.type === 'code' ? <Code className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
                 point.type === 'markdown' ? <MessageSquare className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
@@ -1890,7 +1900,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                         rows={1}
                     />
                 ) : point.type === 'markdown' || point.type === 'code' ? (
-                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenMarkdownModal}>
+                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenContentView}>
                       {point.type === 'markdown' ? (
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown>
                       ) : (
@@ -1903,7 +1913,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                      <div className="flex-grow min-w-0 flex items-center gap-1">
                         <span 
                             className="cursor-pointer text-primary hover:underline" 
-                            onClick={() => point.text && setFloatingVideoUrl(point.text)}
+                            onClick={handleLinkClick}
                             onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
                         >
                             {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
@@ -1925,7 +1935,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             </div>
         </li>
     );
-}
+};
 
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
@@ -1933,6 +1943,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
