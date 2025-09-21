@@ -564,12 +564,11 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     };
 
     const Controls = () => {
-        const { zoomIn, zoomOut, resetTransform } = useControls();
         return (
             <div className="absolute top-2 right-2 z-20 flex flex-col gap-2">
-                <Button size="icon" onClick={() => zoomIn()}><ZoomIn/></Button>
-                <Button size="icon" onClick={() => zoomOut()}><ZoomOut/></Button>
-                <Button size="icon" onClick={() => resetTransform()}><RefreshCw/></Button>
+                <Button size="icon" onClick={() => transformWrapperRef.current?.zoomIn()}><ZoomIn/></Button>
+                <Button size="icon" onClick={() => transformWrapperRef.current?.zoomOut()}><ZoomOut/></Button>
+                <Button size="icon" onClick={() => transformWrapperRef.current?.resetTransform()}><RefreshCw/></Button>
                 <Button size="icon" onClick={toggleFullScreen}>
                     {isFullScreen ? <Shrink className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
                 </Button>
@@ -889,15 +888,15 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
     if (rootFolderId) {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
-            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
+            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(folder => {
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
                 const childrenFolders = buildFolderTree(folder.id);
                 return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
             });
         };
         const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
         if (!rootFolder) return null;
-        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
+        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
         const childrenFolders = buildFolderTree(rootFolderId);
         return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
     }
@@ -907,8 +906,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
 
     if (selectedTopic === 'Resources') {
         const buildFolderTree = (parentId: string | null): MindMapNode[] => {
-            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => a.name.localeCompare(b.name)).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
+            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(folder => {
+                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
                 const childrenFolders = buildFolderTree(folder.id);
                 return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
             });
@@ -1237,17 +1236,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     return <InteractiveFocusAreaMap rootId={rootFocusAreaId} />;
   }
 
-  const Controls = () => {
-    const { zoomIn, zoomOut, resetTransform } = useControls();
-    return (
-        <div className="absolute top-2 right-2 z-20 flex gap-2">
-            <Button size="icon" onClick={() => transformWrapperRef.current?.zoomIn()}><ZoomIn/></Button>
-            <Button size="icon" onClick={() => transformWrapperRef.current?.zoomOut()}><ZoomOut/></Button>
-            <Button size="icon" onClick={() => transformWrapperRef.current?.resetTransform()}><RefreshCw/></Button>
-        </div>
-    );
-  };
-  
   return (
     <>
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-full flex flex-col">
@@ -1282,7 +1270,6 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
           <TransformWrapper ref={transformWrapperRef} minScale={0.1} initialScale={0.8} wheel={{ step: 0.1 }}>
             {({ zoomIn, zoomOut, resetTransform, ...rest }) => (
               <>
-                {!showControls && <Controls />}
                 <TransformComponent wrapperStyle={{ width: "100%", height: "100%" }}>
                   {selectedTopic === 'Conceptual Flow' ? (
                     <ConceptualFlowDiagram />
