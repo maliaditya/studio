@@ -629,7 +629,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return newSchedule;
     });
   }, [setSchedule]);
-  
+
   const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let definitionUpdated = false;
@@ -656,7 +656,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         findAndUpdate(upskillDefinitions, setUpskillDefinitions);
     }
   }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-
+  
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
   
@@ -721,7 +721,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity, allUpskillLogs, allDeepWorkLogs]);
 
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = deepWorkDefinitions.some(parent => (parent.linkedDeepWorkIds || []).includes(def.id));
     
     if (isParent) {
@@ -731,7 +731,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [deepWorkDefinitions]);
   
   const getUpskillNodeType = useCallback((def: ExerciseDefinition): string => {
-    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = upskillDefinitions.some(parent => (parent.linkedUpskillIds || []).includes(def.id));
     
     if(isParent) {
@@ -2969,7 +2969,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (Array.isArray(activities)) {
               newDaySchedule[slotName] = activities.map(act => ({
                 ...act,
-                id: `${act.type}-${dateKey}-${Math.random()}`,
+                id: `${act.type}-${dayKey}-${Math.random()}`,
                 completed: false,
                 completedAt: undefined,
                 focusSessionInitialStartTime: undefined,
@@ -3015,5 +3015,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
     
