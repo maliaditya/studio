@@ -255,105 +255,114 @@ function MyPlatePageContent() {
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
-
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [d.id, def]));
-
+  
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+  
     for (const dateKey in schedule) {
-        const daySchedule = schedule[dateKey];
-        if (!daySchedule) continue;
-
-        for (const slotName in daySchedule) {
-            const activities = (daySchedule as any)[slotName] || [];
-            if (!Array.isArray(activities)) continue;
-
-            for (const activity of activities) {
-                if (!activity || !activity.id) continue;
-
-                let totalMinutes = 0;
-                let suffix = '';
-
-                if (activity.completed) {
-                    if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
-                        let definition: ExerciseDefinition | undefined;
-                        const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-
-                        if (activity.taskIds && activity.taskIds.length > 0) {
-                            const mainLogInstanceId = activity.taskIds[0];
-                            let mainDefId: string | undefined;
-                            
-                            const logsSource = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-                            const logEntry = logsSource.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                            if(logEntry) mainDefId = logEntry.definitionId;
-
-                            if (mainDefId) {
-                                definition = allDefs.get(mainDefId);
-                            }
+      const daySchedule = schedule[dateKey];
+      if (!daySchedule) continue;
+  
+      for (const slotName in daySchedule) {
+        const activities = (daySchedule as any)[slotName] || [];
+        if (!Array.isArray(activities)) continue;
+  
+        for (const activity of activities) {
+          if (!activity || !activity.id) continue;
+  
+          let totalMinutes = 0;
+          let suffix = '';
+  
+          if (activity.completed) {
+            if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
+              let definition: ExerciseDefinition | undefined;
+              const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+              
+              if (activity.taskIds && activity.taskIds.length > 0) {
+                const mainLogInstanceId = activity.taskIds[0];
+                let mainDefId: string | undefined;
+  
+                const upskillLog = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                if (upskillLog) mainDefId = upskillLog.definitionId;
+                else {
+                    const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
+                    if (deepWorkLog) mainDefId = deepWorkLog.definitionId;
+                }
+                if (mainDefId) {
+                  definition = allDefs.get(mainDefId);
+                }
+              }
+  
+              if (!definition) {
+                const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
+                const category = microSkill ? microSkill.microSkillName : activity.details;
+                definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
+              }
+  
+              if (definition) {
+                const leafNodes = getDescendantLeafNodes(definition.id, activity.type === 'upskill' ? 'upskill' : 'deepwork');
+                
+                if (leafNodes.length > 0) {
+                    totalMinutes = leafNodes.reduce((sum, node) => {
+                        if (node.last_logged_date === dateKey) {
+                            return sum + (node.loggedDuration || 0);
                         }
-                        
-                        if (!definition) {
-                            const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-                            const category = microSkillInfo ? microSkillInfo.microSkillName : activity.details;
-                            definition = sourceDefs.find(d => d.name === activity.details && d.category === category);
-                        }
-
-                        if (definition) {
-                            const leafNodes = getDescendantLeafNodes(definition.id, activity.type === 'upskill' ? 'upskill' : 'deepwork');
-                            if (leafNodes.length > 0) {
-                                totalMinutes = leafNodes.reduce((sum, node) => {
-                                    if (node.last_logged_date === dateKey) {
-                                        return sum + (node.loggedDuration || 0);
-                                    }
-                                    return sum;
-                                }, 0);
-                            } else {
-                                if (definition.last_logged_date === dateKey) {
-                                    totalMinutes = definition.loggedDuration || 0;
-                                }
-                            }
-                            suffix = ' logged';
-                        }
-
-                    } else if (activity.duration) {
-                        totalMinutes = activity.duration;
-                        suffix = ' logged';
-                    }
+                        return sum;
+                    }, 0);
                 } else {
-                    switch(activity.type) {
-                        case 'workout': totalMinutes = 90; break;
-                        case 'mindset': totalMinutes = 15; break;
-                        case 'upskill':
-                        case 'deepwork':
-                        case 'branding':
-                            if (activity.taskIds && activity.taskIds.length > 0) {
-                                const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                                const taskDef = allDefs.get(mainTaskDefId);
-                                if (taskDef) {
-                                    totalMinutes = calculateTotalEstimate(taskDef);
-                                } else {
-                                    totalMinutes = 120;
-                                }
-                            } else {
-                                totalMinutes = 120;
-                            }
-                            break;
-                        case 'planning': case 'tracking': totalMinutes = 30; break;
-                        case 'lead-generation': totalMinutes = 45; break;
-                        case 'essentials': case 'interrupt': case 'distraction':
-                            totalMinutes = activity.duration || 0; break;
-                        default: totalMinutes = 0;
+                    if (definition.last_logged_date === dateKey) {
+                        totalMinutes = definition.loggedDuration || 0;
                     }
                 }
-
-                if (totalMinutes > 0) {
-                    const h = Math.floor(totalMinutes / 60);
-                    const m = Math.round(totalMinutes % 60);
-                    newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
-                }
+                suffix = ' logged';
+              }
+  
+            } else if (activity.duration) {
+              totalMinutes = activity.duration;
+              suffix = ' logged';
             }
+          } else {
+            // For non-completed tasks, calculate estimated duration
+            switch(activity.type) {
+              case 'workout': totalMinutes = 90; break;
+              case 'mindset': totalMinutes = 15; break;
+              case 'upskill':
+              case 'deepwork':
+              case 'branding':
+                if (activity.taskIds && activity.taskIds.length > 0) {
+                  const mainTaskDefId = activity.taskIds[0].split('-')[0];
+                  const taskDef = allDefs.get(mainTaskDefId);
+                  if (taskDef) {
+                    totalMinutes = calculateTotalEstimate(taskDef);
+                  } else {
+                    totalMinutes = 120;
+                  }
+                } else {
+                  totalMinutes = 120;
+                }
+                break;
+              case 'planning':
+              case 'tracking':
+                totalMinutes = 30; break;
+              case 'lead-generation': totalMinutes = 45; break;
+              case 'essentials':
+              case 'interrupt':
+              case 'distraction':
+                 totalMinutes = activity.duration || 0; break;
+              default: totalMinutes = 0;
+            }
+          }
+  
+          if (totalMinutes > 0) {
+            const h = Math.floor(totalMinutes / 60);
+            const m = Math.round(totalMinutes % 60);
+            newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
+          }
         }
+      }
     }
     return newDurations;
   }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, calculateTotalEstimate, microSkillMap, getDescendantLeafNodes]);
+
 
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
@@ -1091,10 +1100,7 @@ function MyPlatePageContent() {
           : brandingLogs.find(l => l.date === selectedDateKey);
 
     const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-
-    // This part is the critical fix. `activityInfo` may not have task details yet.
-    // We need to look at the specialization/category from `activityInfo.details` and find all
-    // top-level tasks (Intentions/Curiosities) for it.
+    
     const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details);
     const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : activityInfo.details;
     
@@ -1456,4 +1462,6 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+
 
