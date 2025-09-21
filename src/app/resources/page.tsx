@@ -407,7 +407,7 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
                 onUpdate={onUpdate}
                 onDelete={onDelete}
                 onOpenNestedPopup={onOpenNestedPopup}
-                onOpenMarkdownModal={onOpenMarkdownModal}
+                onOpenContentView={onOpenMarkdownModal}
                 onEditLinkText={onEditLinkText}
                 onConvertToCard={onConvertToCard}
                 dragHandle={{ attributes, listeners }}
@@ -1063,7 +1063,7 @@ function ResourcesPageContent() {
   
   
   const renderFolderOptions = useCallback((parentId: string | null, level: number): JSX.Element[] => {
-    const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => a.name.localeCompare(b.name));
+    const folders = resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => (a.name || '').localeCompare(b.name || ''));
     let options: JSX.Element[] = [];
 
     folders.forEach(folder => {
@@ -1107,7 +1107,7 @@ function ResourcesPageContent() {
             const bIsPinned = pinnedFolderIds.has(b.id);
             if (aIsPinned && !bIsPinned) return -1;
             if (!aIsPinned && bIsPinned) return 1;
-            return a.name.localeCompare(b.name);
+            return (a.name || '').localeCompare(b.name || '');
         });
 
     if (foldersToRender.length === 0 && level > 0) return null;
@@ -1320,7 +1320,7 @@ function ResourcesPageContent() {
         onDragEnd={handleDragEnd}
       >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Left Sidebar */}
               <aside className="md:col-span-1 space-y-6">
               <Card>
@@ -1349,7 +1349,7 @@ function ResourcesPageContent() {
               </aside>
 
               {/* Main Content */}
-              <main className="md:col-span-3">
+              <main className="md:col-span-2">
                    <div
                       ref={tabsContainerRef}
                       onWheel={handleWheelScroll}
@@ -1681,8 +1681,9 @@ function ResourcesPageContent() {
 
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-                <DialogHeader className="sr-only"><DialogTitle>Resource Mind Map</DialogTitle></DialogHeader>
-                <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
+                <div className="flex-grow min-h-0">
+                  <MindMapViewer defaultView="Resources" rootFolderId={mindMapRootFolderId} showControls={false} />
+                </div>
             </DialogContent>
         </Dialog>
         <Dialog open={isAdding} onOpenChange={setIsAdding}>
@@ -1796,7 +1797,7 @@ function ResourcesPageContent() {
 
 const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle }: { 
     point: ResourcePoint, 
-    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
+    onUpdate: (updatedText: string) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
@@ -1943,6 +1944,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
