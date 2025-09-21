@@ -74,7 +74,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         if (!audioEl) return;
       
         const loadAndPlayAudio = async () => {
-          if (playingAudio && resource) {
+          if (playingAudio && resource && resource.hasLocalAudio) {
             const audioBlob = await getAudio(resource.id);
             if (audioBlob) {
               const audioUrl = URL.createObjectURL(audioBlob);
@@ -95,20 +95,19 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         
         const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
         const handleDurationChange = () => setDuration(audioEl.duration);
-
+      
         audioEl.addEventListener('timeupdate', handleTimeUpdate);
         audioEl.addEventListener('durationchange', handleDurationChange);
       
         // Cleanup object URL and event listeners
         return () => {
           if (audioEl) {
-            if (!audioEl.paused) audioEl.pause();
-            URL.revokeObjectURL(audioEl.src);
+            URL.revokeObjectURL(audioEl.src); // Clean up blob URL
             audioEl.removeEventListener('timeupdate', handleTimeUpdate);
             audioEl.removeEventListener('durationchange', handleDurationChange);
           }
         };
-      }, [playingAudio, resource, globalVolume]);
+      }, [playingAudio, resource?.id, resource?.hasLocalAudio, globalVolume]);
 
     useEffect(() => {
       const audioEl = audioRef.current;
@@ -118,7 +117,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         audioEl.currentTime = playbackRequest.timestamp;
         setPlayingAudio(true);
         
-        // Handle auto-stopping
         const checkEndTime = () => {
           if (playbackRequest.endTime && audioEl.currentTime >= playbackRequest.endTime) {
             audioEl.pause();
@@ -133,7 +131,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
               audioEl.removeEventListener('timeupdate', checkEndTime);
             };
         } else {
-            // If there's no end time, just play and clear the request
             setPlaybackRequest(null);
         }
       }
@@ -202,7 +199,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       if (file) {
         try {
           await storeAudio(resource.id, file);
-          // Set a flag on the resource to indicate local audio is available
           onUpdate({ ...resource, hasLocalAudio: true });
         } catch (error) {
           console.error("Failed to store audio in IndexedDB", error);
