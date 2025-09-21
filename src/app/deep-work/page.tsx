@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -12,7 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack, NodeType } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -706,7 +707,7 @@ function DeepWorkPageContent() {
   const currentTaskType = currentTask?.type || null;
 
   const [editingFocusArea, setEditingFocusArea] = useState<ExerciseDefinition | null>(null);
-  const [editedFocusAreaData, setEditedFocusAreaData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string }>({});
+  const [editedFocusAreaData, setEditedFocusAreaData] = useState<Partial<ExerciseDefinition> & { estHours?: string; estMinutes?: string; nodeType?: NodeType }>({});
   
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
@@ -889,13 +890,17 @@ function DeepWorkPageContent() {
     if (editingFocusArea) {
         const hours = Math.floor((editingFocusArea.estimatedDuration || 0) / 60);
         const minutes = (editingFocusArea.estimatedDuration || 0) % 60;
+        const isDeepWork = deepWorkDefinitions.some(d => d.id === editingFocusArea.id);
+        const nodeType = isDeepWork ? getDeepWorkNodeType(editingFocusArea) : getUpskillNodeType(editingFocusArea);
+        
         setEditedFocusAreaData({
           ...editingFocusArea,
           estHours: hours > 0 ? String(hours) : '',
-          estMinutes: minutes > 0 ? String(minutes) : ''
+          estMinutes: minutes > 0 ? String(minutes) : '',
+          nodeType: editingFocusArea.nodeType || nodeType as NodeType,
         });
     }
-  }, [editingFocusArea]);
+  }, [editingFocusArea, deepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
   
   const currentDatedWorkout = useMemo(() => {
     const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -997,7 +1002,8 @@ function DeepWorkPageContent() {
 
     let finalData: Partial<ExerciseDefinition> = { 
       ...editedFocusAreaData,
-      estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined
+      estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
+      nodeType: editedFocusAreaData.nodeType,
     };
     
     let isDeepWork = deepWorkDefinitions.some(d => d.id === editingFocusArea.id);
@@ -1908,6 +1914,19 @@ function DeepWorkPageContent() {
                             <div className="space-y-1"><Label htmlFor="edit-hours">Est. Hours</Label><Input id="edit-hours" type="number" value={editedFocusAreaData.estHours || ''} onChange={(e) => setEditedFocusAreaData(d => ({ ...d, estHours: e.target.value }))} /></div>
                             <div className="space-y-1"><Label htmlFor="edit-mins">Est. Minutes</Label><Input id="edit-mins" type="number" value={editedFocusAreaData.estMinutes || ''} onChange={(e) => setEditedFocusAreaData(d => ({ ...d, estMinutes: e.target.value }))} /></div>
                         </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="edit-nodetype">Node Type</Label>
+                          <Select value={editedFocusAreaData.nodeType || ''} onValueChange={(value) => setEditedFocusAreaData(d => ({...d, nodeType: value as NodeType}))}>
+                            <SelectTrigger id="edit-nodetype">
+                              <SelectValue placeholder="Select a type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(editingFocusArea && deepWorkDefinitions.some(d => d.id === editingFocusArea.id) ? ['Intention', 'Objective', 'Action', 'Standalone'] : ['Curiosity', 'Objective', 'Visualization', 'Standalone']).map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditingFocusArea(null)}>Cancel</Button>
@@ -2200,4 +2219,5 @@ export default function DeepWorkPage() {
     
 
     
+
 

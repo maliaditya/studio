@@ -49,6 +49,9 @@ export interface DecompositionRow {
   useCases: string;
 }
 
+export type NodeType = 'Intention' | 'Objective' | 'Action' | 'Standalone' | 'Curiosity' | 'Visualization';
+
+
 export interface ExerciseDefinition {
   id: string;
   name: string; // Subtopic for upskill
@@ -67,6 +70,7 @@ export interface ExerciseDefinition {
   linkedResourceIds?: string[];
   isReadyForBranding?: boolean;
   linkedProjectIds?: string[];
+  nodeType?: NodeType;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
   contentUrls?: {
