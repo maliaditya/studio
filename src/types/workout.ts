@@ -280,10 +280,11 @@ export interface AudioAnnotation {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link';
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link' | 'timestamp';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
   displayText?: string;
+  timestamp?: number; // Time in seconds for audio/video notes
 }
 
 export interface Stopper {
@@ -323,9 +324,8 @@ export interface Resource {
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
-  audioUrl?: string; // For cloud-hosted URLs (future)
   hasLocalAudio?: boolean; // Flag to check IndexedDB
-  audioAnnotations?: AudioAnnotation[];
+  audioAnnotations?: AudioAnnotation[]; // This is now deprecated but kept for migration
 
   // For 'habit' type
   trigger?: {

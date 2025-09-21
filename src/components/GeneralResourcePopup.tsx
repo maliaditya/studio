@@ -39,7 +39,7 @@ const formatTime = (seconds: number): string => {
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
@@ -109,6 +109,15 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         };
       }, [playingAudio, resource, globalVolume]);
 
+    useEffect(() => {
+      if (playbackRequest && playbackRequest.resourceId === resource?.id && audioRef.current) {
+        audioRef.current.currentTime = playbackRequest.timestamp;
+        setPlayingAudio(true);
+        setPlaybackRequest(null); // Clear the request
+      }
+    }, [playbackRequest, resource?.id, setPlaybackRequest]);
+
+
     if (!resource) return null;
 
     const handleTitleChange = (newTitle: string) => {
@@ -116,8 +125,16 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
 
     const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
+        let newPoint: ResourcePoint;
+        if (type === 'timestamp') {
+          newPoint = { id: `point_${Date.now()}`, text: newAnnotation || 'New Note', type, timestamp: currentTime };
+          setNewAnnotation('');
+        } else {
+          newPoint = { id: `point_${Date.now()}`, text: 'New step...', type };
+        }
+        
+        const updatedPoints = [...(resource.points || []), newPoint].sort((a,b) => (a.timestamp || Infinity) - (b.timestamp || Infinity));
+        
         onUpdate({ ...resource, points: updatedPoints });
     };
 
@@ -137,23 +154,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         e.stopPropagation();
         setPlayingAudio(false);
         onClose(resource.id);
-    };
-
-    const handleAddAnnotation = () => {
-        if (!newAnnotation.trim()) return;
-        const annotation: AudioAnnotation = {
-            id: `anno_${Date.now()}`,
-            timestamp: currentTime,
-            note: newAnnotation.trim(),
-        };
-        const updatedAnnotations = [...(resource.audioAnnotations || []), annotation];
-        onUpdate({ ...resource, audioAnnotations: updatedAnnotations });
-        setNewAnnotation('');
-    };
-
-    const handleDeleteAnnotation = (annotationId: string) => {
-        const updatedAnnotations = (resource.audioAnnotations || []).filter(a => a.id !== annotationId);
-        onUpdate({ ...resource, audioAnnotations: updatedAnnotations });
     };
 
     const handleSeekTo = (timestamp: number) => {
@@ -198,7 +198,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             case 'card':
                 return (
                     <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).map(point => (
+                        {(resource.points || []).sort((a, b) => (a.timestamp || Infinity) - (b.timestamp || Infinity)).map(point => (
                             <EditableResourcePoint 
                                 key={point.id}
                                 point={point}
@@ -207,6 +207,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
                                 onOpenContentView={(e) => handleOpenContentView(point, e)}
                                 onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
+                                onSeekTo={handleSeekTo}
                             />
                         ))}
                     </ul>
@@ -280,6 +281,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return <p className="text-sm text-muted-foreground">Unknown resource type.</p>;
         }
     };
+    
+    const handleOpenContentView = (point: ResourcePoint, event: React.MouseEvent) => {
+        openContentViewPopup(`content-${point.id}`, resource, point, event);
+    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
@@ -294,15 +299,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCreateBrainHack(resource.id, 'resource', resource.id)}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                     </TooltipProvider>
-                    {resource.hasLocalAudio ? (
-                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
-                            {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                        </Button>
-                    ) : (
-                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
-                            <Upload className="h-4 w-4" />
-                        </Button>
-                    )}
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
                         <X className="h-4 w-4" />
                     </Button>
@@ -332,16 +328,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             </CardTitle>
                         )}
                     </div>
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {renderContent()}
-                    </CardContent>
-                </div>
-                 {resource.hasLocalAudio && (
-                    <CardFooter className="p-3 border-t">
-                        <div className="w-full space-y-2">
+                     {resource.hasLocalAudio && (
+                        <div className="w-full space-y-2 pt-2">
                             <div className="flex items-center gap-2">
+                                 <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
+                                    {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                                </Button>
                                 <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
                                 <input
                                     type="range"
@@ -353,42 +345,42 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 />
                                 <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
                             </div>
-                            <div className="space-y-2">
-                                <ScrollArea className="h-24">
-                                    <ul className="space-y-1 pr-2">
-                                        {(resource.audioAnnotations || []).sort((a,b) => a.timestamp - b.timestamp).map(anno => (
-                                            <li key={anno.id} className="text-xs flex items-center justify-between group p-1 rounded hover:bg-muted/50">
-                                                <button className="flex items-center gap-2 text-left" onClick={() => handleSeekTo(anno.timestamp)}>
-                                                    <span className="font-mono text-primary font-semibold">{formatTime(anno.timestamp)}</span>
-                                                    <span className="text-muted-foreground">{anno.note}</span>
-                                                </button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteAnnotation(anno.id)}>
-                                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                                </Button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </ScrollArea>
-                                <div className="flex gap-2">
-                                    <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note..." className="h-8 text-xs" />
-                                    <Button size="sm" onClick={handleAddAnnotation}>Add Note</Button>
-                                </div>
-                            </div>
                         </div>
-                    </CardFooter>
-                )}
+                    )}
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-3 pt-0">
+                        {renderContent()}
+                    </CardContent>
+                </div>
+                 <CardFooter className="p-3 border-t">
+                    <div className="flex gap-2 w-full">
+                       {resource.hasLocalAudio && (
+                         <div className="flex gap-2 w-full">
+                            <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note at current time..." className="h-8 text-xs" />
+                            <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
+                        </div>
+                       )}
+                       {!resource.hasLocalAudio && (
+                           <Button variant="outline" size="sm" className="w-full" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
+                               <Upload className="mr-2 h-4 w-4" />Upload Audio
+                           </Button>
+                       )}
+                    </div>
+                 </CardFooter>
             </Card>
         </div>
     );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView }: { 
+const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
+    onSeekTo: (timestamp: number) => void;
 }) => {
     const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
@@ -471,6 +463,11 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
             point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
+            point.type === 'timestamp' ? (
+                <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
+                    {formatTime(point.timestamp || 0)}
+                </button>
+            ) :
             <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
             }
              <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
