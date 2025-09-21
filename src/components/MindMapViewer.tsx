@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -143,7 +144,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (!containerRef.current) return;
         if (!document.fullscreenElement) {
             containerRef.current.requestFullscreen().catch(err => {
-                console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                console.error(`Error attempting to enable full-screen mode: ${''}${err.message} (${err.name})`);
             });
         } else {
             if (document.exitFullscreen) {
@@ -643,7 +644,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 const isChild = linkedDeepWorkChildIds.has(definition.id);
                                 if (isParent && !isChild) nodeType = 'Intention';
                                 else if (isParent && isChild) nodeType = 'Objective';
-                                else if (!isParent && isChild) nodeType = 'Action';
+                                else if (isParent && isChild) nodeType = 'Action';
                                 else nodeType = 'Standalone';
                             }
                             
@@ -655,9 +656,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                     definition={definition}
                                     onExpandChildren={() => handleExpandChildren(nodeId)}
                                     onRevealParents={() => handleRevealParents(nodeId)}
-                                    onExpandAll={handleExpandAll}
                                     canExpandChildren={canExpandChildren}
                                     canRevealParents={canRevealParents}
+                                    onExpandAll={handleExpandAll}
                                     isRootNode={isRootNode}
                                     status={getNodeStatus(nodeId)}
                                     nodeType={nodeType}
@@ -1334,4 +1335,46 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
       </Dialog>
     </>
   );
+}
+
+```
+  </change>
+  <change>
+    <file>src/app/mind-map/page.tsx</file>
+    <content><![CDATA[
+"use client";
+
+import React from 'react';
+import { AuthGuard } from '@/components/AuthGuard';
+import { useSearchParams } from 'next/navigation';
+import { MindMapViewer } from '@/components/MindMapViewer';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+
+function MindMapPageContent() {
+    const searchParams = useSearchParams();
+    const viewFromQuery = searchParams.get('view');
+    
+    // Determine the default view based on the query parameter.
+    const defaultView = viewFromQuery === 'strategic' ? 'Strategic Overview' : '';
+
+    return (
+        <Dialog open={true}>
+            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>Mind Map</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    <MindMapViewer defaultView={defaultView} />
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default function MindMapPage() {
+    return (
+        <AuthGuard>
+            <MindMapPageContent />
+        </AuthGuard>
+    )
 }
