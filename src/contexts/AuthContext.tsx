@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -73,6 +73,8 @@ interface AuthContextType {
   setIsAudioPlaying: React.Dispatch<React.SetStateAction<boolean>>;
   globalVolume: number;
   setGlobalVolume: React.Dispatch<React.SetStateAction<number>>;
+  playbackRequest: PlaybackRequest | null;
+  setPlaybackRequest: React.Dispatch<React.SetStateAction<PlaybackRequest | null>>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -402,6 +404,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [globalVolume, setGlobalVolume] = useState(0.2);
+  const [playbackRequest, setPlaybackRequest] = useState<PlaybackRequest | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
@@ -723,6 +726,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const children = [
         ...(def.linkedDeepWorkIds || []), 
         ...(def.linkedUpskillIds || []),
+        ...(def.linkedResourceIds || []),
       ];
       children.forEach(childId => {
         if (!map.has(childId)) map.set(childId, []);
@@ -818,22 +822,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
-
+  
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
+  
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
       if (!daySchedule) continue;
-
+  
       for (const slotName in daySchedule) {
         const activities = (daySchedule as any)[slotName] || [];
         if (Array.isArray(activities)) {
           for (const activity of activities) {
             if (!activity || !activity.id) continue;
-
+  
             let totalMinutes = 0;
             let suffix = '';
-
+  
             if (activity.completed) {
               if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
                   let definition: ExerciseDefinition | undefined;
@@ -886,12 +890,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 case 'deepwork':
                 case 'branding':
                   if (activity.taskIds && activity.taskIds.length > 0) {
-                    const mainTaskDefId = activity.taskIds[0].split('-')[0];
-                    const taskDef = allDefs.get(mainTaskDefId);
-                    if (taskDef) {
-                      totalMinutes = calculateTotalEstimate(taskDef);
+                    const mainLogInstanceId = activity.taskIds[0];
+                    let mainTaskDefId: string | undefined;
+                    const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
+                    mainTaskDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+
+                    if (mainTaskDefId) {
+                      const taskDef = allDefs.get(mainTaskDefId);
+                      if (taskDef) {
+                        totalMinutes = calculateTotalEstimate(taskDef);
+                      } else {
+                        totalMinutes = 120;
+                      }
                     } else {
-                      totalMinutes = 120;
+                       totalMinutes = 120;
                     }
                   } else {
                     totalMinutes = 120;
@@ -2624,7 +2636,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return newSchedule;
       });
   };
-
+  
   const handleLinkHabit = (activityId: string, habitId: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     setSchedule(prevSchedule => {
@@ -2775,6 +2787,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pipState, setPipState,
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
+    playbackRequest, setPlaybackRequest,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -2994,6 +3007,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [isLoadingState, currentUser, schedule, setSchedule, toast]);
+  
+  useEffect(() => {
+    if (playbackRequest) {
+      // Find the popup and potentially play audio
+      // This part is tricky because GeneralResourcePopup is what holds the audioRef
+      // A better way might be to have a global audio player.
+      // For now, let's just make sure the popup opens.
+      const { resourceId } = playbackRequest;
+      // You'll need an event-like object. For now, null will have to do.
+      openGeneralPopup(resourceId, null); 
+      // The logic inside GeneralResourcePopup needs to check for playbackRequest
+      // on mount/update.
+    }
+  }, [playbackRequest]);
 
   return (
     <AuthContext.Provider value={value}>

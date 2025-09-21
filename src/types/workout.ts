@@ -744,3 +744,8 @@ export interface DailyReviewLog {
     successes: number;
     failures: number;
 }
+
+export interface PlaybackRequest {
+  resourceId: string;
+  timestamp: number;
+}

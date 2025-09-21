@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings, ChevronDown } from 'lucide-react';
+import { BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -13,12 +13,82 @@ import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import type { Resource, AudioAnnotation } from '@/types/workout';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const GlobalSearch = () => {
+  const { resources, openGeneralPopup, setPlaybackRequest } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    if (!query) return [];
+    
+    const results: { resource: Resource, annotation: AudioAnnotation }[] = [];
+    
+    resources.forEach(resource => {
+      if (resource.audioAnnotations) {
+        resource.audioAnnotations.forEach(annotation => {
+          if (annotation.note.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ resource, annotation });
+          }
+        });
+      }
+    });
+
+    return results;
+  }, [query, resources]);
+
+  const handleSelect = (resource: Resource, annotation: AudioAnnotation, e: React.MouseEvent) => {
+    setPlaybackRequest({ resourceId: resource.id, timestamp: annotation.timestamp });
+    openGeneralPopup(resource.id, e);
+    setOpen(false);
+  };
+  
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput 
+        placeholder="Search audio notes..." 
+        value={query}
+        onValueChange={setQuery}
+      />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandGroup heading="Audio Annotations">
+          {searchResults.map(({ resource, annotation }) => (
+            <CommandItem 
+              key={annotation.id}
+              onSelect={(e) => handleSelect(resource, annotation, e as any)}
+              className="flex justify-between items-center"
+            >
+              <div className="flex-grow min-w-0">
+                <p className="font-medium truncate">{annotation.note}</p>
+                <p className="text-xs text-muted-foreground truncate">{resource.name}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                <span className="text-xs text-muted-foreground font-mono">{formatTime(annotation.timestamp)}</span>
+                <Play className="h-4 w-4 text-primary" />
+              </div>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </CommandDialog>
+  );
+};
+
 
 function NavigationMenu() {
   const [isClient, setIsClient] = useState(false);
@@ -100,6 +170,7 @@ export function Header() {
   const router = useRouter();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   return (
     <>
@@ -112,8 +183,17 @@ export function Header() {
             </Link>
           </div>
           
-          <div className="flex-grow flex items-center justify-center">
+          <div className="flex-grow flex items-center justify-center gap-4">
             {currentUser && <NavigationMenu />}
+            {currentUser && (
+              <>
+                <Button variant="outline" className="gap-2 text-muted-foreground" onClick={() => setIsSearchOpen(true)}>
+                  <Search className="h-4 w-4" />
+                  Search Notes...
+                </Button>
+                <GlobalSearch />
+              </>
+            )}
           </div>
           
           <div className="flex items-center gap-4">
