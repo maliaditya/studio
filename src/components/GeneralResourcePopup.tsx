@@ -6,7 +6,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
-import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
+import type { Resource, ResourcePoint, PopupState, AudioAnnotation } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
 import { useDraggable } from '@dnd-kit/core';
@@ -31,13 +31,23 @@ interface GeneralResourcePopupProps {
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
 }
 
+const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
+
+
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, openBrainHackPopup } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
     const audioRef = useRef<HTMLAudioElement | null>(null);
 
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [newAnnotation, setNewAnnotation] = useState('');
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     
@@ -59,35 +69,45 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     }
     
     useEffect(() => {
-      const audioEl = audioRef.current;
-      if (!audioEl) return;
-    
-      const loadAndPlayAudio = async () => {
-        if (playingAudio && resource) {
-          const audioBlob = await getAudio(resource.id);
-          if (audioBlob) {
-            const audioUrl = URL.createObjectURL(audioBlob);
-            audioEl.src = audioUrl;
-            audioEl.volume = globalVolume;
-            audioEl.play().catch(e => console.error("Audio play failed:", e));
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+      
+        const loadAndPlayAudio = async () => {
+          if (playingAudio && resource) {
+            const audioBlob = await getAudio(resource.id);
+            if (audioBlob) {
+              const audioUrl = URL.createObjectURL(audioBlob);
+              if (audioEl.src !== audioUrl) {
+                  audioEl.src = audioUrl;
+              }
+              audioEl.volume = globalVolume;
+              audioEl.play().catch(e => console.error("Audio play failed:", e));
+            } else {
+              setPlayingAudio(false); // Can't find audio to play
+            }
           } else {
-            setPlayingAudio(false); // Can't find audio to play
+            audioEl.pause();
           }
-        } else {
-          audioEl.pause();
-        }
-      };
-    
-      loadAndPlayAudio();
-    
-      // Cleanup object URL
-      return () => {
-        if (audioEl && !audioEl.paused) {
-          audioEl.pause();
-          URL.revokeObjectURL(audioEl.src);
-        }
-      };
-    }, [playingAudio, resource, globalVolume]);
+        };
+      
+        loadAndPlayAudio();
+        
+        const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
+        const handleDurationChange = () => setDuration(audioEl.duration);
+
+        audioEl.addEventListener('timeupdate', handleTimeUpdate);
+        audioEl.addEventListener('durationchange', handleDurationChange);
+      
+        // Cleanup object URL and event listeners
+        return () => {
+          if (audioEl) {
+            if (!audioEl.paused) audioEl.pause();
+            URL.revokeObjectURL(audioEl.src);
+            audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+            audioEl.removeEventListener('durationchange', handleDurationChange);
+          }
+        };
+      }, [playingAudio, resource, globalVolume]);
 
     if (!resource) return null;
 
@@ -119,6 +139,33 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         onClose(resource.id);
     };
 
+    const handleAddAnnotation = () => {
+        if (!newAnnotation.trim()) return;
+        const annotation: AudioAnnotation = {
+            id: `anno_${Date.now()}`,
+            timestamp: currentTime,
+            note: newAnnotation.trim(),
+        };
+        const updatedAnnotations = [...(resource.audioAnnotations || []), annotation];
+        onUpdate({ ...resource, audioAnnotations: updatedAnnotations });
+        setNewAnnotation('');
+    };
+
+    const handleDeleteAnnotation = (annotationId: string) => {
+        const updatedAnnotations = (resource.audioAnnotations || []).filter(a => a.id !== annotationId);
+        onUpdate({ ...resource, audioAnnotations: updatedAnnotations });
+    };
+
+    const handleSeekTo = (timestamp: number) => {
+        if (audioRef.current) {
+            audioRef.current.currentTime = timestamp;
+            if (audioRef.current.paused) {
+                setPlayingAudio(true);
+            }
+        }
+    };
+
+
     const getIcon = () => {
         switch (resource.type) {
             case 'habit': return <Zap className="h-5 w-5 text-primary"/>;
@@ -126,10 +173,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             case 'card': return <Library className="h-5 w-5 text-primary"/>;
             default: return <Library className="h-5 w-5 text-primary"/>;
         }
-    };
-
-    const handleOpenContentView = (point: ResourcePoint, e: React.MouseEvent) => {
-        openContentViewPopup(`content-${point.id}`, resource, point, e);
     };
 
     const handleAudioUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,7 +285,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
             <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] relative group">
+            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
@@ -295,6 +338,45 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         {renderContent()}
                     </CardContent>
                 </div>
+                 {resource.hasLocalAudio && (
+                    <CardFooter className="p-3 border-t">
+                        <div className="w-full space-y-2">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max={duration || 0}
+                                    value={currentTime}
+                                    onChange={(e) => { if (audioRef.current) audioRef.current.currentTime = parseFloat(e.target.value); }}
+                                    className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+                                />
+                                <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex gap-2">
+                                    <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} placeholder="Add a note..." className="h-8 text-xs" />
+                                    <Button size="sm" onClick={handleAddAnnotation}>Add Note</Button>
+                                </div>
+                                <ScrollArea className="h-24">
+                                    <ul className="space-y-1 pr-2">
+                                        {(resource.audioAnnotations || []).sort((a,b) => a.timestamp - b.timestamp).map(anno => (
+                                            <li key={anno.id} className="text-xs flex items-center justify-between group p-1 rounded hover:bg-muted/50">
+                                                <button className="flex items-center gap-2 text-left" onClick={() => handleSeekTo(anno.timestamp)}>
+                                                    <span className="font-mono text-primary font-semibold">{formatTime(anno.timestamp)}</span>
+                                                    <span className="text-muted-foreground">{anno.note}</span>
+                                                </button>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteAnnotation(anno.id)}>
+                                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    </CardFooter>
+                )}
             </Card>
         </div>
     );
@@ -437,5 +519,3 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
         </li>
     );
 };
-
-    

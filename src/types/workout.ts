@@ -271,6 +271,12 @@ export interface GapAnalysis {
   strainReduction?: string;
 }
 
+export interface AudioAnnotation {
+  id: string;
+  timestamp: number; // in seconds
+  note: string;
+}
+
 export interface ResourcePoint {
   id: string;
   text: string;
@@ -319,7 +325,8 @@ export interface Resource {
   icon?: string;
   audioUrl?: string; // For cloud-hosted URLs (future)
   hasLocalAudio?: boolean; // Flag to check IndexedDB
-  
+  audioAnnotations?: AudioAnnotation[];
+
   // For 'habit' type
   trigger?: {
     action?: string;
