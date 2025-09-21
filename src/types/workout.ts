@@ -271,12 +271,6 @@ export interface GapAnalysis {
   strainReduction?: string;
 }
 
-export interface AudioAnnotation {
-  id: string;
-  timestamp: number; // in seconds
-  note: string;
-}
-
 export interface ResourcePoint {
   id: string;
   text: string;
@@ -284,7 +278,8 @@ export interface ResourcePoint {
   url?: string;
   resourceId?: string; // ID of the linked Resource card
   displayText?: string;
-  timestamp?: number; // Time in seconds for audio/video notes
+  timestamp?: number; // Start time in seconds for audio/video notes
+  endTime?: number; // End time in seconds for audio/video notes
 }
 
 export interface Stopper {
@@ -325,7 +320,6 @@ export interface Resource {
   points?: ResourcePoint[];
   icon?: string;
   hasLocalAudio?: boolean; // Flag to check IndexedDB
-  audioAnnotations?: AudioAnnotation[]; // This is now deprecated but kept for migration
 
   // For 'habit' type
   trigger?: {

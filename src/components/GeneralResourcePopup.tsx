@@ -5,7 +5,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Workflow, Link as LinkIcon, Edit3, Unlink, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState, AudioAnnotation } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -23,6 +23,8 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { storeAudio, getAudio, deleteAudio } from '@/lib/audioDB';
+import { Link as LinkIcon } from 'lucide-react';
+import { Workflow } from 'lucide-react';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -388,6 +390,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
     const [editText, setEditText] = useState(point.text);
     const [isFetchingMeta, setIsFetchingMeta] = useState(false);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [endTimeInput, setEndTimeInput] = useState(point.endTime ? point.endTime.toString() : '');
 
     const handleSave = async () => {
         if (editText.trim() === '') {
@@ -457,6 +460,15 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             setFloatingVideoUrl(point.text);
         }
     };
+    
+    const handleEndTimeBlur = () => {
+        const newEndTime = parseFloat(endTimeInput);
+        if (!isNaN(newEndTime) && newEndTime > (point.timestamp || 0)) {
+            onUpdate(point.id, { endTime: newEndTime });
+        } else {
+            setEndTimeInput(point.endTime ? point.endTime.toString() : ''); // Revert on invalid
+        }
+    }
 
     return (
         <li className="flex items-start gap-3 group/item w-full">
@@ -466,6 +478,7 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
             point.type === 'timestamp' ? (
                 <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
                     {formatTime(point.timestamp || 0)}
+                    {point.endTime && ` - ${formatTime(point.endTime)}`}
                 </button>
             ) :
             <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
@@ -504,6 +517,19 @@ const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onO
                 )}
             </div>
             <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
+                {point.type === 'timestamp' && (
+                    <div className="flex items-center gap-1">
+                        <Input 
+                            type="number" 
+                            value={endTimeInput} 
+                            onChange={(e) => setEndTimeInput(e.target.value)}
+                            onBlur={handleEndTimeBlur}
+                            onKeyDown={(e) => e.key === 'Enter' && handleEndTimeBlur()}
+                            className="w-16 h-6 text-xs" 
+                            placeholder="End"
+                        />
+                    </div>
+                )}
                 {point.type === 'text' && (
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
                         <Blocks className="h-3 w-3"/>
