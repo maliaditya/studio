@@ -593,6 +593,58 @@ function SkillPageContent() {
 
     toast({ title: 'Download Started', description: `Your specialization "${specToDownload.name}" is being downloaded.` });
   };
+  
+  const handleDownloadMicroSkill = (microSkill: MicroSkill) => {
+    const getDescendants = (startNodeId: string): any[] => {
+      const startNode = upskillDefinitions.find(d => d.id === startNodeId);
+      if (!startNode) return [];
+
+      const children = (startNode.linkedUpskillIds || [])
+        .map(id => getDescendants(id))
+        .flat();
+      
+      const resourceCards = (startNode.linkedResourceIds || [])
+        .map(id => resources.find(r => r.id === id))
+        .filter(r => r?.type === 'card' && r.points)
+        .map(rc => ({ name: rc!.name, points: rc!.points }));
+
+      const nodeData = {
+        name: startNode.name,
+        description: startNode.description,
+        link: startNode.link,
+        estimatedDuration: startNode.estimatedDuration,
+        resourceCards: resourceCards.length > 0 ? resourceCards : undefined,
+      };
+
+      if (getUpskillNodeType(startNode) === 'Visualization') {
+        return [nodeData];
+      }
+
+      if (getUpskillNodeType(startNode) === 'Objective') {
+        return [{...nodeData, visualizations: children }];
+      }
+
+      if (getUpskillNodeType(startNode) === 'Curiosity') {
+        return [{...nodeData, objectives: children }];
+      }
+      
+      return [nodeData];
+    };
+
+    const curiosities = upskillDefinitions.filter(def => def.category === microSkill.name && getUpskillNodeType(def) === 'Curiosity');
+    const microSkillData = {
+      name: microSkill.name,
+      curiosities: curiosities.flatMap(c => getDescendants(c.id)),
+    };
+    
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify([microSkillData], null, 2))}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = `${microSkill.name}_micro-skill.json`;
+    link.click();
+    
+    toast({ title: 'Download Started', description: `Your micro-skill "${microSkill.name}" is being downloaded.` });
+  };
 
 
   const handleAddDomain = (e: React.FormEvent) => {
@@ -1182,6 +1234,12 @@ function SkillPageContent() {
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
                                                       <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => handleSelect(micro, 'microSkill')}>{micro.name}</CardTitle>
                                                       <div className="flex items-center">
+                                                          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleSelectForDeepWork(micro)}>
+                                                            <Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/>
+                                                          </Button>
+                                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadMicroSkill(micro)}>
+                                                            <Download className="h-4 w-4 text-blue-500" />
+                                                          </Button>
                                                           <button onClick={() => setRepetitionModalState({ isOpen: true, skill: micro })}>
                                                               <LineChartIcon className="h-4 w-4 text-muted-foreground hover:text-primary"/>
                                                           </button>
@@ -1191,7 +1249,6 @@ function SkillPageContent() {
                                                             onCheckedChange={(checked) => handleToggleMicroSkillRepetition(selectedCoreSkill.id, area.id, micro.id, !!checked)}
                                                             className="ml-2"
                                                           />
-                                                          <button className="p-1" onClick={() => handleSelectForDeepWork(micro)}><Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/></button>
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
