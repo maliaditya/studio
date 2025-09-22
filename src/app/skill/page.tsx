@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
@@ -73,7 +73,8 @@ const SpecializationItem: React.FC<{
   onDelete: (skillId: string) => void;
   totalEst: number;
   totalLogged: number;
-}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete, totalEst, totalLogged }) => {
+  onDownload: (skillId: string) => void;
+}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete, totalEst, totalLogged, onDownload }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
     
@@ -102,6 +103,9 @@ const SpecializationItem: React.FC<{
                     </button>
                     <div className="flex items-center opacity-0 group-hover:opacity-100">
                         {totalEst > 0 && <Badge variant="secondary" className="mr-2 text-xs">{formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log</Badge>}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDownload(spec.id)}>
+                            <Download className="h-4 w-4 text-blue-500" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(spec.id)}>
                             <Plus className="h-4 w-4 text-green-500" />
                         </Button>
@@ -126,6 +130,7 @@ const SpecializationItem: React.FC<{
                                 onDelete={onDelete}
                                 totalEst={0}
                                 totalLogged={0}
+                                onDownload={onDownload}
                             />
                         )
                     })}
@@ -555,6 +560,40 @@ function SkillPageContent() {
     }
   };
 
+  const handleDownloadSpecialization = (skillId: string) => {
+    const specToDownload = coreSkills.find(s => s.id === skillId);
+    if (!specToDownload) {
+      toast({ title: 'Error', description: 'Specialization not found.', variant: 'destructive' });
+      return;
+    }
+
+    const getDescendantSpecs = (parentId: string): CoreSkill[] => {
+      const children = coreSkills.filter(s => s.parentId === parentId);
+      return [...children, ...children.flatMap(c => getDescendantSpecs(c.id))];
+    };
+
+    const allSpecsInTree = [specToDownload, ...getDescendantSpecs(skillId)];
+    const allMicroSkillNames = new Set(allSpecsInTree.flatMap(s => s.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name))));
+    
+    const relevantUpskillTasks = upskillDefinitions.filter(t => allMicroSkillNames.has(t.category));
+    const relevantDeepWorkTasks = deepWorkDefinitions.filter(t => allMicroSkillNames.has(t.category));
+
+    const exportData = {
+      ...specToDownload,
+      childSpecializations: getDescendantSpecs(skillId),
+      upskillTasks: relevantUpskillTasks,
+      deepWorkTasks: relevantDeepWorkTasks
+    };
+
+    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(exportData, null, 2))}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = `${specToDownload.name}_specialization.json`;
+    link.click();
+
+    toast({ title: 'Download Started', description: `Your specialization "${specToDownload.name}" is being downloaded.` });
+  };
+
 
   const handleAddDomain = (e: React.FormEvent) => {
     e.preventDefault();
@@ -934,6 +973,7 @@ function SkillPageContent() {
                                                         onDelete={handleDeleteCoreSkill}
                                                         totalEst={totalEst}
                                                         totalLogged={totalLogged}
+                                                        onDownload={handleDownloadSpecialization}
                                                     />
                                                 );
                                             })}
@@ -1415,5 +1455,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
