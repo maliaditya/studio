@@ -388,23 +388,23 @@ function SkillPageContent() {
 
             let currentFolderPath = ["Skills & Project Resources", domainName, specializationData.name];
             
-            specializationData.skillAreas.forEach((areaData: any) => {
+            (specializationData.skillAreas || []).forEach((areaData: any) => {
                 const areaFolderPath = [...currentFolderPath, areaData.name];
                 const newSkillArea: SkillArea = { id: `sa_${Date.now()}_${Math.random()}`, name: areaData.name, purpose: areaData.purpose || '', microSkills: [] };
 
-                areaData.microSkills.forEach((microData: any) => {
+                (areaData.microSkills || []).forEach((microData: any) => {
                     const microSkillFolderPath = [...areaFolderPath, microData.name];
                     const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name, isReadyForRepetition: false };
 
-                    microData.curiosities.forEach((curiosityData: any) => {
+                    (microData.curiosities || []).forEach((curiosityData: any) => {
                         const curiosityFolderPath = [...microSkillFolderPath, curiosityData.name];
                         const newCuriosity: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: curiosityData.name, category: newMicroSkill.name as any, description: curiosityData.description, link: curiosityData.link, estimatedDuration: curiosityData.estimatedDuration, linkedUpskillIds: [] };
 
-                        curiosityData.objectives.forEach((objectiveData: any) => {
+                        (curiosityData.objectives || []).forEach((objectiveData: any) => {
                             const objectiveFolderPath = [...curiosityFolderPath, objectiveData.name];
                             const newObjective: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: objectiveData.name, category: newMicroSkill.name as any, description: objectiveData.description, link: objectiveData.link, estimatedDuration: objectiveData.estimatedDuration, linkedUpskillIds: [] };
 
-                            objectiveData.visualizations.forEach((vizData: any) => {
+                            (objectiveData.visualizations || []).forEach((vizData: any) => {
                                 const vizFolderPath = [...objectiveFolderPath, vizData.name];
                                 const newViz: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: vizData.name, category: newMicroSkill.name as any, description: vizData.description, link: vizData.link, estimatedDuration: vizData.estimatedDuration, linkedResourceIds: [] };
 
@@ -489,15 +489,15 @@ function SkillPageContent() {
                 const microSkillFolderPath = [...basePath, microData.name];
                 const newMicroSkill: MicroSkill = { id: `ms_${Date.now()}_${Math.random()}`, name: microData.name, isReadyForRepetition: false };
                 
-                microData.curiosities.forEach((curiosityData: any) => {
+                (microData.curiosities || []).forEach((curiosityData: any) => {
                     const curiosityFolderPath = [...microSkillFolderPath, curiosityData.name];
                     const newCuriosity: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: curiosityData.name, category: newMicroSkill.name as any, description: curiosityData.description, link: curiosityData.link, estimatedDuration: curiosityData.estimatedDuration, linkedUpskillIds: [] };
 
-                    curiosityData.objectives.forEach((objectiveData: any) => {
+                    (curiosityData.objectives || []).forEach((objectiveData: any) => {
                         const objectiveFolderPath = [...curiosityFolderPath, objectiveData.name];
                         const newObjective: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: objectiveData.name, category: newMicroSkill.name as any, description: objectiveData.description, link: objectiveData.link, estimatedDuration: objectiveData.estimatedDuration, linkedUpskillIds: [] };
 
-                        objectiveData.visualizations.forEach((vizData: any) => {
+                        (objectiveData.visualizations || []).forEach((vizData: any) => {
                             const vizFolderPath = [...objectiveFolderPath, vizData.name];
                             const newViz: ExerciseDefinition = { id: `def_${Date.now()}_${Math.random()}`, name: vizData.name, category: newMicroSkill.name as any, description: vizData.description, link: vizData.link, estimatedDuration: vizData.estimatedDuration, linkedResourceIds: [] };
 
@@ -1512,3 +1512,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
