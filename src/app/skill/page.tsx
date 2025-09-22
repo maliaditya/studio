@@ -168,6 +168,8 @@ function SkillPageContent() {
     getDeepWorkNodeType,
     getUpskillNodeType,
     getDescendantLeafNodes,
+    selectedMicroSkill,
+    setSelectedMicroSkill,
   } = useAuth();
   
   const router = useRouter();
@@ -840,6 +842,11 @@ function SkillPageContent() {
     }
   };
 
+  const handleSelectForDeepWork = (microSkill: MicroSkill) => {
+    setSelectedMicroSkill(microSkill);
+    router.push('/deep-work');
+  };
+
   const formatMinutes = (minutes: number) => {
     if (minutes < 1) return "0m";
     if (minutes < 60) return `${Math.round(minutes)}m`;
@@ -1144,6 +1151,7 @@ function SkillPageContent() {
                                                             onCheckedChange={(checked) => handleToggleMicroSkillRepetition(selectedCoreSkill.id, area.id, micro.id, !!checked)}
                                                             className="ml-2"
                                                           />
+                                                          <button className="p-1" onClick={() => handleSelectForDeepWork(micro)}><Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/></button>
                                                       </div>
                                                   </CardHeader>
                                                   <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
@@ -1407,3 +1415,5 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+    
