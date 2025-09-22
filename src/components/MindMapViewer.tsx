@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -217,7 +216,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         nodes.forEach((pos, nodeId) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
-            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])]; // Exclude resources
             childIds.forEach(childId => {
                 if (nodesOnCanvas.has(childId)) {
                     const edgeId1 = `${nodeId}-${childId}`;
@@ -284,8 +283,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
     
-            // Expand children
-            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+            // Expand children (excluding resources)
+            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])];
             const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId) && !newNodesMap.has(childId));
             
             if (childrenToLoad.length > 0) {
@@ -307,7 +306,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                     newNodesMap.set(parentId, {
-                        x: pos.x + HORIZONTAL_SPACING, 
+                        x: pos.x - HORIZONTAL_SPACING, 
                         y: pos.y + (childrenToLoad.length + index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
                     newEdgesSet.add(`${parentId}-${nodeId}`);
@@ -339,7 +338,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
 
-        const childIds = [...(currentNodeDef.linkedDeepWorkIds || []), ...(currentNodeDef.linkedUpskillIds || []), ...(currentNodeDef.linkedResourceIds || [])];
+        const childIds = [...(currentNodeDef.linkedDeepWorkIds || []), ...(currentNodeDef.linkedUpskillIds || [])]; // Exclude resources
         const validChildIds = childIds.filter(id => allDefinitions.has(id));
 
         const nodesToUpdate = new Map<string, { x: number; y: number }>();
@@ -382,7 +381,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
                  nodesToUpdate.set(parentId, {
-                    x: currentNodePos.x + HORIZONTAL_SPACING,
+                    x: currentNodePos.x - HORIZONTAL_SPACING,
                     y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
@@ -612,7 +611,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource);
                             if (!definition) return null;
                             
-                            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || []), ...(definition.linkedResourceIds || [])];
+                            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])];
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
                             const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
                             const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
@@ -664,6 +663,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                     upskillDefinitions={upskillDefinitions}
                                     progress={getNodeProgress(nodeId)}
                                     openGeneralPopup={openGeneralPopup}
+                                    resources={resources}
                                 />
                             );
                         })}
@@ -674,7 +674,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     );
 };
 
-const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress, openGeneralPopup }: any) => {
+const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealParents, canExpandChildren, canRevealParents, onExpandAll, isRootNode, status, nodeType, upskillDefinitions, progress, openGeneralPopup, resources }: any) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: nodeId });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
     
@@ -703,6 +703,13 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             openGeneralPopup(definition.id, e);
         }
     };
+
+    const linkedResources = useMemo(() => 
+        (definition.linkedResourceIds || [])
+            .map((id: string) => resources.find((r: Resource) => r.id === id))
+            .filter((r: Resource | undefined): r is Resource => !!r),
+        [definition.linkedResourceIds, resources]
+    );
 
     return (
         <motion.div
@@ -742,6 +749,16 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                         </div>
                     )}
                 </div>
+                {linkedResources.length > 0 && (
+                    <CardContent className="p-2 pt-0">
+                         <p className="font-medium text-xs text-muted-foreground mb-1">Resources:</p>
+                        <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                            {linkedResources.map((res: Resource) => (
+                                <li key={res.id} className="truncate hover:text-foreground cursor-pointer" onClick={(e) => openGeneralPopup(res.id, e)}>{res.name}</li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                )}
                 {showProgress && (
                   <CardFooter className="p-2 pt-0">
                     <div className="w-full">
@@ -1323,4 +1340,3 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     </>
   );
 }
-
