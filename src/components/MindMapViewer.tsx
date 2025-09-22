@@ -307,8 +307,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                     newNodesMap.set(parentId, {
-                        x: pos.x - HORIZONTAL_SPACING, 
-                        y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
+                        x: pos.x + HORIZONTAL_SPACING, 
+                        y: pos.y + (childrenToLoad.length + index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                     });
                     newEdgesSet.add(`${parentId}-${nodeId}`);
                 });
@@ -382,7 +382,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
                  nodesToUpdate.set(parentId, {
-                    x: currentNodePos.x - HORIZONTAL_SPACING,
+                    x: currentNodePos.x + HORIZONTAL_SPACING,
                     y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
                 });
             }
@@ -1323,3 +1323,4 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     </>
   );
 }
+
