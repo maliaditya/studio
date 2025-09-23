@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -216,20 +215,20 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 
     const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
 
-    useEffect(() => {
+     useEffect(() => {
         const repetitionSkills = coreSkills.flatMap(cs => 
             cs.skillAreas.flatMap(sa => 
                 sa.microSkills.filter(ms => ms.isReadyForRepetition)
             )
         );
-    
+
+        let hasScheduleChanged = false;
         const newSchedule = { ...schedule };
-        let scheduleUpdated = false;
-    
+
         repetitionSkills.forEach(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
             if (intentions.length === 0) return;
-    
+
             const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
             
             const allCompletionDates = new Set<string>();
@@ -237,9 +236,9 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                 if (node.last_logged_date) allCompletionDates.add(node.last_logged_date);
             });
             const sortedDates = Array.from(allCompletionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-    
+
             if (sortedDates.length === 0) return;
-    
+
             let reps = 1;
             let lastReviewDate = sortedDates[0];
             for (let i = 1; i < sortedDates.length; i++) {
@@ -264,7 +263,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
     
             const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
             
-            if (!slotActivities.some(act => act.details === activityTitle)) {
+            if (!slotActivities.some(act => act.details === activityTitle && act.type === 'deepwork')) {
                 const newActivity: Activity = {
                     id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
                     type: 'deepwork',
@@ -273,14 +272,15 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                     slot: targetSlot,
                 };
                 slotActivities.push(newActivity);
-                scheduleUpdated = true;
+                hasScheduleChanged = true;
             }
         });
     
-        if (scheduleUpdated) {
+        if (hasScheduleChanged) {
             setSchedule(newSchedule);
         }
     }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule]);
+
 
     useEffect(() => {
         if (initialWeek) {
