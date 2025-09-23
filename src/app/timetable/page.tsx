@@ -261,21 +261,22 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
             const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
             
             const activityTitle = `Spaced Repetition: ${skill.name}`;
+            const targetSlot = 'Late Night';
             
             if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
-            if (!newSchedule[nextReviewDateKey]['Morning']) newSchedule[nextReviewDateKey]['Morning'] = [];
+            if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
 
-            const morningActivities = newSchedule[nextReviewDateKey]['Morning'] as Activity[];
+            const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
             
-            if (!morningActivities.some(act => act.details === activityTitle)) {
+            if (!slotActivities.some(act => act.details === activityTitle)) {
                 const newActivity: Activity = {
                     id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
                     type: 'deepwork',
                     details: activityTitle,
                     completed: false,
-                    slot: 'Morning',
+                    slot: targetSlot,
                 };
-                morningActivities.push(newActivity);
+                slotActivities.push(newActivity);
                 scheduleUpdated = true;
             }
         });
