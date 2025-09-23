@@ -7,7 +7,7 @@ import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { format, startOfWeek, addDays, isToday, isBefore, startOfToday } from 'date-fns';
+import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition, WorkoutExercise, DatedWorkout } from '@/types/workout';
@@ -207,15 +207,84 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
         schedule, setSchedule, 
         settings, toggleRoutine, 
         currentSlot, 
-        setUpskillDefinitions, 
-        setDeepWorkDefinitions,
-        allUpskillLogs,
-        allDeepWorkLogs,
-        getUpskillNodeType,
-        getDeepWorkNodeType,
+        coreSkills,
+        deepWorkDefinitions,
+        getDescendantLeafNodes,
     } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
+
+    const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
+
+    useEffect(() => {
+        const repetitionSkills = coreSkills.flatMap(cs => 
+            cs.skillAreas.flatMap(sa => 
+                sa.microSkills.filter(ms => ms.isReadyForRepetition)
+            )
+        );
+
+        const newSchedule = { ...schedule };
+        let scheduleUpdated = false;
+
+        repetitionSkills.forEach(skill => {
+            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+            const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            
+            if (allLeafNodes.length === 0) return;
+
+            const completionDates = new Set<string>();
+            allLeafNodes.forEach(node => {
+                if (node.last_logged_date) completionDates.add(node.last_logged_date);
+            });
+            const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+
+            let reps = 0;
+            let lastReviewDate = sortedDates.length > 0 ? sortedDates[0] : new Date();
+
+            if (sortedDates.length > 0) {
+                reps = 1;
+                for (let i = 1; i < sortedDates.length; i++) {
+                    const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
+                    if (daysBetween <= (DOUBLING_INTERVALS[reps - 1] || 128)) {
+                        reps++;
+                    } else {
+                        reps = 1;
+                    }
+                    lastReviewDate = sortedDates[i];
+                }
+            }
+            
+            if (sortedDates.length === 0) return;
+
+            const nextInterval = DOUBLING_INTERVALS[reps] || 128;
+            const nextReviewDate = addDays(lastReviewDate, nextInterval);
+            const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
+            
+            const activityTitle = `Spaced Repetition: ${skill.name}`;
+            
+            if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
+            if (!newSchedule[nextReviewDateKey]['Morning']) newSchedule[nextReviewDateKey]['Morning'] = [];
+
+            const morningActivities = newSchedule[nextReviewDateKey]['Morning'] as Activity[];
+            
+            if (!morningActivities.some(act => act.details === activityTitle)) {
+                const newActivity: Activity = {
+                    id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
+                    type: 'deepwork',
+                    details: activityTitle,
+                    completed: false,
+                    slot: 'Morning',
+                };
+                morningActivities.push(newActivity);
+                scheduleUpdated = true;
+            }
+        });
+
+        if (scheduleUpdated) {
+            setSchedule(newSchedule);
+        }
+
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule]);
 
     useEffect(() => {
         if (initialWeek) {
