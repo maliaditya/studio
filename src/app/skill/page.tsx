@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -176,6 +177,8 @@ function SkillPageContent() {
     getDescendantLeafNodes,
     selectedMicroSkill,
     setSelectedMicroSkill,
+    offerizationPlans,
+    logSubTaskTime,
   } = useAuth();
   
   const router = useRouter();
@@ -215,6 +218,11 @@ function SkillPageContent() {
   const [uploadSkillAreaInfo, setUploadSkillAreaInfo] = useState<{ coreSkillId: string; skillAreaId: string } | null>(null);
 
   const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
+
+  const [isLogProgressModalOpen, setIsLogProgressModalOpen] = useState(false);
+  const [loggingMicroSkill, setLoggingMicroSkill] = useState<MicroSkill | null>(null);
+  const [progressInput, setProgressInput] = useState<{ items: string, hours: string, pages: string }>({ items: '', hours: '', pages: '' });
+
 
   useEffect(() => {
     // One-time data migration to fix old "Foundation" and "Professionalism" skills
@@ -977,6 +985,54 @@ function SkillPageContent() {
     return `${hours}h ${remainingMinutes > 0 ? `${remainingMinutes}m` : ''}`.trim();
   };
 
+  const handleOpenLogProgressModal = (microSkill: MicroSkill) => {
+    setLoggingMicroSkill(microSkill);
+    setIsLogProgressModalOpen(true);
+    setProgressInput({ items: '', hours: '', pages: '' });
+  };
+  
+  const handleLogProgress = () => {
+    if (!loggingMicroSkill) return;
+
+    const { items, hours, pages } = progressInput;
+    let totalMinutes = 0;
+    
+    // Find the first available curiosity for this micro-skill to log against.
+    const curiosityToLog = upskillDefinitions.find(def => 
+        def.category === loggingMicroSkill.name && getUpskillNodeType(def) === 'Curiosity'
+    );
+    
+    if (!curiosityToLog) {
+        toast({ title: 'Error', description: `No 'Curiosity' task found for "${loggingMicroSkill.name}" to log time against.`, variant: 'destructive'});
+        setIsLogProgressModalOpen(false);
+        return;
+    }
+
+    if (hours) totalMinutes += parseInt(hours) * 60;
+    // Assuming 1 item takes ~10 minutes, and 1 page takes ~2 minutes.
+    if (items) totalMinutes += parseInt(items) * 10;
+    if (pages) totalMinutes += parseInt(pages) * 2;
+    
+    logSubTaskTime(curiosityToLog.id, totalMinutes);
+
+    toast({ title: "Progress Logged", description: `Logged ${formatMinutes(totalMinutes)} for "${loggingMicroSkill.name}".`});
+    setIsLogProgressModalOpen(false);
+  };
+  
+  const learningPlanForSkill = useMemo(() => {
+    if (!loggingMicroSkill) return null;
+    const microSkillInfo = microSkillMap.get(loggingMicroSkill.id);
+    if (!microSkillInfo) return null;
+    const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+    if (!coreSkill) return null;
+    return offerizationPlans[coreSkill.id]?.learningPlan || null;
+  }, [loggingMicroSkill, microSkillMap, coreSkills, offerizationPlans]);
+
+  const onSelectMicroSkill = (skill: MicroSkill | null) => {
+    setSelectedMicroSkill(skill);
+  };
+  const onSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {};
+
   return (
     <DndContext onDragEnd={handleDragEnd}>
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -1293,15 +1349,22 @@ function SkillPageContent() {
                                             
                                             const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
+                                            const learningPlan = offerizationPlans[selectedCoreSkill!.id]?.learningPlan;
+                                            const hasLearningPlan = (learningPlan?.audioVideoResources?.length ?? 0) > 0 || (learningPlan?.bookWebpageResources?.length ?? 0) > 0;
 
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => handleSelect(micro, 'microSkill')}>{micro.name}</CardTitle>
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
                                                       <div className="flex items-center">
                                                           <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleSelectForDeepWork(micro)}>
                                                             <Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/>
                                                           </Button>
+                                                          {hasLearningPlan && (
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleOpenLogProgressModal(micro)}>
+                                                              <ClipboardList className="h-4 w-4 text-teal-500" />
+                                                            </Button>
+                                                          )}
                                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadMicroSkill(micro)}>
                                                             <Download className="h-4 w-4 text-blue-500" />
                                                           </Button>
@@ -1565,6 +1628,43 @@ function SkillPageContent() {
         modalState={repetitionModalState} 
         onOpenChange={(isOpen) => setRepetitionModalState(prev => ({ ...prev, isOpen }))} 
       />
+      
+      {isLogProgressModalOpen && loggingMicroSkill && (
+        <Dialog open={isLogProgressModalOpen} onOpenChange={setIsLogProgressModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Log Progress for {loggingMicroSkill.name}</DialogTitle>
+                    <DialogDescription>
+                        Enter the progress you've made for this micro-skill.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    {learningPlanForSkill?.audioVideoResources && learningPlanForSkill.audioVideoResources.length > 0 && (
+                        <>
+                            <div className="space-y-1">
+                                <Label htmlFor="log-items">Items Completed</Label>
+                                <Input id="log-items" type="number" value={progressInput.items} onChange={e => setProgressInput(p => ({...p, items: e.target.value}))} placeholder="e.g., 5" />
+                            </div>
+                             <div className="space-y-1">
+                                <Label htmlFor="log-hours">Hours Watched/Listened</Label>
+                                <Input id="log-hours" type="number" value={progressInput.hours} onChange={e => setProgressInput(p => ({...p, hours: e.target.value}))} placeholder="e.g., 2.5" />
+                            </div>
+                        </>
+                    )}
+                    {learningPlanForSkill?.bookWebpageResources && learningPlanForSkill.bookWebpageResources.length > 0 && (
+                        <div className="space-y-1">
+                            <Label htmlFor="log-pages">Pages Read</Label>
+                            <Input id="log-pages" type="number" value={progressInput.pages} onChange={e => setProgressInput(p => ({...p, pages: e.target.value}))} placeholder="e.g., 50" />
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsLogProgressModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleLogProgress}>Log Progress</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
     </div>
     </DndContext>
   );
