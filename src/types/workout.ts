@@ -261,6 +261,8 @@ export interface LearningResourceAudio {
   tutor: string;
   totalItems: number | null;
   totalHours: number | null;
+  startDate?: string | null;
+  completionDate?: string | null;
 }
 
 export interface LearningResourceBook {
@@ -268,14 +270,15 @@ export interface LearningResourceBook {
   name: string;
   author: string;
   totalPages: number | null;
+  startDate?: string | null;
+  completionDate?: string | null;
 }
 
 export interface LearningPlan {
   audioVideoResources?: LearningResourceAudio[];
   bookWebpageResources?: LearningResourceBook[];
-  startDate?: string | null;
-  completionDate?: string | null;
 }
+
 
 export interface ProductizationPlan {
   productType?: string;
@@ -338,11 +341,12 @@ export interface Resource {
   demoLink?: string;
   linkedResourceId?: string;
   linkedBrainHackIds?: string[];
+  hasLocalAudio?: boolean; // Flag to check IndexedDB
+  audioUrl?: string;
 
   // For 'card' type
   points?: ResourcePoint[];
   icon?: string;
-  hasLocalAudio?: boolean; // Flag to check IndexedDB
 
   // For 'habit' type
   trigger?: {

@@ -1086,7 +1086,7 @@ function OfferizationContent() {
     toast({ title: 'Micro-Skill Added', description: `"${name}" has been added.` });
   };
 
-  const handleGapAnalysisChange = (specializationId: string, field: keyof GapAnalysis, value: string) => {
+  const handleGapAnalysisChange = (specializationId: string, field: keyof Omit<GapAnalysis, 'gapTypes'>, value: string) => {
     setOfferizationPlans(prev => ({
       ...prev,
       [specializationId]: {
@@ -1279,23 +1279,10 @@ function OfferizationContent() {
     toast({ title: "Offer Deleted", description: "The offer has been removed from your plan.", variant: "destructive" });
   };
   
-  const handleLearningPlanFieldChange = (specializationId: string, field: keyof Omit<LearningPlan, 'audioVideoResources' | 'bookWebpageResources'>, value: any) => {
-    setOfferizationPlans(prev => ({
-        ...prev,
-        [specializationId]: {
-            ...(prev[specializationId] || {}),
-            learningPlan: {
-                ...(prev[specializationId]?.learningPlan || {}),
-                [field]: value
-            }
-        }
-    }));
-  };
-
-  const handleUpdateLearningResource = (specId: string, type: 'audio' | 'book', index: number, field: string, value: any) => {
+  const handleLearningPlanFieldChange = (specializationId: string, type: 'audio' | 'book', index: number, field: string, value: any) => {
     setOfferizationPlans(prev => {
       const plans = { ...prev };
-      const specPlan = { ...(plans[specId] || {}) };
+      const specPlan = { ...(plans[specializationId] || {}) };
       const learningPlan = { ...(specPlan.learningPlan || {}) };
   
       if (type === 'audio') {
@@ -1324,10 +1311,10 @@ function OfferizationContent() {
       const learningPlan = { ...(specPlan.learningPlan || {}) };
   
       if (type === 'audio') {
-        const newResource: LearningResourceAudio = { id: `audio_${Date.now()}`, name: '', tutor: '', totalItems: null, totalHours: null };
+        const newResource: LearningResourceAudio = { id: `audio_${Date.now()}`, name: '', tutor: '', totalItems: null, totalHours: null, startDate: null, completionDate: null };
         learningPlan.audioVideoResources = [...(learningPlan.audioVideoResources || []), newResource];
       } else {
-        const newResource: LearningResourceBook = { id: `book_${Date.now()}`, name: '', author: '', totalPages: null };
+        const newResource: LearningResourceBook = { id: `book_${Date.now()}`, name: '', author: '', totalPages: null, startDate: null, completionDate: null };
         learningPlan.bookWebpageResources = [...(learningPlan.bookWebpageResources || []), newResource];
       }
       specPlan.learningPlan = learningPlan;
@@ -1491,31 +1478,23 @@ function OfferizationContent() {
                       <AccordionItem value="item-learning">
                           <AccordionTrigger>Learning Planner</AccordionTrigger>
                           <AccordionContent className="space-y-4">
-                              <div className="pl-6 grid grid-cols-2 gap-4 pt-2 border-t">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{learningPlan.startDate ? format(parseISO(learningPlan.startDate), 'PPP') : 'Start Date'}</Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={learningPlan.startDate ? parseISO(learningPlan.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent>
-                                </Popover>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{learningPlan.completionDate ? format(parseISO(learningPlan.completionDate), 'PPP') : 'End Date'}</Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={learningPlan.completionDate ? parseISO(learningPlan.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent>
-                                </Popover>
-                              </div>
                               <div className="space-y-3">
                                   <h4 className="font-medium text-sm">Audio/Video Resources</h4>
                                   {(learningPlan.audioVideoResources || []).map((resource, index) => (
-                                      <div key={resource.id} className="grid grid-cols-3 gap-2 items-center">
-                                          <Input value={resource.name} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'name', e.target.value)} placeholder="Name"/>
-                                          <Input value={resource.tutor} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'tutor', e.target.value)} placeholder="Tutor"/>
-                                          <div className="flex items-center gap-1">
-                                              <Input type="number" value={resource.totalItems || ''} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'totalItems', e.target.value === '' ? null : Number(e.target.value))} placeholder="Items"/>
-                                              <Input type="number" value={resource.totalHours || ''} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="Hours"/>
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'audio', index)}><Trash2 className="h-4 w-4"/></Button>
+                                      <div key={resource.id} className="grid grid-cols-1 gap-2 p-2 border rounded-md">
+                                          <div className="flex justify-between items-center">
+                                            <Input value={resource.name} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'name', e.target.value)} placeholder="Name" className="font-semibold"/>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'audio', index)}><Trash2 className="h-4 w-4"/></Button>
                                           </div>
+                                          <Input value={resource.tutor} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'tutor', e.target.value)} placeholder="Tutor"/>
+                                          <div className="grid grid-cols-2 gap-2">
+                                              <Input type="number" value={resource.totalItems || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'totalItems', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Items"/>
+                                              <Input type="number" value={resource.totalHours || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Hours"/>
+                                          </div>
+                                           <div className="grid grid-cols-2 gap-2">
+                                               <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.startDate ? format(parseISO(resource.startDate), 'PPP') : 'Start Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.startDate ? parseISO(resource.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'audio', index, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
+                                               <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.completionDate ? format(parseISO(resource.completionDate), 'PPP') : 'End Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.completionDate ? parseISO(resource.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'audio', index, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
+                                           </div>
                                       </div>
                                   ))}
                                   <Button variant="outline" size="sm" onClick={() => handleAddLearningResource(spec.id, 'audio')}>+ Add Audio/Video</Button>
@@ -1523,13 +1502,17 @@ function OfferizationContent() {
                               <div className="space-y-3">
                                   <h4 className="font-medium text-sm">Books/Webpages Resources</h4>
                                   {(learningPlan.bookWebpageResources || []).map((resource, index) => (
-                                      <div key={resource.id} className="grid grid-cols-3 gap-2 items-center">
-                                          <Input value={resource.name} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'name', e.target.value)} placeholder="Name" />
-                                          <Input value={resource.author} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
-                                           <div className="flex items-center gap-1">
-                                              <Input type="number" value={resource.totalPages || ''} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} placeholder="Pages" />
-                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'book', index)}><Trash2 className="h-4 w-4"/></Button>
-                                           </div>
+                                      <div key={resource.id} className="grid grid-cols-1 gap-2 p-2 border rounded-md">
+                                          <div className="flex justify-between items-center">
+                                            <Input value={resource.name} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'name', e.target.value)} placeholder="Name" className="font-semibold"/>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'book', index)}><Trash2 className="h-4 w-4"/></Button>
+                                          </div>
+                                          <Input value={resource.author} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
+                                          <Input type="number" value={resource.totalPages || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Pages" />
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.startDate ? format(parseISO(resource.startDate), 'PPP') : 'Start Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.startDate ? parseISO(resource.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'book', index, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
+                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.completionDate ? format(parseISO(resource.completionDate), 'PPP') : 'End Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.completionDate ? parseISO(resource.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'book', index, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
+                                          </div>
                                       </div>
                                   ))}
                                   <Button variant="outline" size="sm" onClick={() => handleAddLearningResource(spec.id, 'book')}>+ Add Book/Webpage</Button>
