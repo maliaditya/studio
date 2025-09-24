@@ -1192,27 +1192,27 @@ function SkillPageContent() {
                   </div>
               ) : selectedCoreSkill?.type === 'Foundation' ? (
                   <div className="space-y-4">
-                      {coreSkills.filter(s => s.type === 'Specialization').flatMap(spec =>
-                          spec.skillAreas.flatMap(area =>
-                              area.microSkills.filter(ms => {
-                                  const totals = microSkillTotals.get(ms.id);
-                                  return totals && (totals.intentionLogged + totals.curiosityLogged) >= 1200; // 20 hours
-                              }).map(ms => ({ microSkill: ms, coreSkillName: spec.name, skillAreaName: area.name }))
-                          )
-                      ).sort((a,b) => (microSkillTotals.get(b.microSkill.id)?.intentionLogged || 0) - (microSkillTotals.get(a.microSkill.id)?.intentionLogged || 0))
-                      .map(({ microSkill, coreSkillName, skillAreaName }) => {
-                          const intentions = microSkillIntentions.get(microSkill.name) || [];
+                      {coreSkills.filter(spec => {
+                          const specTotals = specializationTotals.get(spec.id);
+                          return spec.type === 'Specialization' && specTotals && specTotals.totalLogged >= 1200; // 20 hours
+                      }).sort((a,b) => (specializationTotals.get(b.id)?.totalLogged || 0) - (specializationTotals.get(a.id)?.totalLogged || 0))
+                      .map(spec => {
+                          const allIntentions = spec.skillAreas.flatMap(area => 
+                              area.microSkills.flatMap(ms => microSkillIntentions.get(ms.name) || [])
+                          );
                           return (
-                              <Card key={microSkill.id}>
+                              <Card key={spec.id}>
                                   <CardHeader className="py-3">
-                                      <CardTitle className="text-base">{microSkill.name}</CardTitle>
-                                      <CardDescription>{coreSkillName} &gt; {skillAreaName}</CardDescription>
+                                      <CardTitle className="text-base">{spec.name}</CardTitle>
+                                      <CardDescription>
+                                          Total Logged: {formatMinutes((specializationTotals.get(spec.id)?.totalLogged || 0))}
+                                      </CardDescription>
                                   </CardHeader>
                                   <CardContent className="p-3 pt-0">
                                       <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                      {intentions.length > 0 ? (
+                                      {allIntentions.length > 0 ? (
                                         <ul className="space-y-1 text-xs">
-                                          {intentions.map(intention => (
+                                          {allIntentions.map(intention => (
                                             <li key={intention.id}>
                                               <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                             </li>
