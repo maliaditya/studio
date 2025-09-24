@@ -255,12 +255,23 @@ export interface Offer {
   format: string;
 }
 
+export interface LearningPlan {
+  hasAudioVideo?: boolean;
+  hasBooksWebsites?: boolean;
+  totalAudioVideos?: number | null;
+  totalHours?: number | null;
+  totalPages?: number | null;
+  startDate?: string | null;
+  completionDate?: string | null;
+}
+
 export interface ProductizationPlan {
   productType?: string;
   offerTypes?: string[];
   gapAnalysis?: GapAnalysis;
   releases?: Release[];
   offers?: Offer[];
+  learningPlan?: LearningPlan;
 }
 
 export interface GapAnalysis {

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -20,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -495,7 +496,7 @@ function PlanningContent() {
                               <div className="space-y-4">
                                   <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
                                   <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Time (Target Date)</Label>
+                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date:</Label>
                                       <Popover>
                                           <PopoverTrigger asChild>
                                           <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !currentSkillPlan.targetDate && "text-muted-foreground")}>
@@ -514,11 +515,11 @@ function PlanningContent() {
                                       </Popover>
                                   </div>
                                   <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money (Total Amount)</Label>
+                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money Needed:</Label>
                                       <Input type="number" value={currentSkillPlan.requiredMoney || ''} onChange={(e) => handleSkillPlanFieldChange('requiredMoney', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 500" />
                                   </div>
                                   <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy (Total Productive Hours)</Label>
+                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy Needed:</Label>
                                       <Input type="number" value={currentSkillPlan.requiredHours || ''} onChange={(e) => handleSkillPlanFieldChange('requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
                                   </div>
                               </div>
@@ -571,7 +572,7 @@ function PlanningContent() {
                       <div className="space-y-4">
                           <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
                           <div className="space-y-1">
-                              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Time (Target Date)</Label>
+                              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date</Label>
                               <Popover>
                                   <PopoverTrigger asChild>
                                   <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !currentProductPlan.targetDate && "text-muted-foreground")}>
@@ -1277,6 +1278,19 @@ function OfferizationContent() {
     });
     toast({ title: "Offer Deleted", description: "The offer has been removed from your plan.", variant: "destructive" });
   };
+  
+  const handleLearningPlanFieldChange = (specializationId: string, field: keyof LearningPlan, value: any) => {
+    setOfferizationPlans(prev => ({
+        ...prev,
+        [specializationId]: {
+            ...(prev[specializationId] || {}),
+            learningPlan: {
+                ...(prev[specializationId]?.learningPlan || {}),
+                [field]: value
+            }
+        }
+    }));
+  };
 
 
   return (
@@ -1288,6 +1302,7 @@ function OfferizationContent() {
           const gapAnalysis = plan.gapAnalysis;
           const releases = plan.releases || [];
           const offers = plan.offers || [];
+          const learningPlan = plan.learningPlan || {};
           
           return (
               <Card key={spec.id} className="flex flex-col">
@@ -1411,6 +1426,44 @@ function OfferizationContent() {
                                 <Textarea id={`goal-${spec.id}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
                             </div>
                          </AccordionContent>
+                      </AccordionItem>
+                      <AccordionItem value="item-learning">
+                        <AccordionTrigger>Learning Planner</AccordionTrigger>
+                        <AccordionContent className="space-y-4">
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id={`av-${spec.id}`} checked={learningPlan.hasAudioVideo} onCheckedChange={(checked) => handleLearningPlanFieldChange(spec.id, 'hasAudioVideo', !!checked)} />
+                                <Label htmlFor={`av-${spec.id}`}>Audio/Video</Label>
+                            </div>
+                            {learningPlan.hasAudioVideo && (
+                                <div className="pl-6 grid grid-cols-2 gap-4">
+                                    <Input type="number" placeholder="Total Videos" value={learningPlan.totalAudioVideos ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalAudioVideos', e.target.value === '' ? null : Number(e.target.value))} />
+                                    <Input type="number" placeholder="Total Hours" value={learningPlan.totalHours ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} />
+                                </div>
+                            )}
+                            <div className="flex items-center space-x-2">
+                                <Checkbox id={`bw-${spec.id}`} checked={learningPlan.hasBooksWebsites} onCheckedChange={(checked) => handleLearningPlanFieldChange(spec.id, 'hasBooksWebsites', !!checked)} />
+                                <Label htmlFor={`bw-${spec.id}`}>Books/Webpages</Label>
+                            </div>
+                            {learningPlan.hasBooksWebsites && (
+                                <div className="pl-6">
+                                    <Input type="number" placeholder="Total Pages" value={learningPlan.totalPages ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} />
+                                </div>
+                            )}
+                             <div className="pl-6 grid grid-cols-2 gap-4 pt-2 border-t">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{learningPlan.startDate ? format(parseISO(learningPlan.startDate), 'PPP') : 'Start Date'}</Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={learningPlan.startDate ? parseISO(learningPlan.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent>
+                                </Popover>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{learningPlan.completionDate ? format(parseISO(learningPlan.completionDate), 'PPP') : 'End Date'}</Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={learningPlan.completionDate ? parseISO(learningPlan.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent>
+                                </Popover>
+                            </div>
+                        </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-4">
                          <AccordionTrigger>Project Planner</AccordionTrigger>
