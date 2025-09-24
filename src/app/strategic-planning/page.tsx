@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -1279,7 +1279,7 @@ function OfferizationContent() {
     toast({ title: "Offer Deleted", description: "The offer has been removed from your plan.", variant: "destructive" });
   };
   
-  const handleLearningPlanFieldChange = (specializationId: string, field: keyof LearningPlan, value: any) => {
+  const handleLearningPlanFieldChange = (specializationId: string, field: keyof Omit<LearningPlan, 'audioVideoResources' | 'bookWebpageResources'>, value: any) => {
     setOfferizationPlans(prev => ({
         ...prev,
         [specializationId]: {
@@ -1290,6 +1290,67 @@ function OfferizationContent() {
             }
         }
     }));
+  };
+
+  const handleUpdateLearningResource = (specId: string, type: 'audio' | 'book', index: number, field: string, value: any) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+  
+      if (type === 'audio') {
+        const resources = [...(learningPlan.audioVideoResources || [])];
+        if (resources[index]) {
+          resources[index] = { ...resources[index], [field]: value };
+          learningPlan.audioVideoResources = resources;
+        }
+      } else {
+        const resources = [...(learningPlan.bookWebpageResources || [])];
+        if (resources[index]) {
+          resources[index] = { ...resources[index], [field]: value };
+          learningPlan.bookWebpageResources = resources;
+        }
+      }
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+  
+  const handleAddLearningResource = (specId: string, type: 'audio' | 'book') => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+  
+      if (type === 'audio') {
+        const newResource: LearningResourceAudio = { id: `audio_${Date.now()}`, name: '', tutor: '', totalItems: null, totalHours: null };
+        learningPlan.audioVideoResources = [...(learningPlan.audioVideoResources || []), newResource];
+      } else {
+        const newResource: LearningResourceBook = { id: `book_${Date.now()}`, name: '', author: '', totalPages: null };
+        learningPlan.bookWebpageResources = [...(learningPlan.bookWebpageResources || []), newResource];
+      }
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+  
+  const handleDeleteLearningResource = (specId: string, type: 'audio' | 'book', index: number) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+  
+      if (type === 'audio') {
+        learningPlan.audioVideoResources = (learningPlan.audioVideoResources || []).filter((_, i) => i !== index);
+      } else {
+        learningPlan.bookWebpageResources = (learningPlan.bookWebpageResources || []).filter((_, i) => i !== index);
+      }
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
   };
 
 
@@ -1315,7 +1376,7 @@ function OfferizationContent() {
                   </div>
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
-                <Accordion type="multiple" className="w-full">
+                <Accordion type="multiple" defaultValue={['item-1']} className="w-full">
                    <AccordionItem value="item-1">
                      <AccordionTrigger>Micro-Skills</AccordionTrigger>
                      <AccordionContent>
@@ -1428,28 +1489,9 @@ function OfferizationContent() {
                          </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-learning">
-                        <AccordionTrigger>Learning Planner</AccordionTrigger>
-                        <AccordionContent className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id={`av-${spec.id}`} checked={learningPlan.hasAudioVideo} onCheckedChange={(checked) => handleLearningPlanFieldChange(spec.id, 'hasAudioVideo', !!checked)} />
-                                <Label htmlFor={`av-${spec.id}`}>Audio/Video</Label>
-                            </div>
-                            {learningPlan.hasAudioVideo && (
-                                <div className="pl-6 grid grid-cols-2 gap-4">
-                                    <Input type="number" placeholder="Total Videos" value={learningPlan.totalAudioVideos ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalAudioVideos', e.target.value === '' ? null : Number(e.target.value))} />
-                                    <Input type="number" placeholder="Total Hours" value={learningPlan.totalHours ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} />
-                                </div>
-                            )}
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id={`bw-${spec.id}`} checked={learningPlan.hasBooksWebsites} onCheckedChange={(checked) => handleLearningPlanFieldChange(spec.id, 'hasBooksWebsites', !!checked)} />
-                                <Label htmlFor={`bw-${spec.id}`}>Books/Webpages</Label>
-                            </div>
-                            {learningPlan.hasBooksWebsites && (
-                                <div className="pl-6">
-                                    <Input type="number" placeholder="Total Pages" value={learningPlan.totalPages ?? ''} onChange={(e) => handleLearningPlanFieldChange(spec.id, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} />
-                                </div>
-                            )}
-                             <div className="pl-6 grid grid-cols-2 gap-4 pt-2 border-t">
+                          <AccordionTrigger>Learning Planner</AccordionTrigger>
+                          <AccordionContent className="space-y-4">
+                              <div className="pl-6 grid grid-cols-2 gap-4 pt-2 border-t">
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{learningPlan.startDate ? format(parseISO(learningPlan.startDate), 'PPP') : 'Start Date'}</Button>
@@ -1462,8 +1504,37 @@ function OfferizationContent() {
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={learningPlan.completionDate ? parseISO(learningPlan.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent>
                                 </Popover>
-                            </div>
-                        </AccordionContent>
+                              </div>
+                              <div className="space-y-3">
+                                  <h4 className="font-medium text-sm">Audio/Video Resources</h4>
+                                  {(learningPlan.audioVideoResources || []).map((resource, index) => (
+                                      <div key={resource.id} className="grid grid-cols-3 gap-2 items-center">
+                                          <Input value={resource.name} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'name', e.target.value)} placeholder="Name"/>
+                                          <Input value={resource.tutor} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'tutor', e.target.value)} placeholder="Tutor"/>
+                                          <div className="flex items-center gap-1">
+                                              <Input type="number" value={resource.totalItems || ''} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'totalItems', e.target.value === '' ? null : Number(e.target.value))} placeholder="Items"/>
+                                              <Input type="number" value={resource.totalHours || ''} onChange={e => handleUpdateLearningResource(spec.id, 'audio', index, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="Hours"/>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'audio', index)}><Trash2 className="h-4 w-4"/></Button>
+                                          </div>
+                                      </div>
+                                  ))}
+                                  <Button variant="outline" size="sm" onClick={() => handleAddLearningResource(spec.id, 'audio')}>+ Add Audio/Video</Button>
+                              </div>
+                              <div className="space-y-3">
+                                  <h4 className="font-medium text-sm">Books/Webpages Resources</h4>
+                                  {(learningPlan.bookWebpageResources || []).map((resource, index) => (
+                                      <div key={resource.id} className="grid grid-cols-3 gap-2 items-center">
+                                          <Input value={resource.name} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'name', e.target.value)} placeholder="Name" />
+                                          <Input value={resource.author} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
+                                           <div className="flex items-center gap-1">
+                                              <Input type="number" value={resource.totalPages || ''} onChange={e => handleUpdateLearningResource(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} placeholder="Pages" />
+                                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'book', index)}><Trash2 className="h-4 w-4"/></Button>
+                                           </div>
+                                      </div>
+                                  ))}
+                                  <Button variant="outline" size="sm" onClick={() => handleAddLearningResource(spec.id, 'book')}>+ Add Book/Webpage</Button>
+                              </div>
+                          </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-4">
                          <AccordionTrigger>Project Planner</AccordionTrigger>

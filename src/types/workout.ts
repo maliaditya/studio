@@ -255,12 +255,24 @@ export interface Offer {
   format: string;
 }
 
+export interface LearningResourceAudio {
+  id: string;
+  name: string;
+  tutor: string;
+  totalItems: number | null;
+  totalHours: number | null;
+}
+
+export interface LearningResourceBook {
+  id: string;
+  name: string;
+  author: string;
+  totalPages: number | null;
+}
+
 export interface LearningPlan {
-  hasAudioVideo?: boolean;
-  hasBooksWebsites?: boolean;
-  totalAudioVideos?: number | null;
-  totalHours?: number | null;
-  totalPages?: number | null;
+  audioVideoResources?: LearningResourceAudio[];
+  bookWebpageResources?: LearningResourceBook[];
   startDate?: string | null;
   completionDate?: string | null;
 }
