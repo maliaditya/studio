@@ -400,6 +400,16 @@ export function WeightGoalCard({
                         const plan = offerizationPlans[spec.id]?.learningPlan;
                         if (!plan) return null;
 
+                        const calculateDailyTarget = (total: number | null, start: string | null | undefined, end: string | null | undefined) => {
+                            if (!total || !start || !end) return null;
+                            const startDate = parseISO(start);
+                            const endDate = parseISO(end);
+                            if (isAfter(startDate, endDate)) return null;
+                            const days = differenceInDays(endDate, startDate) + 1;
+                            if (days <= 0) return null;
+                            return (total / days).toFixed(1);
+                        };
+
                         return (
                             <li key={spec.id}>
                                 <Card>
@@ -407,19 +417,40 @@ export function WeightGoalCard({
                                         <CardTitle className="text-base">{spec.name}</CardTitle>
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0 text-xs">
-                                        <ul className="space-y-1">
-                                            {(plan.audioVideoResources || []).map(res => (
-                                                <li key={res.id} className="flex justify-between">
-                                                    <span className="text-muted-foreground truncate" title={res.name}>{res.name}</span>
-                                                    <span className="font-medium">{res.totalHours ? `${res.totalHours}h` : (res.totalItems ? `${res.totalItems} items` : '')}</span>
+                                        <ul className="space-y-2">
+                                            {(plan.audioVideoResources || []).map(res => {
+                                                const dailyHours = calculateDailyTarget(res.totalHours, res.startDate, res.completionDate);
+                                                const dailyItems = calculateDailyTarget(res.totalItems, res.startDate, res.completionDate);
+                                                return (
+                                                <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
+                                                    <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
+                                                    <div className="grid grid-cols-2 gap-x-2">
+                                                        <span>{res.tutor}</span>
+                                                        <span className="text-right">{res.totalItems ? `${res.totalItems} items` : ''}{res.totalHours ? ` / ${res.totalHours}h` : ''}</span>
+                                                        {res.startDate && <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}</span>}
+                                                        {(dailyItems || dailyHours) && (
+                                                            <span className="text-xs text-right font-medium text-primary">
+                                                                {dailyItems && `${dailyItems} items/day`}
+                                                                {dailyItems && dailyHours && " | "}
+                                                                {dailyHours && `${dailyHours} h/day`}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </li>
-                                            ))}
-                                            {(plan.bookWebpageResources || []).map(res => (
-                                                <li key={res.id} className="flex justify-between">
-                                                    <span className="text-muted-foreground truncate" title={res.name}>{res.name}</span>
-                                                    <span className="font-medium">{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
+                                            )})}
+                                            {(plan.bookWebpageResources || []).map(res => {
+                                                const dailyPages = calculateDailyTarget(res.totalPages, res.startDate, res.completionDate);
+                                                return (
+                                                <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
+                                                    <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
+                                                    <div className="grid grid-cols-2 gap-x-2">
+                                                        <span>{res.author}</span>
+                                                        <span className="text-right">{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
+                                                        {res.startDate && <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}</span>}
+                                                        {dailyPages && <span className="text-xs text-right font-medium text-primary">{dailyPages} pgs/day</span>}
+                                                    </div>
                                                 </li>
-                                            ))}
+                                            )})}
                                         </ul>
                                     </CardContent>
                                 </Card>
@@ -748,3 +779,5 @@ export function WeightGoalCard({
         </Card>
     );
 }
+
+    
