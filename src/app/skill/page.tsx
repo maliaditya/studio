@@ -1190,6 +1190,40 @@ function SkillPageContent() {
                       ))}
                       {linkedTasksByCoreSkill.size === 0 && <p className="text-center text-muted-foreground">No Intentions or Curiosities linked to this project yet.</p>}
                   </div>
+              ) : selectedCoreSkill?.type === 'Foundation' ? (
+                  <div className="space-y-4">
+                      {coreSkills.filter(s => s.type === 'Specialization').flatMap(spec =>
+                          spec.skillAreas.flatMap(area =>
+                              area.microSkills.filter(ms => {
+                                  const totals = microSkillTotals.get(ms.id);
+                                  return totals && (totals.intentionLogged + totals.curiosityLogged) >= 1200; // 20 hours
+                              }).map(ms => ({ microSkill: ms, coreSkillName: spec.name, skillAreaName: area.name }))
+                          )
+                      ).sort((a,b) => (microSkillTotals.get(b.microSkill.id)?.intentionLogged || 0) - (microSkillTotals.get(a.microSkill.id)?.intentionLogged || 0))
+                      .map(({ microSkill, coreSkillName, skillAreaName }) => {
+                          const intentions = microSkillIntentions.get(microSkill.name) || [];
+                          return (
+                              <Card key={microSkill.id}>
+                                  <CardHeader className="py-3">
+                                      <CardTitle className="text-base">{microSkill.name}</CardTitle>
+                                      <CardDescription>{coreSkillName} &gt; {skillAreaName}</CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="p-3 pt-0">
+                                      <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
+                                      {intentions.length > 0 ? (
+                                        <ul className="space-y-1 text-xs">
+                                          {intentions.map(intention => (
+                                            <li key={intention.id}>
+                                              <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : <p className="text-muted-foreground text-xs italic">No intentions defined.</p>}
+                                  </CardContent>
+                              </Card>
+                          );
+                      })}
+                  </div>
               ) : selectedCoreSkill ? (
                   <div className="space-y-4">
                       {selectedCoreSkill.type === 'Specialization' && (
