@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -24,6 +24,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { storeAudio, getAudio, deleteAudio } from '@/lib/audioDB';
 import { Link as LinkIcon } from 'lucide-react';
 import { Workflow } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -40,11 +41,12 @@ const formatTime = (seconds: number): string => {
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest } = useAuth();
+    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
+    const router = useRouter();
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -200,6 +202,15 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             }
         }
     };
+    
+    const handleViewOnPage = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (resource.folderId) {
+            setSelectedResourceFolderId(resource.folderId);
+            router.push('/resources');
+            onClose(resource.id);
+        }
+    };
 
 
     const getIcon = () => {
@@ -331,6 +342,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
