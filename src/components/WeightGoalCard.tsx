@@ -10,7 +10,7 @@ import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan } from '@/types/workout';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -89,12 +89,12 @@ export function WeightGoalCard({
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
+    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills } = useAuth();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'projects' | 'weight' | 'diet' | 'rules'>('projects');
-    const { openRuleDetailPopup } = useAuth();
 
 
     const [heightInput, setHeightInput] = useState('');
@@ -109,60 +109,6 @@ export function WeightGoalCard({
         const dayName = format(new Date(), 'EEEE');
         return dietPlan.find(plan => plan.day === dayName);
     }, [dietPlan]);
-
-    const activeProjectIds = useMemo(() => {
-        const activeIds = new Set<string>();
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        projects.forEach(project => {
-            // Check productization plans
-            if (productizationPlans && productizationPlans[project.name]) {
-                activeIds.add(project.id);
-                return; // Go to next project if already added
-            }
-
-            // Check offerization plans
-            const isOfferedAndActive = Object.values(offerizationPlans).some(plan => 
-                plan.releases?.some(release => {
-                    if (release.name !== project.name) return false;
-                    try {
-                        return isAfter(parseISO(release.launchDate), today) || format(parseISO(release.launchDate), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
-                    } catch { return false; }
-                })
-            );
-            if (isOfferedAndActive) {
-                activeIds.add(project.id);
-            }
-        });
-
-        return activeIds;
-    }, [projects, productizationPlans, offerizationPlans]);
-
-    const linkedDeepWorkChildIds = useMemo(() => {
-        return new Set<string>(
-            (deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || [])
-        );
-    }, [deepWorkDefinitions]);
-
-    const activeIntentions = useMemo(() => {
-        return (deepWorkDefinitions || [])
-            .filter(def => {
-                const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 ||
-                               (def.linkedUpskillIds?.length ?? 0) > 0 ||
-                               (def.linkedResourceIds?.length ?? 0) > 0;
-                const isChild = linkedDeepWorkChildIds.has(def.id);
-                const isIntention = isParent && !isChild;
-                
-                if (!isIntention) return false;
-
-                const linkedProjects = def.linkedProjectIds || [];
-                if (linkedProjects.length === 0) return false; 
-                
-                return linkedProjects.some(projectId => activeProjectIds.has(projectId));
-            })
-            .sort((a, b) => a.name.localeCompare(b.name));
-    }, [deepWorkDefinitions, linkedDeepWorkChildIds, activeProjectIds]);
 
     useEffect(() => {
         if (!areDetailsSet) {
@@ -431,35 +377,52 @@ export function WeightGoalCard({
     };
 
     const renderProjectsContent = () => {
-      if (activeIntentions.length === 0) {
+        if (!skillAcquisitionPlans || skillAcquisitionPlans.length === 0) {
+            return (
+              <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
+                <p>No learning plans found.</p>
+                <Link href="/strategic-planning" className="text-primary hover:underline mt-1">
+                  Create a learning plan to see it here.
+                </Link>
+              </div>
+            );
+        }
+      
         return (
-          <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
-            <p>No active intentions found.</p>
-            <Link href="/deep-work" className="text-primary hover:underline mt-1">
-              Create an intention to see it here.
-            </Link>
-          </div>
+            <ScrollArea className="h-[250px] pr-3">
+              <ul className="space-y-3">
+                {skillAcquisitionPlans.map(plan => {
+                  const specialization = coreSkills.find(s => s.id === plan.specializationId);
+                  if (!specialization) return null;
+                  return (
+                    <li key={plan.specializationId}>
+                      <Card>
+                        <CardHeader className="p-3">
+                          <CardTitle className="text-base">{specialization.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-3 pt-0 text-xs">
+                          <ul className="space-y-1">
+                            <li className="flex justify-between">
+                              <span className="text-muted-foreground">Target Date:</span>
+                              <span className="font-medium">{plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}</span>
+                            </li>
+                            <li className="flex justify-between">
+                              <span className="text-muted-foreground">Money Needed:</span>
+                              <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
+                            </li>
+                             <li className="flex justify-between">
+                              <span className="text-muted-foreground">Hours Needed:</span>
+                              <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
+                            </li>
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    </li>
+                  )
+                })}
+              </ul>
+            </ScrollArea>
         );
-      }
-      return (
-        <ScrollArea className="h-[250px] pr-3">
-          <ul className="space-y-2">
-            {activeIntentions.map((intention) => (
-              <li key={intention.id} className="flex items-center justify-between p-2 rounded-md hover:bg-accent transition-colors">
-                <p className="font-medium text-sm truncate flex-grow" title={intention.name}>{intention.name}</p>
-                <div className="flex items-center flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDiagramClick(intention)}>
-                        <Workflow className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => router.push(`/mindset?intentionId=${intention.id}`)}>
-                        <Brain className="h-4 w-4" />
-                    </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </ScrollArea>
-      );
     };
       
     const renderWeightContent = () => {
