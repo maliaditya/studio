@@ -368,6 +368,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
                         </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Upload Audio</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
@@ -447,11 +448,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                              <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
                              <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
                          </div>
-                        )}
-                        {!resource.hasLocalAudio && (
-                            <Button variant="outline" size="sm" className="w-full" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}>
-                                <Upload className="mr-2 h-4 w-4" />Upload Audio
-                            </Button>
                         )}
                      </div>
                  </CardFooter>
