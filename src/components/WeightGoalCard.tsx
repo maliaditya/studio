@@ -17,7 +17,7 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { ChartContainer, ChartConfig } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -377,11 +377,11 @@ export function WeightGoalCard({
     };
 
     const renderProjectsContent = () => {
-        const plannedSpecializations = Object.entries(offerizationPlansFromAuth)
-            .filter(([, plan]) => plan.learningPlan && (plan.learningPlan.audioVideoResources?.length || 0 > 0 || plan.learningPlan.bookWebpageResources?.length || 0 > 0))
+        const plannedSpecializations = Object.entries(offerizationPlans || {})
+            .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
             .map(([specId]) => coreSkills.find(s => s.id === specId))
             .filter((spec): spec is CoreSkill => !!spec);
-
+    
         if (plannedSpecializations.length === 0) {
             return (
                 <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
@@ -399,6 +399,17 @@ export function WeightGoalCard({
                     {plannedSpecializations.map(spec => {
                         const plan = offerizationPlansFromAuth[spec.id]?.learningPlan;
                         if (!plan) return null;
+    
+                        const allMicroSkills = spec.skillAreas.flatMap(sa => sa.microSkills);
+                        
+                        const completed = allMicroSkills
+                            .filter(ms => ms.isReadyForRepetition)
+                            .reduce((acc, ms) => {
+                                acc.items += ms.completedItems || 0;
+                                acc.hours += ms.completedHours || 0;
+                                acc.pages += ms.completedPages || 0;
+                                return acc;
+                            }, { items: 0, hours: 0, pages: 0 });
 
                         const calculateDailyTarget = (total: number | null, start: string | null | undefined, end: string | null | undefined) => {
                             if (!total || !start || !end) return null;
@@ -409,7 +420,7 @@ export function WeightGoalCard({
                             if (days <= 0) return null;
                             return (total / days).toFixed(1);
                         };
-
+    
                         return (
                             <li key={spec.id}>
                                 <Card>
@@ -434,7 +445,10 @@ export function WeightGoalCard({
                                                         )}
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
-                                                        <span>{res.totalItems ? `${res.totalItems} items` : ''}{res.totalHours ? ` / ${res.totalHours}h` : ''}</span>
+                                                        <span>
+                                                            {res.totalItems ? `${completed.items}/${res.totalItems} items` : ''}
+                                                            {res.totalHours ? ` / ${completed.hours.toFixed(1)}/${res.totalHours}h` : ''}
+                                                        </span>
                                                         {(dailyItems || dailyHours) && (
                                                             <div className="text-right">
                                                                 <p className="text-xs font-medium text-primary">
@@ -463,7 +477,7 @@ export function WeightGoalCard({
                                                         )}
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
-                                                        <span>{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
+                                                        <span>{res.totalPages ? `${completed.pages}/${res.totalPages} pgs` : ''}</span>
                                                         <div className="text-right">
                                                             {dailyPages && <p className="text-xs font-medium text-primary">{dailyPages} pgs/day</p>}
                                                             {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
@@ -799,3 +813,5 @@ export function WeightGoalCard({
         </Card>
     );
 }
+
+  
