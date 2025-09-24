@@ -222,7 +222,7 @@ interface AuthContextType {
 
   // Pillar Popup
   pillarPopupState: PillarPopupState | null;
-  openPillarPopup: (pillarName: string) => void;
+  openPillarPopup: (pillarName: string, event?: React.MouseEvent) => void;
   closePillarPopup: () => void;
   handlePillarPopupDragEnd: (event: DragEndEvent) => void;
 
@@ -2141,15 +2141,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openPillarPopup = (pillarName: string) => {
+  const openPillarPopup = (pillarName: string, event?: React.MouseEvent) => {
+    let x = 50, y = 50; // Default position
+    if (event) {
+        x = event.clientX;
+        y = event.clientY;
+    }
     setPillarPopupState({
         pillarName,
-        x: 50,
-        y: 50,
+        x,
+        y,
         level: 0,
         z: 90
     });
-  };
+};
 
   const closePillarPopup = () => {
     setPillarPopupState(null);
