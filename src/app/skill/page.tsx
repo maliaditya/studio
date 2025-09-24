@@ -216,6 +216,37 @@ function SkillPageContent() {
 
   const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
 
+  useEffect(() => {
+    // One-time data migration to fix old "Foundation" and "Professionalism" skills
+    const professionalismExists = coreSkills.some(s => s.name === 'Professionalism');
+    const foundationExists = coreSkills.some(s => s.name === 'Foundation');
+    
+    if (professionalismExists || foundationExists) {
+        let skillsModified = false;
+        
+        let newCoreSkills = coreSkills.filter(s => s.name !== 'Professionalism');
+        if (newCoreSkills.length < coreSkills.length) {
+            skillsModified = true;
+        }
+
+        newCoreSkills = newCoreSkills.map(s => {
+            if (s.name === 'Foundation') {
+                skillsModified = true;
+                return { ...s, name: 'बोध(Realization)' };
+            }
+            return s;
+        });
+
+        if (skillsModified) {
+            setCoreSkills(newCoreSkills);
+            toast({
+                title: "Data Updated",
+                description: "Your 'Foundation' and 'Professionalism' skills have been updated to the new format.",
+            });
+        }
+    }
+  }, []); // Run only once on initial mount
+
   const allDefinitionsMap = useMemo(() => {
     const map = new Map<string, ExerciseDefinition>();
     [...deepWorkDefinitions, ...upskillDefinitions].forEach(def => map.set(def.id, def));
