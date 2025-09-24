@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -239,6 +239,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         setPlayingAudio(prev => !prev);
     };
 
+    const handleToggleFavorite = () => {
+      onUpdate({ ...resource, isFavorite: !resource.isFavorite });
+    };
+
     const renderContent = () => {
         switch (resource.type) {
             case 'card':
@@ -342,6 +346,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
+                            {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
+                        </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
