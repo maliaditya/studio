@@ -435,15 +435,15 @@ export function WeightGoalCard({
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
                                                         <span>{res.totalItems ? `${res.totalItems} items` : ''}{res.totalHours ? ` / ${res.totalHours}h` : ''}</span>
-                                                        <span className="text-right">
-                                                            {daysRemaining !== null && daysRemaining >= 0 && <span className="font-bold">({daysRemaining}d left)</span>}
-                                                        </span>
                                                         {(dailyItems || dailyHours) && (
-                                                            <span className="text-xs text-right font-medium text-primary col-span-2">
-                                                                {dailyItems && `${dailyItems} items/day`}
-                                                                {dailyItems && dailyHours && " | "}
-                                                                {dailyHours && `${dailyHours} h/day`}
-                                                            </span>
+                                                            <div className="text-right">
+                                                                <p className="text-xs font-medium text-primary">
+                                                                    {dailyItems && `${dailyItems} items/day`}
+                                                                    {dailyItems && dailyHours && " | "}
+                                                                    {dailyHours && `${dailyHours} h/day`}
+                                                                </p>
+                                                                {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </li>
@@ -464,10 +464,10 @@ export function WeightGoalCard({
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
                                                         <span>{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
-                                                        <span className="text-right">
-                                                           {daysRemaining !== null && daysRemaining >= 0 && <span className="font-bold">({daysRemaining}d left)</span>}
-                                                        </span>
-                                                        {dailyPages && <span className="text-xs text-right font-medium text-primary col-span-2">{dailyPages} pgs/day</span>}
+                                                        <div className="text-right">
+                                                            {dailyPages && <p className="text-xs font-medium text-primary">{dailyPages} pgs/day</p>}
+                                                            {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
+                                                        </div>
                                                     </div>
                                                 </li>
                                             )})}
