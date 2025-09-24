@@ -489,6 +489,9 @@ export interface MicroSkill {
   id: string;
   name: string;
   isReadyForRepetition?: boolean;
+  completedItems?: number;
+  completedHours?: number;
+  completedPages?: number;
 }
 
 // Project Skill Linking

@@ -995,27 +995,29 @@ function SkillPageContent() {
     if (!loggingMicroSkill) return;
 
     const { items, hours, pages } = progressInput;
-    let totalMinutes = 0;
-    
-    // Find the first available curiosity for this micro-skill to log against.
-    const curiosityToLog = upskillDefinitions.find(def => 
-        def.category === loggingMicroSkill.name && getUpskillNodeType(def) === 'Curiosity'
-    );
-    
-    if (!curiosityToLog) {
-        toast({ title: 'Error', description: `No 'Curiosity' task found for "${loggingMicroSkill.name}" to log time against.`, variant: 'destructive'});
-        setIsLogProgressModalOpen(false);
-        return;
-    }
+    const completedItems = parseInt(items) || 0;
+    const completedHours = parseFloat(hours) || 0;
+    const completedPages = parseInt(pages) || 0;
 
-    if (hours) totalMinutes += parseInt(hours) * 60;
-    // Assuming 1 item takes ~10 minutes, and 1 page takes ~2 minutes.
-    if (items) totalMinutes += parseInt(items) * 10;
-    if (pages) totalMinutes += parseInt(pages) * 2;
-    
-    logSubTaskTime(curiosityToLog.id, totalMinutes);
+    setCoreSkills(prevCoreSkills => prevCoreSkills.map(cs => ({
+        ...cs,
+        skillAreas: cs.skillAreas.map(sa => ({
+            ...sa,
+            microSkills: sa.microSkills.map(ms => {
+                if (ms.id === loggingMicroSkill.id) {
+                    return {
+                        ...ms,
+                        completedItems: (ms.completedItems || 0) + completedItems,
+                        completedHours: (ms.completedHours || 0) + completedHours,
+                        completedPages: (ms.completedPages || 0) + completedPages,
+                    };
+                }
+                return ms;
+            })
+        }))
+    })));
 
-    toast({ title: "Progress Logged", description: `Logged ${formatMinutes(totalMinutes)} for "${loggingMicroSkill.name}".`});
+    toast({ title: "Progress Logged", description: `Progress for "${loggingMicroSkill.name}" has been updated.`});
     setIsLogProgressModalOpen(false);
   };
   
