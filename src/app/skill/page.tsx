@@ -988,7 +988,11 @@ function SkillPageContent() {
   const handleOpenLogProgressModal = (microSkill: MicroSkill) => {
     setLoggingMicroSkill(microSkill);
     setIsLogProgressModalOpen(true);
-    setProgressInput({ items: '', hours: '', pages: '' });
+    setProgressInput({ 
+        items: microSkill.completedItems?.toString() || '', 
+        hours: microSkill.completedHours?.toString() || '',
+        pages: microSkill.completedPages?.toString() || '',
+    });
   };
   
   const handleLogProgress = () => {
@@ -1007,9 +1011,9 @@ function SkillPageContent() {
                 if (ms.id === loggingMicroSkill.id) {
                     return {
                         ...ms,
-                        completedItems: (ms.completedItems || 0) + completedItems,
-                        completedHours: (ms.completedHours || 0) + completedHours,
-                        completedPages: (ms.completedPages || 0) + completedPages,
+                        completedItems: completedItems,
+                        completedHours: completedHours,
+                        completedPages: completedPages,
                     };
                 }
                 return ms;
@@ -1029,11 +1033,6 @@ function SkillPageContent() {
     if (!coreSkill) return null;
     return offerizationPlans[coreSkill.id]?.learningPlan || null;
   }, [loggingMicroSkill, microSkillMap, coreSkills, offerizationPlans]);
-
-  const onSelectMicroSkill = (skill: MicroSkill | null) => {
-    setSelectedMicroSkill(skill);
-  };
-  const onSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {};
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -1357,7 +1356,7 @@ function SkillPageContent() {
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => setSelectedMicroSkill(micro)}>{micro.name}</CardTitle>
                                                       <div className="flex items-center">
                                                           <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleSelectForDeepWork(micro)}>
                                                             <Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/>
