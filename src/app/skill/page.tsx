@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -651,11 +652,10 @@ function SkillPageContent() {
     e.preventDefault();
     if (!newDomainName.trim()) return;
     const newDomain: SkillDomain = { id: `d_${Date.now()}`, name: newDomainName.trim() };
-    const foundationSkill: CoreSkill = { id: `cs_${Date.now()}_f`, domainId: newDomain.id, name: 'Foundation', type: 'Foundation', skillAreas: [], parentId: null };
-    const professionalismSkill: CoreSkill = { id: `cs_${Date.now()}_p`, domainId: newDomain.id, name: 'Professionalism', type: 'Professionalism', skillAreas: [], parentId: null };
+    const foundationSkill: CoreSkill = { id: `cs_${Date.now()}_f`, domainId: newDomain.id, name: 'बोध(Realization)', type: 'Foundation', skillAreas: [], parentId: null };
     
     setSkillDomains(prev => [...prev, newDomain]);
-    setCoreSkills(prev => [...prev, foundationSkill, professionalismSkill]);
+    setCoreSkills(prev => [...prev, foundationSkill]);
     setNewDomainName('');
     setSelectedDomainId(newDomain.id);
     setSelectedSkillId(foundationSkill.id);
@@ -1512,5 +1512,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-    
