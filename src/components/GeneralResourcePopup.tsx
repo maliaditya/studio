@@ -1,10 +1,10 @@
 
       "use client";
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -41,12 +41,12 @@ const formatTime = (seconds: number): string => {
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
     const audioRef = useRef<HTMLAudioElement>(null);
-    const router = useRouter();
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -153,6 +153,24 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         }
       }
     }, [playbackRequest, resource?.id, setPlaybackRequest]);
+
+    const folderPath = useMemo(() => {
+      if (!resource || !resource.folderId || !resourceFolders) {
+        return '';
+      }
+      const path: string[] = [];
+      let currentFolderId: string | null = resource.folderId;
+      while (currentFolderId) {
+        const folder = resourceFolders.find(f => f.id === currentFolderId);
+        if (folder) {
+          path.unshift(folder.name);
+          currentFolderId = folder.parentId;
+        } else {
+          currentFolderId = null;
+        }
+      }
+      return path.join(' / ');
+    }, [resource, resourceFolders]);
 
 
     if (!resource) return null;
@@ -385,6 +403,18 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             </CardTitle>
                         )}
                     </div>
+                    {folderPath && (
+                        <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
+                          <span className="flex items-center gap-1">
+                            {folderPath.split(' / ').map((part, index, arr) => (
+                                <React.Fragment key={index}>
+                                    <span>{part}</span>
+                                    {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
+                                </React.Fragment>
+                            ))}
+                          </span>
+                        </CardDescription>
+                    )}
                      {resource.hasLocalAudio && (
                         <div className="w-full space-y-2 pt-2">
                             <div className="flex items-center gap-2">
