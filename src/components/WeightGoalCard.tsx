@@ -377,50 +377,56 @@ export function WeightGoalCard({
     };
 
     const renderProjectsContent = () => {
-        if (!skillAcquisitionPlans || skillAcquisitionPlans.length === 0) {
+        const plannedSpecializations = Object.entries(offerizationPlans)
+            .filter(([, plan]) => plan.learningPlan && (plan.learningPlan.audioVideoResources?.length || 0 > 0 || plan.learningPlan.bookWebpageResources?.length || 0 > 0))
+            .map(([specId]) => coreSkills.find(s => s.id === specId))
+            .filter((spec): spec is CoreSkill => !!spec);
+
+        if (plannedSpecializations.length === 0) {
             return (
-              <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
-                <p>No learning plans found.</p>
-                <Link href="/strategic-planning" className="text-primary hover:underline mt-1">
-                  Create a learning plan to see it here.
-                </Link>
-              </div>
+                <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
+                    <p>No learning plans found.</p>
+                    <Link href="/strategic-planning?tab=offerization" className="text-primary hover:underline mt-1">
+                        Create a learning plan to see it here.
+                    </Link>
+                </div>
             );
         }
       
         return (
             <ScrollArea className="h-[250px] pr-3">
-              <ul className="space-y-3">
-                {skillAcquisitionPlans.map(plan => {
-                  const specialization = coreSkills.find(s => s.id === plan.specializationId);
-                  if (!specialization) return null;
-                  return (
-                    <li key={plan.specializationId}>
-                      <Card>
-                        <CardHeader className="p-3">
-                          <CardTitle className="text-base">{specialization.name}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0 text-xs">
-                          <ul className="space-y-1">
-                            <li className="flex justify-between">
-                              <span className="text-muted-foreground">Target Date:</span>
-                              <span className="font-medium">{plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}</span>
+                <ul className="space-y-3">
+                    {plannedSpecializations.map(spec => {
+                        const plan = offerizationPlans[spec.id]?.learningPlan;
+                        if (!plan) return null;
+
+                        return (
+                            <li key={spec.id}>
+                                <Card>
+                                    <CardHeader className="p-3">
+                                        <CardTitle className="text-base">{spec.name}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-3 pt-0 text-xs">
+                                        <ul className="space-y-1">
+                                            {(plan.audioVideoResources || []).map(res => (
+                                                <li key={res.id} className="flex justify-between">
+                                                    <span className="text-muted-foreground truncate" title={res.name}>{res.name}</span>
+                                                    <span className="font-medium">{res.totalHours ? `${res.totalHours}h` : (res.totalItems ? `${res.totalItems} items` : '')}</span>
+                                                </li>
+                                            ))}
+                                            {(plan.bookWebpageResources || []).map(res => (
+                                                <li key={res.id} className="flex justify-between">
+                                                    <span className="text-muted-foreground truncate" title={res.name}>{res.name}</span>
+                                                    <span className="font-medium">{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
                             </li>
-                            <li className="flex justify-between">
-                              <span className="text-muted-foreground">Money Needed:</span>
-                              <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
-                            </li>
-                             <li className="flex justify-between">
-                              <span className="text-muted-foreground">Hours Needed:</span>
-                              <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
-                            </li>
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    </li>
-                  )
-                })}
-              </ul>
+                        )
+                    })}
+                </ul>
             </ScrollArea>
         );
     };
