@@ -421,13 +421,18 @@ export function WeightGoalCard({
                                             {(plan.audioVideoResources || []).map(res => {
                                                 const dailyHours = calculateDailyTarget(res.totalHours, res.startDate, res.completionDate);
                                                 const dailyItems = calculateDailyTarget(res.totalItems, res.startDate, res.completionDate);
+                                                const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
                                                 return (
                                                 <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
                                                     <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
                                                     <div className="grid grid-cols-2 gap-x-2">
                                                         <span>{res.tutor}</span>
                                                         <span className="text-right">{res.totalItems ? `${res.totalItems} items` : ''}{res.totalHours ? ` / ${res.totalHours}h` : ''}</span>
-                                                        {res.startDate && <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}</span>}
+                                                        {res.startDate && (
+                                                          <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}
+                                                            {daysRemaining !== null && daysRemaining >= 0 && <span className="font-bold"> ({daysRemaining}d left)</span>}
+                                                          </span>
+                                                        )}
                                                         {(dailyItems || dailyHours) && (
                                                             <span className="text-xs text-right font-medium text-primary">
                                                                 {dailyItems && `${dailyItems} items/day`}
@@ -440,13 +445,18 @@ export function WeightGoalCard({
                                             )})}
                                             {(plan.bookWebpageResources || []).map(res => {
                                                 const dailyPages = calculateDailyTarget(res.totalPages, res.startDate, res.completionDate);
+                                                const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
                                                 return (
                                                 <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
                                                     <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
                                                     <div className="grid grid-cols-2 gap-x-2">
                                                         <span>{res.author}</span>
                                                         <span className="text-right">{res.totalPages ? `${res.totalPages} pgs` : ''}</span>
-                                                        {res.startDate && <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}</span>}
+                                                        {res.startDate && (
+                                                          <span className="text-xs">{format(parseISO(res.startDate), 'MMM d')} - {res.completionDate ? format(parseISO(res.completionDate), 'MMM d') : '...'}
+                                                           {daysRemaining !== null && daysRemaining >= 0 && <span className="font-bold"> ({daysRemaining}d left)</span>}
+                                                          </span>
+                                                        )}
                                                         {dailyPages && <span className="text-xs text-right font-medium text-primary">{dailyPages} pgs/day</span>}
                                                     </div>
                                                 </li>
