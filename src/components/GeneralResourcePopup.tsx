@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -21,9 +21,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { storeAudio, getAudio, deleteAudio } from '@/lib/audioDB';
-import { Link as LinkIcon } from 'lucide-react';
-import { Workflow } from 'lucide-react';
+import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
 
 interface GeneralResourcePopupProps {
