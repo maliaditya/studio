@@ -8,7 +8,7 @@ import { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Link as LinkIcon, Unlink, Trash2, Code, MessageSquare, ArrowRight, Blocks, Loader2 } from 'lucide-react';
+import { Link as LinkIcon, Unlink, Trash2, Code, MessageSquare, ArrowRight, Blocks, Loader2, X } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
