@@ -414,7 +414,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                           </span>
                         </CardDescription>
                     )}
-                     {resource.hasLocalAudio && (
+                     {audioSrc && (
                         <div className="w-full space-y-2 pt-2">
                             <div className="flex items-center gap-2">
                                  <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
@@ -441,7 +441,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 </div>
                  <CardFooter className="p-3 border-t">
                      <div className="flex gap-2 w-full">
-                        {resource.hasLocalAudio && (
+                        {audioSrc && (
                           <div className="flex gap-2 w-full">
                              <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
                              <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
@@ -453,4 +453,3 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         </div>
     );
 }
-

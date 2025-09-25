@@ -223,20 +223,22 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
     );
 };
 
-export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onSeekTo, currentTime, onSetEndTime, onClearEndTime }: {
-    point: ResourcePoint,
-    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void,
+export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle, onSeekTo, currentTime, onSetEndTime, onClearEndTime }: { 
+    point: ResourcePoint, 
+    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
+    onEditLinkText?: (point: ResourcePoint) => void;
+    dragHandle?: { attributes: any; listeners: any };
     onSeekTo: (timestamp: number) => void;
     currentTime: number;
     onSetEndTime: () => void;
     onClearEndTime: () => void;
 }) => {
     const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
-
+    
     const [isEditing, setIsEditing] = useState(point.text === 'New step...');
     const [editText, setEditText] = useState(point.text);
     const [isFetchingMeta, setIsFetchingMeta] = useState(false);
@@ -315,16 +317,18 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
 
     return (
         <li className={`flex items-start gap-3 group/item w-full p-1 rounded-md ${isActiveTimestamp ? 'bg-primary/10' : ''}`}>
-            {point.type === 'code' ? <Code className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            point.type === 'link' ? <LinkIcon className="h-4 w-4 mt-1.5 text-primary/70 flex-shrink-0" /> :
-            point.type === 'timestamp' ? (
-                <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
-                    {formatTime(point.timestamp || 0)}
-                </button>
-            ) :
-            <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
-            }
+            <div className="pt-1.5" {...dragHandle?.attributes} {...dragHandle?.listeners}>
+                {point.type === 'code' ? <Code className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'markdown' ? <MessageSquare className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'link' ? <LinkIcon className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'timestamp' ? (
+                    <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
+                        {formatTime(point.timestamp || 0)}
+                    </button>
+                ) :
+                <ArrowRight className="h-4 w-4 text-primary/50 flex-shrink-0" />
+                }
+            </div>
              <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
                 {isEditing ? (
                     <Textarea 
@@ -350,6 +354,7 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
                         <span 
                             className="cursor-pointer text-primary hover:underline" 
                             onClick={handleLinkClick}
+                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText?.(point); }}
                         >
                             {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
                         </span>
@@ -383,4 +388,3 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
         </li>
     );
 };
-
