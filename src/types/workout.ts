@@ -343,6 +343,7 @@ export interface Resource {
   linkedBrainHackIds?: string[];
   hasLocalAudio?: boolean; // Flag to check IndexedDB
   audioUrl?: string;
+  audioFileName?: string;
 
   // For 'card' type
   points?: ResourcePoint[];

@@ -243,7 +243,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       if (file) {
         try {
           await storeAudio(resource.id, file);
-          onUpdate({ ...resource, hasLocalAudio: true });
+          onUpdate({ ...resource, hasLocalAudio: true, audioFileName: file.name });
         } catch (error) {
           console.error("Failed to store audio in IndexedDB", error);
         }
@@ -271,7 +271,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 onUpdate={handleUpdatePoint}
                                 onDelete={() => handleDeletePoint(point.id)}
                                 onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
-                                onOpenContentView={(e) => handleOpenContentView(point, e)}
+                                onOpenContentView={(e) => openContentViewPopup(`content-${point.id}`, resource, point, e)}
                                 onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
                                 onSeekTo={handleSeekTo}
                                 currentTime={currentTime}
@@ -431,6 +431,11 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 />
                                 <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
                             </div>
+                             {resource.audioFileName && (
+                                <p className="text-xs text-muted-foreground truncate" title={resource.audioFileName}>
+                                  Now Playing: {resource.audioFileName}
+                                </p>
+                            )}
                         </div>
                     )}
                 </CardHeader>
