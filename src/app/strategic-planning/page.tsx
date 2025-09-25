@@ -612,6 +612,10 @@ function PlanningContent() {
   );
 }
 
+function ProductizationContent() {
+    return <div>Productization Content Placeholder</div>;
+}
+
 // OfferizationContent component and others remain unchanged
 // ... Rest of the file
 function OfferizationContent() {
@@ -1479,5 +1483,6 @@ function OffersContent() {
 function MatrixContent() {
   return <div>Matrix Content Placeholder</div>;
 }
+
 
 
