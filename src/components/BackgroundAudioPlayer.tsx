@@ -72,21 +72,9 @@ export function BackgroundAudioPlayer() {
   };
 
   const handleToggleAllWidgets = () => {
-    const newVisibility = !settings.allWidgetsVisible;
     setSettings(prev => ({
         ...prev,
-        allWidgetsVisible: newVisibility,
-        widgetVisibility: {
-            ...prev.widgetVisibility,
-            pistons: newVisibility,
-            mindset: newVisibility,
-            activityDistribution: newVisibility,
-            favorites: newVisibility,
-            topPriorities: newVisibility,
-            brainHacks: newVisibility,
-            ruleEquations: newVisibility,
-            visualizationTechniques: newVisibility,
-        }
+        allWidgetsVisible: !prev.allWidgetsVisible,
     }));
   };
   
