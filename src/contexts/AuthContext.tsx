@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -1509,36 +1509,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => {
+  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string) => {
     let definition: ExerciseDefinition | undefined;
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
     let logSource: DatedWorkout[];
 
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const SLOT_CAPACITY_MINUTES = 240;
-
-    const currentSlotActivities = schedule[todayKey]?.[slotName] || [];
-    const currentSlotDuration = (Array.isArray(currentSlotActivities) ? currentSlotActivities : [])
-        .filter(act => !act.completed)
-        .reduce((sum, act) => {
-            let activityDuration = 0;
-            if (act.type === 'essentials' || act.type === 'interrupt') {
-                activityDuration = act.duration || 0;
-            } else {
-                const estDurationStr = activityDurations[act.id];
-                activityDuration = estDurationStr ? parseInt(estDurationStr.replace(/[a-zA-Z\s]/g, '')) || 0 : 0;
-            }
-            return sum + activityDuration;
-        }, 0);
-    
-    if (currentSlotDuration + duration > SLOT_CAPACITY_MINUTES) {
-        toast({
-            title: "Slot Full",
-            description: `Cannot add task. This would exceed the 4-hour limit for the '${slotName}' slot.`,
-            variant: "destructive"
-        });
-        return;
-    }
     
     switch (activityType) {
         case 'upskill':
@@ -1599,12 +1575,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return [...prevLogs, todaysLog!];
     });
 
-    const newActivity: Omit<Activity, 'slot'> = {
+    const newActivity: Activity = {
         id: `${activityType}-${Date.now()}-${Math.random()}`,
         type: activityType,
         details: definition.name,
         completed: false,
         taskIds: [exerciseInstance.id],
+        slot: slotName,
+        linkedEntityType: activityType === 'deepwork' ? 'intention' : activityType === 'upskill' ? 'curiosity' : undefined
     };
     
     setSchedule(prev => {
@@ -2853,6 +2831,168 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return rootTask || null;
   }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
 
+  useEffect(() => {
+    if (isLoadingState || !currentUser) return;
+  
+    const allDates = Object.keys(schedule).map(parseISO).filter(isValid);
+    if (allDates.length === 0) return;
+  
+    const latestDate = max(allDates);
+    const today = startOfDay(new Date());
+  
+    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+    const startOfLatestWeek = startOfWeek(latestDate, { weekStartsOn: 1 });
+  
+    if (isAfter(startOfThisWeek, startOfLatestWeek)) {
+      const newSchedule = { ...schedule };
+      let scheduleUpdated = false;
+      const daysToCarryOver = eachDayOfInterval({ start: startOfThisWeek, end: addDays(startOfThisWeek, 6) });
+  
+      daysToCarryOver.forEach(day => {
+        const dayKey = format(day, 'yyyy-MM-dd');
+        const lastWeekDayKey = format(subDays(day, 7), 'yyyy-MM-dd');
+        const lastWeekSchedule = schedule[lastWeekDayKey];
+  
+        if (lastWeekSchedule && !newSchedule[dayKey]) {
+          const newDaySchedule: DailySchedule = {};
+          Object.keys(lastWeekSchedule).forEach(key => {
+            const slotName = key as SlotName;
+            const activities = lastWeekSchedule[slotName] as Activity[] | undefined;
+            if (Array.isArray(activities)) {
+              newDaySchedule[slotName] = activities.map(act => ({
+                ...act,
+                id: `${act.type}-${dayKey}-${Math.random()}`,
+                completed: false,
+                completedAt: undefined,
+                focusSessionInitialStartTime: undefined,
+                focusSessionStartTime: undefined,
+                focusSessionEndTime: undefined,
+                focusSessionPauses: [],
+              }));
+            }
+          });
+          newSchedule[dayKey] = newDaySchedule;
+          scheduleUpdated = true;
+        }
+      });
+  
+      if (scheduleUpdated) {
+        setSchedule(newSchedule);
+        toast({
+          title: "New Week, New Plan!",
+          description: "Your schedule from last week has been carried over.",
+        });
+      }
+    }
+  }, [isLoadingState, currentUser, schedule, setSchedule, toast]);
+  
+  useEffect(() => {
+    if (playbackRequest) {
+      // Find the popup and potentially play audio
+      // This part is tricky because GeneralResourcePopup is what holds the audioRef
+      // A better way might be to have a global audio player.
+      // For now, let's just make sure the popup opens.
+      const { resourceId } = playbackRequest;
+      // You'll need an event-like object. For now, null will have to do.
+      openGeneralPopup(resourceId, null); 
+      // The logic inside GeneralResourcePopup needs to check for playbackRequest
+      // on mount/update.
+    }
+  }, [playbackRequest]);
+
+  useEffect(() => {
+    const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
+    const repetitionSkills = coreSkills.flatMap(cs => 
+        cs.skillAreas.flatMap(sa => 
+            sa.microSkills.filter(ms => ms.isReadyForRepetition)
+        )
+    );
+
+    let hasScheduleChanged = false;
+    const newSchedule = { ...schedule };
+    
+    const allLogs = [...allDeepWorkLogs];
+
+    repetitionSkills.forEach(skill => {
+        const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+        if (intentions.length === 0) return;
+
+        const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+        
+        const allCompletionDates = new Set<string>();
+        allLeafNodes.forEach(node => {
+            if (node.last_logged_date) allCompletionDates.add(node.last_logged_date);
+        });
+        const sortedDates = Array.from(allCompletionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+
+        if (sortedDates.length === 0) return;
+
+        let reps = 1;
+        let lastReviewDate = sortedDates[0];
+        for (let i = 1; i < sortedDates.length; i++) {
+            const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
+            if (daysBetween <= (DOUBLING_INTERVALS[reps - 1] || 128)) {
+                reps++;
+            } else {
+                reps = 1;
+            }
+            lastReviewDate = sortedDates[i];
+        }
+        
+        const nextInterval = DOUBLING_INTERVALS[reps] || 128;
+        const nextReviewDate = addDays(lastReviewDate, nextInterval);
+        const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
+
+        const activityTitle = skill.name;
+        const targetSlot = settings.spacedRepetitionSlot || 'Late Night';
+
+        if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
+        if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
+
+        const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
+        
+        const mainIntention = intentions.find(i => !i.parentId);
+
+        if (mainIntention && !slotActivities.some(act => act.details === mainIntention.name)) {
+            let logForDay = allLogs.find(log => log.date === nextReviewDateKey);
+            if (!logForDay) {
+                logForDay = { id: nextReviewDateKey, date: nextReviewDateKey, exercises: [] };
+                allLogs.push(logForDay);
+            }
+            
+            let exerciseInstance = logForDay.exercises.find(ex => ex.definitionId === mainIntention.id);
+            if (!exerciseInstance) {
+                exerciseInstance = {
+                    id: `${mainIntention.id}-${nextReviewDateKey}-${Math.random()}`,
+                    definitionId: mainIntention.id,
+                    name: mainIntention.name,
+                    category: mainIntention.category,
+                    loggedSets: [],
+                    targetSets: 1,
+                    targetReps: '1',
+                };
+                logForDay.exercises.push(exerciseInstance);
+            }
+
+            const newActivity: Activity = {
+                id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
+                type: 'deepwork',
+                details: mainIntention.name,
+                completed: false,
+                slot: targetSlot,
+                taskIds: [exerciseInstance.id],
+            };
+            slotActivities.push(newActivity);
+            hasScheduleChanged = true;
+        }
+    });
+
+    if (hasScheduleChanged) {
+        setSchedule(newSchedule);
+        setAllDeepWorkLogs(allLogs);
+    }
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule, settings.spacedRepetitionSlot, allDeepWorkLogs, setAllDeepWorkLogs]);
+  
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -3112,24 +3252,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             sa.microSkills.filter(ms => ms.isReadyForRepetition)
         )
     );
-
+  
     let hasScheduleChanged = false;
     const newSchedule = { ...schedule };
-
+    const newAllDeepWorkLogs = [...allDeepWorkLogs];
+  
     repetitionSkills.forEach(skill => {
         const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
         if (intentions.length === 0) return;
-
+  
         const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-        
         const allCompletionDates = new Set<string>();
         allLeafNodes.forEach(node => {
             if (node.last_logged_date) allCompletionDates.add(node.last_logged_date);
         });
         const sortedDates = Array.from(allCompletionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-
+  
         if (sortedDates.length === 0) return;
-
+  
         let reps = 1;
         let lastReviewDate = sortedDates[0];
         for (let i = 1; i < sortedDates.length; i++) {
@@ -3145,32 +3285,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const nextInterval = DOUBLING_INTERVALS[reps] || 128;
         const nextReviewDate = addDays(lastReviewDate, nextInterval);
         const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
-
+  
         const activityTitle = skill.name;
         const targetSlot = settings.spacedRepetitionSlot || 'Late Night';
-
+  
         if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
         if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
-
+  
         const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
         
-        if (!slotActivities.some(act => act.details === activityTitle && act.type === 'deepwork')) {
+        const mainIntention = intentions.find(i => getDeepWorkNodeType(i) === 'Intention');
+  
+        if (mainIntention && !slotActivities.some(act => act.details === mainIntention.name)) {
+            let logForDay = newAllDeepWorkLogs.find(log => log.date === nextReviewDateKey);
+            if (!logForDay) {
+                logForDay = { id: nextReviewDateKey, date: nextReviewDateKey, exercises: [] };
+                newAllDeepWorkLogs.push(logForDay);
+            }
+            
+            let exerciseInstance = logForDay.exercises.find(ex => ex.definitionId === mainIntention.id);
+            if (!exerciseInstance) {
+                exerciseInstance = {
+                    id: `${mainIntention.id}-${nextReviewDateKey}-${Math.random()}`,
+                    definitionId: mainIntention.id,
+                    name: mainIntention.name,
+                    category: mainIntention.category,
+                    loggedSets: [],
+                    targetSets: 1,
+                    targetReps: '1',
+                };
+                logForDay.exercises.push(exerciseInstance);
+            }
+  
             const newActivity: Activity = {
                 id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
                 type: 'deepwork',
-                details: activityTitle,
+                details: mainIntention.name,
                 completed: false,
                 slot: targetSlot,
+                taskIds: [exerciseInstance.id],
             };
             slotActivities.push(newActivity);
             hasScheduleChanged = true;
         }
     });
-
+  
     if (hasScheduleChanged) {
         setSchedule(newSchedule);
+        setAllDeepWorkLogs(newAllDeepWorkLogs);
     }
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, setSchedule, settings.spacedRepetitionSlot]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, settings.spacedRepetitionSlot, allDeepWorkLogs, getDeepWorkNodeType]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -3193,3 +3357,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
