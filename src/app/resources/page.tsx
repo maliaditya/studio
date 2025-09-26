@@ -33,7 +33,7 @@ import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from '@/components/EditableFields';
+import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse, EditableResourcePoint } from '@/components/EditableFields';
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -404,13 +404,22 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
         <div ref={setNodeRef} style={style} className="relative bg-card">
             <EditableResourcePoint 
                 point={point}
-                onUpdate={onUpdate}
+                onUpdate={(pointId, updates) => {
+                    const newText = (updates as { text: string }).text;
+                    if (typeof newText === 'string') {
+                        onUpdate(newText);
+                    }
+                }}
                 onDelete={onDelete}
                 onOpenNestedPopup={onOpenNestedPopup}
                 onOpenContentView={onOpenMarkdownModal}
                 onEditLinkText={onEditLinkText}
                 onConvertToCard={onConvertToCard}
                 dragHandle={{ attributes, listeners }}
+                onSeekTo={()=>{}}
+                currentTime={0}
+                onSetEndTime={()=>{}}
+                onClearEndTime={()=>{}}
             />
         </div>
     );
@@ -1802,155 +1811,13 @@ function ResourcesPageContent() {
   );
 }
 
-const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle }: { 
-    point: ResourcePoint, 
-    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
-    onDelete: () => void,
-    onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onOpenContentView: (event: React.MouseEvent) => void;
-    onEditLinkText: (point: ResourcePoint) => void;
-    onConvertToCard: () => void;
-    dragHandle?: { attributes: any; listeners: any };
-}) => {
-    const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
-    
-    const [isEditing, setIsEditing] = useState(point.text === 'New step...');
-    const [editText, setEditText] = useState(point.text);
-    const [isFetchingMeta, setIsFetchingMeta] = useState(false);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    const handleSave = async () => {
-        if (editText.trim() === '') {
-            onDelete();
-            return;
-        }
-
-        if (point.type === 'link' && editText.trim() !== point.text) {
-            setIsFetchingMeta(true);
-            try {
-                const response = await fetch('/api/get-link-metadata', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: editText.trim() }),
-                });
-                const result = await response.json();
-                if (response.ok) {
-                    onUpdate(point.id, { text: editText.trim(), displayText: result.title || editText.trim() });
-                } else {
-                     onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
-                }
-            } catch (error) {
-                onUpdate(point.id, { text: editText.trim(), displayText: editText.trim() });
-            } finally {
-                setIsFetchingMeta(false);
-            }
-        } else {
-            onUpdate(point.id, { text: editText.trim() });
-        }
-        setIsEditing(false);
-    };
-
-    React.useEffect(() => {
-        if (isEditing && textareaRef.current) {
-            textareaRef.current.focus();
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [isEditing]);
-    
-    const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setEditText(e.target.value);
-        e.target.style.height = 'auto';
-        e.target.style.height = `${e.target.scrollHeight}px`;
-    }
-    
-     if (point.type === 'card' && point.resourceId) {
-        return (
-            <li className="flex items-start gap-3 group/item">
-                <ArrowRight className="h-4 w-4 mt-1.5 text-primary/50 flex-shrink-0" />
-                <button onClick={onOpenNestedPopup} className="text-left font-medium text-primary hover:underline flex-grow">
-                    {point.text}
-                </button>
-                 <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover/item:opacity-100 flex-shrink-0" onClick={onDelete}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-            </li>
-        )
-    }
-    
-    const handleLinkClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (point.text && point.text.startsWith('brainhack://')) {
-            const hackId = point.text.replace('brainhack://', '');
-            openBrainHackPopup(hackId, e);
-        } else if (point.text) {
-            setFloatingVideoUrl(point.text);
-        }
-    };
-
-    return (
-        <li className={cn("flex items-start gap-3 group/item w-full p-1 rounded-md")}>
-            <div className="pt-0.5" {...dragHandle?.attributes} {...dragHandle?.listeners}>
-                {point.type === 'code' ? <Code className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
-                point.type === 'markdown' ? <MessageSquare className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
-                point.type === 'link' ? <LinkIcon className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
-                <ArrowRight className="h-4 w-4 text-primary/50 flex-shrink-0" />
-                }
-            </div>
-             <div className="flex-grow min-w-0" onDoubleClick={() => !isEditing && setIsEditing(true)}>
-                {isEditing ? (
-                    <Textarea 
-                        ref={textareaRef} 
-                        value={editText} 
-                        onChange={handleTextareaChange} 
-                        onBlur={handleSave} 
-                        className="text-sm" 
-                        rows={1}
-                    />
-                ) : point.type === 'markdown' || point.type === 'code' ? (
-                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenContentView}>
-                      {point.type === 'markdown' ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown>
-                      ) : (
-                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                            {point.text || ""}
-                        </SyntaxHighlighter>
-                      )}
-                    </div>
-                ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0 flex items-center gap-1">
-                        <span 
-                            className="cursor-pointer text-primary hover:underline" 
-                            onClick={handleLinkClick}
-                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText(point); }}
-                        >
-                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
-                        </span>
-                    </div>
-                ) : (
-                    <p className="whitespace-pre-wrap break-words">{point.text}</p>
-                )}
-            </div>
-            <div className="flex items-center flex-shrink-0 opacity-0 group-hover/item:opacity-100 transition-opacity">
-                {point.type === 'text' && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground" onClick={onConvertToCard}>
-                        <Blocks className="h-3 w-3"/>
-                    </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={onDelete}>
-                    <Trash2 className="h-3 w-3"/>
-                </Button>
-            </div>
-        </li>
-    );
-};
-
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
     
 
     
+
 
 
 
