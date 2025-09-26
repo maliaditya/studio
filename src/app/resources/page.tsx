@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1341,9 +1342,9 @@ function ResourcesPageContent() {
         onDragEnd={handleDragEnd}
       >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {/* Left Sidebar */}
-              <aside className="md:col-span-1 md:sticky top-24">
+              <aside className="md:col-span-1 md:sticky top-24 self-start">
                   <Card className="h-full">
                       <CardHeader>
                       <div className="flex justify-between items-center">
@@ -1364,7 +1365,7 @@ function ResourcesPageContent() {
                               <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
                               <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
                           </form>
-                          <ScrollArea className="h-[calc(100vh-24rem)]">
+                          <ScrollArea className="h-[calc(100vh-28rem)]">
                             {renderSidebarFolders(null, 0)}
                           </ScrollArea>
                       </CardContent>
@@ -1372,11 +1373,11 @@ function ResourcesPageContent() {
               </aside>
 
               {/* Main Content */}
-              <main className="md:col-span-3">
+              <main className="md:col-span-3 flex flex-col h-[calc(100vh-8rem)]">
                    <div
                       ref={tabsContainerRef}
                       onWheel={handleWheelScroll}
-                      className="flex items-center border-b mb-4 overflow-x-auto"
+                      className="flex items-center border-b mb-4 overflow-x-auto flex-shrink-0 sticky top-20 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2"
                   >
                       {sortedTabs.map(tabId => {
                           const folder = resourceFolders.find(f => f.id === tabId);
@@ -1403,151 +1404,153 @@ function ResourcesPageContent() {
                           );
                       })}
                   </div>
-                  <div>
-                  <h2 className="text-2xl font-bold mb-4">
-                      {selectedResourceFolderId && !searchTerm
-                      ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
-                      : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
-                  </h2>
-                  
-                  <SortableContext items={filteredResources.map(r => r.id)}>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                          {filteredResources.map(res => {
-                               const markdownOrCodeCount = (res.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
-                               const pointCount = (res.points || []).length;
-                               let cardClassName = "";
-                               
-                               if (markdownOrCodeCount > 1 || pointCount > 15) {
-                                   cardClassName = "lg:col-span-3";
-                               } else if (markdownOrCodeCount > 0 || pointCount > 5) {
-                                   cardClassName = "lg:col-span-2";
-                               }
-   
-                              let cardContent: React.ReactNode;
-                              
-                              if (res.type === 'model3d') {
-                                  cardContent = (
-                                      <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
-                                          <CardHeader className="p-3">
-                                              <div className="flex justify-between items-start gap-2">
-                                                  <CardTitle className="text-sm flex items-center gap-2">
-                                                      <span className="text-primary"><View className="h-4 w-4" /></span>
-                                                      <span className="truncate">{res.name}</span>
-                                                  </CardTitle>
-                                                  <div className="flex items-center">
-                                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModelModalState({ isOpen: true, modelUrl: res.modelUrl || null })}>
-                                                          <Expand className="h-4 w-4" />
-                                                      </Button>
-                                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteResource(res)}>
-                                                          <Trash2 className="h-4 w-4 text-destructive" />
-                                                      </Button>
-                                                  </div>
-                                              </div>
-                                          </CardHeader>
-                                          <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
-                                              {res.modelUrl ? <ModelViewer modelUrl={res.modelUrl} /> : <p className="text-muted-foreground">No model</p>}
-                                          </CardContent>
-                                      </Card>
-                                  );
-                              } else if (res.type === 'habit') {
-                                  cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
-                              } else if (res.type === 'mechanism') {
-                                  cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
-                              } else if(res.type === 'card') {
-                                  cardContent = <ResourceCardComponent playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
-                              } else {
-                                  const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
-                                  const isGif = isGifUrl(res.link);
-                                  const imageEmbedUrl = isImageUrl(res.link) && !isGif ? res.link : null;
-                                  const isObsidianUrlLink = isObsidianUrl(res.link);
-
-                                  const cardProps: any = {};
-                                  if (isGif && res.linkedResourceId) {
-                                    cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
-                                  } else if (youtubeEmbedUrl) {
-                                    cardProps.onClick = (e: React.MouseEvent) => {
-                                        e.stopPropagation();
-                                        setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
-                                    };
-                                  }
+                  <div className="flex-grow min-h-0">
+                    <ScrollArea className="h-full">
+                      <h2 className="text-2xl font-bold mb-4">
+                          {selectedResourceFolderId && !searchTerm
+                          ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                          : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
+                      </h2>
+                      
+                      <SortableContext items={filteredResources.map(r => r.id)}>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                              {filteredResources.map(res => {
+                                  const markdownOrCodeCount = (res.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
+                                  const pointCount = (res.points || []).length;
+                                  let cardClassName = "";
                                   
-                                  return (
-                                  <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
-                                       <Card
-                                          {...cardProps}
-                                          className={cn(
-                                              "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
-                                              (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
-                                          )}
-                                      >
-                                          <CardHeader className="flex-row items-center gap-3 p-3 space-y-0">
-                                              {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
-                                              <CardTitle className="text-sm truncate flex-grow" title={res.name}>{res.name}</CardTitle>
-                                          </CardHeader>
-                                          <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
-                                              {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
-                                              {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
-                                              {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
-                                              {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setYoutubeModalState({isOpen: true, playlist: [res], currentIndex: 0}); }}><Expand className="h-4 w-4" /></Button>}
-                                              <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                          </div>
-                                          {imageEmbedUrl ? (
-                                              <>
-                                                  <div className="aspect-video w-full bg-black overflow-hidden relative">
-                                                      <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                  if (markdownOrCodeCount > 1 || pointCount > 15) {
+                                      cardClassName = "lg:col-span-3";
+                                  } else if (markdownOrCodeCount > 0 || pointCount > 5) {
+                                      cardClassName = "lg:col-span-2";
+                                  }
+      
+                                  let cardContent: React.ReactNode;
+                                  
+                                  if (res.type === 'model3d') {
+                                      cardContent = (
+                                          <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
+                                              <CardHeader className="p-3">
+                                                  <div className="flex justify-between items-start gap-2">
+                                                      <CardTitle className="text-sm flex items-center gap-2">
+                                                          <span className="text-primary"><View className="h-4 w-4" /></span>
+                                                          <span className="truncate">{res.name}</span>
+                                                      </CardTitle>
+                                                      <div className="flex items-center">
+                                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setModelModalState({ isOpen: true, modelUrl: res.modelUrl || null })}>
+                                                              <Expand className="h-4 w-4" />
+                                                          </Button>
+                                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteResource(res)}>
+                                                              <Trash2 className="h-4 w-4 text-destructive" />
+                                                          </Button>
+                                                      </div>
                                                   </div>
-                                              </>
-                                          ) : isGif ? (
-                                              <>
-                                                  <div className="aspect-video w-full bg-black overflow-hidden relative">
-                                                      <Image src={res.link!} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
-                                                  </div>
-                                              </>
-                                          ) : youtubeEmbedUrl ? (
-                                              <div className="h-full flex flex-col">
-                                                  <div className="aspect-video w-full bg-black overflow-hidden">
-                                                     <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-                                                  </div>
+                                              </CardHeader>
+                                              <CardContent className="flex-grow flex items-center justify-center bg-black/10 dark:bg-black/20 aspect-video">
+                                                  {res.modelUrl ? <ModelViewer modelUrl={res.modelUrl} /> : <p className="text-muted-foreground">No model</p>}
+                                              </CardContent>
+                                          </Card>
+                                      );
+                                  } else if (res.type === 'habit') {
+                                      cardContent = <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
+                                  } else if (res.type === 'mechanism') {
+                                      cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
+                                  } else if(res.type === 'card') {
+                                      cardContent = <ResourceCardComponent playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                  } else {
+                                      const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
+                                      const isGif = isGifUrl(res.link);
+                                      const imageEmbedUrl = isImageUrl(res.link) && !isGif ? res.link : null;
+                                      const isObsidianUrlLink = isObsidianUrl(res.link);
+
+                                      const cardProps: any = {};
+                                      if (isGif && res.linkedResourceId) {
+                                        cardProps.onClick = (e: React.MouseEvent) => handleOpenNestedPopup(res.linkedResourceId!, e);
+                                      } else if (youtubeEmbedUrl) {
+                                        cardProps.onClick = (e: React.MouseEvent) => {
+                                            e.stopPropagation();
+                                            setYoutubeModalState({isOpen: true, playlist: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)), currentIndex: filteredResources.filter(r => getYouTubeEmbedUrl(r.link)).findIndex(v => v.id === res.id) });
+                                        };
+                                      }
+                                      
+                                      return (
+                                      <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>
+                                          <Card
+                                              {...cardProps}
+                                              className={cn(
+                                                  "relative group rounded-3xl flex flex-col overflow-hidden transition-all duration-300 hover:shadow-2xl hover:-translate-y-1.5 h-full bg-card",
+                                                  (youtubeEmbedUrl || (isGif && res.linkedResourceId)) && "cursor-pointer"
+                                              )}
+                                          >
+                                              <CardHeader className="flex-row items-center gap-3 p-3 space-y-0">
+                                                  {res.iconUrl ? <Image src={res.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
+                                                  <CardTitle className="text-sm truncate flex-grow" title={res.name}>{res.name}</CardTitle>
+                                              </CardHeader>
+                                              <div className="absolute top-2 right-2 z-30 flex items-center gap-1">
+                                                  {res.githubLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.githubLink} target="_blank" rel="noopener noreferrer"><Github className="h-4 w-4"/></a></Button>)}
+                                                  {res.demoLink && (<Button asChild variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><a href={res.demoLink} target="_blank" rel="noopener noreferrer"><Globe className="h-4 w-4"/></a></Button>)}
+                                                  {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setFloatingVideoUrl(res.link!); }}><PictureInPicture className="h-4 w-4" /></Button>}
+                                                  {youtubeEmbedUrl && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={(e) => { e.stopPropagation(); setYoutubeModalState({isOpen: true, playlist: [res], currentIndex: 0}); }}><Expand className="h-4 w-4" /></Button>}
+                                                  <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}><DropdownMenuItem onSelect={() => setEditingResource(res)}><Edit3 className="mr-2 h-4 w-4" /><span>Edit</span></DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteResource(res)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /><span>Delete</span></DropdownMenuItem></DropdownMenuContent></DropdownMenu>
                                               </div>
-                                          ) : isObsidianUrlLink && res.link ? (
-                                              <div className="flex flex-col h-full">
-                                                  <div className="flex-grow min-h-0 aspect-[4/3]">
-                                                      <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
+                                              {imageEmbedUrl ? (
+                                                  <>
+                                                      <div className="aspect-video w-full bg-black overflow-hidden relative">
+                                                          <Image src={imageEmbedUrl} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                                      </div>
+                                                  </>
+                                              ) : isGif ? (
+                                                  <>
+                                                      <div className="aspect-video w-full bg-black overflow-hidden relative">
+                                                          <Image src={res.link!} alt={res.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                                                      </div>
+                                                  </>
+                                              ) : youtubeEmbedUrl ? (
+                                                  <div className="h-full flex flex-col">
+                                                      <div className="aspect-video w-full bg-black overflow-hidden">
+                                                        <iframe id={`video-${res.id}`} width="100%" height="100%" src={youtubeEmbedUrl} title={res.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
+                                                      </div>
                                                   </div>
-                                                  <div className="p-2 border-t flex items-center gap-2">
-                                                      <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                                      <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                                  </div>
-                                              </div>
-                                          ) : (
-                                              <div className="p-4 flex flex-col flex-grow">
-                                                  <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
-                                                  <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[40px]">{res.description || 'No description available.'}</p>
-                                                  <div className="mt-auto pt-4 flex items-center gap-2">
-                                                      <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
-                                                      {res.link && (
+                                              ) : isObsidianUrlLink && res.link ? (
+                                                  <div className="flex flex-col h-full">
+                                                      <div className="flex-grow min-h-0 aspect-[4/3]">
+                                                          <iframe src={res.link} title={res.name} frameBorder="0" className="w-full h-full" />
+                                                      </div>
+                                                      <div className="p-2 border-t flex items-center gap-2">
+                                                          <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
                                                           <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
-                                                      )}
+                                                      </div>
                                                   </div>
-                                              </div>
-                                          )}
-                                      </Card>
-                                  </SortableResourceCard>
-                                  )
-                              }
-                               return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
-                          })}
-                          {selectedResourceFolderId && !searchTerm && (
-                              <Card 
-                                  onClick={() => setIsAdding(true)}
-                                  className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
-                              >
-                                  <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                                  <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
-                              </Card>
-                              )}
-                      </div>
-                  </SortableContext>
+                                              ) : (
+                                                  <div className="p-4 flex flex-col flex-grow">
+                                                      <a href={res.link} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground truncate block hover:underline mt-1">{res.link}</a>
+                                                      <p className="text-sm text-muted-foreground mt-3 line-clamp-2 flex-grow min-h-[40px]">{res.description || 'No description available.'}</p>
+                                                      <div className="mt-auto pt-4 flex items-center gap-2">
+                                                          <Button asChild variant="secondary" size="sm" className="w-full"><a href={res.link} target="_blank" rel="noopener noreferrer">Visit Site <ExternalLink className="ml-2 h-3 w-3" /></a></Button>
+                                                          {res.link && (
+                                                              <Button variant="outline" size="sm" className="w-full" onClick={() => setFloatingVideoUrl(res.link!)}><PictureInPicture className="mr-2 h-3 w-3" /> View in App</Button>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              )}
+                                          </Card>
+                                      </SortableResourceCard>
+                                      )
+                                  }
+                                  return <SortableResourceCard key={res.id} item={res} className={cardClassName} linkingFromId={linkingFromId}>{cardContent}</SortableResourceCard>;
+                              })}
+                              {selectedResourceFolderId && !searchTerm && (
+                                  <Card 
+                                      onClick={() => setIsAdding(true)}
+                                      className="rounded-3xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[220px] hover:shadow-xl hover:-translate-y-1"
+                                  >
+                                      <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">Add New Resource</p>
+                                  </Card>
+                                  )}
+                          </div>
+                      </SortableContext>
+                    </ScrollArea>
                   </div>
               </main>
           </div>
@@ -1831,6 +1834,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
