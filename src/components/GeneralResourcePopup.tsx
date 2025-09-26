@@ -38,8 +38,101 @@ const formatTime = (seconds: number): string => {
 };
 
 
+const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: ResourcePoint[] })[] => {
+  if (!points) return [];
+  
+  const pointsWithChildren = points.map(p => ({ ...p, children: [] as ResourcePoint[] }));
+
+  const sortedTimestampPoints = pointsWithChildren
+    .filter(p => p.type === 'timestamp' && p.timestamp !== undefined)
+    .sort((a, b) => a.timestamp! - b.timestamp!);
+  
+  const otherPoints = pointsWithChildren.filter(p => p.type !== 'timestamp' || p.timestamp === undefined);
+
+  const isContained = (child: ResourcePoint, parent: ResourcePoint) => {
+    if (child.id === parent.id) return false;
+    if (parent.timestamp === undefined || parent.endTime === undefined) return false;
+    if (child.timestamp === undefined) return false;
+    return child.timestamp >= parent.timestamp && (child.endTime || child.timestamp) <= parent.endTime;
+  };
+
+  const roots: (ResourcePoint & { children: ResourcePoint[] })[] = [];
+  
+  sortedTimestampPoints.forEach(point => {
+    let parentFound = false;
+    // Try to find the smallest possible container
+    for (let i = sortedTimestampPoints.length - 1; i >= 0; i--) {
+      const potentialParent = sortedTimestampPoints[i];
+      if (isContained(point, potentialParent)) {
+        potentialParent.children.push(point);
+        parentFound = true;
+        break;
+      }
+    }
+    if (!parentFound) {
+      roots.push(point);
+    }
+  });
+
+  return [...otherPoints.sort((a,b) => (a.text || '').localeCompare(b.text || '')), ...roots];
+};
+
+
+const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, setFloatingVideoUrl, openBrainHackPopup }: {
+    points: (ResourcePoint & { children: ResourcePoint[] })[];
+    onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void;
+    onDelete: (pointId: string) => void;
+    onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
+    openContentViewPopup: (contentId: string, point: ResourcePoint, event: React.MouseEvent) => void;
+    createResourceWithHierarchy: (pointToConvert: ResourcePoint, type: Resource['type']) => void;
+    onSeekTo: (timestamp: number) => void;
+    currentTime: number;
+    setFloatingVideoUrl: (url: string | null) => void;
+    openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
+}) => {
+  return (
+    <ul className="space-y-1 text-sm text-muted-foreground pr-2">
+      {points.map(point => (
+        <li key={point.id}>
+          <EditableResourcePoint 
+              point={point}
+              onUpdate={onUpdate}
+              onDelete={() => onDelete(point.id)}
+              onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e)}
+              onOpenContentView={(e) => openContentViewPopup(`content-${point.id}`, point, e)}
+              onConvertToCard={() => createResourceWithHierarchy(point, 'card')}
+              onSeekTo={onSeekTo}
+              currentTime={currentTime}
+              onSetEndTime={() => onUpdate(point.id, { endTime: Math.max(0, currentTime) })}
+              onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
+              setFloatingVideoUrl={setFloatingVideoUrl}
+              openBrainHackPopup={openBrainHackPopup}
+          />
+          {point.children.length > 0 && (
+            <div className="pl-4 mt-1 border-l-2 border-dashed border-primary/20">
+              <PointTree 
+                points={point.children}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onOpenNestedPopup={onOpenNestedPopup}
+                openContentViewPopup={openContentViewPopup}
+                createResourceWithHierarchy={createResourceWithHierarchy}
+                onSeekTo={onSeekTo}
+                currentTime={currentTime}
+                setFloatingVideoUrl={setFloatingVideoUrl}
+                openBrainHackPopup={openBrainHackPopup}
+              />
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+};
+
+
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy, setFloatingVideoUrl, openPistonsFor, handleCreateBrainHack, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -258,36 +351,33 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const handleToggleFavorite = () => {
       onUpdate({ ...resource, isFavorite: !resource.isFavorite });
     };
+    
+    const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
 
     const renderContent = () => {
         switch (resource.type) {
             case 'card':
                 return (
-                    <ul className="space-y-3 text-sm text-muted-foreground pr-2">
-                        {(resource.points || []).sort((a, b) => (a.timestamp === undefined ? Infinity : a.timestamp) - (b.timestamp === undefined ? Infinity : b.timestamp)).map(point => (
-                            <EditableResourcePoint 
-                                key={point.id}
-                                point={point}
-                                onUpdate={handleUpdatePoint}
-                                onDelete={() => handleDeletePoint(point.id)}
-                                onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e, popupState)}
-                                onOpenContentView={(e) => openContentViewPopup(`content-${point.id}`, resource, point, e)}
-                                onConvertToCard={() => createResourceWithHierarchy(resource, point, 'card')}
-                                onSeekTo={handleSeekTo}
-                                currentTime={currentTime}
-                                onSetEndTime={() => handleUpdatePoint(point.id, { endTime: Math.max(0, currentTime) })}
-                                onClearEndTime={() => handleUpdatePoint(point.id, { endTime: undefined })}
-                            />
-                        ))}
-                    </ul>
+                    <PointTree
+                        points={pointTree}
+                        onUpdate={handleUpdatePoint}
+                        onDelete={handleDeletePoint}
+                        onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
+                        openContentViewPopup={(contentId, point, event) => openContentViewPopup(contentId, resource, point, event)}
+                        createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
+                        onSeekTo={handleSeekTo}
+                        currentTime={currentTime}
+                        setFloatingVideoUrl={setFloatingVideoUrl}
+                        openBrainHackPopup={openBrainHackPopup}
+                    />
                 );
             case 'habit':
                 return (
                     <div className="space-y-1">
                         <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
+                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
                         <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
+                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
                     </div>
                 );
             case 'mechanism':
@@ -350,10 +440,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return <p className="text-sm text-muted-foreground">Unknown resource type.</p>;
         }
     };
-    
-    const handleOpenContentView = (point: ResourcePoint, event: React.MouseEvent) => {
-        openContentViewPopup(`content-${point.id}`, resource, point, event);
-    };
 
     return (
         <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
@@ -371,7 +457,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCreateBrainHack(resource.id, 'resource', resource.id)}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                     </TooltipProvider>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
                         <X className="h-4 w-4" />
