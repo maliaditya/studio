@@ -16,13 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse, EditableResourcePoint } from '@/components/EditableFields';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
+import { EditableResourcePoint } from './EditableFields';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -93,7 +93,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
   return (
     <ul className="space-y-1 text-sm text-muted-foreground pr-2">
       {points.map(point => (
-        <li key={point.id}>
+        <React.Fragment key={point.id}>
           <EditableResourcePoint 
               point={point}
               onUpdate={onUpdate}
@@ -124,7 +124,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               />
             </div>
           )}
-        </li>
+        </React.Fragment>
       ))}
     </ul>
   );
@@ -375,9 +375,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return (
                     <div className="space-y-1">
                         <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
+                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
                         <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} />
+                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
                     </div>
                 );
             case 'mechanism':
