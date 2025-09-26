@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -335,7 +334,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
 ResourceCardComponent.displayName = 'ResourceCardComponent';
 
 
-const SortableResourceCard = ({ item, children, className, linkingFromId }: { 
+const SortableResourceCard = React.memo(({ item, children, className, linkingFromId }: { 
     item: Resource; 
     children: React.ReactNode;
     className?: string;
@@ -362,7 +361,9 @@ const SortableResourceCard = ({ item, children, className, linkingFromId }: {
             {children}
         </div>
     );
-};
+});
+SortableResourceCard.displayName = 'SortableResourceCard';
+
 
 const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
     point: ResourcePoint;
@@ -426,7 +427,7 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
 SortablePoint.displayName = 'SortablePoint';
 
 
-const DraggableFolder = ({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
+const DraggableFolder = React.memo(({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: folder.id,
         data: { type: 'folder' }
@@ -444,9 +445,11 @@ const DraggableFolder = ({ folder, children, isDragging, ...props }: { folder: R
             </div>
         </div>
     );
-  };
+});
+DraggableFolder.displayName = 'DraggableFolder';
+
   
-const DroppableFolder = ({ folder, children, ...props }: { folder: ResourceFolder, children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) => {
+const DroppableFolder = React.memo(({ folder, children, ...props }: { folder: ResourceFolder, children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) => {
     const { isOver, setNodeRef } = useDroppable({
         id: folder.id,
         data: { type: 'folder' }
@@ -457,7 +460,8 @@ const DroppableFolder = ({ folder, children, ...props }: { folder: ResourceFolde
             {children}
         </div>
     );
-};
+});
+DroppableFolder.displayName = 'DroppableFolder';
 
 
 function ResourcesPageContent() {
@@ -1337,36 +1341,36 @@ function ResourcesPageContent() {
         onDragEnd={handleDragEnd}
       >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
               {/* Left Sidebar */}
-              <aside className="md:col-span-1 space-y-6">
-              <Card>
-                  <CardHeader>
-                  <div className="flex justify-between items-center">
-                      <CardTitle>Folders</CardTitle>
-                  </div>
-                  </CardHeader>
-                  <CardContent>
-                      <div className="relative mb-4">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                              value={searchTerm} 
-                              onChange={e => setSearchTerm(e.target.value)} 
-                              placeholder="Search folders & cards..."
-                              className="pl-10"
-                          />
+              <aside className="md:col-span-1 space-y-6 sticky top-24">
+                  <Card>
+                      <CardHeader>
+                      <div className="flex justify-between items-center">
+                          <CardTitle>Folders</CardTitle>
                       </div>
-                      <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
-                          <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
-                          <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
-                      </form>
-                      {renderSidebarFolders(null, 0)}
-                  </CardContent>
-              </Card>
+                      </CardHeader>
+                      <CardContent>
+                          <div className="relative mb-4">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input 
+                                  value={searchTerm} 
+                                  onChange={e => setSearchTerm(e.target.value)} 
+                                  placeholder="Search folders & cards..."
+                                  className="pl-10"
+                              />
+                          </div>
+                          <form onSubmit={handleAddFolder} className="flex gap-2 mb-4">
+                              <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
+                              <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
+                          </form>
+                          {renderSidebarFolders(null, 0)}
+                      </CardContent>
+                  </Card>
               </aside>
 
               {/* Main Content */}
-              <main className="md:col-span-2">
+              <main className="md:col-span-3">
                    <div
                       ref={tabsContainerRef}
                       onWheel={handleWheelScroll}
@@ -1825,6 +1829,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
