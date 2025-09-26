@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -491,7 +490,7 @@ export function SmartLoggingPrompt({
     focus: {
         icon: <BrainCircuit className="h-6 w-6 text-purple-500" />,
         title: "Focus Session Active",
-        description: "Visualize what you want to do, then your actions will follow.",
+        description: "",
         actions: []
     }
   };
