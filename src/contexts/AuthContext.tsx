@@ -439,6 +439,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     },
     allWidgetsVisible: true,
     agendaShowCurrentSlotOnly: false,
+    spacedRepetitionSlot: 'Late Night',
   });
 
   // Health State
@@ -1181,6 +1182,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
+        spacedRepetitionSlot: 'Late Night',
     };
     setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
 
@@ -3124,4 +3126,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-

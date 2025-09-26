@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -256,7 +257,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
             const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
     
             const activityTitle = skill.name;
-            const targetSlot = 'Late Night';
+            const targetSlot = settings.spacedRepetitionSlot || 'Late Night';
     
             if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
             if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
@@ -279,7 +280,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
         if (hasScheduleChanged) {
             setSchedule(newSchedule);
         }
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule]);
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule, settings.spacedRepetitionSlot]);
 
 
     useEffect(() => {

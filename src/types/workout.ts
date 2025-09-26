@@ -732,6 +732,7 @@ export interface UserSettings {
   allWidgetsVisible: boolean;
   agendaShowCurrentSlotOnly: boolean;
   currentPurpose?: string;
+  spacedRepetitionSlot?: SlotName;
 }
 
 export interface ActiveFocusSession {

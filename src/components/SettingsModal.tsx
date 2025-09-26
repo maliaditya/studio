@@ -20,7 +20,7 @@ import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Trash2, RefreshCw } from 'lucide-react';
-import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility } from '@/types/workout';
+import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -43,6 +43,9 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
   { id: 'visualizationTechniques', label: 'Visualization Techniques' },
   { id: 'spacedRepetition', label: 'Spaced Repetition Queue' },
 ];
+
+const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes } = useAuth();
@@ -473,6 +476,24 @@ ${JSON.stringify(finalTemplate, null, 2)}
                                         <Label htmlFor="level-3" className="font-normal">Level 3: Actions & Visualizations (Granular tasks)</Label>
                                     </div>
                                 </RadioGroup>
+                            </div>
+                             <Separator />
+                            <div>
+                                <Label className="font-semibold">Spaced Repetition</Label>
+                                <p className="text-xs text-muted-foreground mb-2">Set the default time slot for spaced repetition tasks.</p>
+                                <Select
+                                  value={settings.spacedRepetitionSlot || 'Late Night'}
+                                  onValueChange={(value) => handleSettingChange('spacedRepetitionSlot', value as SlotName)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a slot..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {SLOT_NAMES.map(slot => (
+                                      <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                             </div>
                         </div>
                      </AccordionContent>
