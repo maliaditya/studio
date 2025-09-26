@@ -660,5 +660,3 @@ export function SmartLoggingPrompt({
     </>
   );
 }
-
-    
