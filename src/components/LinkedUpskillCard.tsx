@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -170,8 +169,9 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   activeProjectIds,
   currentSlot,
 }, ref) => {
-  const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+  const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings, setFloatingVideoUrl } = useAuth();
   const { schedulingLevel = 3 } = settings;
+  const router = useRouter();
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
       id: `card-upskill-${upskillDef.id}`,
@@ -199,20 +199,17 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
     }
     return [];
   }, [upskillDef.id, nodeType, getDescendantLeafNodes]);
-
-  const isObjectiveComplete = useMemo(() => {
-    if (nodeType === 'Visualization' || nodeType === 'Standalone') {
-        return (upskillDef.loggedDuration || 0) > 0;
-    }
-    if (leafNodes.length === 0) {
-        return (upskillDef.loggedDuration || 0) > 0;
-    }
-    return leafNodes.every(node => (node.loggedDuration || 0) > 0);
-  }, [nodeType, upskillDef, leafNodes]);
   
   const completedCount = useMemo(() => {
-    return leafNodes.filter(node => (node.loggedDuration || 0) > 0).length;
-  }, [leafNodes]);
+    return leafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id)).length;
+  }, [leafNodes, permanentlyLoggedTaskIds]);
+
+  const isObjectiveComplete = useMemo(() => {
+    if (leafNodes.length === 0) {
+        return permanentlyLoggedTaskIds.has(upskillDef.id);
+    }
+    return completedCount >= leafNodes.length;
+  }, [leafNodes, completedCount, permanentlyLoggedTaskIds, upskillDef.id]);
   
   const isAddToSessionEnabled = useMemo(() => {
     const typeLevelMap = { 'Curiosity': 1, 'Objective': 2, 'Visualization': 3, 'Standalone': 3 };
@@ -258,6 +255,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
         <div className="absolute inset-0 z-0" onMouseDown={(e) => isDragging && e.stopPropagation()}/>
          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
+            {getYouTubeEmbedUrl(upskillDef.link) && <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" onClick={() => setFloatingVideoUrl(upskillDef.link!)}><PictureInPicture className="h-4 w-4"/></Button>}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -282,7 +280,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
             <DropdownMenuItem onSelect={() => onEdit(upskillDef)}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onOpenMindMap(upskillDef.id)}><GitMerge className="mr-2 h-4 w-4"/>View Mind Map</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => handleViewProgress(upskillDef)}><TrendingUp className="mr-2 h-4 w-4" /><span>View Progress</span></DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => handleCreateBrainHack(upskillDef.id, 'upskill')}>
+             <DropdownMenuItem onSelect={() => handleCreateBrainHack(upskillDef.id, 'upskill')}>
                 <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
             </DropdownMenuItem>
             <DropdownMenuSeparator /><DropdownMenuItem onSelect={() => handleUnlinkItem('upskill', upskillDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem><DropdownMenuItem onSelect={() => handleDeleteSubtopic(upskillDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
@@ -331,7 +329,7 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
                 {(upskillDef.linkedUpskillIds || []).map(childId => {
                     const childDef = upskillDefinitions.find(d => d.id === childId);
                     if (!childDef) return null;
-                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={isComplete} type="upskill" onClick={() => handleCardClick(childDef)} />;
+                    return <DraggableSubtaskItem key={childId} childId={childId} parentId={upskillDef.id} childName={childDef.name} isLogged={(childDef.loggedDuration || 0) > 0} type="upskill" onClick={() => handleCardClick(childDef)} />;
                 })}
                  {(upskillDef.linkedResourceIds || []).map(childId => {
                     const childDef = resources.find(d => d.id === childId);
@@ -342,7 +340,6 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
         </CardContent>
         <CardFooter className="pt-3 flex items-center justify-end">
             <div className="flex items-center gap-1 flex-shrink-0">
-                {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(upskillDef.id, 'upskill')}>Add Visualization</Button>}
                 {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
                 {estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatMinutes(estDuration)}</Badge>}
                 {loggedMinutes > 0 && <Badge variant="secondary">{formatMinutes(loggedMinutes)} logged</Badge>}
@@ -353,5 +350,3 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
   );
 });
 LinkedUpskillCard.displayName = 'LinkedUpskillCard';
-
-    

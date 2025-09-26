@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -409,7 +408,6 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                 </CardContent>
                 <CardFooter className="pt-3 flex items-center justify-end">
                     <div className="flex items-center gap-1 flex-shrink-0">
-                         {nodeType === 'Objective' && <Button variant="outline" size="sm" className="mr-auto h-7 text-xs" onClick={() => handleCreateAndLinkChild(deepworkDef.id, 'deepwork')}>Add Action</Button>}
                          {leafNodes.length > 0 && <Badge variant="default" className="flex items-center gap-1"><CheckSquare className="h-3 w-3"/>{completedCount}/{leafNodes.length}</Badge>}
                          {loggedMinutes > 0 && <Badge variant="secondary">{formatDuration(loggedMinutes)} logged</Badge>}
                         {estDuration && estDuration > 0 && <Badge variant="outline" className="flex-shrink-0">{formatDuration(estDuration)} est.</Badge>}
@@ -420,5 +418,3 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     );
 });
 LinkedDeepWorkCard.displayName = 'LinkedDeepWorkCard';
-
-    
