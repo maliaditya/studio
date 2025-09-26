@@ -130,7 +130,7 @@ interface ResourceCardComponentProps {
     onConvertToCard: (point: ResourcePoint) => void;
 }
 
-const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: ResourceCardComponentProps) => {
+const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: ResourceCardComponentProps) => {
     const { resources, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     
@@ -331,7 +331,9 @@ const ResourceCardComponent = ({ resource, onUpdate, onDelete, onOpenNestedPopup
             </CardFooter>
         </Card>
     );
-};
+});
+ResourceCardComponent.displayName = 'ResourceCardComponent';
+
 
 const SortableResourceCard = ({ item, children, className, linkingFromId }: { 
     item: Resource; 
@@ -362,7 +364,7 @@ const SortableResourceCard = ({ item, children, className, linkingFromId }: {
     );
 };
 
-const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
+const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
     point: ResourcePoint;
     onConvertToCard: () => void;
     onUpdate: (updatedText: string) => void;
@@ -376,6 +378,7 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
     const style = {
         transform: CSS.Transform.toString(transform),
         zIndex: isDragging ? 10 : 'auto',
+        transition,
     };
     
     if (point.type === 'card' && point.resourceId) {
@@ -416,14 +419,11 @@ const SortablePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNeste
                 onEditLinkText={onEditLinkText}
                 onConvertToCard={onConvertToCard}
                 dragHandle={{ attributes, listeners }}
-                onSeekTo={()=>{}}
-                currentTime={0}
-                onSetEndTime={()=>{}}
-                onClearEndTime={()=>{}}
             />
         </div>
     );
-};
+});
+SortablePoint.displayName = 'SortablePoint';
 
 
 const DraggableFolder = ({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
@@ -482,7 +482,9 @@ function ResourcesPageContent() {
   const [newResourceName, setNewResourceName] = useState('');
   const [newResourceLink, setNewResourceLink] = useState('');
   
-  const [editingFolder, setEditingFolder] = useState<ResourceFolder | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState('');
+  
   const [newlyCreatedFolderId, setNewlyCreatedFolderId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
   
@@ -854,15 +856,20 @@ function ResourcesPageContent() {
     toast({ title: "Folder Deleted", description: "The folder and all its contents have been removed." });
   };
   
+  const handleStartEditingFolder = (folder: ResourceFolder) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+  
   const commitFolderEdit = () => {
-    if (!editingFolder) return;
-    if (!editingFolder.name.trim()) {
+    if (!editingFolderId) return;
+    if (!editingFolderName.trim()) {
         toast({ title: "Rename Cancelled", description: "Folder name cannot be empty.", variant: "destructive" });
         cancelFolderEdit();
         return;
     }
-    setResourceFolders(prev => prev.map(f => f.id === editingFolder.id ? editingFolder : f));
-    setEditingFolder(null);
+    setResourceFolders(prev => prev.map(f => f.id === editingFolderId ? { ...f, name: editingFolderName.trim() } : f));
+    setEditingFolderId(null);
   };
   
   const handleAddNewNestedFolder = (parentFolder: ResourceFolder) => {
@@ -873,7 +880,8 @@ function ResourcesPageContent() {
       icon: 'Folder',
     };
     setResourceFolders(prev => [...prev, newFolder]);
-    setEditingFolder(newFolder);
+    setEditingFolderId(newFolder.id);
+    setEditingFolderName("New Folder");
     setNewlyCreatedFolderId(newFolder.id);
 
     // Ensure parent is expanded
@@ -885,11 +893,11 @@ function ResourcesPageContent() {
   };
 
   const cancelFolderEdit = () => {
-    if (!editingFolder) return;
-    if (editingFolder.id === newlyCreatedFolderId) {
-      setResourceFolders(prev => prev.filter(f => f.id !== editingFolder.id));
+    if (newlyCreatedFolderId === editingFolderId) {
+        setResourceFolders(prev => prev.filter(f => f.id !== editingFolderId));
     }
-    setEditingFolder(null);
+    setEditingFolderId(null);
+    setEditingFolderName('');
     setNewlyCreatedFolderId(null);
   };
 
@@ -1125,12 +1133,12 @@ function ResourcesPageContent() {
       <ul className={cn("space-y-1", level > 0 && "pl-4")}>
         {foldersToRender.map(folder => (
             <li key={folder.id}>
-                 {editingFolder?.id === folder.id ? (
+                 {editingFolderId === folder.id ? (
                     <div className="flex items-center gap-2 p-1 w-full">
                         <Folder className="h-4 w-4 flex-shrink-0"/>
                         <Input
-                            value={editingFolder.name}
-                            onChange={e => setEditingFolder({...editingFolder, name: e.target.value})}
+                            value={editingFolderName}
+                            onChange={e => setEditingFolderName(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') { commitFolderEdit(); e.preventDefault(); } 
                                 else if (e.key === 'Escape') { cancelFolderEdit(); }
@@ -1179,7 +1187,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [filteredFolders, editingFolder, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
+  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
 
   
   const isDescendant = (childId: string, parentId: string): boolean => {
@@ -1546,7 +1554,7 @@ function ResourcesPageContent() {
                 </Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { setEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
+                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleStartEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
             </div>
         )}
@@ -1817,6 +1825,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
