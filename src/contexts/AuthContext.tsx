@@ -1881,7 +1881,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!resource) return newPopups;
         
         const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 1024 : 640;
+        const popupWidth = hasMarkdown ? 1280 : 768;
         
         let x, y, level, parentId;
 
@@ -3124,3 +3124,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
