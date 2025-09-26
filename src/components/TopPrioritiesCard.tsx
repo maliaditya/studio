@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -128,15 +127,23 @@ export function TopPrioritiesCard() {
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
 
+    // Initialize with a default, non-window-dependent position
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
         setIsClient(true);
+        // Only access window and localStorage after the component has mounted
         const savedPosition = localStorage.getItem('top_priorities_position');
         if (savedPosition) {
-            setPosition(JSON.parse(savedPosition));
+            try {
+                setPosition(JSON.parse(savedPosition));
+            } catch (error) {
+                console.error("Failed to parse position from localStorage", error);
+                // Fallback to default position if parsing fails
+                setPosition({ x: window.innerWidth - 340, y: 50 });
+            }
         } else {
             setPosition({ x: window.innerWidth - 340, y: 50 });
         }
