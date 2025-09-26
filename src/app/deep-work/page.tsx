@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -375,7 +375,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap: (id: string) => void;
     handleUpdateFocusAreaName: (id: string, newName: string) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
-    handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill') => void;
     setEmbedUrl: (url: string | null) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
@@ -384,7 +383,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     linkProjectToTask: (taskId: string, projectId: string | null) => void;
     onEdit: (def: ExerciseDefinition) => void;
-    handleOpenManageLinksModal: (type: 'resource', parent: ExerciseDefinition) => void;
+    handleOpenManageLinksModal: (parent: ExerciseDefinition) => void;
     handleCreateResource: (parentTask: ExerciseDefinition) => void;
     activeProjectIds: Set<string>;
     currentSlot: string;
@@ -410,7 +409,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap,
     handleUpdateFocusAreaName,
     handleCreateAndLinkChild,
-    handleCreateBrainHack,
     setEmbedUrl,
     setFloatingVideoUrl,
     handleOpenNestedPopup,
@@ -447,34 +445,6 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     const linkedProjects = (currentTask.linkedProjectIds || [])
       .map(pid => projects.find(p => p.id === pid))
       .filter((p): p is Project => !!p);
-    
-    const deepWorkLinkableTasks = deepWorkDefinitions.filter((def: ExerciseDefinition) => {
-        if (def.id === currentTask.id) return false;
-        const nodeType = getDeepWorkNodeType(def);
-        return def.category === currentTask.category && (nodeType === 'Action' || nodeType === 'Standalone');
-    });
-
-    const upskillLinkableTasks = upskillDefinitions.filter((def: ExerciseDefinition) => {
-        if (def.id === currentTask.id) return false;
-        const nodeType = getUpskillNodeType(def);
-        return def.category === currentTask.category && (nodeType === 'Visualization' || nodeType === 'Standalone');
-    });
-    
-    const handleLinkToggle = (itemId: string, itemType: 'deepwork' | 'upskill' | 'resource') => {
-        if (!currentTask) return;
-        
-        const linkKey = itemType === 'deepwork' ? 'linkedDeepWorkIds' : itemType === 'upskill' ? 'linkedUpskillIds' : 'linkedResourceIds';
-        const currentLinks = currentTask[linkKey] || [];
-        const isLinked = currentLinks.includes(itemId);
-        
-        const newLinks = isLinked ? currentLinks.filter((id: string) => id !== itemId) : [...currentLinks, itemId];
-        
-        const setParentDefinitions = currentTask.type === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
-        
-        setParentDefinitions((prev: ExerciseDefinition[]) => prev.map(def => 
-            def.id === currentTask.id ? { ...def, [linkKey]: newLinks } : def
-        ));
-    };
 
     return (
         <div ref={ref} className="space-y-4">
@@ -493,52 +463,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         <Button variant="ghost" size="icon" onClick={() => handleViewProgress(currentTask, currentTask.type)}><TrendingUp className="h-4 w-4"/></Button>
                     </TooltipTrigger><TooltipContent><p>View Progress</p></TooltipContent></Tooltip></TooltipProvider>
                     
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline"><LinkIcon className="mr-2 h-4 w-4" /> Link Deep Work</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64">
-                            <DropdownMenuLabel>Link Actions/Standalones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <ScrollArea className="h-[200px]">
-                                {deepWorkLinkableTasks.map((task: ExerciseDefinition) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={task.id}
-                                        checked={(currentTask.linkedDeepWorkIds || []).includes(task.id)}
-                                        onCheckedChange={() => handleLinkToggle(task.id, 'deepwork')}
-                                    >
-                                        {task.name}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                            </ScrollArea>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline"><BookCopy className="mr-2 h-4 w-4" /> Link Upskill</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64">
-                            <DropdownMenuLabel>Link Visualizations/Standalones</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <ScrollArea className="h-[200px]">
-                                {upskillLinkableTasks.map((task: ExerciseDefinition) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={task.id}
-                                        checked={(currentTask.linkedUpskillIds || []).includes(task.id)}
-                                        onCheckedChange={() => handleLinkToggle(task.id, 'upskill')}
-                                    >
-                                        {task.name}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                            </ScrollArea>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button size="sm" variant="outline" onClick={() => handleCreateBrainHack(currentTask.id, currentTask.type)}>
-                        <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal('resource', currentTask as ExerciseDefinition)}>
-                        <Folder className="mr-2 h-4 w-4" /> Link Resource
+                    <Button size="sm" variant="outline" onClick={() => handleOpenManageLinksModal(currentTask as ExerciseDefinition)}>
+                        <LinkIcon className="mr-2 h-4 w-4" /> Link Items
                     </Button>
 
                     {isHighLevelNode && (
@@ -592,7 +518,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             projects={projectsInDomainForChild}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
-                            handleCreateBrainHack={handleCreateBrainHack}
+                            handleCreateBrainHack={() => {}}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -627,7 +553,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={projectsInDomainForChild}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
-                            handleCreateBrainHack={handleCreateBrainHack}
+                            handleCreateBrainHack={() => {}}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -710,7 +636,6 @@ function DeepWorkPageContent() {
     activeProjectIds,
     currentSlot,
     permanentlyLoggedTaskIds,
-    handleCreateBrainHack,
   } = useAuth();
   const router = useRouter();
   
@@ -731,19 +656,10 @@ function DeepWorkPageContent() {
   const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
   
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
-  const [manageLinksConfig, setManageLinksConfig] = useState<{type: 'deepwork' | 'upskill' | 'resource', parent: ExerciseDefinition} | null>(null);
-  const [newLinkedItemName, setNewLinkedItemName] = useState('');
-  const [newLinkedItemDescription, setNewLinkedItemDescription] = useState('');
-  const [newLinkedItemLink, setNewLinkedItemLink] = useState('');
-  const [newLinkedItemHours, setNewLinkedItemHours] = useState('');
-  const [newLinkedItemMinutes, setNewLinkedItemMinutes] = useState('');
-  const [newLinkedItemFolderId, setNewLinkedItemFolderId] = useState('');
+  const [manageLinksConfig, setManageLinksConfig] = useState<{ parent: ExerciseDefinition } | null>(null);
   const [linkSearchTerm, setLinkSearchTerm] = useState('');
   const [tempLinkedIds, setTempLinkedIds] = useState<string[]>([]);
-  const [isCreatingLink, setIsCreatingLink] = useState(false);
-  
-  const [newLinkedItemMicroSkillId, setNewLinkedItemMicroSkillId] = useState<string>('');
-  const [newLinkedItemCuriosityId, setNewLinkedItemCuriosityId] = useState<string | null>(null);
+  const [linkTab, setLinkTab] = useState<'deepwork' | 'upskill' | 'resource'>('deepwork');
 
   // State for hierarchical linking
   const [folderPath, setFolderPath] = useState<string[]>([]);
@@ -760,9 +676,6 @@ function DeepWorkPageContent() {
   
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'mechanism'>('link');
-  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
-
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   
   const [isLinkProjectModalOpen, setIsLinkProjectModalOpen] = useState(false);
@@ -1131,224 +1044,72 @@ function DeepWorkPageContent() {
 }, [microSkillMap, coreSkills]);
 
 
-  const handleOpenManageLinksModal = (type: 'deepwork' | 'upskill' | 'resource', parent: ExerciseDefinition) => {
-    setManageLinksConfig({ type, parent });
-    if (type === 'deepwork') {
-        setTempLinkedIds(parent.linkedDeepWorkIds || []);
-    } else if (type === 'upskill') {
-        setTempLinkedIds(parent.linkedUpskillIds || []);
-    } else {
-        setTempLinkedIds(parent.linkedResourceIds || []);
-    }
-    
-    const parentMicroSkillId = getMicroSkillIdFromCategory(parent.category);
-    if (parentMicroSkillId) {
-        setNewLinkedItemMicroSkillId(parentMicroSkillId);
-    }
-    
-    setNewLinkedItemCuriosityId(null);
-    setNewLinkedItemName(''); 
-    setNewLinkedItemDescription(''); 
-    setNewLinkedItemLink(''); 
-    setNewLinkedItemHours(''); 
-    setNewLinkedItemMinutes(''); 
-    setNewLinkedItemFolderId('');
+  const handleOpenManageLinksModal = (parent: ExerciseDefinition) => {
+    setManageLinksConfig({ parent });
+    const allLinkedIds = [
+      ...(parent.linkedDeepWorkIds || []),
+      ...(parent.linkedUpskillIds || []),
+      ...(parent.linkedResourceIds || [])
+    ];
+    setTempLinkedIds(allLinkedIds);
     setLinkSearchTerm(''); 
-    setFolderPath([]);
     setIsManageLinksModalOpen(true);
   };
   
-  const handleCreateAndLinkItem = async () => {
+  const handleSaveLinks = () => {
     if (!manageLinksConfig) return;
-    const { type, parent } = manageLinksConfig;
-    
-    let newId: string;
-    let updatedParent: ExerciseDefinition;
-    
-    const setParentDefinitions = upskillDefinitions.some(d => d.id === parent.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
-    
-    if (type === 'resource') {
-        if (addResourceType === 'link') {
-            if (!newLinkedItemFolderId) { toast({ title: "Error", description: "A folder must be selected.", variant: "destructive" }); return; }
-            if (!newLinkedItemLink.trim()) { toast({ title: "Error", description: "A link is required.", variant: "destructive" }); return; }
-            
-            setIsCreatingLink(true);
-            try {
-                let fullLink = newLinkedItemLink.trim();
-                if (!fullLink.startsWith('http://') && !fullLink.startsWith('https://')) {
-                    fullLink = 'https://' + fullLink;
-                }
-                const response = await fetch('/api/get-link-metadata', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: fullLink }), });
-                const result = await response.json();
-                if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
-                const newResource: Resource = {
-                    id: `res_${Date.now()}_${Math.random()}`, name: result.title || 'Untitled Resource', link: fullLink, type: 'link',
-                    description: result.description || '', folderId: newLinkedItemFolderId, iconUrl: getFaviconUrl(fullLink), createdAt: new Date().toISOString()
-                };
-                newId = newResource.id;
-                setResources(prev => [...prev, newResource]);
-            } catch (error) {
-                toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata.", variant: "destructive" });
-                return;
-            } finally { 
-                setIsCreatingLink(false);
-            }
-        } else { // Card, Habit, Mechanism
-            if (!newLinkedItemFolderId || !newLinkedItemName.trim()) { toast({ title: "Error", description: "Folder and name are required.", variant: "destructive" }); return; }
-            const newResource: Resource = {
-                id: `res_${Date.now()}`,
-                name: newLinkedItemName.trim(),
-                folderId: newLinkedItemFolderId,
-                type: addResourceType,
-                points: [],
-                icon: 'Library',
-                createdAt: new Date().toISOString(),
-                mechanismFramework: addResourceType === 'mechanism' ? mechanismFramework : undefined,
-            };
-            newId = newResource.id;
-            setResources(prev => [...prev, newResource]);
-        }
-        
-        updatedParent = { ...parent, linkedResourceIds: [...(parent.linkedResourceIds || []), newId] };
-        setParentDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        setNavigationStack(prev => prev.map(item => item.id === parent.id ? { ...item, ...updatedParent } : item));
-        toast({ title: "Resource Added", description: `New resource has been saved and linked.`});
-        setIsManageLinksModalOpen(false);
-        return;
-    }
-     if (type === 'upskill') {
-        const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
-        if (!newLinkedItemName.trim() || !microSkillName) {
-            toast({ title: "Error", description: "Name and micro-skill are required.", variant: "destructive" });
-            return;
-        }
+    const { parent } = manageLinksConfig;
 
-        const hours = parseInt(newLinkedItemHours, 10) || 0;
-        const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
-        const totalMinutes = hours * 60 + minutes;
-        const newUpskillDef: ExerciseDefinition = {
-            id: `def_upskill_${Date.now()}`,
-            name: newLinkedItemName.trim(),
-            category: microSkillName as ExerciseCategory,
-            description: newLinkedItemDescription.trim(),
-            link: newLinkedItemLink.trim(),
-            iconUrl: getFaviconUrl(newLinkedItemLink.trim()),
-            estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
-            loggedDuration: 0,
-        };
-        setUpskillDefinitions(prev => [...prev, newUpskillDef]);
-        
-        if (newLinkedItemCuriosityId) {
-            setUpskillDefinitions(prev => prev.map(def => 
-                def.id === newLinkedItemCuriosityId 
-                    ? { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), newUpskillDef.id] } 
-                    : def
-            ));
-        }
+    const newDeepWorkIds = tempLinkedIds.filter(id => deepWorkDefinitions.some(d => d.id === id));
+    const newUpskillIds = tempLinkedIds.filter(id => upskillDefinitions.some(d => d.id === id));
+    const newResourceIds = tempLinkedIds.filter(id => resources.some(r => r.id === id));
 
-        let finalParent = { ...parent, linkedUpskillIds: [...(parent.linkedUpskillIds || []), newUpskillDef.id] };
-
-        setParentDefinitions(prev => prev.map(def => def.id === parent.id ? finalParent : def));
-        setNavigationStack(prev => prev.map(item => item.id === parent.id ? { ...item, ...finalParent } : item));
-
-    } else { // deepwork
-        const microSkillName = microSkillMap.get(newLinkedItemMicroSkillId)?.microSkillName;
-        if (!newLinkedItemName.trim() || !microSkillName) {
-             toast({ title: "Error", description: "Name and micro-skill are required.", variant: "destructive" });
-            return;
-        }
-        const hours = parseInt(newLinkedItemHours, 10) || 0;
-        const minutes = parseInt(newLinkedItemMinutes, 10) || 0;
-        const totalMinutes = hours * 60 + minutes;
-        
-        const newDeepWorkDef: ExerciseDefinition = {
-            id: `def_deep_${Date.now()}`, 
-            name: newLinkedItemName.trim(), 
-            category: microSkillName as ExerciseCategory,
-            description: newLinkedItemDescription.trim(),
-            estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
-            loggedDuration: 0,
-        };
-        setDeepWorkDefinitions(prev => [...prev, newDeepWorkDef]);
-        updatedParent = { ...parent, linkedDeepWorkIds: [...(parent.linkedDeepWorkIds || []), newDeepWorkDef.id] };
-        setParentDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
-        setNavigationStack(prev => prev.map(item => item.id === parent.id ? { ...item, ...updatedParent } : item));
-    }
-    toast({ title: "Success", description: "New item created and linked." });
-    setIsManageLinksModalOpen(false);
-  };
-
-  const handleSaveExistingLinks = () => {
-    if (!manageLinksConfig) return;
-    const { type, parent } = manageLinksConfig;
-    let key;
-    if (type === 'deepwork') key = 'linkedDeepWorkIds';
-    else if (type === 'upskill') key = 'linkedUpskillIds';
-    else key = 'linkedResourceIds';
-    
-    const updatedParent = { ...parent, [key]: tempLinkedIds };
+    const updatedParent = {
+      ...parent,
+      linkedDeepWorkIds: newDeepWorkIds,
+      linkedUpskillIds: newUpskillIds,
+      linkedResourceIds: newResourceIds,
+    };
     
     const setParentDefinitions = upskillDefinitions.some(d => d.id === parent.id) ? setUpskillDefinitions : setDeepWorkDefinitions;
     
     setParentDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent : def));
     setNavigationStack(prev => prev.map(item => item.id === parent.id ? { ...item, ...updatedParent } : item));
+    
     toast({ title: "Success", description: "Links have been updated." });
     setIsManageLinksModalOpen(false);
   };
   
   const filteredItemsForLinking = useMemo(() => {
     if (!manageLinksConfig) return [];
-    const { type, parent } = manageLinksConfig;
+    
+    let sourceDefs: (ExerciseDefinition | Resource)[] = [];
 
-    if (type === 'resource') {
-        let displayItems: (ResourceFolder | Resource)[] = [];
-        const subfolders = resourceFolders.filter(f => f.parentId === currentFolderIdForLinking);
-        const resourcesInFolder = resources.filter(res => res.folderId === currentFolderIdForLinking);
-        displayItems = [...subfolders, ...resourcesInFolder];
-        
-        return displayItems.filter(item => {
-            if ('link' in item || 'points' in item) { // It's a resource, not a folder
-                if (linkSearchTerm && !item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())) return false;
-            }
-            return true;
-        });
-    }
-
-    if (type === 'deepwork') {
-        let filteredDefs = deepWorkDefinitions.filter(def => def.name && def.name !== 'placeholder' && def.id !== parent.id);
-        if (linkSearchTerm) {
-            filteredDefs = filteredDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
-        }
-        return filteredDefs;
-    }
-
-    // Type is 'upskill'
-    let sourceDefs = upskillDefinitions.filter(def => {
-      if (!def.name || def.name === 'placeholder' || def.id === parent.id) return false;
-      const nodeType = getUpskillNodeType(def);
-      return nodeType === 'Visualization' || nodeType === 'Standalone';
-    });
-
-    if (selectedSpecializationId) {
-        const microSkillNamesInSpecialization = new Set(
-            coreSkills.find(s => s.id === selectedSpecializationId)
-                ?.skillAreas.flatMap(sa => sa.microSkills)
-                .map(ms => ms.name) || []
-        );
-        sourceDefs = sourceDefs.filter(def => microSkillNamesInSpecialization.has(def.category));
+    if (linkTab === 'deepwork') {
+      sourceDefs = deepWorkDefinitions.filter(def => {
+        if (def.id === manageLinksConfig.parent.id) return false;
+        const nodeType = getDeepWorkNodeType(def);
+        return nodeType === 'Action' || nodeType === 'Standalone' || nodeType === 'Objective';
+      });
+    } else if (linkTab === 'upskill') {
+      sourceDefs = upskillDefinitions.filter(def => {
+        if (def.id === manageLinksConfig.parent.id) return false;
+        const nodeType = getUpskillNodeType(def);
+        return nodeType === 'Visualization' || nodeType === 'Standalone' || nodeType === 'Objective';
+      });
+    } else if (linkTab === 'resource') {
+      sourceDefs = resources;
     }
     
     if (linkSearchTerm) {
-        sourceDefs = sourceDefs.filter(def => def.name.toLowerCase().includes(linkSearchTerm.toLowerCase()));
+      return sourceDefs.filter(item => 
+        item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
+      );
     }
+    
     return sourceDefs;
+  }, [linkTab, linkSearchTerm, manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, getDeepWorkNodeType, getUpskillNodeType]);
 
-  }, [manageLinksConfig, deepWorkDefinitions, upskillDefinitions, resources, linkSearchTerm, resourceFolders, currentFolderIdForLinking, getUpskillNodeType, selectedSpecializationId, coreSkills]);
-
-
-  const curiositiesForLinking = useMemo(() => {
-    return upskillDefinitions.filter(def => getUpskillNodeType(def) === 'Curiosity');
-  }, [upskillDefinitions, getUpskillNodeType]);
 
   const handleUnlinkItem = (type: 'deepwork' | 'upskill' | 'resource', idToUnlink: string) => {
     if (!currentTask) return;
@@ -1787,7 +1548,6 @@ function DeepWorkPageContent() {
                                 onOpenMindMap={onOpenMindMap}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
                                 handleCreateAndLinkChild={handleCreateAndLinkChild}
-                                handleCreateBrainHack={handleCreateBrainHack}
                                 setEmbedUrl={setEmbedUrl}
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
@@ -1825,7 +1585,7 @@ function DeepWorkPageContent() {
                                         projects={projects}
                                         handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                                         handleCreateAndLinkChild={handleCreateAndLinkChild}
-                                        handleCreateBrainHack={handleCreateBrainHack}
+                                        handleCreateBrainHack={() => {}}
                                         activeProjectIds={activeProjectIds}
                                         currentSlot={currentSlot}
                                     />
@@ -1854,7 +1614,7 @@ function DeepWorkPageContent() {
                                             upskillDefinitions={upskillDefinitions}
                                             projectsInDomain={[]}
                                             handleCreateAndLinkChild={handleCreateAndLinkChild}
-                                            handleCreateBrainHack={handleCreateBrainHack}
+                                            handleCreateBrainHack={() => {}}
                                             activeProjectIds={activeProjectIds}
                                             currentSlot={currentSlot}
                                         />
@@ -1963,156 +1723,50 @@ function DeepWorkPageContent() {
               <Dialog open={isManageLinksModalOpen} onOpenChange={setIsManageLinksModalOpen}>
                 <DialogContent className="sm:max-w-3xl h-[80vh] flex flex-col">
                   <DialogHeader>
-                    <DialogTitle>Manage Links for: {manageLinksConfig.parent.name}</DialogTitle>
-                    <DialogDescription>Link existing items or create new ones to build out this objective.</DialogDescription>
+                    <DialogTitle>Link Items to: {manageLinksConfig.parent.name}</DialogTitle>
+                    <DialogDescription>Search for items and select them to create a link.</DialogDescription>
                   </DialogHeader>
-                  <Tabs defaultValue="link" className="flex-grow flex flex-col min-h-0">
-                      <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="link">Link Existing</TabsTrigger>
-                          <TabsTrigger value="create">Create New</TabsTrigger>
-                      </TabsList>
-                      <TabsContent value="link" className="flex-grow min-h-0">
-                          <div className="flex flex-col h-full">
-                              <div className="flex gap-2 mb-2 p-1">
-                                <Input placeholder="Search..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} />
-                                <Select value={manageLinksConfig.type} onValueChange={(value) => {
-                                    setManageLinksConfig(prev => prev ? { ...prev, type: value as any } : null);
-                                    setSelectedSpecializationId(null);
-                                }}>
-                                    <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="deepwork">Deep Work</SelectItem>
-                                        <SelectItem value="upskill">Upskill</SelectItem>
-                                        <SelectItem value="resource">Resource</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {manageLinksConfig.type === 'upskill' && (
-                                    <Select value={selectedSpecializationId || ''} onValueChange={(id) => setSelectedSpecializationId(id === 'all' ? null : id)}>
-                                        <SelectTrigger className="w-[240px]">
-                                            <SelectValue placeholder="Filter by Specialization..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">All Specializations</SelectItem>
-                                            {coreSkills.filter(cs => cs.type === 'Specialization').map(spec => (
-                                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                              </div>
-                              {manageLinksConfig.type === 'resource' && (
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground w-full mb-2 p-1 border-b">
-                                  <Button variant="ghost" size="sm" onClick={() => setFolderPath([])} disabled={folderPath.length === 0}>Root</Button>
-                                  {folderPath.map((folderId, index) => {
-                                      const folder = resourceFolders.find(f => f.id === folderId);
-                                      return ( <React.Fragment key={folderId}> <ChevronRightIcon className="h-4 w-4" /> <Button variant="ghost" size="sm" onClick={() => setFolderPath(p => p.slice(0, index + 1))} disabled={index === folderPath.length - 1}> {folder?.name} </Button> </React.Fragment> )
-                                  })}
-                                </div>
-                              )}
-                              <ScrollArea className="flex-grow border rounded-md p-2">
-                                  {filteredItemsForLinking.length > 0 ? (
-                                      (filteredItemsForLinking as any[]).map(item => {
-                                          const isFolder = 'parentId' in item;
-                                          const isChecked = tempLinkedIds.includes(item.id);
-                                          return (
-                                              <div key={item.id} className="flex items-center space-x-2 p-1">
-                                                  <Checkbox id={`cb-link-${item.id}`} checked={isChecked} onCheckedChange={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])} disabled={isFolder}/>
-                                                  <Label 
-                                                      htmlFor={`cb-link-${item.id}`}
-                                                      className="font-normal w-full flex items-center gap-2 cursor-pointer"
-                                                      onClick={isFolder ? () => setFolderPath(p => [...p, item.id]) : undefined}
-                                                  >
-                                                      {isFolder ? <Folder className="h-4 w-4 text-primary" /> : manageLinksConfig.type === 'upskill' ? <BookCopy className="h-4 w-4" /> : <Library className="h-4 w-4"/>}
-                                                      {item.name}
-                                                  </Label>
-                                              </div>
-                                          )
-                                      })
-                                  ) : <p className="text-sm text-center text-muted-foreground p-4">No items to link. Try another filter or create a new item.</p>}
-                              </ScrollArea>
-                              <DialogFooter className="pt-4">
-                                  <Button onClick={handleSaveExistingLinks}>Save Links</Button>
-                              </DialogFooter>
-                          </div>
-                      </TabsContent>
-                      <TabsContent value="create" className="flex-grow min-h-0">
-                          <ScrollArea className="h-full pr-4">
-                              {manageLinksConfig.type === 'resource' ? (
-                                    <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as any)} className="w-full">
-                                        <TabsList className="grid w-full grid-cols-4">
-                                            <TabsTrigger value="link">Link</TabsTrigger>
-                                            <TabsTrigger value="card">Card</TabsTrigger>
-                                            <TabsTrigger value="habit">Habit</TabsTrigger>
-                                            <TabsTrigger value="mechanism">Mechanism</TabsTrigger>
-                                        </TabsList>
-                                        <TabsContent value="link" className="pt-4 space-y-4">
-                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
-                                            <div className="space-y-1"><Label>Link URL</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>
-                                        </TabsContent>
-                                        <TabsContent value="card" className="pt-4 space-y-4">
-                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
-                                            <div className="space-y-1"><Label>Card Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                        </TabsContent>
-                                        <TabsContent value="habit" className="pt-4 space-y-4">
-                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
-                                            <div className="space-y-1"><Label>Habit Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                        </TabsContent>
-                                        <TabsContent value="mechanism" className="pt-4 space-y-4">
-                                            <div className="space-y-1"><Label>Folder</Label><Select value={newLinkedItemFolderId} onValueChange={setNewLinkedItemFolderId}><SelectTrigger/><SelectContent>{resourceFolders.map(f => (<SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>))}</SelectContent></Select></div>
-                                            <div className="space-y-1"><Label>Mechanism Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                            <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id="r-negative-modal" /><Label htmlFor="r-negative-modal">Negative</Label></div>
-                                                <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-positive-modal" /><Label htmlFor="r-positive-modal">Positive</Label></div>
-                                            </RadioGroup>
-                                        </TabsContent>
-                                    </Tabs>
-                              ) : (
-                                  <div className="space-y-4">
-                                      <div className="space-y-1">
-                                          <Label>Micro-Skill</Label>
-                                          <Select value={newLinkedItemMicroSkillId} onValueChange={setNewLinkedItemMicroSkillId}>
-                                              <SelectTrigger><SelectValue placeholder="Select a micro-skill..."/></SelectTrigger>
-                                              <SelectContent>
-                                                  {Object.entries(allMicroSkillsGrouped).map(([group, skills]) => (
-                                                      <React.Fragment key={group}>
-                                                          <Label className="px-2 py-1.5 text-xs font-semibold">{group}</Label>
-                                                          {skills.map(skill => (
-                                                              <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>
-                                                          ))}
-                                                      </React.Fragment>
-                                                  ))}
-                                              </SelectContent>
-                                          </Select>
-                                      </div>
-                                      {manageLinksConfig.type === 'upskill' && newLinkedItemMicroSkillId && (
-                                          <div className="space-y-1">
-                                              <Label>Parent Task (Optional)</Label>
-                                                <Select value={newLinkedItemCuriosityId || 'none'} onValueChange={id => setNewLinkedItemCuriosityId(id === 'none' ? null : id)}>
-                                                    <SelectTrigger><SelectValue placeholder="Link to existing task..."/></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="none">None (create as new Curiosity)</SelectItem>
-                                                        {curiositiesForLinking.map(curiosity => (
-                                                            <SelectItem key={curiosity.id} value={curiosity.id}>{curiosity.name}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                          </div>
-                                      )}
-                                      <div className="space-y-1"><Label>Name</Label><Input value={newLinkedItemName} onChange={e => setNewLinkedItemName(e.target.value)} /></div>
-                                      <div className="space-y-1"><Label>Description</Label><Textarea value={newLinkedItemDescription} onChange={e => setNewLinkedItemDescription(e.target.value)} /></div>
-                                      {manageLinksConfig.type === 'upskill' && <div className="space-y-1"><Label>Link (Optional)</Label><Input value={newLinkedItemLink} onChange={e => setNewLinkedItemLink(e.target.value)} /></div>}
-                                      <div className="grid grid-cols-2 gap-4">
-                                          <div className="space-y-1"><Label>Est. Hours</Label><Input type="number" value={newLinkedItemHours} onChange={e => setNewLinkedItemHours(e.target.value)} /></div>
-                                          <div className="space-y-1"><Label>Est. Minutes</Label><Input type="number" value={newLinkedItemMinutes} onChange={e => setNewLinkedItemMinutes(e.target.value)} /></div>
-                                      </div>
-                                  </div>
-                              )}
-                              <DialogFooter className="pt-4">
-                                  <Button onClick={handleCreateAndLinkItem} disabled={isCreatingLink}>{isCreatingLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create & Link</Button>
-                              </DialogFooter>
-                          </ScrollArea>
-                      </TabsContent>
-                  </Tabs>
+                  <div className="flex-grow flex flex-col min-h-0">
+                      <div className="flex gap-2 mb-2 p-1">
+                        <div className="relative flex-grow">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input placeholder="Search tasks and resources..." value={linkSearchTerm} onChange={e => setLinkSearchTerm(e.target.value)} className="pl-10" />
+                        </div>
+                      </div>
+                      <Tabs value={linkTab} onValueChange={(value) => setLinkTab(value as any)} className="flex-grow flex flex-col min-h-0">
+                          <TabsList className="grid w-full grid-cols-3">
+                              <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
+                              <TabsTrigger value="upskill">Upskill</TabsTrigger>
+                              <TabsTrigger value="resource">Resources</TabsTrigger>
+                          </TabsList>
+                           <ScrollArea className="flex-grow border rounded-md p-2 mt-2">
+                               {filteredItemsForLinking.length > 0 ? (
+                                   (filteredItemsForLinking as any[]).map(item => {
+                                       const isChecked = tempLinkedIds.includes(item.id);
+                                       const itemType = item.type ? 'resource' : (deepWorkDefinitions.some(d => d.id === item.id) ? 'deepwork' : 'upskill');
+
+                                       return (
+                                           <div key={item.id} className="flex items-center space-x-2 p-1">
+                                               <Checkbox
+                                                 id={`cb-link-${item.id}`}
+                                                 checked={isChecked}
+                                                 onCheckedChange={() => setTempLinkedIds(prev => prev.includes(item.id) ? prev.filter(id => id !== item.id) : [...prev, item.id])}
+                                               />
+                                               <Label htmlFor={`cb-link-${item.id}`} className="font-normal w-full flex items-center gap-2 cursor-pointer">
+                                                 {itemType === 'deepwork' ? <Briefcase className="h-4 w-4 text-primary" /> : itemType === 'upskill' ? <BookCopy className="h-4 w-4 text-primary" /> : <Folder className="h-4 w-4 text-primary" />}
+                                                 {item.name}
+                                               </Label>
+                                           </div>
+                                       )
+                                   })
+                               ) : <p className="text-sm text-center text-muted-foreground p-4">No items found.</p>}
+                           </ScrollArea>
+                      </Tabs>
+                      <DialogFooter className="pt-4">
+                          <Button variant="outline" onClick={() => setIsManageLinksModalOpen(false)}>Cancel</Button>
+                          <Button onClick={handleSaveLinks}>Save Links</Button>
+                      </DialogFooter>
+                  </div>
                 </DialogContent>
               </Dialog>
           )}
@@ -2182,7 +1836,7 @@ function DeepWorkPageContent() {
                             projects={projects}
                             handleOpenLinkProjectModal={handleOpenLinkProjectModal}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
-                            handleCreateBrainHack={handleCreateBrainHack}
+                            handleCreateBrainHack={() => {}}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -2207,7 +1861,7 @@ function DeepWorkPageContent() {
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={[]}
                             handleCreateAndLinkChild={handleCreateAndLinkChild}
-                            handleCreateBrainHack={handleCreateBrainHack}
+                            handleCreateBrainHack={() => {}}
                             activeProjectIds={activeProjectIds}
                             currentSlot={currentSlot}
                         />
@@ -2231,6 +1885,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
