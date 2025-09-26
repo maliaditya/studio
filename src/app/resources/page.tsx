@@ -32,7 +32,7 @@ import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { EditableField, DoubleEditableField, EmotionEditableField, EditableResponse, EditableResourcePoint } from '@/components/EditableFields';
+import { EditableField, DoubleEditableField, EmotionEditableField, EditableResourcePoint } from '@/components/EditableFields';
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -1340,11 +1340,11 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8" onClick={() => contextMenu && setContextMenu(null)}>
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 items-start">
               {/* Left Sidebar */}
-              <aside className="md:col-span-1 space-y-6 sticky top-24">
-                  <Card>
+              <aside className="md:col-span-1 md:sticky top-24">
+                  <Card className="h-full">
                       <CardHeader>
                       <div className="flex justify-between items-center">
                           <CardTitle>Folders</CardTitle>
@@ -1364,7 +1364,9 @@ function ResourcesPageContent() {
                               <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
                               <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
                           </form>
-                          {renderSidebarFolders(null, 0)}
+                          <ScrollArea className="h-[calc(100vh-24rem)]">
+                            {renderSidebarFolders(null, 0)}
+                          </ScrollArea>
                       </CardContent>
                   </Card>
               </aside>
@@ -1829,6 +1831,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
