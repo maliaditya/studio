@@ -375,8 +375,8 @@ interface AuthContextType {
   handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill' | 'resource', resourceId?: string) => void;
   
   // Brain Hack Popups
-  openBrainHackPopups: Record<string, { x: number, y: number }>;
-  setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, { x: number, y: number }>>>;
+  openBrainHackPopups: Record<string, {x: number, y: number}>;
+  setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, {x: number, y: number}>>>;
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
   recalculateAndFixTaskTypes: () => void;
 }
@@ -1880,8 +1880,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const resource = resources.find(r => r.id === resourceId);
         if (!resource) return newPopups;
         
-        const popupWidth = 512;
-        const popupHeight = 400;
+        const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+        const popupWidth = hasMarkdown ? 1024 : 640;
+        
         let x, y, level, parentId;
 
         if (parentPopupState && parentRect) {
@@ -1900,7 +1901,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
             x = event ? event.clientX : (screenWidth - popupWidth) / 2;
-            y = event ? event.clientY : (screenHeight - popupHeight) / 2;
+            y = event ? event.clientY : (screenHeight - 400) / 2;
         }
         
         newPopups.set(resourceId, { 
@@ -2819,28 +2820,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
-    const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-    const taskInstance = allLogs.flatMap(l => l.exercises).find(ex => (activity.taskIds || []).includes(ex.id));
     
-    if (taskInstance) {
-      currentDefId = taskInstance.definitionId;
-    } else {
-      // Fallback if the instance isn't in a log (e.g., just scheduled)
-      currentDefId = activity.taskIds?.[0]; // This might be an instance ID, so we need to clean it
-      if (currentDefId) {
-        const parts = currentDefId.split('-');
-        // A def ID might be like 'def_12345' or 'bundle_12345'
-        if (parts[0] === 'def' || parts[0] === 'bundle') {
-          // This is likely a definition ID already.
-          // Or from an older system: def_id-timestamp
-          const potentialDefId = currentDefId.substring(0, currentDefId.lastIndexOf('-'));
-          if (allDefs.has(potentialDefId)) {
-            currentDefId = potentialDefId;
-          } else if (!allDefs.has(currentDefId)) {
-             currentDefId = undefined;
-          }
+    const taskInstanceId = activity.taskIds?.[0];
+    if (taskInstanceId) {
+        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
+        const taskInstance = allLogs.flatMap(l => l.exercises).find(ex => ex.id === taskInstanceId);
+        if (taskInstance) {
+            currentDefId = taskInstance.definitionId;
         }
-      }
     }
   
     if (!currentDefId) return null;
@@ -2862,7 +2849,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return rootTask || null;
-  }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs]);
+  }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
