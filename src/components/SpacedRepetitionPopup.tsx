@@ -6,15 +6,16 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Repeat, Focus } from 'lucide-react';
+import { Repeat, Focus, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from './ui/button';
 import { SpacedRepetitionModal } from './SpacedRepetitionModal';
 import type { MicroSkill } from '@/types/workout';
 import { format, parseISO, addDays, differenceInDays, isBefore, isToday, startOfToday } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 export function SpacedRepetitionPopup() {
-    const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes } = useAuth();
+    const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes, scheduleTaskFromMindMap, currentSlot } = useAuth();
     const [isClient, setIsClient] = useState(false);
     
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -23,12 +24,18 @@ export function SpacedRepetitionPopup() {
 
     const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
     const [showOnlyToday, setShowOnlyToday] = useState(false);
+    const { toast } = useToast();
 
     useEffect(() => {
         setIsClient(true);
         const savedPosition = localStorage.getItem('spaced_repetition_position');
         if (savedPosition) {
-            setPosition(JSON.parse(savedPosition));
+            try {
+                setPosition(JSON.parse(savedPosition));
+            } catch (error) {
+                console.error("Failed to parse position from localStorage", error);
+                setPosition({ x: window.innerWidth - 340, y: 620 });
+            }
         } else {
             setPosition({ x: window.innerWidth - 340, y: 620 });
         }
@@ -55,6 +62,7 @@ export function SpacedRepetitionPopup() {
 
         let skillsToReview = repetitionSkills.map(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+            const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
             const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
             const completionDates = new Set<string>();
             allLeafNodes.forEach(node => {
@@ -83,6 +91,7 @@ export function SpacedRepetitionPopup() {
 
             return {
                 ...skill,
+                mainIntentionId: mainIntention?.id,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
                 isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
@@ -147,6 +156,19 @@ export function SpacedRepetitionPopup() {
         userSelect: isDragging ? 'none' : 'auto',
     };
     
+    const handleScheduleClick = (e: React.MouseEvent, skill: { mainIntentionId?: string, name: string }) => {
+        e.stopPropagation();
+        if (skill.mainIntentionId) {
+            scheduleTaskFromMindMap(skill.mainIntentionId, 'deepwork', currentSlot);
+        } else {
+            toast({
+                title: "Cannot Schedule",
+                description: `No main intention found for "${skill.name}".`,
+                variant: "destructive",
+            });
+        }
+    };
+
     if (!isClient || coreSkills.flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills.filter(ms => ms.isReadyForRepetition))).length === 0) {
         return null;
     }
@@ -183,17 +205,27 @@ export function SpacedRepetitionPopup() {
                         <ScrollArea className="h-48 pr-3">
                             <ul className="space-y-2">
                                 {repetitionSkillsWithDates.map(skill => (
-                                    <li key={skill.id}>
-                                        <Button
-                                            variant="secondary"
-                                            className="w-full justify-between h-auto text-left"
-                                            onClick={() => setRepetitionModalState({ isOpen: true, skill })}
-                                        >
-                                            <span className="truncate pr-2">{skill.name}</span>
-                                            <span className={`text-xs whitespace-nowrap ${skill.isOverdue ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
-                                                {format(skill.nextReviewDate, 'MMM dd')}
-                                            </span>
-                                        </Button>
+                                    <li key={skill.id} className="group">
+                                        <div className="flex items-center justify-between">
+                                            <Button
+                                                variant="secondary"
+                                                className="w-full justify-between h-auto text-left flex-grow"
+                                                onClick={() => setRepetitionModalState({ isOpen: true, skill })}
+                                            >
+                                                <span className="truncate pr-2">{skill.name}</span>
+                                                <span className={`text-xs whitespace-nowrap ${skill.isOverdue ? 'text-destructive font-bold' : 'text-muted-foreground'}`}>
+                                                    {format(skill.nextReviewDate, 'MMM dd')}
+                                                </span>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-9 w-9 ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={(e) => handleScheduleClick(e, skill)}
+                                            >
+                                                <CalendarIcon className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </li>
                                 ))}
                                 {repetitionSkillsWithDates.length === 0 && (
