@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -420,6 +421,10 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
                 onConvertToCard={onConvertToCard}
                 onEditLinkText={onEditLinkText}
                 dragHandle={{ attributes, listeners }}
+                onSeekTo={()=>{}}
+                currentTime={0}
+                onSetEndTime={()=>{}}
+                onClearEndTime={()=>{}}
             />
         </div>
     );
@@ -1346,15 +1351,14 @@ function ResourcesPageContent() {
   };
 
   return (
-    <>
-      <audio ref={audioRef} />
       <DndContext
         sensors={sensors}
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
-        <div className="h-[calc(100vh-4rem-1px)] grid grid-cols-1 md:grid-cols-4 gap-8 p-4 sm:p-6 lg:p-8">
-            <aside className="md:col-span-1 h-full flex flex-col">
+        <audio ref={audioRef} />
+        <div className="h-[calc(100vh-4rem-1px)] grid md:grid-cols-[1fr,3fr] lg:grid-cols-[1fr,4fr] p-4 sm:p-6 lg:p-8 gap-8">
+            <aside className="h-full flex flex-col min-h-0">
                 <Card className="flex-grow flex flex-col min-h-0">
                     <CardHeader>
                     <div className="flex justify-between items-center">
@@ -1382,7 +1386,7 @@ function ResourcesPageContent() {
                 </Card>
             </aside>
 
-            <main className="md:col-span-3 flex flex-col h-full">
+            <main className="flex flex-col h-full min-h-0">
                 <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
                     <div
                         ref={tabsContainerRef}
@@ -1570,7 +1574,6 @@ function ResourcesPageContent() {
                 </div>
             </main>
           </div>
-        </div>
         {contextMenu && (
             <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
@@ -1840,7 +1843,6 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
       </DndContext>
-    </>
   );
 }
 
@@ -1850,6 +1852,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
