@@ -2817,27 +2817,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
     
-    const activityTaskDefId = allDefs.get(activity.taskIds?.[0] || '')?.definitionId || activity.taskIds?.[0];
-    if (!activityTaskDefId) return null;
+    // First, find the definitionId of the current task instance
+    let currentDefId: string | undefined;
+    const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+    const taskInstance = allLogs.flatMap(l => l.exercises).find(ex => (activity.taskIds || []).includes(ex.id));
     
-    let currentId: string | undefined = activityTaskDefId;
-    let rootTask: ExerciseDefinition | undefined = allDefs.get(currentId);
-
-    while (currentId) {
-        const parentId = Array.from(allDefs.values()).find(parent => 
-            (parent.linkedDeepWorkIds?.includes(currentId!)) ||
-            (parent.linkedUpskillIds?.includes(currentId!))
-        )?.id;
-
-        if (parentId) {
-            currentId = parentId;
-            rootTask = allDefs.get(currentId);
-        } else {
-            currentId = undefined;
+    if (taskInstance) {
+      currentDefId = taskInstance.definitionId;
+    } else {
+      // Fallback if the instance isn't in a log (e.g., just scheduled)
+      currentDefId = activity.taskIds?.[0]; // This might be an instance ID, so we need to clean it
+      if (currentDefId) {
+        const parts = currentDefId.split('-');
+        // A def ID might be like 'def_12345' or 'bundle_12345'
+        if (parts[0] === 'def' || parts[0] === 'bundle') {
+          // This is likely a definition ID already.
+          // Or from an older system: def_id-timestamp
+          const potentialDefId = currentDefId.substring(0, currentDefId.lastIndexOf('-'));
+          if (allDefs.has(potentialDefId)) {
+            currentDefId = potentialDefId;
+          } else if (!allDefs.has(currentDefId)) {
+             currentDefId = undefined;
+          }
         }
+      }
+    }
+  
+    if (!currentDefId) return null;
+  
+    let currentId: string | undefined = currentDefId;
+    let rootTask: ExerciseDefinition | undefined = allDefs.get(currentId);
+  
+    while (currentId) {
+      const parentId = Array.from(allDefs.values()).find(parent => 
+        (parent.linkedDeepWorkIds?.includes(currentId!)) ||
+        (parent.linkedUpskillIds?.includes(currentId!))
+      )?.id;
+  
+      if (parentId) {
+        currentId = parentId;
+        rootTask = allDefs.get(currentId);
+      } else {
+        currentId = undefined;
+      }
     }
     return rootTask || null;
-  }, [deepWorkDefinitions, upskillDefinitions]);
+  }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
