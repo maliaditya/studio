@@ -235,10 +235,22 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
 
   if (resource.type === 'card') {
-    const hasMarkdownContent = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+    const pointCount = resource.points?.length || 0;
+    const hasSpecialContent = resource.points?.some(p => p.type === 'markdown' || p.type === 'code') || false;
+
+    const getColumnSpan = () => {
+        if (pointCount > 8 || hasSpecialContent) {
+            return "md:col-span-3 xl:col-span-3";
+        }
+        if (pointCount > 4) {
+            return "md:col-span-2 xl:col-span-2";
+        }
+        return "";
+    };
+
     return (
-      <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-        <Card className={cn("relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer", hasMarkdownContent ? 'md:col-span-2 xl:col-span-3' : '')} onClick={(e) => handleStartEditResource(resource)}>
+      <div ref={setCombinedRefs} className={cn(getColumnSpan(), isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
+        <Card className="relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer h-full" onClick={(e) => handleStartEditResource(resource)}>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <DropdownMenu>
@@ -269,7 +281,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
               </CardTitle>
           </CardHeader>
           <CardContent className="flex-grow min-h-0">
-              <ScrollArea className={cn(hasMarkdownContent ? 'h-[200px]' : '')}>
+              <ScrollArea className="h-full">
                   <ul className="space-y-3 pr-3">
                       {(resource.points || []).map((point) => (
                         <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
@@ -2219,6 +2231,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
