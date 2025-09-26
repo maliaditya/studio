@@ -1356,7 +1356,7 @@ function ResourcesPageContent() {
       >
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)]">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 h-full">
-              <aside className="md:col-span-1 h-full flex flex-col">
+              <aside className="md:col-span-1 h-full flex flex-col md:sticky md:top-20 md:h-[calc(100vh-6rem)]">
                   <Card className="flex-grow flex flex-col min-h-0">
                       <CardHeader>
                       <div className="flex justify-between items-center">
@@ -1385,7 +1385,7 @@ function ResourcesPageContent() {
               </aside>
 
               <main className="md:col-span-3 flex flex-col h-full">
-                   <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
+                   <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-16 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
                       <div
                           ref={tabsContainerRef}
                           onWheel={handleWheelScroll}
@@ -1852,6 +1852,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
