@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -179,7 +180,7 @@ const ResistanceSection = React.memo(({ habit, isNegative, onTechniqueClick }: {
                                           </DropdownMenuItem>
                                       </DropdownMenuContent>
                                   </DropdownMenu>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDeleteStopper(habit.id, s.id)}>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleDeleteStopper(habit.id, s.id); }}>
                                     <Trash2 className="h-3 w-3 text-destructive" />
                                   </Button>
                                 </div>
@@ -345,12 +346,11 @@ export function SmartLoggingPrompt({
 }: SmartLoggingPromptProps) {
   const router = useRouter();
   const { 
-    pillarEquations,
-    metaRules,
     habitCards,
     mechanismCards,
     schedule,
-    activityDurations
+    activityDurations,
+    findRootTask,
   } = useAuth();
   
   const [isReviewOpen, setIsReviewOpen] = useState(false);
@@ -434,18 +434,15 @@ export function SmartLoggingPrompt({
     };
   }, [schedule]);
 
-
-  const allEquations = React.useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
-  
   const focusContext = React.useMemo(() => {
-    if (!activeFocusSession?.activity?.habitEquationIds) return null;
+    if (!activeFocusSession?.activity) return null;
     
-    const habitIds = activeFocusSession.activity.habitEquationIds;
-    if (habitIds.length === 0) return null;
+    const rootTask = findRootTask(activeFocusSession.activity);
+    if (!rootTask?.habitEquationIds || rootTask.habitEquationIds.length === 0) return null;
     
-    const uniqueHabitIds = [...new Set(habitIds)];
-
-    const habitDetails = uniqueHabitIds.map(habitId => {
+    const habitIds = rootTask.habitEquationIds;
+    
+    const habitDetails = habitIds.map(habitId => {
         const habit = habitCards.find(h => h.id === habitId);
         if (!habit) return null;
         
@@ -460,7 +457,8 @@ export function SmartLoggingPrompt({
     }).filter((item): item is NonNullable<typeof item> => item !== null);
     
     return habitDetails.length > 0 ? habitDetails : null;
-  }, [activeFocusSession, allEquations, metaRules, habitCards, mechanismCards]);
+  }, [activeFocusSession, findRootTask, habitCards, mechanismCards]);
+
 
   const prompts = {
     empty: {

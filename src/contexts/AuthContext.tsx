@@ -104,6 +104,8 @@ interface AuthContextType {
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => void;
   updateActivity: (updatedActivity: Activity) => void;
+  findRootTask: (activity: Activity) => ExerciseDefinition | null;
+
 
   // Focus Session
   focusSessionModalOpen: boolean;
@@ -2812,6 +2814,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Success", description: "Task classifications have been recalculated." });
   };
 
+  const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    
+    const activityTaskDefId = allDefs.get(activity.taskIds?.[0] || '')?.definitionId || activity.taskIds?.[0];
+    if (!activityTaskDefId) return null;
+    
+    let currentId: string | undefined = activityTaskDefId;
+    let rootTask: ExerciseDefinition | undefined = allDefs.get(currentId);
+
+    while (currentId) {
+        const parentId = Array.from(allDefs.values()).find(parent => 
+            (parent.linkedDeepWorkIds?.includes(currentId!)) ||
+            (parent.linkedUpskillIds?.includes(currentId!))
+        )?.id;
+
+        if (parentId) {
+            currentId = parentId;
+            rootTask = allDefs.get(currentId);
+        } else {
+            currentId = undefined;
+        }
+    }
+    return rootTask || null;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -2828,6 +2855,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
+    findRootTask,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
     allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
