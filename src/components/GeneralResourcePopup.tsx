@@ -47,7 +47,9 @@ const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: R
     .filter(p => p.type === 'timestamp' && p.timestamp !== undefined)
     .sort((a, b) => a.timestamp! - b.timestamp!);
   
-  const otherPoints = pointsWithChildren.filter(p => p.type !== 'timestamp' || p.timestamp === undefined);
+  const otherPoints = pointsWithChildren
+    .filter(p => p.type !== 'timestamp' || p.timestamp === undefined)
+    .sort((a, b) => (a.text || '').localeCompare(b.text || ''));
 
   const isContained = (child: ResourcePoint, parent: ResourcePoint) => {
     if (child.id === parent.id) return false;
@@ -74,7 +76,7 @@ const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: R
     }
   });
 
-  return [...otherPoints.sort((a,b) => (a.text || '').localeCompare(b.text || '')), ...roots];
+  return [...otherPoints, ...roots];
 };
 
 
