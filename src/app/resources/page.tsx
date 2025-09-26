@@ -418,8 +418,8 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
                 onDelete={onDelete}
                 onOpenNestedPopup={onOpenNestedPopup}
                 onOpenContentView={onOpenMarkdownModal}
-                onEditLinkText={onEditLinkText}
                 onConvertToCard={onConvertToCard}
+                onEditLinkText={onEditLinkText}
                 dragHandle={{ attributes, listeners }}
             />
         </div>
@@ -736,6 +736,15 @@ function ResourcesPageContent() {
     
     setActiveResourceTabIds(prev => prev.filter(id => id !== folderIdToClose));
     setSelectedResourceFolderId(newSelectedFolderId);
+  };
+  
+  const handleCloseAllTabs = () => {
+    const pinned = Array.from(pinnedFolderIds);
+    setActiveResourceTabIds(pinned);
+
+    if (selectedResourceFolderId && !pinnedFolderIds.has(selectedResourceFolderId)) {
+      setSelectedResourceFolderId(pinned.length > 0 ? pinned[0] : null);
+    }
   };
   
   const togglePinFolder = (folderId: string) => {
@@ -1269,6 +1278,9 @@ function ResourcesPageContent() {
     });
   }, [activeResourceTabIds, pinnedFolderIds]);
   
+  const showCloseAll = useMemo(() => {
+    return activeResourceTabIds.some(id => !pinnedFolderIds.has(id));
+  }, [activeResourceTabIds, pinnedFolderIds]);
 
   const handleEditLinkText = (point: ResourcePoint) => {
     const resource = resources.find(r => r.points?.some(p => p.id === point.id));
@@ -1341,17 +1353,17 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem-1px)]">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 h-full">
               {/* Left Sidebar */}
-              <aside className="md:col-span-1 md:sticky top-24 self-start">
-                  <Card className="h-full">
+              <aside className="md:col-span-1 md:sticky top-20 self-start h-[calc(100vh-8rem)]">
+                  <Card className="h-full flex flex-col">
                       <CardHeader>
                       <div className="flex justify-between items-center">
                           <CardTitle>Folders</CardTitle>
                       </div>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="flex-grow flex flex-col min-h-0">
                           <div className="relative mb-4">
                               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                               <Input 
@@ -1365,7 +1377,7 @@ function ResourcesPageContent() {
                               <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New Root Folder" />
                               <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
                           </form>
-                          <ScrollArea className="h-[calc(100vh-28rem)]">
+                          <ScrollArea className="flex-grow min-h-0">
                             {renderSidebarFolders(null, 0)}
                           </ScrollArea>
                       </CardContent>
@@ -1373,36 +1385,43 @@ function ResourcesPageContent() {
               </aside>
 
               {/* Main Content */}
-              <main className="md:col-span-3 flex flex-col h-[calc(100vh-8rem)]">
-                   <div
-                      ref={tabsContainerRef}
-                      onWheel={handleWheelScroll}
-                      className="flex items-center border-b mb-4 overflow-x-auto flex-shrink-0 sticky top-20 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2"
-                  >
-                      {sortedTabs.map(tabId => {
-                          const folder = resourceFolders.find(f => f.id === tabId);
-                          if (!folder) return null;
-                          const isPinned = pinnedFolderIds.has(tabId);
-                          return (
-                              <button
-                                  key={tabId}
-                                  onClick={() => setSelectedResourceFolderId(tabId)}
-                                  className={cn(
-                                      "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
-                                      selectedResourceFolderId === tabId 
-                                          ? "border-primary text-primary" 
-                                          : "border-transparent text-muted-foreground hover:bg-muted"
-                                  )}
-                              >
-                                  {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
-                                  <Folder className="h-4 w-4" />
-                                  <span className="whitespace-nowrap">{folder.name}</span>
-                                  {!isPinned && (
-                                      <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
-                                  )}
-                              </button>
-                          );
-                      })}
+              <main className="md:col-span-3 flex flex-col h-full">
+                   <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-[65px] bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
+                      <div
+                          ref={tabsContainerRef}
+                          onWheel={handleWheelScroll}
+                          className="flex items-center overflow-x-auto flex-grow"
+                      >
+                          {sortedTabs.map(tabId => {
+                              const folder = resourceFolders.find(f => f.id === tabId);
+                              if (!folder) return null;
+                              const isPinned = pinnedFolderIds.has(tabId);
+                              return (
+                                  <button
+                                      key={tabId}
+                                      onClick={() => setSelectedResourceFolderId(tabId)}
+                                      className={cn(
+                                          "flex items-center gap-2 px-3 py-2 text-sm font-medium border-b-2",
+                                          selectedResourceFolderId === tabId 
+                                              ? "border-primary text-primary" 
+                                              : "border-transparent text-muted-foreground hover:bg-muted"
+                                      )}
+                                  >
+                                      {isPinned && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
+                                      <Folder className="h-4 w-4" />
+                                      <span className="whitespace-nowrap">{folder.name}</span>
+                                      {!isPinned && (
+                                          <X className="h-4 w-4 ml-2 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleCloseTab(tabId); }} />
+                                      )}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                      {showCloseAll && (
+                          <Button variant="ghost" size="sm" onClick={handleCloseAllTabs} className="ml-2 flex-shrink-0">
+                              Close All
+                          </Button>
+                      )}
                   </div>
                   <div className="flex-grow min-h-0">
                     <ScrollArea className="h-full">
@@ -1834,6 +1853,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
