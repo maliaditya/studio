@@ -1103,7 +1103,7 @@ function DeepWorkPageContent() {
     
     if (linkSearchTerm) {
       return sourceDefs.filter(item => 
-        item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
+        item.name && item.name.toLowerCase().includes(linkSearchTerm.toLowerCase())
       );
     }
     
@@ -1885,6 +1885,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
