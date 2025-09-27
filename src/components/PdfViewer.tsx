@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,9 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { pdfjs, Document, Page } from "react-pdf";
+import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 
-// Point worker to the local file in the public directory.
-pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+// Set worker from the legacy build entry point
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 
 interface PdfViewerProps {
