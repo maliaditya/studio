@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 
 // By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file 
 // to the build output and providing the correct public path.
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 // Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
