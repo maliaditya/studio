@@ -1,21 +1,40 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
+import { getPdf } from "@/lib/audioDB";
+import type { Resource } from "@/types/workout";
 
-// Use PDF.js CDN worker to avoid Next.js module resolution issues
+// Use PDF.js CDN worker
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PdfViewerProps {
-  file: Blob | null;
+  resource: Resource | null;
   scale?: number;
 }
 
-export default function PdfViewer({ file, scale = 1.2 }: PdfViewerProps) {
+export default function PdfViewer({ resource, scale = 1.2 }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
+  const [file, setFile] = useState<Blob | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadPdf() {
+      if (resource?.hasLocalPdf && resource.id) {
+        setIsLoading(true);
+        const pdfBlob = await getPdf(resource.id);
+        setFile(pdfBlob);
+        setIsLoading(false);
+      } else {
+        setFile(null);
+        setIsLoading(false);
+      }
+    }
+    loadPdf();
+  }, [resource]);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
@@ -30,14 +49,23 @@ export default function PdfViewer({ file, scale = 1.2 }: PdfViewerProps) {
     setPageNumber((prev) => (prev < (numPages ?? 1) ? prev + 1 : prev));
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+        <Loader2 className="h-8 w-8 animate-spin mb-4" />
+        <p>Loading PDF...</p>
+      </div>
+    );
+  }
+  
   if (!file) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <Loader2 className="h-8 w-8 animate-spin mb-4" />
-            <p>Loading PDF...</p>
+            <p>Could not load PDF file.</p>
         </div>
     );
   }
+
 
   return (
     <div className="text-center h-full flex flex-col">
@@ -63,3 +91,4 @@ export default function PdfViewer({ file, scale = 1.2 }: PdfViewerProps) {
     </div>
   );
 }
+
