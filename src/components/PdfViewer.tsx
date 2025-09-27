@@ -1,10 +1,11 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 import { useToast } from '@/hooks/use-toast';
 import { getPdf } from '@/lib/audioDB';
@@ -12,10 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 
-// Correctly set the worker path at the module level.
-// This is the standard and most reliable method for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
+// Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PdfViewerProps {
     isOpen: boolean;
