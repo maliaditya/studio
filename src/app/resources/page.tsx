@@ -542,7 +542,7 @@ function ResourcesPageContent() {
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -1646,6 +1646,53 @@ function ResourcesPageContent() {
         </DragOverlay>
       </DndContext>
       <PdfViewer isOpen={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })} resourceId={pdfViewerState.resourceId} />
+      <Dialog open={isAdding} onOpenChange={setIsAdding}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Add New Resource</DialogTitle>
+                <DialogDescription>Select the type of resource you want to add to this folder.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <RadioGroup value={addResourceType} onValueChange={(value) => setAddResourceType(value as any)} className="grid grid-cols-3 gap-4">
+                    <div><RadioGroupItem value="link" id="r-link" className="peer sr-only" /><Label htmlFor="r-link" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><LinkIcon className="mb-3 h-6 w-6"/>Link</Label></div>
+                    <div><RadioGroupItem value="card" id="r-card" className="peer sr-only" /><Label htmlFor="r-card" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Library className="mb-3 h-6 w-6"/>Card</Label></div>
+                    <div><RadioGroupItem value="habit" id="r-habit" className="peer sr-only" /><Label htmlFor="r-habit" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Zap className="mb-3 h-6 w-6"/>Habit</Label></div>
+                    <div><RadioGroupItem value="mechanism" id="r-mechanism" className="peer sr-only" /><Label htmlFor="r-mechanism" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Workflow className="mb-3 h-6 w-6"/>Mechanism</Label></div>
+                    <div><RadioGroupItem value="model3d" id="r-model3d" className="peer sr-only" /><Label htmlFor="r-model3d" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><View className="mb-3 h-6 w-6"/>3D Model</Label></div>
+                    <div><RadioGroupItem value="pdf" id="r-pdf" className="peer sr-only" /><Label htmlFor="r-pdf" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><FileIcon className="mb-3 h-6 w-6"/>PDF</Label></div>
+                </RadioGroup>
+                
+                {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
+                {addResourceType !== 'link' && addResourceType !== 'pdf' && addResourceType !== 'model3d' && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                {addResourceType === 'mechanism' && (
+                    <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
+                        <Label>Framework:</Label>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id="r-neg" /><Label htmlFor="r-neg">Negative</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-pos" /><Label htmlFor="r-pos">Positive</Label></div>
+                    </RadioGroup>
+                )}
+                 {addResourceType === 'model3d' && (
+                    <div className="space-y-2">
+                        <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Model Name"/>
+                        <Input type="file" onChange={handleModelUpload} accept=".glb,.gltf" />
+                    </div>
+                )}
+                 {addResourceType === 'pdf' && (
+                    <Button onClick={handlePdfUploadClick} className="w-full">
+                        <Upload className="mr-2 h-4 w-4"/> Upload PDF
+                    </Button>
+                 )}
+
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
+                <Button onClick={handleAddResource} disabled={isFetchingMeta}>
+                    {isFetchingMeta ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                    Add Resource
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1656,4 +1703,5 @@ export default function ResourcesPage() {
     
 
     
+
 
