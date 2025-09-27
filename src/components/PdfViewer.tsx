@@ -3,15 +3,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { getPdf } from '@/lib/audioDB';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { DocumentProps, PageProps } from 'react-pdf';
 
-let Document: React.ComponentType<DocumentProps> | null = null;
-let Page: React.ComponentType<PageProps> | null = null;
-let pdfjs: any = null;
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+
 
 interface PdfViewerProps {
     isOpen: boolean;
@@ -27,21 +28,6 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
     const [pageNumber, setPageNumber] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isClient, setIsClient] = useState(false);
-
-    useEffect(() => {
-        setIsClient(true);
-        
-        import('react-pdf').then(pdfModule => {
-            Document = pdfModule.Document;
-            Page = pdfModule.Page;
-            pdfjs = pdfModule.pdfjs;
-            pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
-        }).catch(err => {
-            console.error("Failed to load react-pdf module:", err);
-            setError("Could not load PDF viewer components.");
-        });
-    }, []);
 
     useEffect(() => {
         if (isOpen && resourceId) {
@@ -93,7 +79,7 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
                             <p>{error}</p>
                         </div>
                     )}
-                    {isClient && Document && Page && !isLoading && !error && file && (
+                    {!isLoading && !error && file && (
                         <Document
                             file={file}
                             onLoadSuccess={onDocumentLoadSuccess}
