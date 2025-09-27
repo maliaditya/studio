@@ -2,22 +2,49 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import type { DocumentProps, PageProps } from 'react-pdf';
 import { getPdf } from '@/lib/audioDB';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { pdfjs } from 'react-pdf';
 
-// Set up the worker for react-pdf from a CDN. This is the standard and correct way for Next.js.
+// Correctly set the worker URL at the module level.
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 interface PdfViewerProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     resourceId: string | null;
+}
+
+// Dynamically import react-pdf components to ensure they only run on the client
+const Document = (props: DocumentProps) => {
+  const [ClientDocument, setClientDocument] = useState<React.ComponentType<DocumentProps> | null>(null);
+  useEffect(() => {
+    import('react-pdf').then(module => setClientDocument(() => module.Document));
+  }, []);
+  
+  if (!ClientDocument) return <div><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  
+  return <ClientDocument {...props} />;
+}
+
+const Page = (props: PageProps) => {
+  const [ClientPage, setClientPage] = useState<React.ComponentType<PageProps> | null>(null);
+  useEffect(() => {
+    import('react-pdf').then(module => {
+      // Need to import these CSS files for react-pdf to work correctly
+      import('react-pdf/dist/esm/Page/AnnotationLayer.css');
+      import('react-pdf/dist/esm/Page/TextLayer.css');
+      setClientPage(() => module.Page);
+    });
+  }, []);
+  
+  if (!ClientPage) return <div><Loader2 className="h-6 w-6 animate-spin" /></div>;
+  
+  return <ClientPage {...props} />;
 }
 
 export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
@@ -87,11 +114,10 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
                                 setError('Failed to load PDF document.');
                             }}
                             className="flex justify-center items-center h-full overflow-auto"
+                            loading={<Loader2 className="h-6 w-6 animate-spin" />}
                         >
                             <Page 
                                 pageNumber={pageNumber} 
-                                renderTextLayer={true}
-                                renderAnnotationLayer={true}
                                 width={800}
                                 error={<p>Could not load page.</p>}
                                 loading={<Loader2 className="h-6 w-6 animate-spin" />}
