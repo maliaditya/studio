@@ -20,7 +20,7 @@ interface PdfViewerProps {
   scale?: number;
 }
 
-export default function PdfViewer({ resource, scale = 1.2 }: PdfViewerProps) {
+export default function PdfViewer({ resource, scale = 2 }: PdfViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [file, setFile] = useState<Blob | null>(null);
