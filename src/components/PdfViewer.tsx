@@ -1,102 +1,52 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
-import { getPdf } from "@/lib/audioDB";
-import type { Resource } from "@/types/workout";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
-import { ScrollArea } from "./ui/scroll-area";
-import { pdfjs, Document, Page } from "react-pdf";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
+import { useState } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 
-// Set worker from the legacy build entry point
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-
+// Use PDF.js CDN worker
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PdfViewerProps {
-    isOpen: boolean;
-    onOpenChange: (isOpen: boolean) => void;
-    resource: Resource | null;
+  fileUrl: string; // URL or path to PDF file
+  scale?: number;  // Optional zoom factor
 }
 
-export function PdfViewer({ isOpen, onOpenChange, resource }: PdfViewerProps) {
-    const [fileUrl, setFileUrl] = useState<string | null>(null);
-    const [numPages, setNumPages] = useState<number | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+export default function PdfViewer({ fileUrl, scale = 1.2 }: PdfViewerProps) {
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
 
-    useEffect(() => {
-        if (isOpen && resource && resource.hasLocalPdf) {
-            setLoading(true);
-            setError(null);
-            setFileUrl(null);
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+    setPageNumber(1);
+  }
 
-            getPdf(resource.id).then(blob => {
-                if (blob) {
-                    setFileUrl(URL.createObjectURL(blob));
-                } else {
-                    setError("Could not find the stored PDF file.");
-                }
-            }).catch(err => {
-                console.error("Failed to load PDF from DB:", err);
-                setError("Failed to load the PDF from local storage.");
-            }).finally(() => {
-                setLoading(false);
-            });
+  function goToPrevPage() {
+    setPageNumber((prev) => (prev > 1 ? prev - 1 : prev));
+  }
 
-        } else if (isOpen && resource && resource.link) { // Fallback for external links
-            setFileUrl(resource.link);
-            setLoading(false);
-        }
+  function goToNextPage() {
+    setPageNumber((prev) => (prev < (numPages ?? 1) ? prev + 1 : prev));
+  }
 
-        return () => {
-            if (fileUrl && fileUrl.startsWith('blob:')) {
-                URL.revokeObjectURL(fileUrl);
-            }
-        };
-    }, [isOpen, resource]);
+  return (
+    <div style={{ textAlign: "center" }}>
+      <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess}>
+        <Page pageNumber={pageNumber} scale={scale} />
+      </Document>
 
-    function onDocumentLoadSuccess({ numPages }: { numPages: number }): void {
-        setNumPages(numPages);
-    }
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>{resource?.name || "PDF Viewer"}</DialogTitle>
-                    <DialogDescription>
-                        {resource?.pdfFileName || "Loading document..."}
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        {loading && (
-                             <div className="flex h-full w-full items-center justify-center">
-                                <Loader2 className="h-8 w-8 animate-spin" />
-                            </div>
-                        )}
-                        {error && <p className="text-destructive text-center">{error}</p>}
-                        {fileUrl && !error && (
-                             <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess} loading={<div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-                                {Array.from(new Array(numPages || 0), (el, index) => (
-                                    <Page 
-                                        key={`page_${index + 1}`} 
-                                        pageNumber={index + 1}
-                                        renderTextLayer={true}
-                                        renderAnnotationLayer={true}
-                                    />
-                                ))}
-                            </Document>
-                        )}
-                    </ScrollArea>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+      {numPages && numPages > 1 && (
+        <div style={{ marginTop: "1rem" }}>
+          <button onClick={goToPrevPage} disabled={pageNumber <= 1}>
+            Previous
+          </button>
+          <span style={{ margin: "0 1rem" }}>
+            Page {pageNumber} of {numPages}
+          </span>
+          <button onClick={goToNextPage} disabled={pageNumber >= numPages}>
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
-
-export default PdfViewer;
