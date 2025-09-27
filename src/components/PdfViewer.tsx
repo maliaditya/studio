@@ -1,16 +1,15 @@
+
 "use client";
 
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 
-// Set the worker from the static import
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
-
+// Use PDF.js CDN worker to avoid Next.js module resolution issues
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PdfViewerProps {
-  file: Blob | null; // Can be a Blob from IndexedDB
+  file: Blob | null;
   scale?: number;
 }
 
