@@ -1,20 +1,23 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+import { useToast } from '@/hooks/use-toast';
 import { getPdf } from '@/lib/audioDB';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+
+// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file 
+// to the build output and providing the correct public path.
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
 // Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
-// It points to a stable CDN location for the worker file.
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PdfViewerProps {
     isOpen: boolean;
@@ -48,7 +51,6 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
                     }
                 } catch (err) {
                     const message = err instanceof Error ? err.message : 'Could not load PDF.';
-                    console.error(message);
                     setError(message);
                     toast({ title: "Error Loading PDF", description: message, variant: 'destructive' });
                 } finally {
