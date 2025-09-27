@@ -3,48 +3,24 @@
 
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import type { DocumentProps, PageProps } from 'react-pdf';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
 import { getPdf } from '@/lib/audioDB';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { pdfjs } from 'react-pdf';
 
-// Correctly set the worker URL at the module level.
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+// Set the worker source directly at the module level
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  `https://unpkg.com/pdfjs-dist@${pdfjs.version}/`,
+).toString();
 
 interface PdfViewerProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     resourceId: string | null;
-}
-
-// Dynamically import react-pdf components to ensure they only run on the client
-const Document = (props: DocumentProps) => {
-  const [ClientDocument, setClientDocument] = useState<React.ComponentType<DocumentProps> | null>(null);
-  useEffect(() => {
-    import('react-pdf').then(module => setClientDocument(() => module.Document));
-  }, []);
-  
-  if (!ClientDocument) return <div><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  
-  return <ClientDocument {...props} />;
-}
-
-const Page = (props: PageProps) => {
-  const [ClientPage, setClientPage] = useState<React.ComponentType<PageProps> | null>(null);
-  useEffect(() => {
-    import('react-pdf').then(module => {
-      // Need to import these CSS files for react-pdf to work correctly
-      import('react-pdf/dist/esm/Page/AnnotationLayer.css');
-      import('react-pdf/dist/esm/Page/TextLayer.css');
-      setClientPage(() => module.Page);
-    });
-  }, []);
-  
-  if (!ClientPage) return <div><Loader2 className="h-6 w-6 animate-spin" /></div>;
-  
-  return <ClientPage {...props} />;
 }
 
 export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
