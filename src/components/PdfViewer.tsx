@@ -7,7 +7,7 @@ import { getPdf } from '@/lib/audioDB';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
-import { pdfjs, Document, Page } from 'react-pdf';
+import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
