@@ -39,6 +39,7 @@ import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import dynamic from 'next/dynamic';
+import { storePdf } from '@/lib/audioDB';
 
 const PdfViewer = dynamic(() => import('@/components/PdfViewer').then(mod => mod.PdfViewer), {
   ssr: false,
@@ -1383,9 +1384,7 @@ function ResourcesPageContent() {
           hasLocalPdf: true, 
       };
   
-      // You would need a service to store the PDF blob in IndexedDB
-      // For now, we'll just update the resource state
-      // storePdf(newRes.id, file); // This function needs to be implemented in audioDB.ts
+      storePdf(newRes.id, file);
   
       setResources(prev => [...prev, newRes]);
       toast({ title: 'PDF Added', description: `"${file.name}" is ready.` });
