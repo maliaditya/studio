@@ -11,10 +11,12 @@ import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Set the worker source directly at the module level.
-// This is the correct and most reliable way to configure the worker for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file 
+// to the build output and providing the correct public path.
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
 
+// Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PdfViewerProps {
     isOpen: boolean;
