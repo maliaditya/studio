@@ -1,123 +1,18 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { getPdf } from '@/lib/audioDB';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Button } from './ui/button';
-import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import { Document, Page, pdfjs } from "react-pdf";
+import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
-// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file
-// to the build output and providing the correct public path.
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+// Set worker
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 
-// Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-
-
-interface PdfViewerProps {
-    isOpen: boolean;
-    onOpenChange: (isOpen: boolean) => void;
-    resourceId: string | null;
-}
-
-export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
-    const { toast } = useToast();
-    const [file, setFile] = useState<Blob | null>(null);
-    const [numPages, setNumPages] = useState<number>(0);
-    const [pageNumber, setPageNumber] = useState(1);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (isOpen && resourceId) {
-            setIsLoading(true);
-            setError(null);
-            setFile(null);
-            setNumPages(0);
-            setPageNumber(1);
-
-            const fetchPdf = async () => {
-                try {
-                    const pdfBlob = await getPdf(resourceId);
-                    if (pdfBlob) {
-                        setFile(pdfBlob);
-                    } else {
-                        throw new Error('PDF data not found in local storage.');
-                    }
-                } catch (err) {
-                    const message = err instanceof Error ? err.message : 'Could not load PDF.';
-                    setError(message);
-                    toast({ title: "Error Loading PDF", description: message, variant: 'destructive' });
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-            fetchPdf();
-        }
-    }, [isOpen, resourceId, toast]);
-
-    function onDocumentLoadSuccess({ numPages: nextNumPages }: { numPages: number }) {
-        setNumPages(nextNumPages);
-    }
-
-    const goToPrevPage = () => setPageNumber(prev => Math.max(prev - 1, 1));
-    const goToNextPage = () => setPageNumber(prev => Math.min(prev + 1, numPages));
-    
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <DialogHeader className="p-4 border-b flex-shrink-0">
-                    <DialogTitle>PDF Viewer</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0 flex items-center justify-center bg-muted/30">
-                    {isLoading && <Loader2 className="h-8 w-8 animate-spin" />}
-                    {error && (
-                        <div className="text-center text-destructive">
-                            <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-                            <p>{error}</p>
-                        </div>
-                    )}
-                    {!isLoading && !error && file && (
-                        <Document
-                            file={file}
-                            onLoadSuccess={onDocumentLoadSuccess}
-                            onLoadError={(err) => {
-                                console.error('PDF Document Load Error:', err);
-                                setError('Failed to load PDF document.');
-                            }}
-                            className="flex justify-center items-center h-full overflow-auto"
-                            loading={<Loader2 className="h-6 w-6 animate-spin" />}
-                        >
-                            <Page 
-                                pageNumber={pageNumber} 
-                                width={800}
-                                error={<p>Could not load page.</p>}
-                                loading={<Loader2 className="h-6 w-6 animate-spin" />}
-                            />
-                        </Document>
-                    )}
-                </div>
-                {numPages > 0 && (
-                    <DialogFooter className="p-2 border-t flex-shrink-0">
-                        <div className="flex items-center justify-center w-full">
-                            <Button variant="ghost" size="icon" onClick={goToPrevPage} disabled={pageNumber <= 1}>
-                                <ChevronLeft className="h-5 w-5" />
-                            </Button>
-                            <span className="text-sm font-medium">
-                                Page {pageNumber} of {numPages}
-                            </span>
-                             <Button variant="ghost" size="icon" onClick={goToNextPage} disabled={pageNumber >= numPages}>
-                                <ChevronRight className="h-5 w-5" />
-                            </Button>
-                        </div>
-                    </DialogFooter>
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+export default function PdfViewer({ fileUrl }: { fileUrl: string }) {
+  return (
+    <div style={{ width: "100%", height: "100%" }}>
+      <Document file={fileUrl}>
+        <Page pageNumber={1} />
+      </Document>
+    </div>
+  );
 }
