@@ -1259,7 +1259,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         {showControls && (
           <Card className="mb-6 flex-shrink-0">
             <CardHeader>
-              <DialogTitle>Mind Map Controls</DialogTitle>
+              <DialogTitle>Mind Map</DialogTitle>
               <CardDescription>Select a topic to generate its mind map. Use the controls to navigate.</CardDescription>
             </CardHeader>
             <CardContent>

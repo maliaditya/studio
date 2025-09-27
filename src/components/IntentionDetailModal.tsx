@@ -442,7 +442,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                 </Button>
               )}
               <div className="flex-grow min-w-0">
-                  <CardTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</CardTitle>
+                  <DialogTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</DialogTitle>
               </div>
                {isUpskillCuriosity && (
                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewLinkedIntentions}>
