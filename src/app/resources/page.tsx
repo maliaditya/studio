@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View, File as FileIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint, PopupState } from '@/types/workout';
@@ -38,6 +38,7 @@ import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { PdfViewer } from '@/components/PdfViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -128,9 +129,10 @@ interface ResourceCardComponentProps {
     onEditLinkText: (point: ResourcePoint) => void;
     onClosePopup?: (e: React.MouseEvent | React.PointerEvent) => void;
     onConvertToCard: (point: ResourcePoint) => void;
+    onOpenPdfViewer: (resourceId: string) => void;
 }
 
-const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard }: ResourceCardComponentProps) => {
+const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard, onOpenPdfViewer }: ResourceCardComponentProps) => {
     const { resources, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
     
@@ -520,7 +522,7 @@ function ResourcesPageContent() {
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFolderId, setMindMapRootFolderId] = useState<string | null>(null);
   
-  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism'>('link');
+  const [addResourceType, setAddResourceType] = useState<'link' | 'card' | 'habit' | 'model3d' | 'mechanism' | 'pdf'>('link');
   const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
 
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -939,7 +941,7 @@ function ResourcesPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && !newResourceName.trim()) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
@@ -1349,6 +1351,43 @@ function ResourcesPageContent() {
     };
     reader.readAsDataURL(file);
   };
+  
+  const [pdfViewerState, setPdfViewerState] = useState<{isOpen: boolean, resourceId: string | null}>({ isOpen: false, resourceId: null });
+
+  const handleOpenPdfViewer = (resourceId: string) => {
+      setPdfViewerState({ isOpen: true, resourceId });
+  };
+  
+  const pdfUploadInputRef = useRef<HTMLInputElement>(null);
+  
+  const handlePdfUploadClick = () => {
+    pdfUploadInputRef.current?.click();
+  };
+  
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !selectedResourceFolderId) return;
+  
+      const newRes: Resource = {
+          id: `res_pdf_${Date.now()}`,
+          name: file.name,
+          folderId: selectedResourceFolderId,
+          type: 'pdf',
+          createdAt: new Date().toISOString(),
+          pdfFileName: file.name,
+          hasLocalPdf: true, 
+      };
+  
+      // You would need a service to store the PDF blob in IndexedDB
+      // For now, we'll just update the resource state
+      // storePdf(newRes.id, file); // This function needs to be implemented in audioDB.ts
+  
+      setResources(prev => [...prev, newRes]);
+      toast({ title: 'PDF Added', description: `"${file.name}" is ready.` });
+      e.target.value = '';
+      setIsAdding(false);
+  };
+
 
   return (
       <DndContext
@@ -1356,6 +1395,7 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
+        <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
         <audio ref={audioRef} />
         <div className="h-[calc(100vh-4rem-1px)] grid md:grid-cols-[1fr,3fr] lg:grid-cols-[1fr,4fr] p-4 sm:p-6 lg:p-8 gap-8">
             <aside className="h-full flex flex-col min-h-0">
@@ -1447,7 +1487,21 @@ function ResourcesPageContent() {
     
                                 let cardContent: React.ReactNode;
                                 
-                                if (res.type === 'model3d') {
+                                if (res.type === 'pdf') {
+                                    cardContent = (
+                                        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full cursor-pointer" onClick={() => handleOpenPdfViewer(res.id)}>
+                                            <CardHeader className="p-3">
+                                                <CardTitle className="text-sm flex items-center gap-2">
+                                                    <span className="text-primary"><FileIcon className="h-4 w-4" /></span>
+                                                    <span className="truncate">{res.name}</span>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="flex-grow flex items-center justify-center bg-muted/30 aspect-[3/4]">
+                                                <p className="text-muted-foreground">PDF Document</p>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                } else if (res.type === 'model3d') {
                                     cardContent = (
                                         <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full">
                                             <CardHeader className="p-3">
@@ -1476,7 +1530,7 @@ function ResourcesPageContent() {
                                 } else if (res.type === 'mechanism') {
                                     cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                                 } else if(res.type === 'card') {
-                                    cardContent = <ResourceCardComponent playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                    cardContent = <ResourceCardComponent onOpenPdfViewer={() => {}} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
                                 } else {
                                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                     const isGif = isGifUrl(res.link);
@@ -1750,6 +1804,7 @@ function ResourcesPageContent() {
                         <TabsTrigger value="habit">Habit</TabsTrigger>
                         <TabsTrigger value="mechanism">Mechanism</TabsTrigger>
                         <TabsTrigger value="model3d">3D Model</TabsTrigger>
+                        <TabsTrigger value="pdf">PDF</TabsTrigger>
                     </TabsList>
                     <TabsContent value="link" className="pt-4">
                         <Input autoFocus placeholder="https://example.com" value={newResourceLink} onChange={(e) => setNewResourceLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
@@ -1776,6 +1831,11 @@ function ResourcesPageContent() {
                     <TabsContent value="model3d" className="pt-4 space-y-2">
                         <Input autoFocus placeholder="Model name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} />
                         <Input type="file" accept=".glb,.gltf" onChange={handleModelUpload} className="file:text-primary file:font-medium" />
+                    </TabsContent>
+                    <TabsContent value="pdf" className="pt-4">
+                        <Button onClick={handlePdfUploadClick} className="w-full">
+                            <Upload className="mr-2 h-4 w-4" /> Upload PDF
+                        </Button>
                     </TabsContent>
                 </Tabs>
                 <DialogFooter>
@@ -1842,6 +1902,7 @@ function ResourcesPageContent() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        <PdfViewer isOpen={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })} resourceId={pdfViewerState.resourceId} />
       </DndContext>
   );
 }
@@ -1852,6 +1913,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 

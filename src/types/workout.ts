@@ -329,7 +329,7 @@ export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d';
+  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d' | 'pdf';
   createdAt: string;
   isFavorite?: boolean;
 
@@ -344,6 +344,8 @@ export interface Resource {
   hasLocalAudio?: boolean; // Flag to check IndexedDB
   audioUrl?: string;
   audioFileName?: string;
+  hasLocalPdf?: boolean;
+  pdfFileName?: string;
 
   // For 'card' type
   points?: ResourcePoint[];

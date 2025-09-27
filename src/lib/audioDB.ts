@@ -1,8 +1,9 @@
 "use client";
 
-const DB_NAME = 'LifeOSAudioDB';
-const STORE_NAME = 'audioStore';
-const DB_VERSION = 1;
+const DB_NAME = 'LifeOSFileDB';
+const AUDIO_STORE_NAME = 'audioStore';
+const PDF_STORE_NAME = 'pdfStore';
+const DB_VERSION = 2; // Increment version to trigger onupgradeneeded
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -21,8 +22,11 @@ function getDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
+      if (!db.objectStoreNames.contains(AUDIO_STORE_NAME)) {
+        db.createObjectStore(AUDIO_STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(PDF_STORE_NAME)) {
+        db.createObjectStore(PDF_STORE_NAME);
       }
     };
 
@@ -33,11 +37,10 @@ function getDB(): Promise<IDBDatabase> {
     request.onerror = (event) => {
       console.error('IndexedDB error:', (event.target as IDBOpenDBRequest).error);
       reject(new Error('IndexedDB error'));
-      dbPromise = null; // Reset promise on error
+      dbPromise = null;
     };
 
     request.onblocked = () => {
-        // This event is fired when the database is blocked by an old connection.
         console.warn('IndexedDB connection is blocked. Please close other tabs with this app open.');
         reject(new Error('IndexedDB connection blocked.'));
         dbPromise = null;
@@ -47,49 +50,60 @@ function getDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-export async function storeAudio(key: string, audioBlob: Blob): Promise<void> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(audioBlob, key);
-
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => {
-        console.error('Error storing audio:', (event.target as IDBRequest).error);
-        reject(new Error('Failed to store audio.'));
-    };
-  });
-}
-
-export async function getAudio(key: string): Promise<Blob | null> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.get(key);
-
-    request.onsuccess = () => {
-      resolve(request.result || null);
-    };
-    request.onerror = (event) => {
-      console.error('Error fetching audio:', (event.target as IDBRequest).error);
-      reject(new Error('Failed to retrieve audio.'));
-    };
-  });
-}
-
-export async function deleteAudio(key: string): Promise<void> {
+async function storeItem(storeName: string, key: string, blob: Blob): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
-      const transaction = db.transaction(STORE_NAME, 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(key);
+      const transaction = db.transaction(storeName, 'readwrite');
+      const store = transaction.objectStore(storeName);
+      const request = store.put(blob, key);
   
       request.onsuccess = () => resolve();
       request.onerror = (event) => {
-        console.error('Error deleting audio:', (event.target as IDBRequest).error);
-        reject(new Error('Failed to delete audio.'));
+          console.error(`Error storing item in ${storeName}:`, (event.target as IDBRequest).error);
+          reject(new Error(`Failed to store item in ${storeName}.`));
       };
     });
 }
+
+async function getItem(storeName: string, key: string): Promise<Blob | null> {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readonly');
+      const store = transaction.objectStore(storeName);
+      const request = store.get(key);
+  
+      request.onsuccess = () => {
+        resolve(request.result || null);
+      };
+      request.onerror = (event) => {
+        console.error(`Error fetching item from ${storeName}:`, (event.target as IDBRequest).error);
+        reject(new Error(`Failed to retrieve item from ${storeName}.`));
+      };
+    });
+}
+
+async function deleteItem(storeName: string, key: string): Promise<void> {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.delete(key);
+    
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => {
+            console.error(`Error deleting item from ${storeName}:`, (event.target as IDBRequest).error);
+            reject(new Error(`Failed to delete item from ${storeName}.`));
+        };
+    });
+}
+
+
+// Audio functions
+export const storeAudio = (key: string, audioBlob: Blob) => storeItem(AUDIO_STORE_NAME, key, audioBlob);
+export const getAudio = (key: string) => getItem(AUDIO_STORE_NAME, key);
+export const deleteAudio = (key: string) => deleteItem(AUDIO_STORE_NAME, key);
+
+// PDF functions
+export const storePdf = (key: string, pdfBlob: Blob) => storeItem(PDF_STORE_NAME, key, pdfBlob);
+export const getPdf = (key: string) => getItem(PDF_STORE_NAME, key);
+export const deletePdf = (key: string) => deleteItem(PDF_STORE_NAME, key);
