@@ -1,7 +1,6 @@
 
 "use client";
 
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
@@ -10,13 +9,10 @@ import type { Resource } from "@/types/workout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
-import { pdfjs } from "react-pdf";
+import { pdfjs, Document, Page } from "react-pdf";
 
+// Set worker from CDN to prevent "fake worker" warning in Next.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), { ssr: false });
-const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), { ssr: false });
-
 
 interface PdfViewerProps {
     isOpen: boolean;
