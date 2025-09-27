@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
+import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 
-// Use PDF.js CDN worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Set the worker from the static import
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+
 
 interface PdfViewerProps {
   file: Blob | null; // Can be a Blob from IndexedDB
