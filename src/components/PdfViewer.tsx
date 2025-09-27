@@ -88,8 +88,8 @@ export function PdfViewer({ isOpen, onOpenChange, resource }: PdfViewerProps) {
                                     <Page 
                                         key={`page_${index + 1}`} 
                                         pageNumber={index + 1}
-                                        renderTextLayer={false}
-                                        renderAnnotationLayer={false}
+                                        renderTextLayer={true}
+                                        renderAnnotationLayer={true}
                                     />
                                 ))}
                             </Document>
