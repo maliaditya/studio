@@ -38,7 +38,12 @@ import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { PdfViewer } from '@/components/PdfViewer';
+import dynamic from 'next/dynamic';
+
+const PdfViewer = dynamic(() => import('@/components/PdfViewer').then(mod => mod.PdfViewer), {
+  ssr: false,
+  loading: () => <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
+});
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -1397,7 +1402,7 @@ function ResourcesPageContent() {
       >
         <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
         <audio ref={audioRef} />
-        <div className="h-[calc(100vh-4rem-1px)] grid md:grid-cols-[1fr,3fr] lg:grid-cols-[1fr,4fr] p-4 sm:p-6 lg:p-8 gap-8">
+        <div className="h-full flex flex-col min-h-0">
             <aside className="h-full flex flex-col min-h-0">
                 <Card className="flex-grow flex flex-col min-h-0">
                     <CardHeader>
@@ -1530,7 +1535,7 @@ function ResourcesPageContent() {
                                 } else if (res.type === 'mechanism') {
                                     cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                                 } else if(res.type === 'card') {
-                                    cardContent = <ResourceCardComponent onOpenPdfViewer={() => {}} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={handleConvertToCard}/>;
+                                    cardContent = <ResourceCardComponent onOpenPdfViewer={() => {}} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => {}}/>;
                                 } else {
                                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                     const isGif = isGifUrl(res.link);
@@ -1913,29 +1918,3 @@ export default function ResourcesPage() {
     
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
