@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -874,7 +873,7 @@ function ResourcesPageContent() {
     }
     
     setResourceFolders(prev => prev.filter(f => !idsToDelete.includes(f.id)));
-    setResources(prev => prev.filter(r => !idsToDelete.includes(r.folderId)));
+    setResources(prev => prev.filter(r => r.folderId && !idsToDelete.includes(r.folderId)));
     setActiveResourceTabIds(prev => prev.filter(id => !idsToDelete.includes(id)));
     
     if (selectedResourceFolderId && idsToDelete.includes(selectedResourceFolderId)) {
@@ -1657,3 +1656,4 @@ export default function ResourcesPage() {
     
 
     
+

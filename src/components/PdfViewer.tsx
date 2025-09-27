@@ -14,13 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 // Set up the worker for react-pdf from a CDN
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
-
 interface PdfViewerProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     resourceId: string | null;
 }
-
 
 export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
     const { toast } = useToast();
