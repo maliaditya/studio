@@ -2,23 +2,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import dynamic from "next/dynamic";
-import { pdfjs } from "react-pdf";
+import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
 import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
+import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 
-// Use the official CDN worker to avoid bundling issues
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-// Dynamically import react-pdf components with SSR turned off
-const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), {
-  ssr: false,
-  loading: () => <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>,
-});
-const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), {
-  ssr: false,
-});
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
 
 interface PdfViewerProps {
