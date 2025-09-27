@@ -39,7 +39,7 @@ import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import dynamic from 'next/dynamic';
-import { storePdf } from '@/lib/audioDB';
+import { storePdf, getPdf } from '@/lib/audioDB';
 
 const PdfViewer = dynamic(() => import('@/components/PdfViewer'), {
   ssr: false,
@@ -1358,10 +1358,19 @@ function ResourcesPageContent() {
     reader.readAsDataURL(file);
   };
   
-  const [pdfViewerState, setPdfViewerState] = useState<{isOpen: boolean, resource: Resource | null}>({ isOpen: false, resource: null });
+  const [pdfViewerState, setPdfViewerState] = useState<{isOpen: boolean, file: Blob | null}>({ isOpen: false, file: null });
 
-  const handleOpenPdfViewer = (resource: Resource) => {
-      setPdfViewerState({ isOpen: true, resource });
+  const handleOpenPdfViewer = async (resource: Resource) => {
+      if (resource.hasLocalPdf && resource.id) {
+        setPdfViewerState({ isOpen: true, file: null }); // Open with loading state
+        const pdfBlob = await getPdf(resource.id);
+        if (pdfBlob) {
+            setPdfViewerState({ isOpen: true, file: pdfBlob });
+        } else {
+            toast({ title: "Error", description: "Could not load the PDF from local storage.", variant: "destructive" });
+            setPdfViewerState({ isOpen: false, file: null });
+        }
+      }
   };
   
   const pdfUploadInputRef = useRef<HTMLInputElement>(null);
@@ -1646,13 +1655,11 @@ function ResourcesPageContent() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      {pdfViewerState.isOpen && (
-        <PdfViewer
-            isOpen={pdfViewerState.isOpen}
-            onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resource: null })}
-            resource={pdfViewerState.resource}
-        />
-      )}
+      <Dialog open={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, file: null })}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <PdfViewer file={pdfViewerState.file} />
+        </DialogContent>
+      </Dialog>
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent>
             <DialogHeader>
@@ -1710,6 +1717,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
