@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 import { Loader2 } from "lucide-react";
 import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Use the official CDN worker to avoid Next.js bundling issues
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface PdfViewerProps {
   resource: Resource | null;
