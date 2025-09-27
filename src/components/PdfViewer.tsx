@@ -11,12 +11,9 @@ import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Correctly set the worker path at the module level.
-// This is the standard and most reliable method for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url,
-).toString();
+// Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
+// It points to a stable CDN location for the worker file.
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 
 interface PdfViewerProps {
