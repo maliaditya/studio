@@ -6,10 +6,12 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
 import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
-// Dynamically construct the worker URL to match the installed pdfjs-dist version
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url
+).toString();
 
 interface PdfViewerProps {
   resource: Resource | null;
@@ -98,3 +100,4 @@ export default function PdfViewer({ resource, scale = 1.2 }: PdfViewerProps) {
     </div>
   );
 }
+
