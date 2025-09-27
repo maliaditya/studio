@@ -2,13 +2,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
+import dynamic from "next/dynamic";
+import { pdfjs } from "react-pdf";
 import { Loader2 } from "lucide-react";
 import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
-import pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.entry";
 
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
+// Use the official CDN worker to avoid bundling issues
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+
+// Dynamically import react-pdf components with SSR turned off
+const Document = dynamic(() => import("react-pdf").then((mod) => mod.Document), {
+  ssr: false,
+  loading: () => <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>,
+});
+const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), {
+  ssr: false,
+});
 
 
 interface PdfViewerProps {
@@ -26,9 +36,15 @@ export default function PdfViewer({ resource, scale = 1.2 }: PdfViewerProps) {
     async function loadPdf() {
       if (resource?.hasLocalPdf && resource.id) {
         setIsLoading(true);
-        const pdfBlob = await getPdf(resource.id);
-        setFile(pdfBlob);
-        setIsLoading(false);
+        try {
+          const pdfBlob = await getPdf(resource.id);
+          setFile(pdfBlob);
+        } catch (error) {
+          console.error("Failed to load PDF from IndexedDB", error);
+          setFile(null);
+        } finally {
+          setIsLoading(false);
+        }
       } else {
         setFile(null);
         setIsLoading(false);
@@ -92,4 +108,3 @@ export default function PdfViewer({ resource, scale = 1.2 }: PdfViewerProps) {
     </div>
   );
 }
-
