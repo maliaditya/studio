@@ -7,17 +7,19 @@ import { getPdf } from '@/lib/audioDB';
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-// Dynamically import react-pdf components
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import type { DocumentProps, PageProps } from 'react-pdf';
 
 interface PdfViewerProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     resourceId: string | null;
 }
+
+// Client-side only PDF components
+let Document: React.ComponentType<DocumentProps> | null = null;
+let Page: React.ComponentType<PageProps> | null = null;
+let pdfjs: any = null;
+
 
 export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
     const { toast } = useToast();
@@ -26,10 +28,25 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
     const [pageNumber, setPageNumber] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        // Set workerSrc only on the client side when the component mounts
-        pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+        // This ensures the component has mounted on the client
+        setIsClient(true);
+        
+        // Dynamically import react-pdf and configure worker
+        import('react-pdf').then(pdfModule => {
+            Document = pdfModule.Document;
+            Page = pdfModule.Page;
+            pdfjs = pdfModule.pdfjs;
+            pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+              'pdfjs-dist/build/pdf.worker.min.js',
+              `https://unpkg.com/pdfjs-dist@${pdfjs.version}/`,
+            ).toString();
+        }).catch(err => {
+            console.error("Failed to load react-pdf module:", err);
+            setError("Could not load PDF viewer components.");
+        });
     }, []);
 
     useEffect(() => {
@@ -82,7 +99,7 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
                             <p>{error}</p>
                         </div>
                     )}
-                    {!isLoading && !error && file && (
+                    {isClient && Document && Page && !isLoading && !error && file && (
                         <Document
                             file={file}
                             onLoadSuccess={onDocumentLoadSuccess}
