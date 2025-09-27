@@ -9,16 +9,15 @@ import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast';
 import type { DocumentProps, PageProps } from 'react-pdf';
 
+let Document: React.ComponentType<DocumentProps> | null = null;
+let Page: React.ComponentType<PageProps> | null = null;
+let pdfjs: any = null;
+
 interface PdfViewerProps {
     isOpen: boolean;
     onOpenChange: (isOpen: boolean) => void;
     resourceId: string | null;
 }
-
-// Client-side only PDF components
-let Document: React.ComponentType<DocumentProps> | null = null;
-let Page: React.ComponentType<PageProps> | null = null;
-let pdfjs: any = null;
 
 
 export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) {
