@@ -1400,10 +1400,10 @@ function ResourcesPageContent() {
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 h-full p-4">
         <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
         <audio ref={audioRef} />
-        <div className="h-full flex flex-col min-h-0">
-            <aside className="h-full flex flex-col min-h-0">
+        <aside className="h-full flex flex-col min-h-0 xl:col-span-1 lg:col-span-2 md:col-span-2 col-span-1">
                 <Card className="flex-grow flex flex-col min-h-0">
                     <CardHeader>
                     <div className="flex justify-between items-center">
@@ -1431,7 +1431,7 @@ function ResourcesPageContent() {
                 </Card>
             </aside>
 
-            <main className="flex flex-col h-full min-h-0">
+            <main className="h-full flex flex-col min-h-0 xl:col-span-3 lg:col-span-3 md:col-span-2 col-span-1">
                 <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
                     <div
                         ref={tabsContainerRef}
