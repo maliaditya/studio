@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-// Set up the worker for react-pdf from a CDN
+// Set up the worker for react-pdf from a CDN. This is the standard and correct way for Next.js.
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 interface PdfViewerProps {
