@@ -4,7 +4,7 @@
 const DB_NAME = 'LifeOSFileDB';
 const AUDIO_STORE_NAME = 'audioStore';
 const PDF_STORE_NAME = 'pdfStore';
-const DB_VERSION = 2; // Increment version to trigger onupgradeneeded
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
