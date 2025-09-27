@@ -13,12 +13,12 @@ import { pdfjs, Document, Page } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
-// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file 
+// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file
 // to the build output and providing the correct public path.
-import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+import pdfjsWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
 
 // Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 
 interface PdfViewerProps {
