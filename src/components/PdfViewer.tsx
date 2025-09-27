@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,8 +10,9 @@ import { Loader2 } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { pdfjs, Document, Page } from "react-pdf";
 
-// Set worker from CDN to prevent "fake worker" warning in Next.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Point worker to the local file in the public directory.
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+
 
 interface PdfViewerProps {
     isOpen: boolean;
