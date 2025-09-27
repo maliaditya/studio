@@ -284,7 +284,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={onConvertToCard}
+                                        onConvertToCard={() => onConvertToCard(point)}
                                     />
                                 ))}
                             </ul>
@@ -1644,7 +1644,7 @@ function ResourcesPageContent() {
         </DragOverlay>
       </DndContext>
       <Dialog open={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resource: isOpen ? pdfViewerState.resource : null })}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-2">
             <DialogTitle>
                 <VisuallyHidden>PDF Viewer: {pdfViewerState.resource?.name}</VisuallyHidden>
             </DialogTitle>
@@ -1708,6 +1708,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 
