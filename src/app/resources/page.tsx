@@ -1394,15 +1394,14 @@ function ResourcesPageContent() {
 
 
   return (
+    <div className="grid h-full grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
+      <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
       <DndContext
         sensors={sensors}
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 h-full p-4">
-        <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
-        <audio ref={audioRef} />
-        <aside className="h-full flex flex-col min-h-0 xl:col-span-1 lg:col-span-2 md:col-span-2 col-span-1">
+        <aside className="col-span-1 flex h-full min-h-0 flex-col md:col-span-2 lg:col-span-2 xl:col-span-1">
                 <Card className="flex-grow flex flex-col min-h-0">
                     <CardHeader>
                     <div className="flex justify-between items-center">
@@ -1430,7 +1429,7 @@ function ResourcesPageContent() {
                 </Card>
             </aside>
 
-            <main className="h-full flex flex-col min-h-0 xl:col-span-3 lg:col-span-3 md:col-span-2 col-span-1">
+            <main className="h-full flex flex-col min-h-0 col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-3">
                 <div className="flex items-center border-b mb-4 flex-shrink-0 sticky top-0 bg-background/80 backdrop-blur-sm z-10 -mt-2 pt-2">
                     <div
                         ref={tabsContainerRef}
@@ -1631,283 +1630,24 @@ function ResourcesPageContent() {
                   </ScrollArea>
                 </div>
             </main>
-          </div>
-        {contextMenu && (
-            <div ref={contextMenuRef} style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }} className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95" onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { togglePinFolder(contextMenu.item.id); setContextMenu(null); }}>
-                    {pinnedFolderIds.has(contextMenu.item.id) ? <PinOff className="mr-2 h-4 w-4" /> : <Pin className="mr-2 h-4 w-4" />}
-                    {pinnedFolderIds.has(contextMenu.item.id) ? 'Unpin' : 'Pin'}
-                </Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}>New Folder</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4" />Share Publicly</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2" onClick={() => { handleStartEditingFolder(contextMenu.item); setContextMenu(null); }}>Rename</Button>
-                <Button variant="ghost" className="w-full h-9 justify-start px-2 text-destructive hover:text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}>Delete</Button>
+          
+        <DragOverlay>
+          {activeId?.startsWith('folder-') ? (
+            <div className="flex items-center gap-2 p-2 rounded-md bg-accent font-semibold shadow-lg">
+              <Folder className="h-4 w-4" />
+              <span>{resourceFolders.find(f => f.id === activeId)?.name}</span>
             </div>
-        )}
-        
-        {deleteConfirmation && (
-            <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {'folderId' in deleteConfirmation.item
-                                ? `This resource may be linked in other cards. Deleting it could break those links. Are you sure you want to proceed?`
-                                : `This will permanently delete "${deleteConfirmation.item.name}" and all its contents. This action cannot be undone.`
-                            }
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDeleteConfirmation(null)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => { 
-                            if ('parentId' in deleteConfirmation.item) {
-                                handleDeleteFolder(deleteConfirmation.item.id);
-                            } else {
-                                performDeleteResource(deleteConfirmation.item.id);
-                            }
-                            setDeleteConfirmation(null); 
-                        }}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        )}
-
-        {editingResource && (
-          <Dialog open={!!editingResource} onOpenChange={(isOpen) => !isOpen && setEditingResource(null)}>
-            <DialogContent className="sm:max-w-md">
-                {editingResource && (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle>Edit Resource</DialogTitle>
-                            <DialogDescription>Update the details or move this resource to a new folder.</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="res-name" className="text-right">Name</Label>
-                                <Input id="res-name" value={editingResource.name || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, name: e.target.value} : null)} className="col-span-3"/>
-                            </div>
-                            {editingResource?.type === 'link' && (
-                            <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="res-link" className="text-right">Link</Label>
-                                    <Input id="res-link" value={editingResource.link || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, link: e.target.value} : null)} className="col-span-3"/>
-                                </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="res-desc" className="text-right">Description</Label>
-                                    <Textarea id="res-desc" value={editingResource.description || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, description: e.target.value} : null)} className="col-span-3"/>
-                                </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="res-github" className="text-right">GitHub Link</Label>
-                                    <Input id="res-github" value={editingResource.githubLink || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, githubLink: e.target.value} : null)} className="col-span-3"/>
-                                </div>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="res-demo" className="text-right">Demo Link</Label>
-                                    <Input id="res-demo" value={editingResource.demoLink || ''} onChange={(e) => setEditingResource(prev => prev ? {...prev, demoLink: e.target.value} : null)} className="col-span-3"/>
-                                </div>
-                                {isGifUrl(editingResource.link) && (
-                                    <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="res-linked-card" className="text-right">Link to Card</Label>
-                                        <Select
-                                            value={editingResource.linkedResourceId || 'none'}
-                                            onValueChange={(value) => setEditingResource(prev => prev ? { ...prev, linkedResourceId: value === 'none' ? undefined : value } : null)}
-                                        >
-                                            <SelectTrigger id="res-linked-card" className="col-span-3">
-                                                <SelectValue placeholder="Select a card to link..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none">-- None --</SelectItem>
-                                                {resources.filter(r => r.type === 'card' && r.id !== editingResource?.id).map(r => (
-                                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                            </>
-                            )}
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="res-folder" className="text-right">Folder</Label>
-                                <Select value={editingResource.folderId || ''} onValueChange={handleResourceFolderChange}>
-                                    <SelectTrigger id="res-folder" className="col-span-3"><SelectValue placeholder="Select a folder" /></SelectTrigger>
-                                    <SelectContent>{renderFolderOptions(null, 0)}</SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setEditingResource(null)}>Cancel</Button>
-                            <Button onClick={handleSaveResourceEdit}>Save Changes</Button>
-                        </DialogFooter>
-                    </>
-                )}
-            </DialogContent>
-          </Dialog>
-        )}
-        
-        <Dialog open={youtubeModalState.isOpen} onOpenChange={(isOpen) => setYoutubeModalState(p => ({...p, isOpen}))}>
-          <DialogContent
-            className="max-w-4xl h-[90vh] flex flex-col p-2"
-            onWheel={(e) => {
-              if (youtubeModalState.playlist.length > 1) {
-                e.deltaY > 0 ? handleNextVideo() : handlePrevVideo();
-              }
-            }}
-          >
-            <DialogHeader className="sr-only">
-              <DialogTitle>YouTube Playlist</DialogTitle>
-            </DialogHeader>
-            <div className="flex-grow min-h-0 relative group/modal">
-              {youtubeModalState.playlist.length > 0 && (
-                <div className="w-full h-full relative">
-                  <iframe
-                    src={getYouTubeEmbedUrl(youtubeModalState.playlist[youtubeModalState.currentIndex]?.link) || ''}
-                    className="w-full h-full border-0 rounded-md"
-                    title="Embedded YouTube Video"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  ></iframe>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-        
-        <Dialog open={modelModalState.isOpen} onOpenChange={(isOpen) => setModelModalState({ ...modelModalState, isOpen })}>
-            <DialogContent className="max-w-6xl h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>3D Model Viewer</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    {modelModalState.modelUrl ? (
-                        <ModelViewer modelUrl={modelModalState.modelUrl} />
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground">
-                            No model to display.
-                        </div>
-                    )}
-                </div>
-            </DialogContent>
-        </Dialog>
-
-
-        <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-                <div className="flex-grow min-h-0">
-                  <MindMapViewer showControls={false} rootFolderId={mindMapRootFolderId} />
-                </div>
-            </DialogContent>
-        </Dialog>
-        <Dialog open={isAdding} onOpenChange={setIsAdding}>
-            <DialogContent>
-                <DialogHeader>
-                <DialogTitle>Add New Resource</DialogTitle>
-                </DialogHeader>
-                <Tabs value={addResourceType} onValueChange={(v) => setAddResourceType(v as any)} className="w-full mt-2 mb-4">
-                    <TabsList className="grid w-full grid-cols-5">
-                        <TabsTrigger value="link">Link</TabsTrigger>
-                        <TabsTrigger value="card">Card</TabsTrigger>
-                        <TabsTrigger value="habit">Habit</TabsTrigger>
-                        <TabsTrigger value="mechanism">Mechanism</TabsTrigger>
-                        <TabsTrigger value="model3d">3D Model</TabsTrigger>
-                        <TabsTrigger value="pdf">PDF</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="link" className="pt-4">
-                        <Input autoFocus placeholder="https://example.com" value={newResourceLink} onChange={(e) => setNewResourceLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
-                    </TabsContent>
-                    <TabsContent value="card" className="pt-4">
-                        <Input autoFocus placeholder="New card name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
-                    </TabsContent>
-                    <TabsContent value="habit" className="pt-4">
-                        <Input autoFocus placeholder="New habit name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
-                    </TabsContent>
-                    <TabsContent value="mechanism" className="pt-4 space-y-4">
-                        <Input autoFocus placeholder="New mechanism name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddResource()} />
-                        <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="negative" id="r-negative" />
-                                <Label htmlFor="r-negative">Negative Framework</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="positive" id="r-positive" />
-                                <Label htmlFor="r-positive">Positive Framework</Label>
-                            </div>
-                        </RadioGroup>
-                    </TabsContent>
-                    <TabsContent value="model3d" className="pt-4 space-y-2">
-                        <Input autoFocus placeholder="Model name..." value={newResourceName} onChange={(e) => setNewResourceName(e.target.value)} />
-                        <Input type="file" accept=".glb,.gltf" onChange={handleModelUpload} className="file:text-primary file:font-medium" />
-                    </TabsContent>
-                    <TabsContent value="pdf" className="pt-4">
-                        <Button onClick={handlePdfUploadClick} className="w-full">
-                            <Upload className="mr-2 h-4 w-4" /> Upload PDF
-                        </Button>
-                    </TabsContent>
-                </Tabs>
-                <DialogFooter>
-                    <Button variant="ghost" onClick={() => setIsAdding(false)}>Cancel</Button>
-                    <Button onClick={handleAddResource} disabled={isFetchingMeta}>
-                        {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Folder Shared Publicly</DialogTitle>
-                    <DialogDescription>Anyone with this link can view the contents of this folder.</DialogDescription>
-                </DialogHeader>
-                <div className="flex items-center space-x-2">
-                    <Input id="share-link" value={shareUrl} readOnly />
-                    <Button onClick={() => {
-                        navigator.clipboard.writeText(shareUrl);
-                        toast({ title: 'Copied to clipboard!' });
-                    }}><Copy className="mr-2 h-4 w-4"/>Copy</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-              <DialogHeader className="p-4 border-b">
-                  <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
-              </DialogHeader>
-              <div className="flex-grow min-h-0">
-                  <ScrollArea className="h-full">
-                      <div className="p-6">
-                        {markdownModalState.point?.type === 'markdown' ? (
-                            <div className="prose dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown></div>
-                        ) : (
-                            <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0 }} showLineNumbers>
-                                {markdownModalState.point?.text || ""}
-                            </SyntaxHighlighter>
-                        )}
-                      </div>
-                  </ScrollArea>
-              </div>
-          </DialogContent>
-        </Dialog>
-        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Link Text</DialogTitle>
-                    <DialogDescription>
-                        Change the display text for this link. The original URL will be preserved.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Label htmlFor="display-text">Display Text</Label>
-                    <Input id="display-text" value={currentDisplayText} onChange={(e) => setCurrentDisplayText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveLinkText()} autoFocus />
-                    <p className="text-xs text-muted-foreground mt-2 truncate">
-                        URL: {linkTextDialog?.point.text}
-                    </p>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
-                    <Button onClick={handleSaveLinkText}>Save</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-        <PdfViewer isOpen={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })} resourceId={pdfViewerState.resourceId} />
+          ) : activeId?.startsWith('card-') ? (
+            <Card className="w-48 shadow-lg">
+              <CardHeader className="p-3">
+                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardTitle>
+              </CardHeader>
+            </Card>
+          ) : null}
+        </DragOverlay>
       </DndContext>
+      <PdfViewer isOpen={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })} resourceId={pdfViewerState.resourceId} />
+    </div>
   );
 }
 
