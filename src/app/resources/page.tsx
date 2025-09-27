@@ -1645,7 +1645,13 @@ function ResourcesPageContent() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      <PdfViewer isOpen={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })} resourceId={pdfViewerState.resourceId} />
+      {pdfViewerState.isOpen && pdfViewerState.resourceId && (
+        <PdfViewer
+            isOpen={pdfViewerState.isOpen}
+            onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resourceId: null })}
+            resourceId={pdfViewerState.resourceId}
+        />
+      )}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent>
             <DialogHeader>
@@ -1703,5 +1709,6 @@ export default function ResourcesPage() {
     
 
     
+
 
 
