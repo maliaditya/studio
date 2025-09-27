@@ -138,6 +138,8 @@ const DraggableSubtaskItem: React.FC<{
     data: { type: 'subtask', itemType: type, subtaskId: childId, name: childName, parentId: parentId },
   });
 
+  const name = childName || "Untitled";
+
   return (
     <div
       ref={setNodeRef}
@@ -148,10 +150,10 @@ const DraggableSubtaskItem: React.FC<{
         isLogged && "line-through text-muted-foreground/70",
         isDragging && "opacity-0"
       )}
-      title={childName}
+      title={name}
     >
       <span>-</span>
-      <span>{childName.length > 25 ? `${childName.substring(0, 25)}...` : childName}</span>
+      <span>{name.length > 25 ? `${name.substring(0, 25)}...` : name}</span>
     </div>
   );
 };
