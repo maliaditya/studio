@@ -31,18 +31,14 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
-        // This ensures the component has mounted on the client
         setIsClient(true);
         
-        // Dynamically import react-pdf and configure worker
         import('react-pdf').then(pdfModule => {
             Document = pdfModule.Document;
             Page = pdfModule.Page;
             pdfjs = pdfModule.pdfjs;
-            pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-              'pdfjs-dist/build/pdf.worker.min.js',
-              `https://unpkg.com/pdfjs-dist@${pdfjs.version}/`,
-            ).toString();
+            // Correctly construct the worker URL
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
         }).catch(err => {
             console.error("Failed to load react-pdf module:", err);
             setError("Could not load PDF viewer components.");
