@@ -1,11 +1,10 @@
-
 "use client";
 
 import { Document, Page, pdfjs } from "react-pdf";
-import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+import * as pdfjsWorker from "pdfjs-dist/build/pdf.worker.entry";
 
-// Set worker
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+// Set the worker
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 export default function PdfViewer({ fileUrl }: { fileUrl: string }) {
   return (
