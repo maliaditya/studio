@@ -37,7 +37,6 @@ export function PdfViewer({ isOpen, onOpenChange, resourceId }: PdfViewerProps) 
             Document = pdfModule.Document;
             Page = pdfModule.Page;
             pdfjs = pdfModule.pdfjs;
-            // Correctly construct the worker URL
             pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
         }).catch(err => {
             console.error("Failed to load react-pdf module:", err);
