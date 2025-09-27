@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
 
+// Dynamically construct the worker URL to match the installed pdfjs-dist version
 pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 
