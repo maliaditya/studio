@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -22,7 +22,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
-import { EditableResourcePoint } from './EditableFields';
+import { EditableResourcePoint, EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
+import { MindMapViewer } from './MindMapViewer';
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -143,6 +144,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
+    const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -449,6 +451,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
                 <div className="absolute top-2 right-2 z-20 flex items-center">
                     <TooltipProvider delayDuration={200}>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMindMapModalOpen(true)}><GitMerge className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
                             {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
                         </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
@@ -542,6 +545,16 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                      </div>
                  </CardFooter>
             </Card>
+             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
+                    <DialogHeader className="p-4 border-b">
+                        <DialogTitle>Mind Map for: {resource.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-grow min-h-0">
+                      <MindMapViewer showControls={false} rootFocusAreaId={resource.id} />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
