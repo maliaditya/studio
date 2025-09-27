@@ -12,12 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from './ui/button';
 import { ChevronLeft, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 
-// By importing the worker as a URL, the bundler (Next.js/Webpack) will handle copying the worker file 
-// to the build output and providing the correct public path.
-import pdfjsWorker from "pdfjs-dist/build/pdf.worker.min.js?url";
+// Correctly set the worker path at the module level.
+// This is the standard and most reliable method for Next.js.
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-// Set the workerSrc for pdfjs. This is the recommended approach for Next.js.
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface PdfViewerProps {
     isOpen: boolean;
