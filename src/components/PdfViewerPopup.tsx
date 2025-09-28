@@ -2,17 +2,17 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import * as pdfjs from 'pdfjs-dist';
-import { Document, Page } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import "react-pdf/dist/esm/Page/TextLayer.css";
 import { Loader2, ZoomIn, ZoomOut, GripVertical, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getPdf } from '@/lib/audioDB';
+import type { Resource } from '@/types/workout';
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from './ui/button';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { cn } from '@/lib/utils';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from 'dnd-kit';
@@ -51,21 +51,24 @@ export function PdfViewerPopup() {
             setFile(null);
             setIsLoading(false);
         }
-        // Reset state when resource changes
         setNumPages(null);
         setPageNumber(1);
+        setScale(1.5);
     }, [pdfViewerState?.resource]);
     
     const handleDragEnd = (event: DragEndEvent) => {
         const { delta } = event;
         if (pdfViewerState) {
-            setPdfViewerState(prev => ({
-                ...prev!,
-                position: {
-                    x: prev!.position.x + delta.x,
-                    y: prev!.position.y + delta.y,
-                },
-            }));
+            setPdfViewerState(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    position: {
+                        x: prev.position.x + delta.x,
+                        y: prev.position.y + delta.y,
+                    },
+                }
+            });
         }
     };
 
@@ -82,6 +85,14 @@ export function PdfViewerPopup() {
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
+    }
+    
+    function zoomIn() {
+        setScale(prev => Math.min(prev + 0.2, 5));
+    }
+
+    function zoomOut() {
+        setScale(prev => Math.max(prev - 0.2, 0.5));
     }
 
     return (
@@ -103,11 +114,11 @@ export function PdfViewerPopup() {
                                     <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1}>Prev</Button>
                                     <span className="text-sm text-muted-foreground">Page {pageNumber} of {numPages}</span>
                                     <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages}>Next</Button>
-                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setScale(s => Math.min(5, s + 0.2))}><ZoomIn className="h-4 w-4" /></Button>
-                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setScale(s => Math.max(0.5, s - 0.2))}><ZoomOut className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomIn}><ZoomIn className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
                                 </>
                             )}
-                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => ({...prev!, isOpen: false}))}>
+                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => (prev ? {...prev, isOpen: false} : null))}>
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
