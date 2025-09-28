@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -16,7 +17,10 @@ import { cn } from '@/lib/utils';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from 'dnd-kit';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
 export function PdfViewerPopup() {
     const { pdfViewerState, setPdfViewerState } = useAuth();
@@ -31,7 +35,7 @@ export function PdfViewerPopup() {
     });
 
     useEffect(() => {
-        if (pdfViewerState.resource?.hasLocalPdf && pdfViewerState.resource.id) {
+        if (pdfViewerState?.resource?.hasLocalPdf && pdfViewerState.resource.id) {
             setIsLoading(true);
             getPdf(pdfViewerState.resource.id)
                 .then(blob => {
@@ -49,7 +53,7 @@ export function PdfViewerPopup() {
         // Reset state when resource changes
         setNumPages(null);
         setPageNumber(1);
-    }, [pdfViewerState.resource]);
+    }, [pdfViewerState?.resource]);
     
     const handleDragEnd = (event: DragEndEvent) => {
         const { delta } = event;
