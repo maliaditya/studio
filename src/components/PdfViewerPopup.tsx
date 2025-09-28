@@ -36,21 +36,23 @@ export function PdfViewerPopup() {
     });
 
     useEffect(() => {
-        if (pdfViewerState?.resource?.hasLocalPdf && pdfViewerState.resource.id) {
-            setIsLoading(true);
-            getPdf(pdfViewerState.resource.id)
-                .then(blob => {
-                    setFile(blob);
-                })
-                .catch(err => {
-                    console.error("Failed to load PDF:", err);
-                    setFile(null);
-                })
-                .finally(() => setIsLoading(false));
-        } else {
+        if (!pdfViewerState || !pdfViewerState.resource?.hasLocalPdf || !pdfViewerState.resource.id) {
             setFile(null);
             setIsLoading(false);
+            return;
         }
+
+        setIsLoading(true);
+        getPdf(pdfViewerState.resource.id)
+            .then(blob => {
+                setFile(blob);
+            })
+            .catch(err => {
+                console.error("Failed to load PDF:", err);
+                setFile(null);
+            })
+            .finally(() => setIsLoading(false));
+        
         setNumPages(null);
         setPageNumber(1);
         setScale(1.5);
@@ -100,11 +102,13 @@ export function PdfViewerPopup() {
             <div ref={setNodeRef} style={style}>
                 <Card className="w-[800px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
                     <CardHeader 
-                        className="p-2 border-b flex flex-row items-center justify-between cursor-grab active:cursor-grabbing"
-                        {...attributes}
-                        {...listeners}
+                        className="p-2 border-b flex flex-row items-center justify-between"
                     >
-                        <div className="flex items-center gap-2">
+                        <div 
+                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow"
+                            {...attributes}
+                            {...listeners}
+                        >
                            <GripVertical className="h-5 w-5 text-muted-foreground/50" />
                            <CardTitle className="text-base truncate">{pdfViewerState.resource.name}</CardTitle>
                         </div>
