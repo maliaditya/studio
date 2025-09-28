@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, PdfViewerPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -75,6 +75,9 @@ interface AuthContextType {
   setGlobalVolume: React.Dispatch<React.SetStateAction<number>>;
   playbackRequest: PlaybackRequest | null;
   setPlaybackRequest: React.Dispatch<React.SetStateAction<PlaybackRequest | null>>;
+  pdfViewerState: PdfViewerPopupState | null;
+  setPdfViewerState: React.Dispatch<React.SetStateAction<PdfViewerPopupState | null>>;
+  openPdfViewer: (resource: Resource) => void;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -407,6 +410,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [globalVolume, setGlobalVolumeState] = useState(0.2);
   const [playbackRequest, setPlaybackRequest] = useState<PlaybackRequest | null>(null);
+  const [pdfViewerState, setPdfViewerState] = useState<PdfViewerPopupState | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
@@ -606,6 +610,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const openPdfViewer = (resource: Resource) => {
+    setPdfViewerState({
+      isOpen: true,
+      resource,
+      position: { x: window.innerWidth - 820, y: 80 },
+    });
+  };
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
     coreSkills.forEach(coreSkill => {
@@ -2907,26 +2918,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             sa.microSkills.filter(ms => ms.isReadyForRepetition)
         )
     );
-
+  
     let hasScheduleChanged = false;
     const newSchedule = { ...schedule };
-    
-    const allLogs = [...allDeepWorkLogs];
-
+    const newAllDeepWorkLogs = [...allDeepWorkLogs];
+  
     repetitionSkills.forEach(skill => {
         const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
         if (intentions.length === 0) return;
-
+  
         const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-        
         const allCompletionDates = new Set<string>();
         allLeafNodes.forEach(node => {
             if (node.last_logged_date) allCompletionDates.add(node.last_logged_date);
         });
         const sortedDates = Array.from(allCompletionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-
+  
         if (sortedDates.length === 0) return;
-
+  
         let reps = 1;
         let lastReviewDate = sortedDates[0];
         for (let i = 1; i < sortedDates.length; i++) {
@@ -2942,22 +2951,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const nextInterval = DOUBLING_INTERVALS[reps] || 128;
         const nextReviewDate = addDays(lastReviewDate, nextInterval);
         const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
-
+  
         const activityTitle = skill.name;
         const targetSlot = settings.spacedRepetitionSlot || 'Late Night';
-
+  
         if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
         if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
-
+  
         const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
         
-        const mainIntention = intentions.find(i => !i.parentId);
-
+        const mainIntention = intentions.find(i => getDeepWorkNodeType(i) === 'Intention');
+  
         if (mainIntention && !slotActivities.some(act => act.details === mainIntention.name)) {
-            let logForDay = allLogs.find(log => log.date === nextReviewDateKey);
+            let logForDay = newAllDeepWorkLogs.find(log => log.date === nextReviewDateKey);
             if (!logForDay) {
                 logForDay = { id: nextReviewDateKey, date: nextReviewDateKey, exercises: [] };
-                allLogs.push(logForDay);
+                newAllDeepWorkLogs.push(logForDay);
             }
             
             let exerciseInstance = logForDay.exercises.find(ex => ex.definitionId === mainIntention.id);
@@ -2973,7 +2982,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 };
                 logForDay.exercises.push(exerciseInstance);
             }
-
+  
             const newActivity: Activity = {
                 id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
                 type: 'deepwork',
@@ -2986,13 +2995,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             hasScheduleChanged = true;
         }
     });
-
+  
     if (hasScheduleChanged) {
         setSchedule(newSchedule);
-        setAllDeepWorkLogs(allLogs);
+        setAllDeepWorkLogs(newAllDeepWorkLogs);
     }
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule, settings.spacedRepetitionSlot, allDeepWorkLogs, setAllDeepWorkLogs]);
-  
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, settings.spacedRepetitionSlot, allDeepWorkLogs, getDeepWorkNodeType]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -3005,6 +3014,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
+    pdfViewerState, setPdfViewerState, openPdfViewer,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,

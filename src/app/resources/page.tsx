@@ -1686,17 +1686,4 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-    
-
-    
-
-
-
-
-
-
-
-
-
-
 

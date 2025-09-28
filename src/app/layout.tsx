@@ -43,15 +43,15 @@ import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
-import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { FavoriteCards } from '@/components/FavoriteCards';
-import { RuleEquationsCard } from '@/components/RuleEquationsCard';
-import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
 import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
-import { PillarPopup } from '@/components/PillarPopup';
-import { AllResistancesPopup } from '@/components/AllResistancesPopup';
+import { RuleEquationsCard } from '@/components/RuleEquationsCard';
+import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
 import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
+import { AllResistancesPopup } from '@/components/AllResistancesPopup';
+import { StopperProgressModal } from '@/components/StopperProgressModal';
+import { PillarPopup } from '@/components/PillarPopup';
 import dynamic from 'next/dynamic';
 
 const PdfViewerPopup = dynamic(
@@ -622,4 +622,3 @@ export default function RootLayout({
     </html>
   );
 }
-
