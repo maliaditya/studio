@@ -100,7 +100,7 @@ export function PdfViewerPopup() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <div ref={setNodeRef} style={style}>
-                <Card className="w-[800px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
+                <Card className="w-[1024px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
                     <CardHeader 
                         className="p-2 border-b flex flex-row items-center justify-between"
                     >
@@ -118,8 +118,8 @@ export function PdfViewerPopup() {
                                     <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1}>Prev</Button>
                                     <span className="text-sm text-muted-foreground">Page {pageNumber} of {numPages}</span>
                                     <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages}>Next</Button>
-                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomIn}><ZoomIn className="h-4 w-4" /></Button>
                                     <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
+                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomIn}><ZoomIn className="h-4 w-4" /></Button>
                                 </>
                             )}
                             <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => (prev ? {...prev, isOpen: false} : null))}>
