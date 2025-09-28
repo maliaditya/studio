@@ -57,16 +57,18 @@ export function PdfViewerPopup() {
     
     const handleDragEnd = (event: DragEndEvent) => {
         const { delta } = event;
-        setPdfViewerState(prev => ({
-            ...prev,
-            position: {
-                x: prev.position.x + delta.x,
-                y: prev.position.y + delta.y,
-            },
-        }));
+        if (pdfViewerState) {
+            setPdfViewerState(prev => ({
+                ...prev!,
+                position: {
+                    x: prev!.position.x + delta.x,
+                    y: prev!.position.y + delta.y,
+                },
+            }));
+        }
     };
 
-    if (!pdfViewerState.isOpen || !pdfViewerState.resource) return null;
+    if (!pdfViewerState || !pdfViewerState.isOpen || !pdfViewerState.resource) return null;
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -104,7 +106,7 @@ export function PdfViewerPopup() {
                                     <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setScale(s => Math.max(0.5, s - 0.2))}><ZoomOut className="h-4 w-4" /></Button>
                                 </>
                             )}
-                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => ({...prev, isOpen: false}))}>
+                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => ({...prev!, isOpen: false}))}>
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
