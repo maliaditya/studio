@@ -36,26 +36,25 @@ export function PdfViewerPopup() {
     });
 
     useEffect(() => {
-        if (!pdfViewerState || !pdfViewerState.resource?.hasLocalPdf || !pdfViewerState.resource.id) {
+        if (pdfViewerState?.resource?.hasLocalPdf && pdfViewerState.resource.id) {
+            setIsLoading(true);
+            getPdf(pdfViewerState.resource.id)
+                .then(blob => {
+                    setFile(blob);
+                })
+                .catch(err => {
+                    console.error("Failed to load PDF:", err);
+                    setFile(null);
+                })
+                .finally(() => setIsLoading(false));
+            
+            setNumPages(null);
+            setPageNumber(1);
+            setScale(1.5);
+        } else {
             setFile(null);
             setIsLoading(false);
-            return;
         }
-
-        setIsLoading(true);
-        getPdf(pdfViewerState.resource.id)
-            .then(blob => {
-                setFile(blob);
-            })
-            .catch(err => {
-                console.error("Failed to load PDF:", err);
-                setFile(null);
-            })
-            .finally(() => setIsLoading(false));
-        
-        setNumPages(null);
-        setPageNumber(1);
-        setScale(1.5);
     }, [pdfViewerState?.resource]);
     
     const handleDragEnd = (event: DragEndEvent) => {
@@ -105,12 +104,12 @@ export function PdfViewerPopup() {
                         className="p-2 border-b flex flex-row items-center justify-between"
                     >
                         <div 
-                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow"
+                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow min-w-0"
                             {...attributes}
                             {...listeners}
                         >
-                           <GripVertical className="h-5 w-5 text-muted-foreground/50" />
-                           <CardTitle className="text-base truncate">{pdfViewerState.resource.name}</CardTitle>
+                           <GripVertical className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
+                           <CardTitle className="text-base truncate" title={pdfViewerState.resource.name}>{pdfViewerState.resource.name}</CardTitle>
                         </div>
                         <div className="flex items-center gap-2">
                             {numPages && (
