@@ -211,13 +211,14 @@ function AddToSessionPopover({ definition, onSelectSlot, disabled = false, curre
   );
 }
 
-function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource }: {
+function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbedUrl, handleOpenNestedPopup, handleStartEditResource, openPdfViewer }: {
   resource: Resource;
   handleUnlinkItem: (type: 'upskill' | 'resource', id: string) => void;
   handleDelete: (id: string) => void;
   setEmbedUrl: (url: string | null) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
   handleStartEditResource: (resource: Resource) => void;
+  openPdfViewer: (resource: Resource) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
       id: `card-resource-${resource.id}`,
@@ -233,8 +234,16 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
   const youtubeEmbedUrl = resource.link ? getYouTubeEmbedUrl(resource.link) : null;
   const isSpecialEmbed = resource.link ? (isNotionUrl(resource.link) || isObsidianUrl(resource.link)) : false;
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
+  
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (resource.type === 'pdf') {
+      openPdfViewer(resource);
+    } else {
+      handleStartEditResource(resource);
+    }
+  };
 
-  if (resource.type === 'card') {
+  if (resource.type === 'card' || resource.type === 'pdf') {
     const pointCount = resource.points?.length || 0;
     const hasSpecialContent = resource.points?.some(p => p.type === 'markdown' || p.type === 'code') || false;
 
@@ -250,13 +259,13 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
 
     return (
       <div ref={setCombinedRefs} className={cn(getColumnSpan(), isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-        <Card className="relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer h-full" onClick={(e) => handleStartEditResource(resource)}>
+        <Card className="relative flex flex-col group overflow-hidden transition-all duration-300 hover:shadow-xl cursor-pointer h-full" onClick={handleCardClick}>
            <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onSelect={(e) => { e.stopPropagation(); handleStartEditResource(resource); }}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={handleCardClick}><Edit3 className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => handleUnlinkItem('resource', resource.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => handleDelete(resource.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>
@@ -309,7 +318,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
 
   return (
     <div ref={setCombinedRefs} className={cn(isOver && "ring-2 ring-primary ring-offset-2 ring-offset-background rounded-lg", isDragging && "opacity-50")}>
-        <Card className="relative group transition-all duration-300 hover:shadow-xl" onClick={(e) => handleStartEditResource(resource)}>
+        <Card className="relative group transition-all duration-300 hover:shadow-xl" onClick={handleCardClick}>
             <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button {...listeners} {...attributes} variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm cursor-grab active:cursor-grabbing"><GripVertical className="h-4 w-4" /></Button>
                 {embedLinkForModal ? (
@@ -423,7 +432,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     currentSlot,
 }, ref) => {
 
-    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
+    const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds, openPdfViewer } = useAuth();
     
     const getDomainForCategory = useCallback((category: string) => {
         const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === category);
@@ -570,6 +579,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             setEmbedUrl={setEmbedUrl} 
                             handleOpenNestedPopup={handleOpenNestedPopup} 
                             handleStartEditResource={handleStartEditResource} 
+                            openPdfViewer={openPdfViewer}
                         />
                     ) : null;
                 })}
@@ -636,6 +646,7 @@ function DeepWorkPageContent() {
     activeProjectIds,
     currentSlot,
     permanentlyLoggedTaskIds,
+    openPdfViewer,
   } = useAuth();
   const router = useRouter();
   
@@ -1885,6 +1896,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
