@@ -1,5 +1,3 @@
-
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -342,7 +340,6 @@ export interface Resource {
   linkedResourceId?: string;
   linkedBrainHackIds?: string[];
   hasLocalAudio?: boolean; // Flag to check IndexedDB
-  audioUrl?: string;
   audioFileName?: string;
   hasLocalPdf?: boolean;
   pdfFileName?: string;
