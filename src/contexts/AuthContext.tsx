@@ -78,6 +78,7 @@ interface AuthContextType {
   pdfViewerState: PdfViewerPopupState | null;
   setPdfViewerState: React.Dispatch<React.SetStateAction<PdfViewerPopupState | null>>;
   openPdfViewer: (resource: Resource) => void;
+  handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -617,6 +618,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       position: { x: window.innerWidth - 820, y: 80 },
     });
   };
+
+  const handlePdfViewerPopupDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    if (pdfViewerState && active.id === 'pdf-viewer-popup') {
+      setPdfViewerState(prev => prev ? {
+        ...prev,
+        position: {
+          x: prev.position.x + delta.x,
+          y: prev.position.y + delta.y,
+        },
+      } : null);
+    }
+  };
+
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
     coreSkills.forEach(coreSkill => {
@@ -3014,7 +3029,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isAudioPlaying, setIsAudioPlaying,
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
-    pdfViewerState, setPdfViewerState, openPdfViewer,
+    pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3367,4 +3382,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 

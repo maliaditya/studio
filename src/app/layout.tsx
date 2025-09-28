@@ -107,6 +107,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
+    handlePdfViewerPopupDragEnd,
     activeFocusSession,
     setActiveFocusSession,
     handleLogLearning,
@@ -235,6 +236,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleHabitDetailPopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
+    handlePdfViewerPopupDragEnd(event);
   };
   
   const selectedDateKey = format(new Date(), 'yyyy-MM-dd');
@@ -425,7 +427,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             initialSecondsLeft={activeFocusSession.secondsLeft}
             onClose={() => setActiveFocusSession(null)}
             onLogTime={handleLogLearning}
-            onToggleMicroSkillRepetition={handleToggleMicroSkillRepetition}
+            onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
           />
         )}
       {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda) && (
@@ -622,3 +624,4 @@ export default function RootLayout({
     </html>
   );
 }
+
