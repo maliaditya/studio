@@ -785,3 +785,9 @@ export interface AudioAnnotation {
     timestamp: number;
     endTime?: number;
 }
+
+export interface PdfViewerPopupState {
+  isOpen: boolean;
+  resource: Resource | null;
+  position: { x: number; y: number };
+}

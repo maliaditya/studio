@@ -38,14 +38,8 @@ import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import dynamic from 'next/dynamic';
-import { storePdf, getPdf } from '@/lib/audioDB';
+import { storePdf } from '@/lib/audioDB';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
-
-const PdfViewer = dynamic(() => import('@/components/PdfViewer'), {
-  ssr: false,
-  loading: () => <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>,
-});
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -490,6 +484,7 @@ function ResourcesPageContent() {
     globalVolume,
     openGeneralPopup,
     createResourceWithHierarchy,
+    openPdfViewer,
   } = useAuth();
   const { toast } = useToast();
   
@@ -1355,12 +1350,6 @@ function ResourcesPageContent() {
     reader.readAsDataURL(file);
   };
   
-  const [pdfViewerState, setPdfViewerState] = useState<{isOpen: boolean, resource: Resource | null}>({ isOpen: false, resource: null });
-
-  const handleOpenPdfViewer = (resource: Resource) => {
-      setPdfViewerState({ isOpen: true, resource });
-  };
-  
   const pdfUploadInputRef = useRef<HTMLInputElement>(null);
   
   const handlePdfUploadClick = () => {
@@ -1489,7 +1478,7 @@ function ResourcesPageContent() {
                                 
                                 if (res.type === 'pdf') {
                                     cardContent = (
-                                        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full cursor-pointer" onClick={() => handleOpenPdfViewer(res)}>
+                                        <Card className="flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl h-full cursor-pointer" onClick={() => openPdfViewer(res)}>
                                             <CardHeader className="p-3">
                                                 <CardTitle className="text-sm flex items-center gap-2">
                                                     <span className="text-primary"><FileIcon className="h-4 w-4" /></span>
@@ -1530,7 +1519,7 @@ function ResourcesPageContent() {
                                 } else if (res.type === 'mechanism') {
                                     cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                                 } else if(res.type === 'card') {
-                                    cardContent = <ResourceCardComponent onOpenPdfViewer={handleOpenPdfViewer} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => createResourceWithHierarchy(res, undefined, 'card')}/>;
+                                    cardContent = <ResourceCardComponent onOpenPdfViewer={openPdfViewer} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => createResourceWithHierarchy(res, undefined, 'card')}/>;
                                 } else {
                                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                     const isGif = isGifUrl(res.link);
@@ -1643,14 +1632,6 @@ function ResourcesPageContent() {
           ) : null}
         </DragOverlay>
       </DndContext>
-      <Dialog open={pdfViewerState.isOpen} onOpenChange={(isOpen) => setPdfViewerState({ isOpen, resource: isOpen ? pdfViewerState.resource : null })}>
-        <DialogContent className="max-w-6xl h-[90vh] flex flex-col p-2">
-            <DialogTitle>
-                <VisuallyHidden>PDF Viewer: {pdfViewerState.resource?.name}</VisuallyHidden>
-            </DialogTitle>
-            <PdfViewer resource={pdfViewerState.resource} />
-        </DialogContent>
-      </Dialog>
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent>
             <DialogHeader>
@@ -1708,6 +1689,7 @@ export default function ResourcesPage() {
     
 
     
+
 
 
 

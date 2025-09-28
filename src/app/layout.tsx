@@ -52,6 +52,12 @@ import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { PillarPopup } from '@/components/PillarPopup';
 import { AllResistancesPopup } from '@/components/AllResistancesPopup';
 import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
+import dynamic from 'next/dynamic';
+
+const PdfViewerPopup = dynamic(
+  () => import('@/components/PdfViewerPopup').then(mod => mod.PdfViewerPopup),
+  { ssr: false }
+);
 
 
 const slotEndHours: Record<string, number> = {
@@ -555,6 +561,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     }}
                 />
             )}
+            <PdfViewerPopup />
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {
                   if (!popup.parentId) return null;
@@ -616,6 +623,3 @@ export default function RootLayout({
   );
 }
 
-
-
-    
