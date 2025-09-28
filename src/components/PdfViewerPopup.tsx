@@ -16,6 +16,7 @@ import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { cn } from '@/lib/utils';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from 'dnd-kit';
+import { ScrollArea } from './ui/scroll-area';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
