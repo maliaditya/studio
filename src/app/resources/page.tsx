@@ -236,7 +236,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                             </Button>
                         )}
                         {!isPopup && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={()={() => onLinkClick(resource.id)}}>
                                 <LinkIcon className="h-4 w-4" />
                             </Button>
                         )}
@@ -1181,7 +1181,7 @@ function ResourcesPageContent() {
                             >
                                 {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                                 <ChevronDown className={cn("h-4 w-4 transition-transform", (collapsedFolders.has(folder.id) && !searchTerm) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
-                                <div className="flex-grow min-w-0 flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-grow min-w-0">
                                   <Folder className="h-4 w-4 flex-shrink-0"/>
                                   <span className='truncate'>{folder.name}</span>
                                 </div>
@@ -1694,3 +1694,6 @@ export default function ResourcesPage() {
 
 
 
+
+
+    
