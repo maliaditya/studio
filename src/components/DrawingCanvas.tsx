@@ -37,27 +37,34 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       setHistory(newHistory);
       setHistoryIndex(newHistory.length - 1);
     }
-  }, [history, historyIndex, getContext]);
+  }, [getContext, history, historyIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = getContext();
-      if (ctx) {
-        if (initialDrawing) {
-          const img = new Image();
-          img.onload = () => {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-            saveToHistory();
-          };
-          img.src = initialDrawing;
-        } else {
-          saveToHistory();
-        }
+    const ctx = getContext();
+    if (canvas && ctx) {
+      // Draw initial image only once when the component mounts
+      if (initialDrawing) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          // Save the initial state to history
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          setHistory([imageData]);
+          setHistoryIndex(0);
+        };
+        img.src = initialDrawing;
+      } else {
+        // If no initial drawing, set up a blank canvas in history
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const blankImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        setHistory([blankImageData]);
+        setHistoryIndex(0);
       }
     }
-  }, [initialDrawing, getContext, saveToHistory]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array ensures this runs only once
 
   const undo = () => {
     if (historyIndex > 0) {
