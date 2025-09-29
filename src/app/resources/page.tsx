@@ -1174,12 +1174,17 @@ function ResourcesPageContent() {
                             <div
                                 onClick={() => { handleSelectFolder(folder.id); toggleFolderCollapse(folder.id); }}
                                 onContextMenu={(e) => handleContextMenu(e, folder)}
-                                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors min-w-0", selectedResourceFolderId === folder.id && "bg-accent font-semibold")}
+                                className={cn(
+                                "flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group transition-colors",
+                                selectedResourceFolderId === folder.id && "bg-accent font-semibold"
+                                )}
                             >
                                 {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
                                 <ChevronDown className={cn("h-4 w-4 transition-transform", (collapsedFolders.has(folder.id) && !searchTerm) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
-                                <Folder className="h-4 w-4"/>
-                                <span className='flex-grow truncate min-w-0'>{folder.name}</span>
+                                <div className="flex-grow min-w-0 flex items-center gap-2">
+                                  <Folder className="h-4 w-4 flex-shrink-0"/>
+                                  <span className='truncate'>{folder.name}</span>
+                                </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
                                     <Share className="h-4 w-4" />
                                     <span className="sr-only">Share {folder.name}</span>
@@ -1686,5 +1691,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
+
 
 
