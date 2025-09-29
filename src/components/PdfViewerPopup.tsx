@@ -1,14 +1,13 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
-import { Loader2, ZoomIn, ZoomOut, GripVertical, X } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { getPdf } from '@/lib/audioDB';
-import type { Resource } from '@/types/workout';
+import { Loader2, ZoomIn, ZoomOut, GripVertical, X } from "lucide-react";
+import { getPdf } from "@/lib/audioDB";
+import type { Resource } from "@/types/workout";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { useDraggable } from '@dnd-kit/core';
@@ -17,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from 'dnd-kit';
 import { ScrollArea } from './ui/scroll-area';
+import { useAuth } from "@/contexts/AuthContext";
+
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -24,7 +25,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState } = useAuth();
+    const { pdfViewerState, setPdfViewerState, handlePdfViewerPopupDragEnd } = useAuth();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [file, setFile] = useState<Blob | null>(null);
@@ -56,24 +57,8 @@ export default function PdfViewerPopup() {
             setIsLoading(false);
         }
     }, [pdfViewerState?.resource]);
-    
-    const handleDragEnd = (event: DragEndEvent) => {
-        const { delta } = event;
-        if (pdfViewerState) {
-            setPdfViewerState(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    position: {
-                        x: prev.position.x + delta.x,
-                        y: prev.position.y + delta.y,
-                    },
-                }
-            });
-        }
-    };
 
-    if (!pdfViewerState || !pdfViewerState.isOpen || !pdfViewerState.resource) return null;
+    if (!pdfViewerState || !pdfViewerState.isOpen) return null;
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -95,57 +80,57 @@ export default function PdfViewerPopup() {
     function zoomOut() {
         setScale(prev => Math.max(prev - 0.2, 0.5));
     }
+    
+    const resource = pdfViewerState.resource;
 
     return (
-        <DndContext onDragEnd={handleDragEnd}>
-            <div ref={setNodeRef} style={style}>
-                <Card className="w-[1024px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
-                    <CardHeader 
-                        className="p-2 border-b flex flex-row items-center justify-between"
+        <div ref={setNodeRef} style={style}>
+            <Card className="w-[1024px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
+                <CardHeader 
+                    className="p-2 border-b flex flex-row items-center justify-between"
+                >
+                    <div 
+                        className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow min-w-0"
+                        {...attributes}
+                        {...listeners}
                     >
-                        <div 
-                            className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow min-w-0"
-                            {...attributes}
-                            {...listeners}
-                        >
-                           <GripVertical className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
-                           <CardTitle className="text-base truncate" title={pdfViewerState.resource.name}>{pdfViewerState.resource.name}</CardTitle>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {numPages && (
-                                <>
-                                    <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1}>Prev</Button>
-                                    <span className="text-sm text-muted-foreground">Page {pageNumber} of {numPages}</span>
-                                    <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages}>Next</Button>
-                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
-                                    <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomIn}><ZoomIn className="h-4 w-4" /></Button>
-                                </>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => (prev ? {...prev, isOpen: false} : null))}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0 flex-grow min-h-0">
-                        <ScrollArea className="h-full">
-                           {isLoading ? (
-                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                   <Loader2 className="h-8 w-8 animate-spin mb-4" />
-                                   <p>Loading PDF...</p>
-                               </div>
-                           ) : file ? (
-                               <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
-                                   <Page pageNumber={pageNumber} scale={scale} />
-                               </Document>
-                           ) : (
-                               <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                                   <p>Could not load PDF file.</p>
-                               </div>
-                           )}
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </div>
-        </DndContext>
+                       <GripVertical className="h-5 w-5 text-muted-foreground/50 flex-shrink-0" />
+                       <CardTitle className="text-base truncate" title={resource?.name}>{resource?.name}</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {numPages && (
+                            <>
+                                <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber <= 1}>Prev</Button>
+                                <span className="text-sm text-muted-foreground">Page {pageNumber} of {numPages}</span>
+                                <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.min(numPages, p + 1))} disabled={pageNumber >= numPages}>Next</Button>
+                                <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
+                                <Button variant="outline" size="icon" className="h-9 w-9" onClick={zoomIn}><ZoomIn className="h-4 w-4" /></Button>
+                            </>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setPdfViewerState(prev => (prev ? {...prev, isOpen: false} : null))}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0 flex-grow min-h-0">
+                    <ScrollArea className="h-full">
+                       {isLoading ? (
+                           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                               <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                               <p>Loading PDF...</p>
+                           </div>
+                       ) : file ? (
+                           <Document file={file} onLoadSuccess={onDocumentLoadSuccess}>
+                               <Page pageNumber={pageNumber} scale={scale} />
+                           </Document>
+                       ) : (
+                           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                               <p>Could not load PDF file.</p>
+                           </div>
+                       )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
     );
 }

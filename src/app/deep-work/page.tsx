@@ -1315,7 +1315,7 @@ function DeepWorkPageContent() {
 
   const handleCreateResource = async () => {
     if (!currentTask) return;
-
+    
     if (addResourceType === 'pdf') {
         pdfUploadInputRef.current?.click();
         return; // handlePdfUpload will handle the rest
@@ -1326,7 +1326,7 @@ function DeepWorkPageContent() {
       return;
     }
     if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
-      toast({ title: "Error", description: "Name is required.", variant: "destructive" });
+      toast({ title: "Error", description: "Name is required for this resource type.", variant: "destructive" });
       return;
     }
   
@@ -1408,10 +1408,6 @@ function DeepWorkPageContent() {
     toast({ title: `Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
   };
   
-    const pdfUploadButtonClick = () => {
-        pdfUploadInputRef.current?.click();
-    };
-    
     const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!currentTask) return;
         const file = e.target.files?.[0];
@@ -1427,19 +1423,25 @@ function DeepWorkPageContent() {
             hasLocalPdf: true,
         };
 
-        await storePdf(finalResource.id, file);
+        try {
+            await storePdf(finalResource.id, file);
 
-        const updatedTask = createResourceWithHierarchy(currentTask, undefined, finalResource.type, finalResource);
-  
-        if (updatedTask) {
-          const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
-          setNavigationStack(prev => prev.map(item =>
-              item.id === taskWithType.id ? { ...item, ...taskWithType } : item
-          ));
+            const updatedTask = createResourceWithHierarchy(currentTask, undefined, 'pdf', finalResource);
+    
+            if (updatedTask) {
+              const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
+              setNavigationStack(prev => prev.map(item =>
+                  item.id === taskWithType.id ? { ...item, ...taskWithType } : item
+              ));
+            }
+          
+            setIsAddResourceModalOpen(false);
+            toast({ title: `PDF Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
+        } catch (error) {
+            console.error("Failed to store PDF:", error);
+            toast({ title: `Error storing PDF`, description: "Could not save the PDF file to the local database.", variant: "destructive" });
         }
-      
-        setIsAddResourceModalOpen(false);
-        toast({ title: `PDF Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
+
 
         e.target.value = ''; // Reset file input
     };
@@ -1753,7 +1755,7 @@ function DeepWorkPageContent() {
                                             onEdit={setEditingFocusArea}
                                             onOpenLinkProjectModal={handleOpenLinkProjectModal}
                                             onOpenMindMap={onOpenMindMap}
-                                            onUpdateName={handleUpdateFocusAreaName}
+                                            onUpdateName={handleUpdateName}
                                             resources={resources}
                                             upskillDefinitions={upskillDefinitions}
                                             projectsInDomain={[]}
@@ -1990,7 +1992,7 @@ function DeepWorkPageContent() {
                      {addResourceType === 'pdf' && (
                         <>
                             <Input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
-                            <Button onClick={pdfUploadButtonClick} className="w-full">
+                            <Button onClick={() => pdfUploadInputRef.current?.click()} className="w-full">
                                 <Upload className="mr-2 h-4 w-4"/> Upload PDF
                             </Button>
                         </>
@@ -2082,6 +2084,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 

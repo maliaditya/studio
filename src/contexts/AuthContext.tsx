@@ -197,7 +197,7 @@ interface AuthContextType {
   createHabitFromThought: (thought: PistonEntry, habitName: string, folderId: string) => void;
   lastSelectedHabitFolder: string | null;
   setLastSelectedHabitFolder: React.Dispatch<React.SetStateAction<string | null>>;
-  createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type']) => ExerciseDefinition | Resource | undefined;
+  createResourceWithHierarchy: (parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type?: Resource['type'], prebuiltResource?: Resource) => ExerciseDefinition | Resource | undefined;
   handleDeleteStopper: (habitId: string, stopperId: string) => void;
   handleDeleteStrength: (habitId: string, strengthId: string) => void;
   logStopperEncounter: (habitId: string, stopperId: string) => void;
@@ -2482,7 +2482,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }));
   };
   
-  const createResourceWithHierarchy = useCallback((parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card'): ExerciseDefinition | Resource | undefined => {
+  const createResourceWithHierarchy = useCallback((parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card', prebuiltResource?: Resource): ExerciseDefinition | Resource | undefined => {
+    if (prebuiltResource) {
+        setResources(prev => [...prev, prebuiltResource]);
+        
+        let updatedParent;
+        if (pointToConvert) {
+            updatedParent = {
+              ...parent,
+              points: (parent.points || []).map(p => p.id === pointToConvert.id ? { ...p, type: 'card' as const, resourceId: prebuiltResource.id } : p)
+            };
+        } else {
+            updatedParent = {
+                ...parent,
+                linkedResourceIds: [...(parent.linkedResourceIds || []), prebuiltResource.id]
+            };
+        }
+
+        if ('category' in parent) {
+            const isUpskill = upskillDefinitions.some(d => d.id === parent.id);
+            if (isUpskill) {
+                setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
+            } else {
+                setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
+            }
+        } else {
+            setResources(prev => prev.map(res => res.id === parent.id ? updatedParent as Resource : res));
+        }
+        return updatedParent;
+    }
+  
     let path: string[] = ["Skills & Project Resources"];
   
     if ('category' in parent) { // It's an ExerciseDefinition
@@ -2925,7 +2954,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // on mount/update.
     }
   }, [playbackRequest]);
-  
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -3201,6 +3229,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 
