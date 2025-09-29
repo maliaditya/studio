@@ -8,7 +8,7 @@ import { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { Button } from './ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Link as LinkIcon, Unlink, Trash2, Code, MessageSquare, ArrowRight, Blocks, Loader2, X } from 'lucide-react';
+import { Link as LinkIcon, Unlink, Trash2, Code, MessageSquare, ArrowRight, Blocks, Loader2, X, Paintbrush } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -140,7 +140,7 @@ export const EmotionEditableField = ({ value1, value2, onUpdate1, onUpdate2, lab
 }) => {
     return (
         <div className="editable-sentence">
-          <span contentEditable={false} className="uneditable-text">That one </span>
+          <span contentEditable={false} className="uneditable-text">That one </span> 
           <EditableSpan value={value1} onBlur={onUpdate1} placeholder={placeholder1} className="editable-placeholder" />
           <span contentEditable={false} className="uneditable-text">{label}</span>
           <EditableSpan value={value2} onBlur={onUpdate2} placeholder={placeholder2} className="editable-placeholder" />
@@ -223,7 +223,7 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
     );
 };
 
-export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle, onSeekTo, currentTime, onSetEndTime, onClearEndTime }: { 
+export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle, onSeekTo, currentTime, onSetEndTime, onClearEndTime, onOpenDrawingCanvas }: { 
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
@@ -236,6 +236,7 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
     currentTime: number;
     onSetEndTime: () => void;
     onClearEndTime: () => void;
+    onOpenDrawingCanvas: () => void;
 }) => {
     const { setFloatingVideoUrl, openBrainHackPopup } = useAuth();
     
@@ -321,6 +322,7 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
                 {point.type === 'code' ? <Code className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
                 point.type === 'markdown' ? <MessageSquare className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
                 point.type === 'link' ? <LinkIcon className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
+                point.type === 'paint' ? <Paintbrush className="h-4 w-4 text-primary/70 flex-shrink-0" /> :
                 point.type === 'timestamp' ? (
                     <button onClick={() => point.timestamp && onSeekTo(point.timestamp)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
                         {formatTime(point.timestamp || 0)}
@@ -359,6 +361,13 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
                             {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
                         </span>
                     </div>
+                ) : point.type === 'paint' ? (
+                    <button
+                        onClick={() => onOpenDrawingCanvas()}
+                        className="text-left font-medium text-primary hover:underline"
+                    >
+                        {point.text || 'Untitled Canvas'}
+                    </button>
                 ) : (
                     <p className="whitespace-pre-wrap break-words">{point.text}</p>
                 )}
@@ -388,3 +397,4 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
         </li>
     );
 };
+
