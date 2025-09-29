@@ -26,6 +26,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   
   const [isTextInput, setIsTextInput] = useState(false);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   const getContext = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -63,6 +64,12 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialDrawing]); 
   
+  useEffect(() => {
+    if (isTextInput && textInputRef.current) {
+      textInputRef.current.focus();
+    }
+  }, [isTextInput]);
+
   const undo = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
@@ -86,10 +93,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (tool === 'text') {
       if (textInput.value) { // Finalize previous text if any
         drawText(textInput.value, textInput.x, textInput.y);
-        setTextInput({ x: 0, y: 0, value: '' });
       }
       setIsTextInput(true);
-      setTextInput(prev => ({...prev, x: offsetX, y: offsetY }));
+      setTextInput({ x: offsetX, y: offsetY, value: '' });
       return;
     }
 
@@ -222,10 +228,10 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         />
         {isTextInput && (
           <input
+            ref={textInputRef}
             type="text"
             onBlur={handleTextInputBlur}
             onKeyDown={handleTextInputKeyDown}
-            autoFocus
             style={{
               position: 'absolute',
               left: textInput.x,
