@@ -54,14 +54,12 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (ctx && canvasRef.current) {
       const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      setHistory(prev => {
-        const newHistory = prev.slice(0, historyIndex + 1);
-        newHistory.push(imageData);
-        return newHistory;
-      });
-      setHistoryIndex(prev => prev + 1);
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(imageData);
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
     }
-  }, [getContext, historyIndex]);
+  }, [getContext, history, historyIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -69,6 +67,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Clear and set background
     ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -82,7 +81,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     } else {
         saveToHistory();
     }
-  }, [isOpen, initialDrawing]); // Removed saveToHistory from dependencies
+  }, [isOpen, initialDrawing]); // `saveToHistory` removed to prevent loop
 
   const undo = () => {
     if (historyIndex > 0) {
@@ -127,10 +126,15 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (!ctx) return;
     
+    // For brush tools, we need to save the current state to history before drawing
+    // so that we can restore it on mouse up to prevent partial lines.
+    // For shapes, we restore on mouse move, so we don't need to save here.
     if (tool === 'brush' || tool === 'eraser') {
-      ctx.beginPath();
-      ctx.moveTo(offsetX, offsetY);
+      saveToHistory();
     }
+    
+    ctx.beginPath();
+    ctx.moveTo(offsetX, offsetY);
   };
 
   const drawInteraction = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -139,14 +143,16 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     if (!ctx) return;
     const { offsetX, offsetY } = e.nativeEvent;
 
+    // For shapes, restore canvas to pre-draw state on each move
     if (tool === 'rectangle' || tool === 'circle') {
-      if (history[historyIndex]) {
-        ctx.putImageData(history[historyIndex], 0, 0);
+      const lastState = history[historyIndex];
+      if (lastState) {
+        ctx.putImageData(lastState, 0, 0);
       }
     }
 
     ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.strokeStyle = tool === 'brush' ? color : '#000000';
+    ctx.strokeStyle = tool === 'brush' ? color : '#000000'; // eraser uses destination-out
     ctx.lineWidth = lineWidth;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -156,9 +162,13 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
       ctx.stroke();
     } else if (tool === 'rectangle') {
       ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
       ctx.strokeRect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
     } else if (tool === 'circle') {
       ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = lineWidth;
       const radius = Math.sqrt(Math.pow(offsetX - startPoint.x, 2) + Math.pow(offsetY - startPoint.y, 2));
       ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
       ctx.stroke();
@@ -170,9 +180,12 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     setIsDrawing(false);
     
     const ctx = getContext();
-    if (!ctx) return;
+    if (!ctx || !startPoint) return;
 
-    if (tool === 'brush' || tool === 'eraser') {
+    if (tool === 'rectangle' || tool === 'circle') {
+      // Final draw of the shape on release
+      drawInteraction(e);
+    } else {
         ctx.closePath();
     }
     
@@ -202,11 +215,13 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       if (e.currentTarget.value) {
         drawText(e.currentTarget.value, textInput.x, textInput.y);
       }
       setIsTextInput(false);
     } else if (e.key === 'Escape') {
+        e.preventDefault();
       setIsTextInput(false);
     }
   };
