@@ -795,6 +795,4 @@ export interface DrawingCanvasPopupState {
   resourceId: string;
   pointId: string;
   initialDrawing?: string;
-  x: number;
-  y: number;
 }
