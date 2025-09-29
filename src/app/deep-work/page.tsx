@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -1319,7 +1318,7 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && !newResourceName.trim()) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
@@ -1421,6 +1420,39 @@ function DeepWorkPageContent() {
   
     const pdfUploadButtonClick = () => {
         pdfUploadInputRef.current?.click();
+    };
+    
+    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!currentTask) return;
+        const file = e.target.files?.[0];
+        if (!file) {
+            toast({ title: 'PDF file is required', variant: 'destructive' });
+            return;
+        }
+        
+        const finalResource: Resource = {
+            id: `res_pdf_${Date.now()}`,
+            name: newResourceName.trim() || file.name,
+            folderId: 'temp', // will be moved by createResourceWithHierarchy
+            type: 'pdf',
+            createdAt: new Date().toISOString(),
+            pdfFileName: file.name,
+            hasLocalPdf: true,
+        };
+        await storePdf(finalResource.id, file);
+
+        const updatedTask = createResourceWithHierarchy(currentTask, undefined, 'pdf', finalResource);
+
+        if (updatedTask) {
+            const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
+            setNavigationStack(prev => prev.map(item =>
+                item.id === taskWithType.id ? { ...item, ...taskWithType } : item
+            ));
+        }
+
+        setNewResourceName('');
+        setIsAddResourceModalOpen(false);
+        toast({ title: `PDF Added`, description: `"${finalResource.name}" has been saved and linked.` });
     };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
@@ -1585,7 +1617,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={handleToggleReadyForBranding}
+                    onToggleReadyForBranding={onToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
@@ -1951,7 +1983,7 @@ function DeepWorkPageContent() {
                     </RadioGroup>
                     
                     {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
-                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' ) && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf' ) && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
                     
                     {addResourceType === 'mechanism' && (
                         <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
@@ -1968,7 +2000,7 @@ function DeepWorkPageContent() {
                     )}
                      {addResourceType === 'pdf' && (
                         <>
-                            <Input type="file" ref={pdfUploadInputRef} accept=".pdf" className="hidden" />
+                            <Input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
                             <Button onClick={pdfUploadButtonClick} className="w-full">
                                 <Upload className="mr-2 h-4 w-4"/> Upload PDF
                             </Button>
@@ -2061,6 +2093,8 @@ export default function DeepWorkPage() {
     
 
     
+
+
 
 
 
