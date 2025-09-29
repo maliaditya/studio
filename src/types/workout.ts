@@ -1,3 +1,5 @@
+
+
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -798,4 +800,9 @@ export interface DrawingCanvasPopupState {
   initialDrawing?: string;
   position: { x: number, y: number };
   onSave: (dataUrl: string) => void;
+}
+
+export interface DailyLearningLog {
+    date: string;
+    completedResourceIds: string[];
 }

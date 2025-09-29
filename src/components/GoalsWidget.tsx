@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -8,8 +9,9 @@ import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, parseISO, isAfter, startOfToday, differenceInDays, isBefore } from 'date-fns';
 import { motion } from 'framer-motion';
-import { Target } from 'lucide-react';
+import { Target, Check } from 'lucide-react';
 import type { CoreSkill } from '@/types/workout';
+import { Checkbox } from './ui/checkbox';
 
 export function GoalsWidget() {
     const { 
@@ -17,7 +19,9 @@ export function GoalsWidget() {
         offerizationPlans, 
         isPistonsHeadOpen, 
         settings, 
-        setSettings 
+        setSettings,
+        dailyReviewLogs,
+        handleToggleDailyGoalCompletion,
     } = useAuth();
     const [isClient, setIsClient] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -41,7 +45,7 @@ export function GoalsWidget() {
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
-        if (target.closest('button, [role="button"]')) return;
+        if (target.closest('button, [role="button"], [role="checkbox"]')) return;
         setIsDragging(true);
         setDragStartOffset({ x: e.clientX - position.x, y: e.clientY - position.y });
     };
@@ -95,6 +99,13 @@ export function GoalsWidget() {
         return (remainingWork / remainingDays).toFixed(1);
     };
 
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysCompletions = useMemo(() => {
+        const log = dailyReviewLogs.find(log => log.date === todayKey);
+        return new Set(log?.completedResourceIds || []);
+    }, [dailyReviewLogs, todayKey]);
+
+
     if (!isClient || !settings.widgetVisibility.goals || plannedSpecializations.length === 0) {
         return null;
     }
@@ -135,29 +146,42 @@ export function GoalsWidget() {
                                 }, { items: 0, hours: 0, pages: 0 });
 
                                 return (plan.audioVideoResources || []).concat(plan.bookWebpageResources || []).map((res, index) => {
-                                    let dailyTarget, unit, progress, authorOrTutor;
+                                    let dailyTarget, unit, progress, authorOrTutor, resourceId;
                                     if ('totalHours' in res) { // LearningResourceAudio
                                         dailyTarget = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
                                         unit = 'h/day';
                                         progress = `${completed.hours.toFixed(1)}/${res.totalHours}h`;
                                         authorOrTutor = res.tutor;
+                                        resourceId = res.id;
                                     } else if ('totalPages' in res) { // LearningResourceBook
                                         dailyTarget = calculateDailyTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
                                         unit = 'pg/day';
                                         progress = `${completed.pages}/${res.totalPages}pgs`;
                                         authorOrTutor = res.author;
+                                        resourceId = res.id;
                                     }
 
                                     if (!dailyTarget) return null;
+                                    const isCompletedToday = todaysCompletions.has(resourceId);
 
                                     return (
                                         <li key={`${spec.id}-${res.id}-${index}`}>
                                             <div className="text-xs p-2 rounded-md bg-muted/50">
-                                                <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
-                                                {authorOrTutor && <p className="text-xs text-muted-foreground">{authorOrTutor}</p>}
-                                                <div className="flex justify-between items-baseline mt-1">
-                                                    <span className="text-muted-foreground">{progress}</span>
-                                                    <span className="text-primary font-bold text-sm">{dailyTarget} {unit}</span>
+                                                <div className="flex items-start">
+                                                    <Checkbox
+                                                        id={`goal-check-${resourceId}`}
+                                                        checked={isCompletedToday}
+                                                        onCheckedChange={() => handleToggleDailyGoalCompletion(resourceId)}
+                                                        className="mr-2 mt-0.5"
+                                                    />
+                                                    <div className="flex-grow">
+                                                        <p className={`font-semibold text-foreground truncate ${isCompletedToday ? 'line-through' : ''}`} title={res.name}>{res.name}</p>
+                                                        {authorOrTutor && <p className={`text-xs text-muted-foreground ${isCompletedToday ? 'line-through' : ''}`}>{authorOrTutor}</p>}
+                                                        <div className="flex justify-between items-baseline mt-1">
+                                                            <span className={`text-muted-foreground ${isCompletedToday ? 'line-through' : ''}`}>{progress}</span>
+                                                            <span className={`text-primary font-bold text-sm ${isCompletedToday ? 'line-through' : ''}`}>{dailyTarget} {unit}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </li>
