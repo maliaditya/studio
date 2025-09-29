@@ -11,7 +11,7 @@ import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
-import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday } from 'date-fns';
+import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -820,5 +820,3 @@ export function WeightGoalCard({
         </Card>
     );
 }
-
-    
