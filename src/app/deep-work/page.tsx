@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, FormEvent, useMemo, useCallback, useRef } from 'react';
@@ -557,7 +558,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             onEdit={onEdit}
                             onOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
-                            onUpdateName={handleUpdateFocusAreaName}
+                            onUpdateName={handleUpdateName}
                             resources={resources}
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={projectsInDomainForChild}
@@ -1314,11 +1315,17 @@ function DeepWorkPageContent() {
   const handleCreateResource = async () => {
     if (!currentTask) return;
   
+    const file = pdfUploadInputRef.current?.files?.[0];
+    if (addResourceType === 'pdf' && !file) {
+      toast({ title: 'PDF file is required', variant: 'destructive' });
+      return;
+    }
+  
     if (addResourceType === 'link' && !newResourceLink.trim()) {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && !newResourceName.trim() && !file) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
@@ -1353,12 +1360,7 @@ function DeepWorkPageContent() {
       } finally {
         setIsFetchingMeta(false);
       }
-    } else if (addResourceType === 'pdf') {
-        const file = pdfUploadInputRef.current?.files?.[0];
-        if (!file) {
-            toast({ title: 'PDF file is required', variant: 'destructive' });
-            return;
-        }
+    } else if (addResourceType === 'pdf' && file) {
         finalResource = {
             id: `res_pdf_${Date.now()}`,
             name: newResourceName.trim() || file.name,
@@ -1371,8 +1373,8 @@ function DeepWorkPageContent() {
         await storePdf(finalResource.id, file);
 
     } else if (addResourceType === 'model3d') {
-        const file = modelUploadInputRef.current?.files?.[0];
-        if (!file) {
+        const file3d = modelUploadInputRef.current?.files?.[0];
+        if (!file3d) {
             toast({ title: 'GLB/GLTF file is required', variant: 'destructive' });
             return;
         }
@@ -1380,11 +1382,11 @@ function DeepWorkPageContent() {
             const reader = new FileReader();
             reader.onload = (event) => resolve(event.target?.result as string);
             reader.onerror = (error) => reject(error);
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(file3d);
         });
         finalResource = {
             id: `res_model_${Date.now()}`,
-            name: newResourceName.trim() || file.name,
+            name: newResourceName.trim() || file3d.name,
             folderId: 'temp',
             type: 'model3d',
             modelUrl,
@@ -1425,34 +1427,8 @@ function DeepWorkPageContent() {
     const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!currentTask) return;
         const file = e.target.files?.[0];
-        if (!file) {
-            toast({ title: 'PDF file is required', variant: 'destructive' });
-            return;
-        }
-        
-        const finalResource: Resource = {
-            id: `res_pdf_${Date.now()}`,
-            name: newResourceName.trim() || file.name,
-            folderId: 'temp', // will be moved by createResourceWithHierarchy
-            type: 'pdf',
-            createdAt: new Date().toISOString(),
-            pdfFileName: file.name,
-            hasLocalPdf: true,
-        };
-        await storePdf(finalResource.id, file);
-
-        const updatedTask = createResourceWithHierarchy(currentTask, undefined, 'pdf', finalResource);
-
-        if (updatedTask) {
-            const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
-            setNavigationStack(prev => prev.map(item =>
-                item.id === taskWithType.id ? { ...item, ...taskWithType } : item
-            ));
-        }
-
-        setNewResourceName('');
-        setIsAddResourceModalOpen(false);
-        toast({ title: `PDF Added`, description: `"${finalResource.name}" has been saved and linked.` });
+        if (!file) return;
+        handleCreateResource();
     };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
@@ -1617,7 +1593,7 @@ function DeepWorkPageContent() {
                     onEdit={setEditingFocusArea}
                     addToRecents={addToRecents}
                     onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={onToggleReadyForBranding}
+                    onToggleReadyForBranding={handleToggleReadyForBranding}
                     libraryView={libraryView}
                     setLibraryView={setLibraryView}
                 />
@@ -2093,6 +2069,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
