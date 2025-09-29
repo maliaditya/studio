@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, parseISO, isAfter, startOfToday, differenceInDays } from 'date-fns';
+import { format, parseISO, isAfter, startOfToday, differenceInDays, isBefore } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Target } from 'lucide-react';
 import type { CoreSkill } from '@/types/workout';
@@ -79,10 +79,13 @@ export function GoalsWidget() {
         const endDate = parseISO(end);
         const today = startOfToday();
         if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
+        
         const remainingWork = total - completed;
         const relevantStartDate = isBefore(startDate, today) ? today : startDate;
         const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
+    
         if (remainingWork <= 0 || remainingDays <= 0) return null;
+    
         return (remainingWork / remainingDays).toFixed(1);
     };
 
