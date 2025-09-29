@@ -16,17 +16,19 @@ type Tool = 'brush' | 'eraser' | 'rectangle' | 'circle' | 'text';
 
 export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+  
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isTextInput, setIsTextInput] = useState(false);
   const [color, setColor] = useState('#ffffff');
   const [lineWidth, setLineWidth] = useState(5);
   const [tool, setTool] = useState<Tool>('brush');
+  
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   
-  const [isTextInput, setIsTextInput] = useState(false);
+  const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
-  const textInputRef = useRef<HTMLInputElement>(null);
 
   const getContext = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -35,9 +37,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (ctx && canvasRef.current) {
       const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
       setHistory(prev => {
-          const newHistory = prev.slice(0, historyIndex + 1);
-          newHistory.push(imageData);
-          return newHistory;
+        const newHistory = prev.slice(0, historyIndex + 1);
+        newHistory.push(imageData);
+        return newHistory;
       });
       setHistoryIndex(prev => prev + 1);
     }
@@ -49,6 +51,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Set a default background
     ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -60,35 +63,20 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         };
         img.src = initialDrawing;
     } else {
+        // Save the initial blank state
         saveToHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialDrawing]); // Only run once on mount or when initialDrawing changes.
   
-  useEffect(() => {
-    const inputEl = textInputRef.current;
-    if (inputEl) {
-        inputEl.style.left = `${textInput.x}px`;
-        inputEl.style.top = `${textInput.y}px`;
-        inputEl.style.fontSize = `${lineWidth * 4}px`;
-        if (isTextInput) {
-            inputEl.style.display = 'block';
-            requestAnimationFrame(() => {
-                inputEl.focus();
-            });
-            inputEl.value = textInput.value;
-        } else {
-            inputEl.style.display = 'none';
-        }
-    }
-  }, [isTextInput, textInput, lineWidth]);
-
   const undo = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
       const ctx = getContext();
-      if (ctx) ctx.putImageData(history[newIndex], 0, 0);
+      if (ctx && history[newIndex]) {
+         ctx.putImageData(history[newIndex], 0, 0);
+      }
     }
   };
 
@@ -97,7 +85,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
       const ctx = getContext();
-      if (ctx) ctx.putImageData(history[newIndex], 0, 0);
+      if (ctx && history[newIndex]) {
+        ctx.putImageData(history[newIndex], 0, 0);
+      }
     }
   };
 
@@ -113,6 +103,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (tool === 'text') {
       setIsTextInput(true);
       setTextInput({ x: offsetX, y: offsetY, value: '' });
+      // We don't set isDrawing to true for text tool
       return;
     }
 
@@ -137,14 +128,15 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
 
     if (tool === 'brush' || tool === 'eraser') {
       ctx.lineTo(offsetX, offsetY);
-      ctx.strokeStyle = tool === 'brush' ? color : '#000000'; // Eraser color doesn't matter with destination-out
+      ctx.strokeStyle = tool === 'brush' ? color : '#000000';
       ctx.lineWidth = lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.stroke();
     } else if (tool === 'rectangle' || tool === 'circle') {
-      if(history[historyIndex]){
-        ctx.putImageData(history[historyIndex], 0, 0); // Restore previous state
+      // Restore the canvas to the state before this drag started
+      if (history[historyIndex]) {
+        ctx.putImageData(history[historyIndex], 0, 0);
       }
       ctx.beginPath();
       ctx.strokeStyle = color;
@@ -158,33 +150,18 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       }
     }
   };
-
+  
   const stopInteraction = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
-    const ctx = getContext();
-    if (!ctx || !startPoint) return;
     setIsDrawing(false);
-    const { offsetX, offsetY } = e.nativeEvent;
     
-    ctx.globalCompositeOperation = 'source-over';
-    
-    if (tool === 'rectangle' || tool === 'circle') {
-      if(history[historyIndex]){
-        ctx.putImageData(history[historyIndex], 0, 0); // Clear preview
-      }
-      ctx.beginPath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      if (tool === 'rectangle') {
-        ctx.strokeRect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
-      } else {
-        const radius = Math.sqrt(Math.pow(offsetX - startPoint.x, 2) + Math.pow(offsetY - startPoint.y, 2));
-        ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-      }
+    const ctx = getContext();
+    if (!ctx) return;
+
+    if (tool === 'brush' || tool === 'eraser') {
+        ctx.closePath();
     }
     
-    ctx.closePath();
     saveToHistory();
     setStartPoint(null);
   };
@@ -206,6 +183,10 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
           drawText(e.target.value, textInput.x, textInput.y);
       }
       setIsTextInput(false);
+      // Ensure the input field is visually hidden after use
+      if (textInputRef.current) {
+          textInputRef.current.style.display = 'none';
+      }
     }
   };
 
@@ -215,10 +196,35 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         drawText(e.currentTarget.value, textInput.x, textInput.y);
       }
       setIsTextInput(false);
+      if (textInputRef.current) {
+        textInputRef.current.style.display = 'none';
+      }
     } else if (e.key === 'Escape') {
       setIsTextInput(false);
+       if (textInputRef.current) {
+        textInputRef.current.style.display = 'none';
+      }
     }
   };
+
+  useEffect(() => {
+    const inputEl = textInputRef.current;
+    if (inputEl) {
+        if (isTextInput) {
+            inputEl.style.left = `${textInput.x}px`;
+            inputEl.style.top = `${textInput.y}px`;
+            inputEl.style.fontSize = `${lineWidth * 4}px`;
+            inputEl.style.display = 'block';
+            inputEl.value = textInput.value;
+            requestAnimationFrame(() => {
+                inputEl.focus();
+            });
+        } else {
+            inputEl.style.display = 'none';
+        }
+    }
+  }, [isTextInput, textInput, lineWidth]);
+
 
   const handleSave = () => {
     const dataUrl = canvasRef.current?.toDataURL('image/png');
