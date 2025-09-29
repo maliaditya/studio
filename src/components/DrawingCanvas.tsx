@@ -23,6 +23,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   const [history, setHistory] = useState<ImageData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
+  
   const [isTextInput, setIsTextInput] = useState(false);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
 
@@ -41,31 +42,27 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const ctx = getContext();
-    if (canvas && ctx) {
-      // Draw initial image only once when the component mounts
-      if (initialDrawing) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Set canvas background
+    ctx.fillStyle = '#111827'; // bg-gray-900
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (initialDrawing) {
         const img = new Image();
         img.onload = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          // Save the initial state to history
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          setHistory([imageData]);
-          setHistoryIndex(0);
+            ctx.drawImage(img, 0, 0);
+            saveToHistory();
         };
         img.src = initialDrawing;
-      } else {
-        // If no initial drawing, set up a blank canvas in history
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        const blankImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        setHistory([blankImageData]);
-        setHistoryIndex(0);
-      }
+    } else {
+        saveToHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array ensures this runs only once
-
+  }, [initialDrawing]); 
+  
   const undo = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
@@ -89,17 +86,19 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (tool === 'text') {
       if (textInput.value) { // Finalize previous text if any
         drawText(textInput.value, textInput.x, textInput.y);
+        setTextInput({ x: 0, y: 0, value: '' });
       }
-      setTextInput({ x: offsetX, y: offsetY, value: '' });
       setIsTextInput(true);
+      setTextInput(prev => ({...prev, x: offsetX, y: offsetY }));
       return;
     }
 
     setIsDrawing(true);
     setStartPoint({ x: offsetX, y: offsetY });
+    const ctx = getContext();
+    if (!ctx) return;
+    
     if (tool === 'brush' || tool === 'eraser') {
-      const ctx = getContext();
-      if (!ctx) return;
       ctx.beginPath();
       ctx.moveTo(offsetX, offsetY);
     }
@@ -120,7 +119,6 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       ctx.globalCompositeOperation = tool === 'brush' ? 'source-over' : 'destination-out';
       ctx.stroke();
     } else if (tool === 'rectangle' || tool === 'circle') {
-      // Preview logic
       ctx.putImageData(history[historyIndex], 0, 0); // Restore previous state
       ctx.beginPath();
       ctx.strokeStyle = color;
@@ -165,19 +163,32 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
 
   const drawText = (text: string, x: number, y: number) => {
     const ctx = getContext();
-    if (!ctx) return;
+    if (!ctx || !text) return;
     ctx.font = `${lineWidth * 4}px sans-serif`;
     ctx.fillStyle = color;
     ctx.fillText(text, x, y);
     saveToHistory();
   };
 
-  const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      drawText(textInput.value, textInput.x, textInput.y);
-      setIsTextInput(false);
-      setTextInput({ x: 0, y: 0, value: '' });
+  const handleTextInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    if (e.target.value) {
+        drawText(e.target.value, textInput.x, textInput.y);
     }
+    setIsTextInput(false);
+    setTextInput({ x: 0, y: 0, value: '' });
+  };
+
+  const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+          if (e.currentTarget.value) {
+              drawText(e.currentTarget.value, textInput.x, textInput.y);
+          }
+          setIsTextInput(false);
+          setTextInput({ x: 0, y: 0, value: '' });
+      } else if (e.key === 'Escape') {
+          setIsTextInput(false);
+          setTextInput({ x: 0, y: 0, value: '' });
+      }
   };
 
   const handleSave = () => {
@@ -190,7 +201,8 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   const clearCanvas = () => {
     const ctx = getContext();
     if (ctx && canvasRef.current) {
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      ctx.fillStyle = '#111827';
+      ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       saveToHistory();
     }
   };
@@ -211,13 +223,8 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         {isTextInput && (
           <input
             type="text"
-            value={textInput.value}
-            onChange={(e) => setTextInput(prev => ({...prev, value: e.target.value}))}
+            onBlur={handleTextInputBlur}
             onKeyDown={handleTextInputKeyDown}
-            onBlur={() => {
-              if (textInput.value) drawText(textInput.value, textInput.x, textInput.y);
-              setIsTextInput(false);
-            }}
             autoFocus
             style={{
               position: 'absolute',
@@ -227,6 +234,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
               border: '1px solid white',
               color: 'white',
               fontSize: `${lineWidth * 4}px`,
+              width: 'auto',
+              minWidth: '50px',
+              zIndex: 10,
             }}
             className="p-1"
           />
