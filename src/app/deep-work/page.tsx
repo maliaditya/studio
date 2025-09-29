@@ -559,7 +559,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             onEdit={onEdit}
                             onOpenLinkProjectModal={handleOpenLinkProjectModal}
                             onOpenMindMap={onOpenMindMap}
-                            onUpdateName={handleUpdateName}
+                            onUpdateName={handleUpdateFocusAreaName}
                             resources={resources}
                             upskillDefinitions={upskillDefinitions}
                             projectsInDomain={projectsInDomainForChild}
@@ -941,6 +941,13 @@ function DeepWorkPageContent() {
     }
   };
 
+  const handleToggleReadyForBranding = (defId: string) => {
+    setDeepWorkDefinitions(prev => prev.map(def =>
+      def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
+    ));
+    toast({ title: "Status Updated", description: "Ready for Branding status has been toggled." });
+  };
+
   const handleSaveFocusAreaEdit = () => {
     if (!editingFocusArea || !editedFocusAreaData.name?.trim()) { toast({ title: "Error", description: "Task name cannot be empty.", variant: "destructive" }); return; }
     
@@ -1211,14 +1218,6 @@ function DeepWorkPageContent() {
 
     toast({ title: "Task Re-linked!", description: `Item moved to a new parent.` });
   };
-
-
-  const handleToggleReadyForBranding = (defId: string) => {
-    setDeepWorkDefinitions(prev => prev.map(def =>
-      def.id === defId ? { ...def, isReadyForBranding: !def.isReadyForBranding } : def
-    ));
-    toast({ title: "Status Updated", description: "Ready for Branding status has been toggled." });
-  };
   
   const currentTaskIsIntention = currentTask && getDeepWorkNodeType(currentTask) === 'Intention';
 
@@ -1318,7 +1317,7 @@ function DeepWorkPageContent() {
     
     if (addResourceType === 'pdf') {
         pdfUploadInputRef.current?.click();
-        return; // handlePdfUpload will handle the rest
+        return;
     }
   
     if (addResourceType === 'link' && !newResourceLink.trim()) {
@@ -1408,43 +1407,41 @@ function DeepWorkPageContent() {
     toast({ title: `Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
   };
   
-    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!currentTask) return;
-        const file = e.target.files?.[0];
-        if (!file) return;
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (!currentTask) return;
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-        const finalResource: Resource = {
-            id: `res_pdf_${Date.now()}`,
-            name: file.name,
-            folderId: 'temp', // This will be handled by createResourceWithHierarchy if needed
-            type: 'pdf',
-            createdAt: new Date().toISOString(),
-            pdfFileName: file.name,
-            hasLocalPdf: true,
-        };
+      const finalResource: Resource = {
+          id: `res_pdf_${Date.now()}`,
+          name: file.name,
+          folderId: 'temp',
+          type: 'pdf',
+          createdAt: new Date().toISOString(),
+          pdfFileName: file.name,
+          hasLocalPdf: true,
+      };
 
-        try {
-            await storePdf(finalResource.id, file);
+      try {
+          await storePdf(finalResource.id, file);
+          const updatedTask = createResourceWithHierarchy(currentTask, undefined, 'pdf', finalResource);
 
-            const updatedTask = createResourceWithHierarchy(currentTask, undefined, 'pdf', finalResource);
-    
-            if (updatedTask) {
+          if (updatedTask) {
               const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
               setNavigationStack(prev => prev.map(item =>
                   item.id === taskWithType.id ? { ...item, ...taskWithType } : item
               ));
-            }
-          
-            setIsAddResourceModalOpen(false);
-            toast({ title: `PDF Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
-        } catch (error) {
-            console.error("Failed to store PDF:", error);
-            toast({ title: `Error storing PDF`, description: "Could not save the PDF file to the local database.", variant: "destructive" });
-        }
+          }
+        
+          setIsAddResourceModalOpen(false);
+          toast({ title: `PDF Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
+      } catch (error) {
+          console.error("Failed to store PDF:", error);
+          toast({ title: `Error storing PDF`, description: "Could not save the PDF file to the local database.", variant: "destructive" });
+      }
 
-
-        e.target.value = ''; // Reset file input
-    };
+      e.target.value = ''; // Reset file input
+  };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
     if (type === 'deepwork') {
@@ -1755,7 +1752,7 @@ function DeepWorkPageContent() {
                                             onEdit={setEditingFocusArea}
                                             onOpenLinkProjectModal={handleOpenLinkProjectModal}
                                             onOpenMindMap={onOpenMindMap}
-                                            onUpdateName={handleUpdateName}
+                                            onUpdateName={handleUpdateFocusAreaName}
                                             resources={resources}
                                             upskillDefinitions={upskillDefinitions}
                                             projectsInDomain={[]}
@@ -2084,6 +2081,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
