@@ -250,7 +250,7 @@ interface AuthContextType {
   
   // Content Viewer Popup
   contentViewPopups: Map<string, ContentViewPopupState>;
-  openContentViewPopup: (contentId: string, resource: Resource, point: ResourcePoint, event: React.MouseEvent) => void;
+  openContentViewPopup: (contentId: string, resource: Resource, point: ResourcePoint, event?: React.MouseEvent) => void;
   closeContentViewPopup: (contentId: string) => void;
   handleContentViewPopupDragEnd: (event: DragEndEvent) => void;
 
@@ -2306,13 +2306,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
-  const openContentViewPopup = (contentId: string, resource: Resource, point: ResourcePoint, event: React.MouseEvent) => {
+  const openContentViewPopup = useCallback((contentId: string, resource: Resource, point: ResourcePoint, event?: React.MouseEvent) => {
     setContentViewPopups(prev => {
         const newPopups = new Map(prev);
         const popupWidth = 896;
-        const x = window.innerWidth / 2 - popupWidth / 2;
-        const y = event.clientY;
+        
+        let x = event ? event.clientX : (window.innerWidth - popupWidth) / 2;
+        let y = event ? event.clientY : 100;
 
+        if (x + popupWidth > window.innerWidth) {
+            x = window.innerWidth - popupWidth - 20;
+        }
+        if (x < 20) {
+            x = 20;
+        }
+        
         newPopups.set(contentId, {
             id: contentId,
             resource,
@@ -2321,7 +2329,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         return newPopups;
     });
-  };
+  }, []);
   
   const closeContentViewPopup = (contentId: string) => {
     setContentViewPopups(prev => {
@@ -2978,8 +2986,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   useEffect(() => {
     if (playbackRequest) {
-      const { resourceId } = playbackRequest;
-      openGeneralPopup(resourceId, null); 
+      openGeneralPopup(playbackRequest.resourceId, null); 
     }
   }, [playbackRequest, openGeneralPopup]);
 
@@ -3250,6 +3257,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -27,6 +28,7 @@ import { MindMapViewer } from './MindMapViewer';
 import { VisuallyHidden } from './ui/visually-hidden';
 import { HabitResourceCard } from './HabitResourceCard';
 import { MechanismResourceCard } from './MechanismResourceCard';
+import { DrawingCanvas } from './DrawingCanvas';
 
 
 interface GeneralResourcePopupProps {
@@ -135,7 +137,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, openDrawingCanvas } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -146,7 +148,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-    
+    const [isDrawingCanvasOpen, setIsDrawingCanvasOpen] = useState(false);
+    const [drawingCanvasProps, setDrawingCanvasProps] = useState<{ resourceId: string, pointId: string, initialDrawing?: string } | null>(null);
+
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
     
@@ -360,12 +364,21 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
     
     const handleOpenDrawingCanvas = useCallback((point: ResourcePoint) => {
-        openDrawingCanvas({
-          resourceId: resource.id,
-          pointId: point.id,
-          initialDrawing: point.drawing
+        setDrawingCanvasProps({
+            resourceId: resource.id,
+            pointId: point.id,
+            initialDrawing: point.drawing,
         });
-    }, [openDrawingCanvas, resource.id]);
+        setIsDrawingCanvasOpen(true);
+    }, [resource.id]);
+
+    const handleSaveDrawing = (dataUrl: string) => {
+        if (drawingCanvasProps) {
+            handleUpdatePoint(drawingCanvasProps.pointId, { drawing: dataUrl });
+        }
+        setIsDrawingCanvasOpen(false);
+        setDrawingCanvasProps(null);
+    };
 
     return (
         <>
@@ -468,15 +481,11 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                     onUpdate={handleUpdatePoint}
                                     onDelete={handleDeletePoint}
                                     onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
-                                    openContentViewPopup={openContentViewPopup}
+                                    openContentViewPopup={(id, point, event) => openContentViewPopup(id, resource, point, event)}
                                     createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
                                     onSeekTo={handleSeekTo}
                                     currentTime={currentTime}
-                                    onOpenDrawingCanvas={(point) => openDrawingCanvas({
-                                      resourceId: resource.id,
-                                      pointId: point.id,
-                                      initialDrawing: point.drawing
-                                    })}
+                                    onOpenDrawingCanvas={(point) => handleOpenDrawingCanvas(point)}
                                 />
                            )}
                         </CardContent>
@@ -502,6 +511,22 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </div>
                     </DialogContent>
                 </Dialog>
+                {drawingCanvasProps && (
+                    <Dialog open={isDrawingCanvasOpen} onOpenChange={setIsDrawingCanvasOpen}>
+                        <DialogContent className="w-auto max-w-[832px] p-0 border-0 bg-transparent shadow-none">
+                            <VisuallyHidden>
+                                <DialogTitle>Drawing Canvas</DialogTitle>
+                                <DialogDescription>A canvas for drawing and sketching ideas.</DialogDescription>
+                            </VisuallyHidden>
+                            <DrawingCanvas
+                                isOpen={isDrawingCanvasOpen}
+                                initialDrawing={drawingCanvasProps.initialDrawing}
+                                onSave={handleSaveDrawing}
+                                onClose={() => setIsDrawingCanvasOpen(false)}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )}
             </div>
         </>
     );
