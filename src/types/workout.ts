@@ -298,12 +298,13 @@ export interface GapAnalysis {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link' | 'timestamp';
+  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link' | 'timestamp' | 'paint';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
   displayText?: string;
   timestamp?: number; // Start time in seconds for audio/video notes
   endTime?: number; // End time in seconds for audio/video notes
+  drawing?: string; // Store drawing data as a data URL
 }
 
 export interface Stopper {
@@ -787,4 +788,13 @@ export interface PdfViewerPopupState {
   isOpen: boolean;
   resource: Resource | null;
   position: { x: number; y: number };
+}
+
+export interface DrawingCanvasPopupState {
+  isOpen: boolean;
+  resourceId: string;
+  pointId: string;
+  initialDrawing?: string;
+  x: number;
+  y: number;
 }

@@ -53,6 +53,7 @@ import { AllResistancesPopup } from '@/components/AllResistancesPopup';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import dynamic from 'next/dynamic';
+import { DrawingCanvas } from '@/components/DrawingCanvas';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -107,6 +108,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     handlePdfViewerPopupDragEnd,
+    drawingCanvasState, setDrawingCanvasState,
     activeFocusSession,
     setActiveFocusSession,
     handleLogLearning,
@@ -510,6 +512,27 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
+            {drawingCanvasState?.isOpen && (
+              <Dialog open={drawingCanvasState.isOpen} onOpenChange={(open) => { if (!open) setDrawingCanvasState(null); }}>
+                <DialogContent className="max-w-4xl p-0 border-0 bg-gray-900">
+                  <DrawingCanvas 
+                    initialDrawing={drawingCanvasState.initialDrawing}
+                    onSave={(dataUrl) => {
+                      if (drawingCanvasState) {
+                        handleUpdateResource({
+                          ...authContext.resources.find(r => r.id === drawingCanvasState.resourceId)!,
+                          points: authContext.resources.find(r => r.id === drawingCanvasState.resourceId)?.points?.map(p => 
+                            p.id === drawingCanvasState.pointId ? { ...p, drawing: dataUrl } : p
+                          )
+                        });
+                      }
+                      setDrawingCanvasState(null);
+                    }}
+                    onClose={() => setDrawingCanvasState(null)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
             {Object.entries(openBrainHackPopups).map(([hackId, pos]) => (
                 <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
             ))}
@@ -623,3 +646,4 @@ export default function RootLayout({
     </html>
   );
 }
+

@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, PdfViewerPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, PdfViewerPopupState, DrawingCanvasPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -79,6 +79,9 @@ interface AuthContextType {
   setPdfViewerState: React.Dispatch<React.SetStateAction<PdfViewerPopupState | null>>;
   openPdfViewer: (resource: Resource) => void;
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
+  drawingCanvasState: DrawingCanvasPopupState | null;
+  setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen'>) => void;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -412,6 +415,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [globalVolume, setGlobalVolumeState] = useState(0.2);
   const [playbackRequest, setPlaybackRequest] = useState<PlaybackRequest | null>(null);
   const [pdfViewerState, setPdfViewerState] = useState<PdfViewerPopupState | null>(null);
+  const [drawingCanvasState, setDrawingCanvasState] = useState<DrawingCanvasPopupState | null>(null);
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
@@ -630,6 +634,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
       } : null);
     }
+  };
+
+  const openDrawingCanvas = (state: Omit<DrawingCanvasPopupState, 'isOpen'>) => {
+    setDrawingCanvasState({ ...state, isOpen: true });
   };
 
   const microSkillMap = useMemo(() => {
@@ -2968,6 +2976,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
+    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3229,6 +3238,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 

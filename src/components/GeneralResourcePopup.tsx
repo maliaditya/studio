@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -80,7 +80,7 @@ const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: R
 };
 
 
-const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, setFloatingVideoUrl, openBrainHackPopup }: {
+const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, setFloatingVideoUrl, openBrainHackPopup, onOpenDrawingCanvas }: {
     points: (ResourcePoint & { children: ResourcePoint[] })[];
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void;
     onDelete: (pointId: string) => void;
@@ -91,6 +91,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
     currentTime: number;
     setFloatingVideoUrl: (url: string | null) => void;
     openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
+    onOpenDrawingCanvas: (point: ResourcePoint) => void;
 }) => {
   return (
     <ul className="space-y-1 text-sm text-muted-foreground pr-2">
@@ -109,6 +110,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
               setFloatingVideoUrl={setFloatingVideoUrl}
               openBrainHackPopup={openBrainHackPopup}
+              onOpenDrawingCanvas={() => onOpenDrawingCanvas(point)}
           />
           {point.children.length > 0 && (
             <div className="pl-4 mt-1 border-l-2 border-dashed border-primary/20">
@@ -123,6 +125,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
                 currentTime={currentTime}
                 setFloatingVideoUrl={setFloatingVideoUrl}
                 openBrainHackPopup={openBrainHackPopup}
+                onOpenDrawingCanvas={onOpenDrawingCanvas}
               />
             </div>
           )}
@@ -134,7 +137,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, openDrawingCanvas } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -356,6 +359,14 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
     
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
+    
+    const handleOpenDrawingCanvas = (point: ResourcePoint) => {
+      openDrawingCanvas({
+        resourceId: resource.id,
+        pointId: point.id,
+        initialDrawing: point.drawing,
+      });
+    };
 
     const renderContent = () => {
         switch (resource.type) {
@@ -372,6 +383,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         currentTime={currentTime}
                         setFloatingVideoUrl={setFloatingVideoUrl}
                         openBrainHackPopup={openBrainHackPopup}
+                        onOpenDrawingCanvas={handleOpenDrawingCanvas}
                     />
                 );
             case 'habit':
@@ -461,6 +473,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
+                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('paint')}><Paintbrush className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Add Paint Canvas</p></TooltipContent></Tooltip>
                         <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                     </TooltipProvider>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
