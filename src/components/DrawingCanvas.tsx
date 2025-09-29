@@ -67,7 +67,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         saveToHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDrawing]); // Only run once on mount or when initialDrawing changes.
+  }, [initialDrawing]); 
   
   const undo = () => {
     if (historyIndex > 0) {
@@ -94,16 +94,16 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   const startInteraction = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const { offsetX, offsetY } = e.nativeEvent;
     
-    // Finalize any previous text before starting a new action
-    if (isTextInput && textInputRef.current && textInputRef.current.value) {
-        drawText(textInputRef.current.value, textInput.x, textInput.y);
+    if (isTextInput && textInputRef.current) {
+        if (textInputRef.current.value) {
+            drawText(textInputRef.current.value, textInput.x, textInput.y);
+        }
+        setIsTextInput(false);
     }
-    setIsTextInput(false);
 
     if (tool === 'text') {
       setIsTextInput(true);
       setTextInput({ x: offsetX, y: offsetY, value: '' });
-      // We don't set isDrawing to true for text tool
       return;
     }
 
@@ -115,6 +115,13 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (tool === 'brush' || tool === 'eraser') {
       ctx.beginPath();
       ctx.moveTo(offsetX, offsetY);
+    } else if (tool === 'rectangle' || tool === 'circle') {
+        // Save the current canvas state before starting to draw the shape
+        if(canvasRef.current){
+            const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+            // This is a temporary store, not part of the main history yet.
+            (ctx as any).__tempState = imageData;
+        }
     }
   };
 
@@ -134,10 +141,11 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       ctx.lineJoin = 'round';
       ctx.stroke();
     } else if (tool === 'rectangle' || tool === 'circle') {
-      // Restore the canvas to the state before this drag started
-      if (history[historyIndex]) {
-        ctx.putImageData(history[historyIndex], 0, 0);
+      const tempState = (ctx as any).__tempState;
+      if (tempState) {
+        ctx.putImageData(tempState, 0, 0);
       }
+      
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
@@ -164,6 +172,7 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     
     saveToHistory();
     setStartPoint(null);
+    delete (ctx as any).__tempState;
   };
 
   const drawText = (text: string, x: number, y: number) => {
@@ -183,10 +192,6 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
           drawText(e.target.value, textInput.x, textInput.y);
       }
       setIsTextInput(false);
-      // Ensure the input field is visually hidden after use
-      if (textInputRef.current) {
-          textInputRef.current.style.display = 'none';
-      }
     }
   };
 
@@ -196,14 +201,8 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         drawText(e.currentTarget.value, textInput.x, textInput.y);
       }
       setIsTextInput(false);
-      if (textInputRef.current) {
-        textInputRef.current.style.display = 'none';
-      }
     } else if (e.key === 'Escape') {
       setIsTextInput(false);
-       if (textInputRef.current) {
-        textInputRef.current.style.display = 'none';
-      }
     }
   };
 
