@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
-import { EditableResourcePoint, EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
+import { EditableResourcePoint } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
 import { VisuallyHidden } from './ui/visually-hidden';
 import { HabitResourceCard } from './HabitResourceCard';
@@ -148,9 +148,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-    const [isDrawingCanvasOpen, setIsDrawingCanvasOpen] = useState(false);
-    const [drawingCanvasProps, setDrawingCanvasProps] = useState<{ resourceId: string, pointId: string, initialDrawing?: string } | null>(null);
-
+    
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
     
@@ -175,19 +173,34 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         const audioEl = audioRef.current;
         if (!audioEl || !resource?.id) return;
         
+        let objectUrl: string | null = null;
+        
         const loadAudio = async () => {
           if (resource.hasLocalAudio) {
-            const audioBlob = await getAudio(resource.id);
-            if (audioBlob) {
-              const url = URL.createObjectURL(audioBlob);
-              setAudioSrc(url);
-              return () => URL.revokeObjectURL(url);
+            try {
+              const audioBlob = await getAudio(resource.id);
+              if (audioBlob) {
+                objectUrl = URL.createObjectURL(audioBlob);
+                setAudioSrc(objectUrl);
+              } else {
+                setAudioSrc(null);
+              }
+            } catch (error) {
+              console.error("Failed to load audio from DB:", error);
+              setAudioSrc(null);
             }
+          } else {
+              setAudioSrc(null);
           }
-          setAudioSrc(null);
         };
         
         loadAudio();
+
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        }
      }, [resource?.id, resource?.hasLocalAudio]);
 
     useEffect(() => {
@@ -282,7 +295,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const handleAddPoint = (type: ResourcePoint['type']) => {
         let newPoint: ResourcePoint;
         if (type === 'timestamp') {
-          const newTimestamp = Math.max(0, currentTime - 30);
+          const newTimestamp = Math.max(0, currentTime);
           newPoint = { id: `point_${Date.now()}`, text: newAnnotation || 'New Note', type, timestamp: newTimestamp };
           setNewAnnotation('');
         } else {
@@ -346,6 +359,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         try {
           await storeAudio(resource.id, file);
           onUpdate({ ...resource, hasLocalAudio: true, audioFileName: file.name });
+          setAudioSrc(URL.createObjectURL(file));
         } catch (error) {
           console.error("Failed to store audio in IndexedDB", error);
         }
@@ -363,22 +377,41 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
     
-    const handleOpenDrawingCanvas = useCallback((point: ResourcePoint) => {
-        setDrawingCanvasProps({
+    const openDrawingCanvas = useCallback((point: ResourcePoint) => {
+        onClose(resource.id);
+        const { openDrawingCanvas } = useAuth();
+        openDrawingCanvas({
             resourceId: resource.id,
             pointId: point.id,
             initialDrawing: point.drawing,
         });
-        setIsDrawingCanvasOpen(true);
-    }, [resource.id]);
+    }, [resource.id, onClose, useAuth]);
+    
 
-    const handleSaveDrawing = (dataUrl: string) => {
-        if (drawingCanvasProps) {
-            handleUpdatePoint(drawingCanvasProps.pointId, { drawing: dataUrl });
+    const renderContent = () => {
+        switch (resource.type) {
+            case 'habit':
+                return <HabitResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
+            case 'mechanism':
+                return <MechanismResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
+            case 'card':
+            default:
+                return (
+                    <PointTree
+                        points={pointTree}
+                        onUpdate={handleUpdatePoint}
+                        onDelete={handleDeletePoint}
+                        onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
+                        openContentViewPopup={(id, point, event) => openContentViewPopup(id, resource, point, event)}
+                        createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
+                        onSeekTo={handleSeekTo}
+                        currentTime={currentTime}
+                        onOpenDrawingCanvas={openDrawingCanvas}
+                    />
+                );
         }
-        setIsDrawingCanvasOpen(false);
-        setDrawingCanvasProps(null);
     };
+
 
     return (
         <>
@@ -471,23 +504,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </CardHeader>
                     <div className="flex-grow min-h-0 overflow-y-auto">
                         <CardContent className="p-3 pt-0">
-                           {resource.type === 'habit' ? (
-                                <HabitResourceCard resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
-                           ) : resource.type === 'mechanism' ? (
-                                <MechanismResourceCard resource={resource} onUpdate={onUpdate} />
-                           ) : (
-                                <PointTree
-                                    points={pointTree}
-                                    onUpdate={handleUpdatePoint}
-                                    onDelete={handleDeletePoint}
-                                    onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
-                                    openContentViewPopup={(id, point, event) => openContentViewPopup(id, resource, point, event)}
-                                    createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
-                                    onSeekTo={handleSeekTo}
-                                    currentTime={currentTime}
-                                    onOpenDrawingCanvas={(point) => handleOpenDrawingCanvas(point)}
-                                />
-                           )}
+                           {renderContent()}
                         </CardContent>
                     </div>
                      <CardFooter className="p-3 border-t">
@@ -511,23 +528,17 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </div>
                     </DialogContent>
                 </Dialog>
-                {drawingCanvasProps && (
-                    <Dialog open={isDrawingCanvasOpen} onOpenChange={setIsDrawingCanvasOpen}>
-                        <DialogContent className="w-auto max-w-[832px] p-0 border-0 bg-transparent shadow-none">
-                            <VisuallyHidden>
-                                <DialogTitle>Drawing Canvas</DialogTitle>
-                                <DialogDescription>A canvas for drawing and sketching ideas.</DialogDescription>
-                            </VisuallyHidden>
-                            <DrawingCanvas
-                                isOpen={isDrawingCanvasOpen}
-                                initialDrawing={drawingCanvasProps.initialDrawing}
-                                onSave={handleSaveDrawing}
-                                onClose={() => setIsDrawingCanvasOpen(false)}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                {drawingCanvasState && (
+                    <DrawingCanvas
+                        isOpen={drawingCanvasState.isOpen}
+                        initialDrawing={drawingCanvasState.initialDrawing}
+                        position={drawingCanvasState.position}
+                        onSave={drawingCanvasState.onSave}
+                        onClose={() => useAuth().setDrawingCanvasState(null)}
+                    />
                 )}
             </div>
         </>
     );
 }
+
