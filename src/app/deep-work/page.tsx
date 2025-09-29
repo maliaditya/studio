@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search, Workflow, Zap } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search, Workflow, Zap, Upload, File as FileIcon, View } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { LinkedUpskillCard } from '@/components/LinkedUpskillCard';
 import { LinkedDeepWorkCard } from '@/components/LinkedDeepWorkCard';
+import { storePdf } from '@/lib/audioDB';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -701,6 +702,8 @@ function DeepWorkPageContent() {
   const [newResourceLink, setNewResourceLink] = useState('');
   const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
+  const modelUploadInputRef = useRef<HTMLInputElement>(null);
+  const pdfUploadInputRef = useRef<HTMLInputElement>(null);
 
 
   const onOpenMindMap = (id: string) => {
@@ -1316,7 +1319,7 @@ function DeepWorkPageContent() {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism') && !newResourceName.trim()) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && !newResourceName.trim()) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
@@ -1351,6 +1354,43 @@ function DeepWorkPageContent() {
       } finally {
         setIsFetchingMeta(false);
       }
+    } else if (addResourceType === 'pdf') {
+        const file = pdfUploadInputRef.current?.files?.[0];
+        if (!file) {
+            toast({ title: 'PDF file is required', variant: 'destructive' });
+            return;
+        }
+        finalResource = {
+            id: `res_pdf_${Date.now()}`,
+            name: newResourceName.trim() || file.name,
+            folderId: 'temp',
+            type: 'pdf',
+            createdAt: new Date().toISOString(),
+            pdfFileName: file.name,
+            hasLocalPdf: true,
+        };
+        await storePdf(finalResource.id, file);
+
+    } else if (addResourceType === 'model3d') {
+        const file = modelUploadInputRef.current?.files?.[0];
+        if (!file) {
+            toast({ title: 'GLB/GLTF file is required', variant: 'destructive' });
+            return;
+        }
+        const modelUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target?.result as string);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file);
+        });
+        finalResource = {
+            id: `res_model_${Date.now()}`,
+            name: newResourceName.trim() || file.name,
+            folderId: 'temp',
+            type: 'model3d',
+            modelUrl,
+            createdAt: new Date().toISOString(),
+        };
     } else {
       finalResource = {
         id: `res_${Date.now()}`,
@@ -1903,10 +1943,13 @@ function DeepWorkPageContent() {
                         <div><RadioGroupItem value="card" id="r-card" className="peer sr-only" /><Label htmlFor="r-card" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Library className="mb-3 h-6 w-6"/>Card</Label></div>
                         <div><RadioGroupItem value="habit" id="r-habit" className="peer sr-only" /><Label htmlFor="r-habit" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Zap className="mb-3 h-6 w-6"/>Habit</Label></div>
                         <div><RadioGroupItem value="mechanism" id="r-mechanism" className="peer sr-only" /><Label htmlFor="r-mechanism" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Workflow className="mb-3 h-6 w-6"/>Mechanism</Label></div>
+                        <div><RadioGroupItem value="model3d" id="r-model3d" className="peer sr-only" /><Label htmlFor="r-model3d" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><View className="mb-3 h-6 w-6"/>3D Model</Label></div>
+                        <div><RadioGroupItem value="pdf" id="r-pdf" className="peer sr-only" /><Label htmlFor="r-pdf" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><FileIcon className="mb-3 h-6 w-6"/>PDF</Label></div>
                     </RadioGroup>
                     
                     {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
-                    {addResourceType !== 'link' && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    
                     {addResourceType === 'mechanism' && (
                         <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
                             <Label>Framework:</Label>
@@ -1914,6 +1957,17 @@ function DeepWorkPageContent() {
                             <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-pos" /><Label htmlFor="r-pos">Positive</Label></div>
                         </RadioGroup>
                     )}
+
+                    {addResourceType === 'model3d' && (
+                        <div className="space-y-2">
+                            <Input type="file" ref={modelUploadInputRef} accept=".glb,.gltf" />
+                        </div>
+                    )}
+                     {addResourceType === 'pdf' && (
+                        <div className="space-y-2">
+                           <Input type="file" ref={pdfUploadInputRef} accept=".pdf" />
+                        </div>
+                     )}
 
                 </div>
                 <DialogFooter>
@@ -2001,6 +2055,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
