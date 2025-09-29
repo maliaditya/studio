@@ -276,7 +276,7 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
         setIsEditing(false);
     };
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (isEditing && textareaRef.current) {
             textareaRef.current.focus();
             textareaRef.current.style.height = 'auto';
@@ -363,7 +363,7 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
                     </div>
                 ) : point.type === 'paint' ? (
                     <button
-                        onClick={() => onOpenDrawingCanvas()}
+                        onClick={onOpenDrawingCanvas}
                         className="text-left font-medium text-primary hover:underline"
                     >
                         {point.text || 'Untitled Canvas'}
@@ -397,4 +397,3 @@ export const EditableResourcePoint = ({ point, onConvertToCard, onUpdate, onDele
         </li>
     );
 };
-

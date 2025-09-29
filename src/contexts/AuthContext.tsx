@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, PdfViewerPopupState, DrawingCanvasPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -81,7 +81,8 @@ interface AuthContextType {
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
-  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen'>) => void;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
+  handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -636,9 +637,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openDrawingCanvas = (state: Omit<DrawingCanvasPopupState, 'isOpen'>) => {
-    setDrawingCanvasState({ ...state, isOpen: true });
-  };
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
+    setDrawingCanvasState({
+      ...state,
+      isOpen: true,
+      position: { x: (window.innerWidth - 832) / 2, y: (window.innerHeight - 700) / 2 },
+      onSave: (dataUrl) => {
+        handleUpdateResource({
+          ...resources.find(r => r.id === state.resourceId)!,
+          points: resources.find(r => r.id === state.resourceId)?.points?.map(p =>
+            p.id === state.pointId ? { ...p, drawing: dataUrl } : p
+          )
+        });
+        setDrawingCanvasState(null);
+      }
+    });
+  }, [resources]);
+
+  const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, delta } = event;
+    if (drawingCanvasState && active.id === 'drawing-canvas-popup') {
+      setDrawingCanvasState(prev => prev ? {
+        ...prev,
+        position: {
+          x: prev.position.x + delta.x,
+          y: prev.position.y + delta.y,
+        },
+      } : null);
+    }
+  }, [drawingCanvasState]);
 
   const microSkillMap = useMemo(() => {
     const map = new Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>();
@@ -2951,17 +2978,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   useEffect(() => {
     if (playbackRequest) {
-      // Find the popup and potentially play audio
-      // This part is tricky because GeneralResourcePopup is what holds the audioRef
-      // A better way might be to have a global audio player.
-      // For now, let's just make sure the popup opens.
       const { resourceId } = playbackRequest;
-      // You'll need an event-like object. For now, null will have to do.
       openGeneralPopup(resourceId, null); 
-      // The logic inside GeneralResourcePopup needs to check for playbackRequest
-      // on mount/update.
     }
-  }, [playbackRequest]);
+  }, [playbackRequest, openGeneralPopup]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -2976,7 +2996,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
-    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas,
+    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3205,17 +3225,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   useEffect(() => {
     if (playbackRequest) {
-      // Find the popup and potentially play audio
-      // This part is tricky because GeneralResourcePopup is what holds the audioRef
-      // A better way might be to have a global audio player.
-      // For now, let's just make sure the popup opens.
-      const { resourceId } = playbackRequest;
-      // You'll need an event-like object. For now, null will have to do.
-      openGeneralPopup(resourceId, null); 
-      // The logic inside GeneralResourcePopup needs to check for playbackRequest
-      // on mount/update.
+      openGeneralPopup(playbackRequest.resourceId, null); 
     }
-  }, [playbackRequest]);
+  }, [playbackRequest, openGeneralPopup]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -3238,6 +3250,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 

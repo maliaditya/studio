@@ -1,5 +1,5 @@
 
-      "use client";
+"use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -24,7 +24,6 @@ import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
 import { EditableResourcePoint, EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
-import { DrawingCanvas } from './DrawingCanvas';
 import { VisuallyHidden } from './ui/visually-hidden';
 
 
@@ -134,7 +133,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, drawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -145,7 +144,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
-    const [drawingCanvasState, setDrawingCanvasState] = useState<{isOpen: boolean, resourceId: string, pointId: string, initialDrawing?: string}>({isOpen: false, resourceId: '', pointId: ''});
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -358,110 +356,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
     
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
-    
-    const openDrawingCanvas = (point: ResourcePoint) => {
-      setDrawingCanvasState({
-        isOpen: true,
-        resourceId: resource.id,
-        pointId: point.id,
-        initialDrawing: point.drawing,
-      });
-    };
-
-    const handleSaveDrawing = (dataUrl: string) => {
-      const { resourceId, pointId } = drawingCanvasState;
-      const updatedPoints = (resources.find(r => r.id === resourceId)?.points || []).map(p =>
-        p.id === pointId ? { ...p, drawing: dataUrl } : p
-      );
-      onUpdate({ ...resource, points: updatedPoints });
-      setDrawingCanvasState({ isOpen: false, resourceId: '', pointId: '' });
-    };
-
-    const renderContent = () => {
-        switch (resource.type) {
-            case 'card':
-                return (
-                    <PointTree
-                        points={pointTree}
-                        onUpdate={handleUpdatePoint}
-                        onDelete={handleDeletePoint}
-                        onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
-                        openContentViewPopup={(contentId, point, event) => openContentViewPopup(contentId, resource, point, event)}
-                        createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
-                        onSeekTo={handleSeekTo}
-                        currentTime={currentTime}
-                        onOpenDrawingCanvas={openDrawingCanvas}
-                    />
-                );
-            case 'habit':
-                return (
-                    <div className="space-y-1">
-                        <EditableField field="trigger" subField="action" prefix="Trigger: When I" suffix="." resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="response" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
-                        <EditableField field="reward" prefix="Reward:" resource={resource} onUpdate={onUpdate} />
-                        <EditableResponse field="newResponse" label="" resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
-                    </div>
-                );
-            case 'mechanism':
-                return resource.mechanismFramework === 'positive' ? (
-                     <div className="space-y-4 text-sm">
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the positive action"/>
-                        </div>
-                         <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="positive internal effect"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Benefit</h4>
-                            <EditableField field="benefit" prefix="This enables " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</h4>
-                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="specific condition" placeholder2="good outcome" />
-                        </div>
-                         <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                            <DoubleEditableField prefix="" infix=" can only happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Positive Condition"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.reward || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, reward: newValue })} label=" gives me " placeholder1="action/image" placeholder2="positive feeling"/>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4 text-sm">
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Action</h4>
-                            <EditableField field="trigger" subField="action" prefix="When I " suffix="," resource={resource} onUpdate={onUpdate} placeholder="describe the negative action"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Mechanism</h4>
-                            <EditableField field="response" subField="visualize" prefix="It causes " suffix=" internally." resource={resource} onUpdate={onUpdate} placeholder="negative internal effect"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Cost</h4>
-                            <EditableField field="reward" prefix="This blocks " suffix="." resource={resource} onUpdate={onUpdate} placeholder="good outcome"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Opposite</h4>
-                            <DoubleEditableField prefix="Only when " infix=", " suffix=" happens." value1={resource.newResponse?.visualize || ""} value2={resource.newResponse?.action || ""} onUpdate1={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), visualize: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, newResponse: { ...(resource.newResponse || {}), action: newValue } })} placeholder1="avoidance of bad action" placeholder2="good outcome" />
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Law</h4>
-                            <DoubleEditableField prefix="" infix=" cannot happen when " suffix="." value1={resource.law?.premise || ""} value2={resource.law?.outcome || ""} onUpdate1={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), premise: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, law: { ...(resource.law || {}), outcome: newValue } })} placeholder1="Good Thing" placeholder2="Negative Condition"/>
-                        </div>
-                        <div>
-                            <h4 className="font-semibold text-xs text-muted-foreground uppercase tracking-wider mb-1">Emotion/Image</h4>
-                            <EmotionEditableField value1={resource.trigger?.feeling || ''} value2={resource.benefit || ''} onUpdate1={(newValue) => onUpdate({ ...resource, trigger: { ...(resource.trigger || {}), feeling: newValue } })} onUpdate2={(newValue) => onUpdate({ ...resource, benefit: newValue })} label=" costs me " placeholder1="action/image" placeholder2="negative consequence"/>
-                        </div>
-                    </div>
-                );
-            default:
-                return <p className="text-sm text-muted-foreground">Unknown resource type.</p>;
-        }
-    };
 
     return (
         <>
@@ -576,21 +470,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </div>
                     </DialogContent>
                 </Dialog>
-                {drawingCanvasState.isOpen && (
-                  <Dialog open={drawingCanvasState.isOpen} onOpenChange={(open) => { if (!open) setDrawingCanvasState({isOpen: false, resourceId: '', pointId: ''}); }}>
-                    <DialogContent className="max-w-4xl p-0 border-0 bg-gray-900">
-                      <DialogHeader className="sr-only">
-                        <DialogTitle>Drawing Canvas</DialogTitle>
-                        <VisuallyHidden><DialogDescription>A canvas for drawing and sketching.</DialogDescription></VisuallyHidden>
-                      </DialogHeader>
-                      <DrawingCanvas 
-                        initialDrawing={drawingCanvasState.initialDrawing}
-                        onSave={handleSaveDrawing}
-                        onClose={() => setDrawingCanvasState({isOpen: false, resourceId: '', pointId: ''})}
-                      />
-                    </DialogContent>
-                  </Dialog>
-                )}
             </div>
         </>
     );

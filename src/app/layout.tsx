@@ -52,8 +52,8 @@ import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
 import { AllResistancesPopup } from '@/components/AllResistancesPopup';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
-import dynamic from 'next/dynamic';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
+import dynamic from 'next/dynamic';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -108,7 +108,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd,
     handlePdfViewerPopupDragEnd,
-    drawingCanvasState, setDrawingCanvasState,
+    drawingCanvasState, setDrawingCanvasState, handleDrawingCanvasPopupDragEnd,
     activeFocusSession,
     setActiveFocusSession,
     handleLogLearning,
@@ -238,6 +238,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleTaskContextPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
     handlePdfViewerPopupDragEnd(event);
+    handleDrawingCanvasPopupDragEnd(event);
   };
   
   const selectedDateKey = format(new Date(), 'yyyy-MM-dd');
@@ -513,25 +514,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         createPortal(
           <>
             {drawingCanvasState?.isOpen && (
-              <Dialog open={drawingCanvasState.isOpen} onOpenChange={(open) => { if (!open) setDrawingCanvasState(null); }}>
-                <DialogContent className="max-w-4xl p-0 border-0 bg-gray-900">
-                  <DrawingCanvas 
-                    initialDrawing={drawingCanvasState.initialDrawing}
-                    onSave={(dataUrl) => {
-                      if (drawingCanvasState) {
-                        handleUpdateResource({
-                          ...authContext.resources.find(r => r.id === drawingCanvasState.resourceId)!,
-                          points: authContext.resources.find(r => r.id === drawingCanvasState.resourceId)?.points?.map(p => 
-                            p.id === drawingCanvasState.pointId ? { ...p, drawing: dataUrl } : p
-                          )
-                        });
-                      }
-                      setDrawingCanvasState(null);
-                    }}
-                    onClose={() => setDrawingCanvasState(null)}
-                  />
-                </DialogContent>
-              </Dialog>
+              <DrawingCanvas
+                isOpen={drawingCanvasState.isOpen}
+                initialDrawing={drawingCanvasState.initialDrawing}
+                position={drawingCanvasState.position}
+                onSave={drawingCanvasState.onSave}
+                onClose={() => setDrawingCanvasState(null)}
+              />
             )}
             {Object.entries(openBrainHackPopups).map(([hackId, pos]) => (
                 <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
@@ -646,4 +635,3 @@ export default function RootLayout({
     </html>
   );
 }
-

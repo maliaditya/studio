@@ -3,18 +3,22 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon } from 'lucide-react';
+import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X } from 'lucide-react';
 import { Slider } from './ui/slider';
+import { useDraggable } from '@dnd-kit/core';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 
 interface DrawingCanvasProps {
+  isOpen: boolean;
   initialDrawing?: string;
+  position: { x: number; y: number };
   onSave: (dataUrl: string) => void;
   onClose: () => void;
 }
 
 type Tool = 'brush' | 'eraser' | 'rectangle' | 'circle' | 'text';
 
-export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvasProps) {
+export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   
@@ -29,6 +33,20 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
+
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: 'drawing-canvas-popup',
+  });
+  
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: position.y,
+    left: position.x,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    willChange: 'transform',
+    zIndex: 110,
+  };
+
 
   const getContext = useCallback(() => canvasRef.current?.getContext('2d'), []);
 
@@ -47,11 +65,10 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !isOpen) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
-    // Set a default background
     ctx.fillStyle = '#111827';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -63,12 +80,10 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         };
         img.src = initialDrawing;
     } else {
-        // Save the initial blank state
         saveToHistory();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDrawing]); 
-  
+  }, [isOpen, initialDrawing]); // Removed saveToHistory from dependencies
+
   const undo = () => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
@@ -115,13 +130,6 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (tool === 'brush' || tool === 'eraser') {
       ctx.beginPath();
       ctx.moveTo(offsetX, offsetY);
-    } else if (tool === 'rectangle' || tool === 'circle') {
-        // Save the current canvas state before starting to draw the shape
-        if(canvasRef.current){
-            const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-            // This is a temporary store, not part of the main history yet.
-            (ctx as any).__tempState = imageData;
-        }
     }
   };
 
@@ -131,31 +139,29 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     if (!ctx) return;
     const { offsetX, offsetY } = e.nativeEvent;
 
+    if (tool === 'rectangle' || tool === 'circle') {
+      if (history[historyIndex]) {
+        ctx.putImageData(history[historyIndex], 0, 0);
+      }
+    }
+
     ctx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.strokeStyle = tool === 'brush' ? color : '#000000';
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
     if (tool === 'brush' || tool === 'eraser') {
       ctx.lineTo(offsetX, offsetY);
-      ctx.strokeStyle = tool === 'brush' ? color : '#000000';
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
       ctx.stroke();
-    } else if (tool === 'rectangle' || tool === 'circle') {
-      const tempState = (ctx as any).__tempState;
-      if (tempState) {
-        ctx.putImageData(tempState, 0, 0);
-      }
-      
+    } else if (tool === 'rectangle') {
       ctx.beginPath();
-      ctx.strokeStyle = color;
-      ctx.lineWidth = lineWidth;
-      if (tool === 'rectangle') {
-        ctx.strokeRect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
-      } else { // circle
-        const radius = Math.sqrt(Math.pow(offsetX - startPoint.x, 2) + Math.pow(offsetY - startPoint.y, 2));
-        ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-      }
+      ctx.strokeRect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
+    } else if (tool === 'circle') {
+      ctx.beginPath();
+      const radius = Math.sqrt(Math.pow(offsetX - startPoint.x, 2) + Math.pow(offsetY - startPoint.y, 2));
+      ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
+      ctx.stroke();
     }
   };
   
@@ -172,7 +178,6 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     
     saveToHistory();
     setStartPoint(null);
-    delete (ctx as any).__tempState;
   };
 
   const drawText = (text: string, x: number, y: number) => {
@@ -240,58 +245,74 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       saveToHistory();
     }
   };
+  
+  if (!isOpen) return null;
 
   return (
-    <div className="flex flex-col h-full bg-gray-900 text-white p-4">
-      <div className="relative">
-        <canvas
-          ref={canvasRef}
-          width={800}
-          height={600}
-          className="border border-gray-700 rounded-md cursor-crosshair"
-          onMouseDown={startInteraction}
-          onMouseMove={drawInteraction}
-          onMouseUp={stopInteraction}
-          onMouseLeave={stopInteraction}
-        />
-        <input
-            ref={textInputRef}
-            type="text"
-            onBlur={handleTextInputBlur}
-            onKeyDown={handleTextInputKeyDown}
-            style={{
-              position: 'absolute',
-              display: 'none',
-              background: 'rgba(0,0,0,0.5)',
-              border: '1px solid white',
-              color: 'white',
-              width: 'auto',
-              minWidth: '50px',
-              zIndex: 10,
-            }}
-            className="p-1"
-        />
-      </div>
-      <div className="flex items-center justify-between mt-4">
-        <div className="flex items-center gap-2">
-            <Button variant={tool === 'brush' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('brush')}><Brush/></Button>
-            <Button variant={tool === 'eraser' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('eraser')}><Eraser/></Button>
-            <Button variant={tool === 'rectangle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('rectangle')}><RectangleHorizontal/></Button>
-            <Button variant={tool === 'circle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('circle')}><Circle/></Button>
-            <Button variant={tool === 'text' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('text')}><TypeIcon/></Button>
-            <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 p-0 border-none bg-transparent" />
-            <Slider value={[lineWidth]} onValueChange={(val) => setLineWidth(val[0])} min={1} max={50} step={1} className="w-32" />
-        </div>
-        <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={undo} disabled={historyIndex <= 0}><Undo/></Button>
-            <Button variant="outline" size="icon" onClick={redo} disabled={historyIndex >= history.length - 1}><Redo/></Button>
-            <Button variant="outline" size="icon" onClick={clearCanvas}><Trash2/></Button>
-        </div>
-        <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave}><Save className="mr-2 h-4 w-4" /> Save</Button>
-        </div>
-      </div>
+    <div ref={setNodeRef} style={style} {...attributes}>
+        <Card className="w-[832px] bg-gray-900 text-white p-4 flex flex-col shadow-2xl border-2 border-primary/50">
+            <CardHeader 
+                className="p-2 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between"
+                {...listeners}
+            >
+                <div className="flex items-center gap-2">
+                    <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                    <CardTitle className="text-base">Drawing Canvas</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X className="h-4 w-4"/></Button>
+            </CardHeader>
+            <CardContent className="p-0">
+                <div className="relative">
+                    <canvas
+                    ref={canvasRef}
+                    width={800}
+                    height={600}
+                    className="border border-gray-700 rounded-md cursor-crosshair"
+                    onMouseDown={startInteraction}
+                    onMouseMove={drawInteraction}
+                    onMouseUp={stopInteraction}
+                    onMouseLeave={stopInteraction}
+                    />
+                    <input
+                        ref={textInputRef}
+                        type="text"
+                        onBlur={handleTextInputBlur}
+                        onKeyDown={handleTextInputKeyDown}
+                        style={{
+                        position: 'absolute',
+                        display: 'none',
+                        background: 'rgba(0,0,0,0.5)',
+                        border: '1px solid white',
+                        color: 'white',
+                        width: 'auto',
+                        minWidth: '50px',
+                        zIndex: 10,
+                        }}
+                        className="p-1"
+                    />
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center gap-2">
+                        <Button variant={tool === 'brush' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('brush')}><Brush/></Button>
+                        <Button variant={tool === 'eraser' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('eraser')}><Eraser/></Button>
+                        <Button variant={tool === 'rectangle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('rectangle')}><RectangleHorizontal/></Button>
+                        <Button variant={tool === 'circle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('circle')}><Circle/></Button>
+                        <Button variant={tool === 'text' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('text')}><TypeIcon/></Button>
+                        <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 p-0 border-none bg-transparent" />
+                        <Slider value={[lineWidth]} onValueChange={(val) => setLineWidth(val[0])} min={1} max={50} step={1} className="w-32" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={undo} disabled={historyIndex <= 0}><Undo/></Button>
+                        <Button variant="outline" size="icon" onClick={redo} disabled={historyIndex >= history.length - 1}><Redo/></Button>
+                        <Button variant="outline" size="icon" onClick={clearCanvas}><Trash2/></Button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSave}><Save className="mr-2 h-4 w-4" /> Save</Button>
+                    </div>
+                </div>
+            </CardContent>
+        </Card>
     </div>
   );
 }

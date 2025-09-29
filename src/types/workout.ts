@@ -795,4 +795,6 @@ export interface DrawingCanvasPopupState {
   resourceId: string;
   pointId: string;
   initialDrawing?: string;
+  position: { x: number, y: number };
+  onSave: (dataUrl: string) => void;
 }
