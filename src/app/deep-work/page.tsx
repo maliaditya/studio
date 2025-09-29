@@ -1419,6 +1419,9 @@ function DeepWorkPageContent() {
     toast({ title: `Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
   };
   
+    const pdfUploadButtonClick = () => {
+        pdfUploadInputRef.current?.click();
+    };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
     if (type === 'deepwork') {
@@ -1948,7 +1951,7 @@ function DeepWorkPageContent() {
                     </RadioGroup>
                     
                     {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
-                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' ) && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
                     
                     {addResourceType === 'mechanism' && (
                         <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
@@ -1964,9 +1967,12 @@ function DeepWorkPageContent() {
                         </div>
                     )}
                      {addResourceType === 'pdf' && (
-                        <div className="space-y-2">
-                           <Input type="file" ref={pdfUploadInputRef} accept=".pdf" />
-                        </div>
+                        <>
+                            <Input type="file" ref={pdfUploadInputRef} accept=".pdf" className="hidden" />
+                            <Button onClick={pdfUploadButtonClick} className="w-full">
+                                <Upload className="mr-2 h-4 w-4"/> Upload PDF
+                            </Button>
+                        </>
                      )}
 
                 </div>
@@ -2055,6 +2061,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
