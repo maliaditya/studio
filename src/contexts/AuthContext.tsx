@@ -381,6 +381,7 @@ interface AuthContextType {
   dailyReviewLogs: DailyReviewLog[];
   setDailyReviewLogs: React.Dispatch<React.SetStateAction<DailyReviewLog[]>>;
   handleCreateBrainHack: (linkedTaskId: string, taskType: 'deepwork' | 'upskill' | 'resource', resourceId?: string) => void;
+  handleToggleDailyGoalCompletion: (resourceId: string) => void;
   
   // Brain Hack Popups
   openBrainHackPopups: Record<string, {x: number, y: number}>;
@@ -442,6 +443,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       activityDistribution: true,
       favorites: true,
       topPriorities: true,
+      goals: true,
       brainHacks: true,
       ruleEquations: true,
       visualizationTechniques: true,
@@ -1240,7 +1242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         smartLogging: false, defaultHabitLinks: {}, routines: [],
         workoutScheduling: 'day-of-week',
         slotRules: {},
-        widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
+        widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, goals: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
@@ -2929,6 +2931,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return rootTask || null;
   }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
 
+  const handleToggleDailyGoalCompletion = (resourceId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setDailyReviewLogs(prev => {
+        const todayLogIndex = prev.findIndex(log => log.date === todayKey);
+        
+        if (todayLogIndex > -1) {
+            const newLogs = [...prev];
+            const todayLog = { ...newLogs[todayLogIndex] };
+            const isCompleted = todayLog.completedResourceIds.includes(resourceId);
+
+            if (isCompleted) {
+                todayLog.completedResourceIds = todayLog.completedResourceIds.filter(id => id !== resourceId);
+            } else {
+                todayLog.completedResourceIds = [...todayLog.completedResourceIds, resourceId];
+            }
+            newLogs[todayLogIndex] = todayLog;
+            return newLogs;
+        } else {
+            return [...prev, { date: todayKey, completedResourceIds: [resourceId] }];
+        }
+    });
+  };
+
   useEffect(() => {
     if (isLoadingState || !currentUser) return;
   
@@ -3105,6 +3130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     spacedRepetitionData, setSpacedRepetitionData,
     dailyReviewLogs, setDailyReviewLogs,
     handleCreateBrainHack,
+    handleToggleDailyGoalCompletion,
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
     recalculateAndFixTaskTypes,
   };
@@ -3257,6 +3283,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+
 
 
 
