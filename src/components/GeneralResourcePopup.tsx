@@ -1,7 +1,7 @@
 
       "use client";
 
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush } from 'lucide-react';
@@ -18,12 +18,15 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAudio, storeAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
 import { EditableResourcePoint, EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
+import { DrawingCanvas } from './DrawingCanvas';
+import { VisuallyHidden } from './ui/visually-hidden';
+
 
 interface GeneralResourcePopupProps {
   popupState: PopupState;
@@ -80,7 +83,7 @@ const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: R
 };
 
 
-const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, setFloatingVideoUrl, openBrainHackPopup, onOpenDrawingCanvas }: {
+const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, onOpenDrawingCanvas }: {
     points: (ResourcePoint & { children: ResourcePoint[] })[];
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void;
     onDelete: (pointId: string) => void;
@@ -89,8 +92,6 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
     createResourceWithHierarchy: (pointToConvert: ResourcePoint, type: Resource['type']) => void;
     onSeekTo: (timestamp: number) => void;
     currentTime: number;
-    setFloatingVideoUrl: (url: string | null) => void;
-    openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
     onOpenDrawingCanvas: (point: ResourcePoint) => void;
 }) => {
   return (
@@ -108,8 +109,6 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               currentTime={currentTime}
               onSetEndTime={() => onUpdate(point.id, { endTime: Math.max(0, currentTime) })}
               onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
-              setFloatingVideoUrl={setFloatingVideoUrl}
-              openBrainHackPopup={openBrainHackPopup}
               onOpenDrawingCanvas={() => onOpenDrawingCanvas(point)}
           />
           {point.children.length > 0 && (
@@ -123,8 +122,6 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
                 createResourceWithHierarchy={createResourceWithHierarchy}
                 onSeekTo={onSeekTo}
                 currentTime={currentTime}
-                setFloatingVideoUrl={setFloatingVideoUrl}
-                openBrainHackPopup={openBrainHackPopup}
                 onOpenDrawingCanvas={onOpenDrawingCanvas}
               />
             </div>
@@ -137,7 +134,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, openDrawingCanvas } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +145,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+    const [drawingCanvasState, setDrawingCanvasState] = useState<{isOpen: boolean, resourceId: string, pointId: string, initialDrawing?: string}>({isOpen: false, resourceId: '', pointId: ''});
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -224,31 +222,32 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 
     useEffect(() => {
       const audioEl = audioRef.current;
-      if (!audioEl) return;
+      if (!audioEl || !playbackRequest || playbackRequest.resourceId !== resource?.id) return;
 
-      if (playbackRequest && playbackRequest.resourceId === resource?.id) {
+      const handlePlayback = () => {
         audioEl.currentTime = playbackRequest.timestamp;
         setPlayingAudio(true);
-        
-        const checkEndTime = () => {
-          if (playbackRequest.endTime && audioEl.currentTime >= playbackRequest.endTime) {
-            audioEl.pause();
-            setPlayingAudio(false);
-            setPlaybackRequest(null);
-          }
-        };
-        
         if (playbackRequest.endTime) {
-            audioEl.addEventListener('timeupdate', checkEndTime);
-            return () => {
-              if (audioEl) { // Check if audioEl still exists
-                audioEl.removeEventListener('timeupdate', checkEndTime);
-              }
-            };
+          const checkEnd = () => {
+            if (audioEl.currentTime >= playbackRequest.endTime!) {
+              audioEl.pause();
+              setPlayingAudio(false);
+              setPlaybackRequest(null);
+              audioEl.removeEventListener('timeupdate', checkEnd);
+            }
+          };
+          audioEl.addEventListener('timeupdate', checkEnd);
         } else {
-            setPlaybackRequest(null);
+          setPlaybackRequest(null);
         }
+      };
+
+      if(audioEl.readyState >= 1) { // HAVE_METADATA
+        handlePlayback();
+      } else {
+        audioEl.addEventListener('loadedmetadata', handlePlayback, { once: true });
       }
+
     }, [playbackRequest, resource?.id, setPlaybackRequest]);
 
     const folderPath = useMemo(() => {
@@ -360,12 +359,22 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
     
-    const handleOpenDrawingCanvas = (point: ResourcePoint) => {
-      openDrawingCanvas({
+    const openDrawingCanvas = (point: ResourcePoint) => {
+      setDrawingCanvasState({
+        isOpen: true,
         resourceId: resource.id,
         pointId: point.id,
         initialDrawing: point.drawing,
       });
+    };
+
+    const handleSaveDrawing = (dataUrl: string) => {
+      const { resourceId, pointId } = drawingCanvasState;
+      const updatedPoints = (resources.find(r => r.id === resourceId)?.points || []).map(p =>
+        p.id === pointId ? { ...p, drawing: dataUrl } : p
+      );
+      onUpdate({ ...resource, points: updatedPoints });
+      setDrawingCanvasState({ isOpen: false, resourceId: '', pointId: '' });
     };
 
     const renderContent = () => {
@@ -381,9 +390,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
                         onSeekTo={handleSeekTo}
                         currentTime={currentTime}
-                        setFloatingVideoUrl={setFloatingVideoUrl}
-                        openBrainHackPopup={openBrainHackPopup}
-                        onOpenDrawingCanvas={handleOpenDrawingCanvas}
+                        onOpenDrawingCanvas={openDrawingCanvas}
                     />
                 );
             case 'habit':
@@ -457,117 +464,134 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-            <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
-            <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-            <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
-                <div className="absolute top-2 right-2 z-20 flex items-center">
-                    <TooltipProvider delayDuration={200}>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMindMapModalOpen(true)}><GitMerge className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
-                            {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
-                        </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Upload Audio</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('paint')}><Paintbrush className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Add Paint Canvas</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
-                    </TooltipProvider>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
+        <>
+            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+                <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
+                <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
+                <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
+                    <div className="absolute top-2 right-2 z-20 flex items-center">
+                        <TooltipProvider delayDuration={200}>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMindMapModalOpen(true)}><GitMerge className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
+                                {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
+                            </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Upload Audio</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('paint')}><Paintbrush className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Add Paint Canvas</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
+                        </TooltipProvider>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
 
-                <CardHeader className="p-3 pt-8 relative flex-shrink-0">
-                    <div
-                        className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
-                        {...listeners}
-                    >
-                        <GripVertical className="h-5 w-5 text-muted-foreground/30" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {getIcon()}
-                        {editingTitle ? (
-                             <Input 
-                                value={resource.name || ''}
-                                onChange={(e) => handleTitleChange(e.target.value)} 
-                                onBlur={() => setEditingTitle(false)} 
-                                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                className="h-8 text-base font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 p-0"
-                                autoFocus
-                            />
-                        ) : (
-                            <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                {resource.name || <span className="text-muted-foreground">[Untitled]</span>}
-                            </CardTitle>
-                        )}
-                    </div>
-                    {folderPath && (
-                        <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
-                          <span className="flex items-center gap-1">
-                            {folderPath.split(' / ').map((part, index, arr) => (
-                                <React.Fragment key={index}>
-                                    <span>{part}</span>
-                                    {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
-                                </React.Fragment>
-                            ))}
-                          </span>
-                        </CardDescription>
-                    )}
-                     {audioSrc && (
-                        <div className="w-full space-y-2 pt-2">
-                            <div className="flex items-center gap-2">
-                                 <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
-                                    {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                                </Button>
-                                <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max={duration || 0}
-                                    value={currentTime}
-                                    onChange={(e) => { if (audioRef.current) audioRef.current.currentTime = parseFloat(e.target.value); }}
-                                    className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+                    <CardHeader className="p-3 pt-8 relative flex-shrink-0">
+                        <div
+                            className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
+                            {...listeners}
+                        >
+                            <GripVertical className="h-5 w-5 text-muted-foreground/30" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {getIcon()}
+                            {editingTitle ? (
+                                 <Input 
+                                    value={resource.name || ''}
+                                    onChange={(e) => handleTitleChange(e.target.value)} 
+                                    onBlur={() => setEditingTitle(false)} 
+                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                                    className="h-8 text-base font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 p-0"
+                                    autoFocus
                                 />
-                                <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
-                            </div>
-                             {resource.audioFileName && (
-                                <p className="text-xs text-muted-foreground truncate" title={resource.audioFileName}>
-                                  Now Playing: {resource.audioFileName}
-                                </p>
+                            ) : (
+                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+                                    {resource.name || <span className="text-muted-foreground">[Untitled]</span>}
+                                </CardTitle>
                             )}
                         </div>
-                    )}
-                </CardHeader>
-                <div className="flex-grow min-h-0 overflow-y-auto">
-                    <CardContent className="p-3 pt-0">
-                        {renderContent()}
-                    </CardContent>
-                </div>
-                 <CardFooter className="p-3 border-t">
-                     <div className="flex gap-2 w-full">
-                        {audioSrc && (
-                          <div className="flex gap-2 w-full">
-                             <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
-                             <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
-                         </div>
+                        {folderPath && (
+                            <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
+                              <span className="flex items-center gap-1">
+                                {folderPath.split(' / ').map((part, index, arr) => (
+                                    <React.Fragment key={index}>
+                                        <span>{part}</span>
+                                        {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
+                                    </React.Fragment>
+                                ))}
+                              </span>
+                            </CardDescription>
                         )}
-                     </div>
-                 </CardFooter>
-            </Card>
-             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
-                    <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Mind Map for: {resource.name}</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex-grow min-h-0">
-                      <MindMapViewer showControls={false} rootFocusAreaId={resource.id} />
+                         {audioSrc && (
+                            <div className="w-full space-y-2 pt-2">
+                                <div className="flex items-center gap-2">
+                                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
+                                        {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                                    </Button>
+                                    <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max={duration || 0}
+                                        value={currentTime}
+                                        onChange={(e) => { if (audioRef.current) audioRef.current.currentTime = parseFloat(e.target.value); }}
+                                        className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer"
+                                    />
+                                    <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
+                                </div>
+                                 {resource.audioFileName && (
+                                    <p className="text-xs text-muted-foreground truncate" title={resource.audioFileName}>
+                                      Now Playing: {resource.audioFileName}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </CardHeader>
+                    <div className="flex-grow min-h-0 overflow-y-auto">
+                        <CardContent className="p-3 pt-0">
+                            {renderContent()}
+                        </CardContent>
                     </div>
-                </DialogContent>
-            </Dialog>
-        </div>
+                     <CardFooter className="p-3 border-t">
+                         <div className="flex gap-2 w-full">
+                            {audioSrc && (
+                              <div className="flex gap-2 w-full">
+                                 <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
+                                 <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
+                             </div>
+                            )}
+                         </div>
+                     </CardFooter>
+                </Card>
+                 <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+                    <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
+                        <DialogHeader className="p-4 border-b">
+                            <DialogTitle>Mind Map for: {resource.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex-grow min-h-0">
+                          <MindMapViewer showControls={false} rootFocusAreaId={resource.id} />
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                {drawingCanvasState.isOpen && (
+                  <Dialog open={drawingCanvasState.isOpen} onOpenChange={(open) => { if (!open) setDrawingCanvasState({isOpen: false, resourceId: '', pointId: ''}); }}>
+                    <DialogContent className="max-w-4xl p-0 border-0 bg-gray-900">
+                      <DialogHeader className="sr-only">
+                        <DialogTitle>Drawing Canvas</DialogTitle>
+                        <VisuallyHidden><DialogDescription>A canvas for drawing and sketching.</DialogDescription></VisuallyHidden>
+                      </DialogHeader>
+                      <DrawingCanvas 
+                        initialDrawing={drawingCanvasState.initialDrawing}
+                        onSave={handleSaveDrawing}
+                        onClose={() => setDrawingCanvasState({isOpen: false, resourceId: '', pointId: ''})}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                )}
+            </div>
+        </>
     );
 }
