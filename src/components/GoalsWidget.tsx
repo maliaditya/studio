@@ -122,7 +122,7 @@ export function GoalsWidget() {
                     </CardHeader>
                 </div>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-48 pr-3">
+                    <ScrollArea className="h-64 pr-3">
                         <ul className="space-y-3">
                             {plannedSpecializations.map(spec => {
                                 const plan = offerizationPlans[spec.id]?.learningPlan;
