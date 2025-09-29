@@ -38,6 +38,7 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
   { id: 'activityDistribution', label: 'Activity Distribution' },
   { id: 'favorites', label: 'Favorite Cards' },
   { id: 'topPriorities', label: 'Top Priorities' },
+  { id: 'goals', label: 'Goals Widget' },
   { id: 'brainHacks', label: 'Brain Hacks' },
   { id: 'ruleEquations', label: 'Rule Equations' },
   { id: 'visualizationTechniques', label: 'Visualization Techniques' },

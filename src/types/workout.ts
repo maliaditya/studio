@@ -390,14 +390,14 @@ export interface ResourceFolder {
 }
 
 export interface PopupState {
-    resourceId: string;
-    level: number;
-    x: number;
-    y: number;
-    parentId?: string;
-    width?: number;
-    height?: number;
-    z?: number;
+  resourceId: string;
+  level: number;
+  x: number;
+  y: number;
+  parentId?: string;
+  width?: number;
+  height?: number;
+  z?: number;
 }
 
 // Canvas Types
@@ -713,6 +713,7 @@ export interface WidgetVisibility {
   ruleEquations: boolean;
   visualizationTechniques: boolean;
   spacedRepetition: boolean;
+  goals: boolean;
 }
 
 export interface UserSettings {

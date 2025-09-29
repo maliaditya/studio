@@ -45,6 +45,7 @@ import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 import { FavoriteCards } from '@/components/FavoriteCards';
 import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
+import { GoalsWidget } from '@/components/GoalsWidget';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { RuleEquationsCard } from '@/components/RuleEquationsCard';
 import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
@@ -404,6 +405,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
+      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.goals && <GoalsWidget />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
