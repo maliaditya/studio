@@ -11,7 +11,7 @@ import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
-import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter } from 'date-fns';
+import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -411,14 +411,21 @@ export function WeightGoalCard({
                                 return acc;
                             }, { items: 0, hours: 0, pages: 0 });
 
-                        const calculateDailyTarget = (total: number | null, start: string | null | undefined, end: string | null | undefined) => {
+                        const calculateDailyTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
                             if (!total || !start || !end) return null;
                             const startDate = parseISO(start);
                             const endDate = parseISO(end);
-                            if (isAfter(startDate, endDate)) return null;
-                            const days = differenceInDays(endDate, startDate) + 1;
-                            if (days <= 0) return null;
-                            return (total / days).toFixed(1);
+                            const today = startOfToday();
+                        
+                            if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
+                        
+                            const remainingWork = total - completed;
+                            const relevantStartDate = isBefore(startDate, today) ? today : startDate;
+                            const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
+                        
+                            if (remainingWork <= 0 || remainingDays <= 0) return null;
+                        
+                            return (remainingWork / remainingDays).toFixed(1);
                         };
     
                         return (
@@ -430,8 +437,8 @@ export function WeightGoalCard({
                                     <CardContent className="p-3 pt-0 text-xs">
                                         <ul className="space-y-2">
                                             {(plan.audioVideoResources || []).map(res => {
-                                                const dailyHours = calculateDailyTarget(res.totalHours, res.startDate, res.completionDate);
-                                                const dailyItems = calculateDailyTarget(res.totalItems, res.startDate, res.completionDate);
+                                                const dailyHours = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
+                                                const dailyItems = calculateDailyTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
                                                 const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
                                                 return (
                                                 <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
@@ -463,7 +470,7 @@ export function WeightGoalCard({
                                                 </li>
                                             )})}
                                             {(plan.bookWebpageResources || []).map(res => {
-                                                const dailyPages = calculateDailyTarget(res.totalPages, res.startDate, res.completionDate);
+                                                const dailyPages = calculateDailyTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
                                                 const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
                                                 return (
                                                 <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
@@ -814,4 +821,4 @@ export function WeightGoalCard({
     );
 }
 
-  
+    
