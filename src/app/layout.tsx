@@ -54,10 +54,9 @@ import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import dynamic from 'next/dynamic';
 
-const PdfViewerPopup = dynamic(
-  () => import('@/components/PdfViewerPopup').then(mod => mod.PdfViewerPopup),
-  { ssr: false }
-);
+const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
+  ssr: false,
+});
 
 
 const slotEndHours: Record<string, number> = {
@@ -624,4 +623,3 @@ export default function RootLayout({
     </html>
   );
 }
-
