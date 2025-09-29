@@ -25,6 +25,8 @@ import { useRouter } from 'next/navigation';
 import { EditableResourcePoint, EditableField, DoubleEditableField, EmotionEditableField, EditableResponse } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
 import { VisuallyHidden } from './ui/visually-hidden';
+import { HabitResourceCard } from './HabitResourceCard';
+import { MechanismResourceCard } from './MechanismResourceCard';
 
 
 interface GeneralResourcePopupProps {
@@ -133,7 +135,7 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, drawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd } = useAuth();
+    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId, openDrawingCanvas } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -356,6 +358,14 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
     
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
+    
+    const handleOpenDrawingCanvas = useCallback((point: ResourcePoint) => {
+        openDrawingCanvas({
+          resourceId: resource.id,
+          pointId: point.id,
+          initialDrawing: point.drawing
+        });
+    }, [openDrawingCanvas, resource.id]);
 
     return (
         <>
@@ -383,7 +393,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </Button>
                     </div>
 
-                    <CardHeader className="p-3 pt-8 relative flex-shrink-0">
+                    <CardHeader 
+                        className="p-3 pt-8 relative flex-shrink-0"
+                    >
                         <div
                             className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
                             {...listeners}
@@ -446,7 +458,27 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </CardHeader>
                     <div className="flex-grow min-h-0 overflow-y-auto">
                         <CardContent className="p-3 pt-0">
-                            {renderContent()}
+                           {resource.type === 'habit' ? (
+                                <HabitResourceCard resource={resource} onUpdate={onUpdate} onOpenNestedPopup={(id, e) => onOpenNestedPopup(id, e, popupState)} popupState={popupState} />
+                           ) : resource.type === 'mechanism' ? (
+                                <MechanismResourceCard resource={resource} onUpdate={onUpdate} />
+                           ) : (
+                                <PointTree
+                                    points={pointTree}
+                                    onUpdate={handleUpdatePoint}
+                                    onDelete={handleDeletePoint}
+                                    onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
+                                    openContentViewPopup={openContentViewPopup}
+                                    createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
+                                    onSeekTo={handleSeekTo}
+                                    currentTime={currentTime}
+                                    onOpenDrawingCanvas={(point) => openDrawingCanvas({
+                                      resourceId: resource.id,
+                                      pointId: point.id,
+                                      initialDrawing: point.drawing
+                                    })}
+                                />
+                           )}
                         </CardContent>
                     </div>
                      <CardFooter className="p-3 border-t">
