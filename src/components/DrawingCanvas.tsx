@@ -73,7 +73,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         inputEl.style.fontSize = `${lineWidth * 4}px`;
         if (isTextInput) {
             inputEl.style.display = 'block';
-            inputEl.focus();
+            requestAnimationFrame(() => {
+                inputEl.focus();
+            });
             inputEl.value = textInput.value;
         } else {
             inputEl.style.display = 'none';
@@ -141,7 +143,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
       ctx.lineJoin = 'round';
       ctx.stroke();
     } else if (tool === 'rectangle' || tool === 'circle') {
-      ctx.putImageData(history[historyIndex], 0, 0); // Restore previous state
+      if(history[historyIndex]){
+        ctx.putImageData(history[historyIndex], 0, 0); // Restore previous state
+      }
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
@@ -165,7 +169,9 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
     ctx.globalCompositeOperation = 'source-over';
     
     if (tool === 'rectangle' || tool === 'circle') {
-      ctx.putImageData(history[historyIndex], 0, 0); // Clear preview
+      if(history[historyIndex]){
+        ctx.putImageData(history[historyIndex], 0, 0); // Clear preview
+      }
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
