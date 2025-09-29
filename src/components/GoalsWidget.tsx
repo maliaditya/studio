@@ -28,7 +28,12 @@ export function GoalsWidget() {
         setIsClient(true);
         const savedPosition = localStorage.getItem('goals_widget_position');
         if (savedPosition) {
-            setPosition(JSON.parse(savedPosition));
+            try {
+                setPosition(JSON.parse(savedPosition));
+            } catch (error) {
+                console.error("Failed to parse position from localStorage", error);
+                setPosition({ x: window.innerWidth - 340, y: 300 });
+            }
         } else {
             setPosition({ x: window.innerWidth - 340, y: 300 });
         }
@@ -78,6 +83,7 @@ export function GoalsWidget() {
         const startDate = parseISO(start);
         const endDate = parseISO(end);
         const today = startOfToday();
+        
         if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
         
         const remainingWork = total - completed;
@@ -129,15 +135,17 @@ export function GoalsWidget() {
                                 }, { items: 0, hours: 0, pages: 0 });
 
                                 return (plan.audioVideoResources || []).concat(plan.bookWebpageResources || []).map((res, index) => {
-                                    let dailyTarget, unit, progress;
-                                    if ('totalHours' in res) {
+                                    let dailyTarget, unit, progress, authorOrTutor;
+                                    if ('totalHours' in res) { // LearningResourceAudio
                                         dailyTarget = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
                                         unit = 'h/day';
                                         progress = `${completed.hours.toFixed(1)}/${res.totalHours}h`;
-                                    } else if ('totalPages' in res) {
+                                        authorOrTutor = res.tutor;
+                                    } else if ('totalPages' in res) { // LearningResourceBook
                                         dailyTarget = calculateDailyTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
                                         unit = 'pg/day';
                                         progress = `${completed.pages}/${res.totalPages}pgs`;
+                                        authorOrTutor = res.author;
                                     }
 
                                     if (!dailyTarget) return null;
@@ -146,6 +154,7 @@ export function GoalsWidget() {
                                         <li key={`${spec.id}-${res.id}-${index}`}>
                                             <div className="text-xs p-2 rounded-md bg-muted/50">
                                                 <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
+                                                {authorOrTutor && <p className="text-xs text-muted-foreground">{authorOrTutor}</p>}
                                                 <div className="flex justify-between items-baseline mt-1">
                                                     <span className="text-muted-foreground">{progress}</span>
                                                     <span className="text-primary font-bold text-sm">{dailyTarget} {unit}</span>
