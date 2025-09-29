@@ -151,7 +151,7 @@ function MyPlatePageContent() {
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -1153,7 +1153,7 @@ function MyPlatePageContent() {
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
+                    <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(startOfToday())} initialFocus />
                     </PopoverContent>
                 </Popover>
             </CardHeader>
@@ -1467,6 +1467,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 

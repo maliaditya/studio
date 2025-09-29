@@ -208,80 +208,9 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
         settings, toggleRoutine, 
         currentSlot, 
         coreSkills,
-        deepWorkDefinitions,
-        getDescendantLeafNodes,
     } = useAuth();
     const { toast } = useToast();
     const [currentWeek, setCurrentWeek] = useState(initialWeek || startOfWeek(new Date(), { weekStartsOn: 1 }));
-
-    const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
-
-     useEffect(() => {
-        const repetitionSkills = coreSkills.flatMap(cs => 
-            cs.skillAreas.flatMap(sa => 
-                sa.microSkills.filter(ms => ms.isReadyForRepetition)
-            )
-        );
-
-        let hasScheduleChanged = false;
-        const newSchedule = { ...schedule };
-
-        repetitionSkills.forEach(skill => {
-            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
-            if (intentions.length === 0) return;
-
-            const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-            
-            const allCompletionDates = new Set<string>();
-            allLeafNodes.forEach(node => {
-                if (node.last_logged_date) allCompletionDates.add(node.last_logged_date);
-            });
-            const sortedDates = Array.from(allCompletionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-
-            if (sortedDates.length === 0) return;
-
-            let reps = 1;
-            let lastReviewDate = sortedDates[0];
-            for (let i = 1; i < sortedDates.length; i++) {
-                const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
-                if (daysBetween <= (DOUBLING_INTERVALS[reps - 1] || 128)) {
-                    reps++;
-                } else {
-                    reps = 1;
-                }
-                lastReviewDate = sortedDates[i];
-            }
-            
-            const nextInterval = DOUBLING_INTERVALS[reps] || 128;
-            const nextReviewDate = addDays(lastReviewDate, nextInterval);
-            const nextReviewDateKey = format(nextReviewDate, 'yyyy-MM-dd');
-    
-            const activityTitle = skill.name;
-            const targetSlot = settings.spacedRepetitionSlot || 'Late Night';
-    
-            if (!newSchedule[nextReviewDateKey]) newSchedule[nextReviewDateKey] = {};
-            if (!newSchedule[nextReviewDateKey][targetSlot]) newSchedule[nextReviewDateKey][targetSlot] = [];
-    
-            const slotActivities = newSchedule[nextReviewDateKey][targetSlot] as Activity[];
-            
-            if (!slotActivities.some(act => act.details === activityTitle && act.type === 'deepwork')) {
-                const newActivity: Activity = {
-                    id: `spaced-repetition-${skill.id}-${nextReviewDateKey}`,
-                    type: 'deepwork',
-                    details: activityTitle,
-                    completed: false,
-                    slot: targetSlot,
-                };
-                slotActivities.push(newActivity);
-                hasScheduleChanged = true;
-            }
-        });
-    
-        if (hasScheduleChanged) {
-            setSchedule(newSchedule);
-        }
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, schedule, setSchedule, settings.spacedRepetitionSlot]);
-
 
     useEffect(() => {
         if (initialWeek) {
