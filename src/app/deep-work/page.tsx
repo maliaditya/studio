@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search, Workflow } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { format, getISOWeek, isMonday, getYear, addDays, parseISO, differenceInDays } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack, NodeType } from '@/types/workout';
+import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, Resource, ResourceFolder, SkillArea, SkillDomain, CoreSkill, MicroSkill, Project, Feature, DailySchedule, Activity, BrainHack, NodeType, ResourcePoint } from '@/types/workout';
 import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -393,7 +393,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     linkProjectToTask: (taskId: string, projectId: string | null) => void;
     onEdit: (def: ExerciseDefinition) => void;
     handleOpenManageLinksModal: (parent: ExerciseDefinition) => void;
-    handleCreateResource: (parentTask: ExerciseDefinition) => void;
+    handleCreateResource: () => void;
     activeProjectIds: Set<string>;
     currentSlot: string;
 }>(({
@@ -593,7 +593,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                     </p>
                 </Card>
                  <Card
-                    onClick={() => handleCreateResource(currentTask)}
+                    onClick={() => handleCreateResource()}
                     className="rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed hover:border-primary hover:bg-muted/50 transition-all duration-300 cursor-pointer min-h-[230px] hover:shadow-xl hover:-translate-y-1"
                 >
                     <Folder className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -694,6 +694,14 @@ function DeepWorkPageContent() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor));
+
+  const [isAddResourceModalOpen, setIsAddResourceModalOpen] = useState(false);
+  const [addResourceType, setAddResourceType] = useState<Resource['type']>('link');
+  const [newResourceName, setNewResourceName] = useState('');
+  const [newResourceLink, setNewResourceLink] = useState('');
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
+  const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
+
 
   const onOpenMindMap = (id: string) => {
     setMindMapRootFocusAreaId(id);
@@ -1301,15 +1309,76 @@ function DeepWorkPageContent() {
     }
   };
 
-  const handleCreateResource = (parentTask: ExerciseDefinition) => {
-    const updatedTask = createResourceWithHierarchy(parentTask, undefined, 'card');
-    if (updatedTask) {
-        const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
-        setNavigationStack(prev => prev.map(item =>
-            item.id === taskWithType!.id ? { ...item, ...taskWithType } : item
-        ));
+  const handleCreateResource = async () => {
+    if (!currentTask) return;
+  
+    if (addResourceType === 'link' && !newResourceLink.trim()) {
+      toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
+      return;
     }
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism') && !newResourceName.trim()) {
+      toast({ title: "Error", description: "Name is required.", variant: "destructive" });
+      return;
+    }
+  
+    let finalResource: Resource;
+  
+    if (addResourceType === 'link') {
+      setIsFetchingMeta(true);
+      try {
+        const response = await fetch('/api/get-link-metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: newResourceLink.trim() }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Failed to fetch metadata.');
+  
+        finalResource = {
+          id: `res_${Date.now()}`,
+          name: result.title || 'Untitled Resource',
+          link: newResourceLink.trim(),
+          description: result.description || '',
+          folderId: 'temp',
+          iconUrl: getFaviconUrl(newResourceLink.trim()),
+          type: 'link',
+          createdAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        toast({ title: "Error adding resource", description: error instanceof Error ? error.message : "Could not fetch metadata from URL.", variant: "destructive" });
+        setIsFetchingMeta(false);
+        return;
+      } finally {
+        setIsFetchingMeta(false);
+      }
+    } else {
+      finalResource = {
+        id: `res_${Date.now()}`,
+        name: newResourceName.trim(),
+        folderId: 'temp',
+        type: addResourceType,
+        points: [],
+        icon: 'Library',
+        createdAt: new Date().toISOString(),
+        mechanismFramework: addResourceType === 'mechanism' ? mechanismFramework : undefined,
+      };
+    }
+  
+    const updatedTask = createResourceWithHierarchy(currentTask, undefined, finalResource.type, finalResource);
+  
+    if (updatedTask) {
+      const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
+      setNavigationStack(prev => prev.map(item =>
+          item.id === taskWithType.id ? { ...item, ...taskWithType } : item
+      ));
+    }
+  
+    setNewResourceName('');
+    setNewResourceLink('');
+    setIsAddResourceModalOpen(false);
+    toast({ title: `Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
   };
+  
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
     if (type === 'deepwork') {
@@ -1568,7 +1637,7 @@ function DeepWorkPageContent() {
                                 linkProjectToTask={linkProjectToTask}
                                 onEdit={setEditingFocusArea}
                                 handleOpenManageLinksModal={handleOpenManageLinksModal}
-                                handleCreateResource={handleCreateResource}
+                                handleCreateResource={() => setIsAddResourceModalOpen(true)}
                                 activeProjectIds={activeProjectIds}
                                 currentSlot={currentSlot}
                             />
@@ -1821,6 +1890,42 @@ function DeepWorkPageContent() {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <Dialog open={isAddResourceModalOpen} onOpenChange={setIsAddResourceModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Add New Resource</DialogTitle>
+                    <DialogDescription>Select the type of resource to add to "{currentTask?.name}".</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <RadioGroup value={addResourceType} onValueChange={(value) => setAddResourceType(value as any)} className="grid grid-cols-3 gap-4">
+                        <div><RadioGroupItem value="link" id="r-link" className="peer sr-only" /><Label htmlFor="r-link" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><LinkIcon className="mb-3 h-6 w-6"/>Link</Label></div>
+                        <div><RadioGroupItem value="card" id="r-card" className="peer sr-only" /><Label htmlFor="r-card" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Library className="mb-3 h-6 w-6"/>Card</Label></div>
+                        <div><RadioGroupItem value="habit" id="r-habit" className="peer sr-only" /><Label htmlFor="r-habit" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Zap className="mb-3 h-6 w-6"/>Habit</Label></div>
+                        <div><RadioGroupItem value="mechanism" id="r-mechanism" className="peer sr-only" /><Label htmlFor="r-mechanism" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Workflow className="mb-3 h-6 w-6"/>Mechanism</Label></div>
+                    </RadioGroup>
+                    
+                    {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
+                    {addResourceType !== 'link' && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    {addResourceType === 'mechanism' && (
+                        <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
+                            <Label>Framework:</Label>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id="r-neg" /><Label htmlFor="r-neg">Negative</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-pos" /><Label htmlFor="r-pos">Positive</Label></div>
+                        </RadioGroup>
+                    )}
+
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAddResourceModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleCreateResource} disabled={isFetchingMeta}>
+                        {isFetchingMeta ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        Add Resource
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
         </div>
         <DragOverlay>
             {activeId && activeDragItem ? (
@@ -1896,6 +2001,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
