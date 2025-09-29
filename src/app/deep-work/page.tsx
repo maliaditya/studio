@@ -237,6 +237,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
   const embedLinkForModal = youtubeEmbedUrl || (isSpecialEmbed ? resource.link : null);
   
   const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (resource.type === 'pdf') {
       openPdfViewer(resource);
     } else {
@@ -275,7 +276,7 @@ function LinkedResourceItem({ resource, handleUnlinkItem, handleDelete, setEmbed
           </div>
           <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
-                  <Library className="h-5 w-5 text-primary" />
+                  {resource.type === 'pdf' ? <FileIcon className="h-5 w-5 text-red-500" /> : <Library className="h-5 w-5 text-primary" />}
                   <TooltipProvider>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -1314,18 +1315,17 @@ function DeepWorkPageContent() {
 
   const handleCreateResource = async () => {
     if (!currentTask) return;
-  
-    const file = pdfUploadInputRef.current?.files?.[0];
-    if (addResourceType === 'pdf' && !file) {
-      toast({ title: 'PDF file is required', variant: 'destructive' });
-      return;
+
+    if (addResourceType === 'pdf') {
+        pdfUploadInputRef.current?.click();
+        return; // handlePdfUpload will handle the rest
     }
   
     if (addResourceType === 'link' && !newResourceLink.trim()) {
       toast({ title: "Error", description: "Resource link is required for a link type.", variant: "destructive" });
       return;
     }
-    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf') && !newResourceName.trim() && !file) {
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !newResourceName.trim()) {
       toast({ title: "Error", description: "Name is required.", variant: "destructive" });
       return;
     }
@@ -1360,18 +1360,6 @@ function DeepWorkPageContent() {
       } finally {
         setIsFetchingMeta(false);
       }
-    } else if (addResourceType === 'pdf' && file) {
-        finalResource = {
-            id: `res_pdf_${Date.now()}`,
-            name: newResourceName.trim() || file.name,
-            folderId: 'temp',
-            type: 'pdf',
-            createdAt: new Date().toISOString(),
-            pdfFileName: file.name,
-            hasLocalPdf: true,
-        };
-        await storePdf(finalResource.id, file);
-
     } else if (addResourceType === 'model3d') {
         const file3d = modelUploadInputRef.current?.files?.[0];
         if (!file3d) {
@@ -1428,7 +1416,32 @@ function DeepWorkPageContent() {
         if (!currentTask) return;
         const file = e.target.files?.[0];
         if (!file) return;
-        handleCreateResource();
+
+        const finalResource: Resource = {
+            id: `res_pdf_${Date.now()}`,
+            name: file.name,
+            folderId: 'temp', // This will be handled by createResourceWithHierarchy if needed
+            type: 'pdf',
+            createdAt: new Date().toISOString(),
+            pdfFileName: file.name,
+            hasLocalPdf: true,
+        };
+
+        await storePdf(finalResource.id, file);
+
+        const updatedTask = createResourceWithHierarchy(currentTask, undefined, finalResource.type, finalResource);
+  
+        if (updatedTask) {
+          const taskWithType = updatedTask as (ExerciseDefinition & { type: 'deepwork' | 'upskill' });
+          setNavigationStack(prev => prev.map(item =>
+              item.id === taskWithType.id ? { ...item, ...taskWithType } : item
+          ));
+        }
+      
+        setIsAddResourceModalOpen(false);
+        toast({ title: `PDF Resource Added`, description: `"${finalResource.name}" has been saved and linked.` });
+
+        e.target.value = ''; // Reset file input
     };
 
   const handleSelectFocusArea = (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => {
@@ -1959,7 +1972,7 @@ function DeepWorkPageContent() {
                     </RadioGroup>
                     
                     {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
-                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d' || addResourceType === 'pdf' ) && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
                     
                     {addResourceType === 'mechanism' && (
                         <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
@@ -2069,6 +2082,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
