@@ -66,10 +66,20 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   }, []);
   
   useEffect(() => {
-    if (isTextInput && textInputRef.current) {
-      textInputRef.current.focus();
+    const inputEl = textInputRef.current;
+    if (inputEl) {
+        inputEl.style.left = `${textInput.x}px`;
+        inputEl.style.top = `${textInput.y}px`;
+        inputEl.style.fontSize = `${lineWidth * 4}px`;
+        if (isTextInput) {
+            inputEl.style.display = 'block';
+            inputEl.focus();
+            inputEl.value = textInput.value;
+        } else {
+            inputEl.style.display = 'none';
+        }
     }
-  }, [isTextInput]);
+  }, [isTextInput, textInput, lineWidth]);
 
   const undo = () => {
     if (historyIndex > 0) {
@@ -97,7 +107,6 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
         drawText(textInputRef.current.value, textInput.x, textInput.y);
     }
     setIsTextInput(false);
-    setTextInput({ x: 0, y: 0, value: '' });
 
     if (tool === 'text') {
       setIsTextInput(true);
@@ -186,24 +195,23 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
   };
 
   const handleTextInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    if (e.target.value) {
-        drawText(e.target.value, textInput.x, textInput.y);
+    if (isTextInput) {
+      if (e.target.value) {
+          drawText(e.target.value, textInput.x, textInput.y);
+      }
+      setIsTextInput(false);
     }
-    setIsTextInput(false);
-    setTextInput({ x: 0, y: 0, value: '' });
   };
 
   const handleTextInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Enter') {
-          if (e.currentTarget.value) {
-              drawText(e.currentTarget.value, textInput.x, textInput.y);
-          }
-          setIsTextInput(false);
-          setTextInput({ x: 0, y: 0, value: '' });
-      } else if (e.key === 'Escape') {
-          setIsTextInput(false);
-          setTextInput({ x: 0, y: 0, value: '' });
+    if (e.key === 'Enter') {
+      if (e.currentTarget.value) {
+        drawText(e.currentTarget.value, textInput.x, textInput.y);
       }
+      setIsTextInput(false);
+    } else if (e.key === 'Escape') {
+      setIsTextInput(false);
+    }
   };
 
   const handleSave = () => {
@@ -235,27 +243,23 @@ export function DrawingCanvas({ initialDrawing, onSave, onClose }: DrawingCanvas
           onMouseUp={stopInteraction}
           onMouseLeave={stopInteraction}
         />
-        {isTextInput && (
-          <input
+        <input
             ref={textInputRef}
             type="text"
             onBlur={handleTextInputBlur}
             onKeyDown={handleTextInputKeyDown}
             style={{
               position: 'absolute',
-              left: textInput.x,
-              top: textInput.y,
+              display: 'none',
               background: 'rgba(0,0,0,0.5)',
               border: '1px solid white',
               color: 'white',
-              fontSize: `${lineWidth * 4}px`,
               width: 'auto',
               minWidth: '50px',
               zIndex: 10,
             }}
             className="p-1"
-          />
-        )}
+        />
       </div>
       <div className="flex items-center justify-between mt-4">
         <div className="flex items-center gap-2">
