@@ -208,7 +208,6 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
       }
     };
 
-
     return (
         <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
@@ -236,7 +235,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                             </Button>
                         )}
                         {!isPopup && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={()={() => onLinkClick(resource.id)}}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
                                 <LinkIcon className="h-4 w-4" />
                             </Button>
                         )}
