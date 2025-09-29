@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isToday, isBefore, startOfToday } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -168,10 +168,8 @@ export function TimeSlots({
         const freeTime = 240 - loggedTime;
         const progress = (loggedTime / 240) * 100;
         
-        const now = new Date();
-        const todayKey = format(now, 'yyyy-MM-dd');
-        const selectedDateKey = format(date, 'yyyy-MM-dd');
-        const isPastSlot = selectedDateKey < todayKey || (selectedDateKey === todayKey && now.getHours() >= slot.endHour);
+        const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
+        const isPastSlot = isBefore(date, startOfToday()) || (isToday(date) && new Date().getHours() >= slot.endHour);
         
         const linkedRules = metaRules.filter(rule => 
             settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)
@@ -191,7 +189,7 @@ export function TimeSlots({
             id={`slot-card-${slot.name.replace(/\s+/g, '-')}`}
             className={cn(
               "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
-              currentSlot === slot.name && selectedDateKey === todayKey
+              isCurrentSlotToday
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60'
             )}
@@ -202,7 +200,7 @@ export function TimeSlots({
                 <CardDescription>{slot.time}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {currentSlot === slot.name && selectedDateKey === todayKey ? (
+                {isCurrentSlotToday ? (
                   <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
                     {remainingTime}
                   </div>
@@ -242,7 +240,7 @@ export function TimeSlots({
                       ))
                     ) : (
                       <div className="flex-grow flex items-center justify-center h-full">
-                        {currentSlot === slot.name && selectedDateKey === todayKey ? (
+                        {isCurrentSlotToday ? (
                           <div className="text-center">
                             <p className="text-lg text-muted-foreground">Current Focus</p>
                           </div>
