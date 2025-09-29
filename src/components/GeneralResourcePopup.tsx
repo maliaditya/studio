@@ -137,7 +137,22 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
 
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
-    const { resources, resourceFolders, globalVolume, openContentViewPopup, createResourceWithHierarchy: createResourceWithHierarchyAuth, setFloatingVideoUrl, openBrainHackPopup, settings, setSettings, playbackRequest, setPlaybackRequest, setSelectedResourceFolderId } = useAuth();
+    const { 
+      resources, 
+      resourceFolders, 
+      globalVolume, 
+      openContentViewPopup, 
+      createResourceWithHierarchy: createResourceWithHierarchyAuth, 
+      setFloatingVideoUrl, 
+      openBrainHackPopup, 
+      settings, 
+      setSettings, 
+      playbackRequest, 
+      setPlaybackRequest, 
+      setSelectedResourceFolderId,
+      drawingCanvasState,
+      openDrawingCanvas: authOpenDrawingCanvas,
+    } = useAuth();
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
@@ -379,15 +394,13 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     
     const openDrawingCanvas = useCallback((point: ResourcePoint) => {
         onClose(resource.id);
-        const { openDrawingCanvas } = useAuth();
-        openDrawingCanvas({
+        authOpenDrawingCanvas({
             resourceId: resource.id,
             pointId: point.id,
             initialDrawing: point.drawing,
         });
-    }, [resource.id, onClose, useAuth]);
+    }, [resource.id, onClose, authOpenDrawingCanvas]);
     
-
     const renderContent = () => {
         switch (resource.type) {
             case 'habit':
@@ -528,17 +541,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </div>
                     </DialogContent>
                 </Dialog>
-                {drawingCanvasState && (
-                    <DrawingCanvas
-                        isOpen={drawingCanvasState.isOpen}
-                        initialDrawing={drawingCanvasState.initialDrawing}
-                        position={drawingCanvasState.position}
-                        onSave={drawingCanvasState.onSave}
-                        onClose={() => useAuth().setDrawingCanvasState(null)}
-                    />
-                )}
             </div>
         </>
     );
 }
-
