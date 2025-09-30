@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X, Hand } from 'lucide-react';
+import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X, Hand, Upload } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -44,7 +44,6 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('rectangle')}><RectangleHorizontal className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('circle')}><Circle className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('text')}><TypeIcon className="h-4 w-4"/></Button>
-            <Button variant='ghost' size='icon' onClick={() => onSelectTool('pan')}><Hand className="h-4 w-4"/></Button>
         </div>
     );
 };
@@ -52,6 +51,7 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
 export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
+  const imageUploadRef = useRef<HTMLInputElement>(null);
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [isTextInput, setIsTextInput] = useState(false);
@@ -85,15 +85,21 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
   const saveToHistory = useCallback(() => {
     const ctx = getContext();
-    if (ctx && canvasRef.current) {
-      const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      setHistory(prevHistory => {
-        const newHistory = prevHistory.slice(0, historyIndex + 1);
-        newHistory.push(imageData);
-        setHistoryIndex(newHistory.length - 1);
-        return newHistory;
-      });
-    }
+    if (!ctx || !canvasRef.current) return;
+    
+    // Use requestAnimationFrame to ensure the canvas has been updated before saving history
+    requestAnimationFrame(() => {
+        const imageData = ctx.getImageData(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+        setHistory(prevHistory => {
+            const newHistory = prevHistory.slice(0, historyIndex + 1);
+            newHistory.push(imageData);
+            if (newHistory.length > 30) { // Limit history size
+                newHistory.shift();
+            }
+            setHistoryIndex(newHistory.length - 1);
+            return newHistory;
+        });
+    });
   }, [getContext, historyIndex]);
 
   useEffect(() => {
@@ -171,7 +177,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (!ctx) return;
     
-    if (tool === 'brush' || tool === 'eraser') {
+    // Save state before drawing shape, not for brush/eraser which is continuous
+    if (tool === 'rectangle' || tool === 'circle') {
       saveToHistory();
     }
     
@@ -303,10 +310,38 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
       setContextMenu({ x: e.clientX, y: e.clientY });
   };
   
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const ctx = getContext();
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvasRef.current!.width, canvasRef.current!.height);
+            saveToHistory();
+          }
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    }
+    // Reset file input to allow uploading the same file again
+    if (e.target) e.target.value = '';
+  };
+  
   if (!isOpen) return null;
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
+        <input
+            type="file"
+            ref={imageUploadRef}
+            onChange={handleImageUpload}
+            accept="image/*"
+            className="hidden"
+        />
         <Card className="w-[1232px] bg-gray-900 text-white p-4 flex flex-col shadow-2xl border-2 border-primary/50">
             <CardHeader 
                 className="p-2 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between"
@@ -367,6 +402,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         <Button variant={tool === 'rectangle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('rectangle')}><RectangleHorizontal/></Button>
                         <Button variant={tool === 'circle' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('circle')}><Circle/></Button>
                         <Button variant={tool === 'text' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('text')}><TypeIcon/></Button>
+                        <Button variant="outline" size="icon" onClick={() => imageUploadRef.current?.click()}><Upload/></Button>
                         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 p-0 border-none bg-transparent" />
                         <Slider value={[lineWidth]} onValueChange={(val) => setLineWidth(val[0])} min={1} max={50} step={1} className="w-32" />
                     </div>
