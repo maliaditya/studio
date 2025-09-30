@@ -621,7 +621,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setPdfViewerState({
       isOpen: true,
       resource,
-      position: { x: window.innerWidth - 820, y: 80 },
+      position: { x: window.innerWidth - (settings.pdfViewerWidth || 1024) - 20, y: 80 },
+      size: { width: settings.pdfViewerWidth || 1024 }
     });
   };
 
@@ -2910,7 +2911,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;

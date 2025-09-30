@@ -711,11 +711,11 @@ export interface WidgetVisibility {
   activityDistribution: boolean;
   favorites: boolean;
   topPriorities: boolean;
+  goals: boolean;
   brainHacks: boolean;
   ruleEquations: boolean;
   visualizationTechniques: boolean;
   spacedRepetition: boolean;
-  goals: boolean;
 }
 
 export interface UserSettings {
@@ -736,6 +736,7 @@ export interface UserSettings {
   agendaShowCurrentSlotOnly: boolean;
   currentPurpose?: string;
   spacedRepetitionSlot?: SlotName;
+  pdfViewerWidth?: number;
 }
 
 export interface ActiveFocusSession {
@@ -791,6 +792,7 @@ export interface PdfViewerPopupState {
   isOpen: boolean;
   resource: Resource | null;
   position: { x: number; y: number };
+  size?: { width: number };
 }
 
 export interface DrawingCanvasPopupState {

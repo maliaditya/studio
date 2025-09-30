@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
@@ -13,11 +13,8 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
-import { DndContext } from '@dnd-kit/core';
-import type { DragEndEvent } from 'dnd-kit';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from "@/contexts/AuthContext";
-
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -25,15 +22,19 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState, handlePdfViewerPopupDragEnd } = useAuth();
+    const { pdfViewerState, setPdfViewerState, settings, setSettings } = useAuth();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [file, setFile] = useState<Blob | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [scale, setScale] = useState(1.5);
+
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeStartRef = useRef({ x: 0, width: 0 });
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'pdf-viewer-popup',
+        disabled: isResizing,
     });
 
     useEffect(() => {
@@ -58,12 +59,53 @@ export default function PdfViewerPopup() {
         }
     }, [pdfViewerState?.resource]);
 
+    const handleResizeMouseDown = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsResizing(true);
+        resizeStartRef.current = {
+            x: e.clientX,
+            width: pdfViewerState?.size?.width || 1024,
+        };
+    };
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!isResizing || !pdfViewerState) return;
+        const dx = e.clientX - resizeStartRef.current.x;
+        const newWidth = Math.max(500, resizeStartRef.current.width + dx);
+        setPdfViewerState(prev => prev ? { ...prev, size: { ...prev.size, width: newWidth } } : null);
+    }, [isResizing, pdfViewerState, setPdfViewerState]);
+    
+    const handleMouseUp = useCallback(() => {
+        if (isResizing) {
+            setIsResizing(false);
+            if (pdfViewerState?.size?.width) {
+              setSettings(prev => ({...prev, pdfViewerWidth: pdfViewerState.size.width}));
+            }
+        }
+    }, [isResizing, pdfViewerState?.size?.width, setSettings]);
+    
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        } else {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        }
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing, handleMouseMove, handleMouseUp]);
+
+
     if (!pdfViewerState || !pdfViewerState.isOpen) return null;
     
     const style: React.CSSProperties = {
         position: 'fixed',
         top: pdfViewerState.position.y,
         left: pdfViewerState.position.x,
+        width: `${pdfViewerState.size?.width || 1024}px`,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
         zIndex: 100,
@@ -85,7 +127,7 @@ export default function PdfViewerPopup() {
 
     return (
         <div ref={setNodeRef} style={style}>
-            <Card className="w-[1024px] h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col">
+            <Card className="h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col relative">
                 <CardHeader 
                     className="p-2 border-b flex flex-row items-center justify-between"
                 >
@@ -130,6 +172,10 @@ export default function PdfViewerPopup() {
                        )}
                     </ScrollArea>
                 </CardContent>
+                 <div
+                    onMouseDown={handleResizeMouseDown}
+                    className="absolute right-0 top-0 h-full w-2 cursor-ew-resize z-10"
+                />
             </Card>
         </div>
     );
