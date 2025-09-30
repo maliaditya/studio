@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1641,7 +1642,7 @@ function ResourcesPageContent() {
       {contextMenu && (
         <div
             ref={contextMenuRef}
-            className="fixed z-50 bg-popover border rounded-md shadow-lg p-1"
+            className="fixed z-50 bg-popover border rounded-md shadow-lg p-1 w-48"
             style={{ top: `${contextMenu.mouseY}px`, left: `${contextMenu.mouseX}px` }}
         >
             <Button variant="ghost" className="w-full justify-start" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}><PlusCircle className="mr-2 h-4 w-4"/>Add Nested Folder</Button>
@@ -1710,3 +1711,4 @@ export default function ResourcesPage() {
 
 
     
+
