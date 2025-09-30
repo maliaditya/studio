@@ -3,7 +3,7 @@ import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-const BLOB_PATHNAME = 'lifeos-releases.json';
+const BLOB_PATHNAME = 'dock-releases.json';
 const ADMIN_USERNAME = "Lonewolf";
 
 export async function GET() {
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
             addRandomSuffix: false,
         });
 
-        return NextResponse.json({ success: true, message: 'Life OS release plan updated successfully.' });
+        return NextResponse.json({ success: true, message: 'Dock release plan updated successfully.' });
 
     } catch (error) {
         console.error("POST /api/publish-releases error:", error);

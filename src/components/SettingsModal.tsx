@@ -56,7 +56,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [specializationName, setSpecializationName] = useState('');
   const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
 
-  const settingsKey = currentUser ? `lifeos_settings_${currentUser.username}` : null;
+  const settingsKey = currentUser ? `dock_settings_${currentUser.username}` : null;
 
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
     if (!settingsKey) return;
@@ -145,7 +145,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   };
 
   const handleResetLandingPage = () => {
-    localStorage.removeItem('lifeos_hide_landing_page');
+    localStorage.removeItem('dock_hide_landing_page');
     toast({
       title: "Preference Reset",
       description: "The landing page will now be shown on your next visit.",

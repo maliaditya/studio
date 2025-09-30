@@ -1,9 +1,9 @@
 
-# LifeOS: Features & Overview
+# Dock: Features & Overview
 
-## What is LifeOS?
+## What is Dock?
 
-LifeOS is an all-in-one personal dashboard designed for ambitious individuals who want to systematically manage their growth, productivity, and personal projects. It integrates health and fitness tracking with deep work, skill acquisition, and a strategic framework for turning ideas into monetizable products or services. It's your personal operating system for a structured and goal-oriented life.
+Dock is an all-in-one personal dashboard designed for ambitious individuals who want to systematically manage their growth, productivity, and personal projects. It integrates health and fitness tracking with deep work, skill acquisition, and a strategic framework for turning ideas into monetizable products or services. It's your personal operating system for a structured and goal-oriented life.
 
 ---
 
@@ -68,7 +68,7 @@ High-level tools to visualize your entire strategy and roadmap.
     -   **Release Planning:** Create detailed, versioned roadmaps for your products/services with launch dates, features, and descriptions.
 -   **Strategic Matrix:** A consolidated dashboard showing all your defined products and services, summarizing their format, status, and strategic goals.
 -   **Interactive Mind Map:**
-    -   A hierarchical visualization of your entire LifeOS, from high-level strategies down to individual learning tasks.
+    -   A hierarchical visualization of your entire Dock, from high-level strategies down to individual learning tasks.
     -   Shows real-time status of every task: Scheduled for Today, Logged Today, Pending from Past, and Completed in Past.
 
 ---
@@ -78,7 +78,7 @@ High-level tools to visualize your entire strategy and roadmap.
 - **Authentication:** Secure local user registration and login, plus a pre-populated `demo/demo` account for exploration.
 - **Data Persistence:** All user data is automatically saved to the browser's local storage.
 - **Cloud Sync:** Securely push your local data to the cloud (Vercel Blob) and pull it down on any other device.
-- **Data Portability:** Export your entire LifeOS data to a single JSON file for backup, or import a previous backup to restore your state.
+- **Data Portability:** Export your entire Dock data to a single JSON file for backup, or import a previous backup to restore your state.
 - **Theming:** Choose from multiple visual themes, including Default, Matrix, and Ad Dark.
 - **Focus Aids:** An optional, ambient background audio player to help with focus and concentration.
 -   **Weekly Backup Reminders:** A friendly prompt on Mondays to encourage you to back up your data.

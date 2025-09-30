@@ -240,7 +240,7 @@ export function Header() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary">
               <BrainCircuit className="h-8 w-8" />
-              <span>LifeOS</span>
+              <span>Dock</span>
             </Link>
           </div>
           

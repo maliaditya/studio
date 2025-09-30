@@ -37,7 +37,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <BrainCircuit className="mx-auto h-14 w-14 text-primary mb-2" />
-          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">LifeOS</CardTitle>
+          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">Dock</CardTitle>
           <CardDescription className="text-muted-foreground">Access your personal dashboard for growth.</CardDescription>
         </CardHeader>
         <CardContent>

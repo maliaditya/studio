@@ -115,7 +115,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (currentUser) {
-      const hideLanding = localStorage.getItem('lifeos_hide_landing_page');
+      const hideLanding = localStorage.getItem('dock_hide_landing_page');
       if (hideLanding === 'true') {
         router.push('/my-plate');
       }
@@ -124,7 +124,7 @@ export default function LandingPage() {
   
   const handleProceed = () => {
     if (dontShowAgain && currentUser) {
-        localStorage.setItem('lifeos_hide_landing_page', 'true');
+        localStorage.setItem('dock_hide_landing_page', 'true');
     }
     router.push(currentUser ? "/my-plate" : "/login");
   };
@@ -145,11 +145,11 @@ export default function LandingPage() {
                     Your Personal OS for Growth
                     </h1>
                     <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                    LifeOS is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
+                    Dock is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
                     </p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-4">
                         <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
-                            {currentUser ? 'Go to Dashboard' : 'Launch Your LifeOS'} <ArrowRight className="ml-2 h-5 w-5" />
+                            {currentUser ? 'Go to Dashboard' : 'Launch Your Dock'} <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
                         <Link href="/seamless-editing-example">
                             <Button variant="link">View Seamless Editing Example</Button>
@@ -200,7 +200,7 @@ export default function LandingPage() {
                     transition={{ duration: 0.7 }}
                     className="text-center"
                 >
-                    <h2 className="text-3xl font-bold tracking-tight">The LifeOS Flywheel</h2>
+                    <h2 className="text-3xl font-bold tracking-tight">The Dock Flywheel</h2>
                     <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
                         A seamless pipeline from skill acquisition to value creation. What you learn is applied, and what you apply can be monetized.
                     </p>
@@ -220,7 +220,7 @@ export default function LandingPage() {
       
       <footer className="border-t bg-muted/50">
           <div className="container mx-auto px-4 py-6 text-center text-muted-foreground text-sm">
-              &copy; {new Date().getFullYear()} LifeOS. All systems operational.
+              &copy; {new Date().getFullYear()} Dock. All systems operational.
           </div>
       </footer>
     </div>

@@ -30,7 +30,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)]">
         <BrainCircuit className="h-16 w-16 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your LifeOS experience...</p>
+        <p className="text-muted-foreground">Loading your Dock experience...</p>
       </div>
     );
   }

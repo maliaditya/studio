@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -110,7 +111,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
       <>
         <Separator className="my-4" />
         <div className="space-y-3">
-          <h4 className="font-semibold text-center text-sm flex items-center justify-center gap-2"><Rocket className="h-4 w-4"/> Upcoming Life OS Releases</h4>
+          <h4 className="font-semibold text-center text-sm flex items-center justify-center gap-2"><Rocket className="h-4 w-4"/> Upcoming Dock Releases</h4>
           <ul className="space-y-3">
             {releases.map(release => (
               <li key={release.id} className="text-sm p-3 rounded-md bg-muted/50">
@@ -147,7 +148,7 @@ export function SupportModal({ isOpen, onOpenChange }: SupportModalProps) {
           </DialogTitle>
           <DialogDescription>
             {showQr
-              ? "Scan the QR code below to pay with any UPI app. Your contribution directly supports the development of these upcoming Life OS features. Thank you!"
+              ? "Scan the QR code below to pay with any UPI app. Your contribution directly supports the development of these upcoming Dock features. Thank you!"
               : "Your support helps bring the features below to life. If you see something you're excited about, please consider contributing to the project's development."}
           </DialogDescription>
         </DialogHeader>
