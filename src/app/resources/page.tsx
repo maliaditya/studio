@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -1179,7 +1178,19 @@ function ResourcesPageContent() {
                                 selectedResourceFolderId === folder.id && "bg-accent font-semibold"
                                 )}
                             >
-                                {pinnedFolderIds.has(folder.id) && <Pin className="h-3 w-3 text-primary flex-shrink-0" />}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        togglePinFolder(folder.id);
+                                    }}
+                                    className="p-1 -ml-1 rounded-full hover:bg-yellow-400/20"
+                                >
+                                    {pinnedFolderIds.has(folder.id) ? (
+                                        <Pin className="h-3 w-3 text-yellow-500 fill-current" />
+                                    ) : (
+                                        <Pin className="h-3 w-3 text-muted-foreground group-hover:text-foreground" />
+                                    )}
+                                </button>
                                 <ChevronDown className={cn("h-4 w-4 transition-transform", (collapsedFolders.has(folder.id) && !searchTerm) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                                 <div className="flex items-center gap-2 flex-grow min-w-0">
                                   <Folder className="h-4 w-4 flex-shrink-0"/>
@@ -1213,7 +1224,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
+  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm, togglePinFolder]);
 
   
   const isDescendant = (childId: string, parentId: string): boolean => {
@@ -1705,10 +1716,6 @@ function ResourcesPageContent() {
 export default function ResourcesPage() {
     return <AuthGuard><ResourcesPageContent /></AuthGuard>;
 }
-
-
-
-
-
     
 
+    
