@@ -265,7 +265,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
-        <Card className="w-[832px] bg-gray-900 text-white p-4 flex flex-col shadow-2xl border-2 border-primary/50">
+        <Card className="w-[1232px] bg-gray-900 text-white p-4 flex flex-col shadow-2xl border-2 border-primary/50">
             <CardHeader 
                 className="p-2 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between"
                 {...listeners}
@@ -280,8 +280,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                 <div className="relative">
                     <canvas
                     ref={canvasRef}
-                    width={800}
-                    height={600}
+                    width={1200}
+                    height={800}
                     className="border border-gray-700 rounded-md cursor-crosshair"
                     onMouseDown={startInteraction}
                     onMouseMove={drawInteraction}
