@@ -62,9 +62,8 @@ const activityColorMapping: Record<string, string> = {
     'Deep Work': 'hsl(var(--chart-1))',
     'Learning': 'hsl(var(--chart-2))',
     'Workout': 'hsl(var(--chart-3))',
-    'Mindset': 'hsl(var(--chart-4))',
-    'Branding': 'hsl(var(--chart-5))',
-    'Lead Gen': 'hsl(27, 87%, 67%)',
+    'Branding': 'hsl(var(--chart-4))',
+    'Lead Gen': 'hsl(var(--chart-5))',
     'Essentials': 'hsl(173, 58%, 39%)',
     'Planning': 'hsl(197, 37%, 24%)',
     'Tracking': 'hsl(43, 74%, 66%)',
@@ -655,6 +654,9 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
       </Dialog>
       <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
         <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle>Timesheet</DialogTitle>
+          </DialogHeader>
           <div className="flex-grow min-h-0">
               <TimesheetPageContent isModal={true} />
           </div>
@@ -676,3 +678,5 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
     </>
   );
 }
+
+    
