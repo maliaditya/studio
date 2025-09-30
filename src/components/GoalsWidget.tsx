@@ -119,7 +119,7 @@ export function GoalsWidget() {
     return (
         <motion.div
             style={style}
-            className="fixed w-full max-w-xs z-50"
+            className="fixed w-full max-w-sm z-50"
             onMouseDown={handleMouseDown}
         >
             <Card className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg">
