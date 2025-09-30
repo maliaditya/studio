@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -922,9 +921,10 @@ function ResourcesPageContent() {
   const handleContextMenu = (e: React.MouseEvent, item: ResourceFolder) => {
     e.preventDefault();
     e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setContextMenu({
-        mouseX: e.clientX,
-        mouseY: e.clientY,
+        mouseX: rect.left,
+        mouseY: rect.bottom,
         item,
     });
   };
@@ -1142,7 +1142,7 @@ function ResourcesPageContent() {
             const bIsPinned = pinnedFolderIds.has(b.id);
             if (aIsPinned && !bIsPinned) return -1;
             if (!aIsPinned && bIsPinned) return 1;
-            return (a.name || '').localeCompare(b.name || '');
+            return a.name.localeCompare(b.name);
         });
 
     if (foldersToRender.length === 0 && level > 0) return null;
@@ -1183,7 +1183,7 @@ function ResourcesPageContent() {
                                 <div className="flex items-center gap-2 flex-grow min-w-0">
                                   <Folder className="h-4 w-4 flex-shrink-0"/>
                                   <span className='truncate' title={folder.name}>
-                                    {folder.name.length > 25 ? `${folder.name.substring(0, 25)}...` : folder.name}
+                                    {folder.name.length > 25 ? `${folder.name.substring(0,25)}...` : folder.name}
                                   </span>
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
@@ -1638,6 +1638,18 @@ function ResourcesPageContent() {
           ) : null}
         </DragOverlay>
       </DndContext>
+      {contextMenu && (
+        <div
+            ref={contextMenuRef}
+            className="fixed z-50 bg-popover border rounded-md shadow-lg p-1"
+            style={{ top: `${contextMenu.mouseY}px`, left: `${contextMenu.mouseX}px` }}
+        >
+            <Button variant="ghost" className="w-full justify-start" onClick={() => { handleAddNewNestedFolder(contextMenu.item); setContextMenu(null); }}><PlusCircle className="mr-2 h-4 w-4"/>Add Nested Folder</Button>
+            <Button variant="ghost" className="w-full justify-start" onClick={() => { handleStartEditingFolder(contextMenu.item); setContextMenu(null); }}><Edit className="mr-2 h-4 w-4"/>Rename</Button>
+            <Button variant="ghost" className="w-full justify-start" onClick={() => { handleShareFolder(contextMenu.item); setContextMenu(null); }}><Share className="mr-2 h-4 w-4"/>Share Folder</Button>
+            <Button variant="ghost" className="w-full justify-start text-destructive" onClick={() => { setDeleteConfirmation({ item: contextMenu.item }); setContextMenu(null); }}><Trash2 className="mr-2 h-4 w-4"/>Delete Folder</Button>
+        </div>
+      )}
       <Dialog open={isAdding} onOpenChange={setIsAdding}>
         <DialogContent>
             <DialogHeader>
