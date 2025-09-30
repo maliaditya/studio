@@ -1448,44 +1448,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const pullDataFromCloud = async (usernameOverride?: string) => {
-    const username = usernameOverride || currentUser?.username;
-    if (!username) {
-      toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-      return;
+    const effectiveUsername = usernameOverride || currentUser?.username;
+    if (!effectiveUsername) {
+        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+        return;
     }
-  
-    const isDemo = username === 'demo';
-  
+
+    const isDemo = effectiveUsername === 'demo';
+
     if (!isDemo) {
-      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
+        toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
     }
-  
+
     try {
-      const response = await fetch(`/api/blob-sync?username=${username.toLowerCase()}`);
-      const result = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to fetch data.');
-      }
-      
-      const data = result.data;
-      
-      if (data && data.main) {
-        loadImportedData(data.main, data.ui || {});
-        toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
-      } else {
-        toast({ title: "No Cloud Data", description: result.message || "No data was found in the cloud for this user." });
-      }
-  
+        const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to fetch data.');
+        }
+        
+        const data = result.data;
+        
+        if (data && data.main) {
+            loadImportedData(data.main, data.ui || {});
+            toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+        } else {
+            toast({ title: "No Cloud Data", description: result.message || "No data was found in the cloud for this user." });
+        }
+
     } catch (error) {
-      console.error("Pull from cloud failed:", error);
-      if (!isDemo) {
-        toast({
-            title: "Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-        });
-      }
+        console.error("Pull from cloud failed:", error);
+        if (!isDemo) {
+            toast({
+                title: "Sync Failed",
+                description: error instanceof Error ? error.message : "An unknown error occurred.",
+                variant: "destructive",
+            });
+        }
     }
   };
 
@@ -3309,3 +3309,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
