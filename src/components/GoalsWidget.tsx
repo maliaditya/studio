@@ -148,7 +148,7 @@ export function GoalsWidget() {
                                     let dailyTarget, unit, progress, authorOrTutor, resourceId;
                                     if ('totalItems' in res) { // LearningResourceAudio
                                         dailyTarget = calculateDailyTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
-                                        unit = 'items/day';
+                                        unit = 'Rec/day';
                                         progress = `${completed.items}/${res.totalItems} items`;
                                         authorOrTutor = res.tutor;
                                         resourceId = res.id;
