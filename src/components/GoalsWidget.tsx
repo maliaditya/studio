@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -147,10 +146,10 @@ export function GoalsWidget() {
 
                                 return (plan.audioVideoResources || []).concat(plan.bookWebpageResources || []).map((res, index) => {
                                     let dailyTarget, unit, progress, authorOrTutor, resourceId;
-                                    if ('totalHours' in res) { // LearningResourceAudio
-                                        dailyTarget = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
-                                        unit = 'h/day';
-                                        progress = `${completed.hours.toFixed(1)}/${res.totalHours}h`;
+                                    if ('totalItems' in res) { // LearningResourceAudio
+                                        dailyTarget = calculateDailyTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
+                                        unit = 'items/day';
+                                        progress = `${completed.items}/${res.totalItems} items`;
                                         authorOrTutor = res.tutor;
                                         resourceId = res.id;
                                     } else if ('totalPages' in res) { // LearningResourceBook
