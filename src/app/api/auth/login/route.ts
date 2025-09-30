@@ -28,12 +28,13 @@ export async function POST(request: Request) {
   try {
     const { blobs } = await list({ prefix: blobPathname, limit: 1 });
 
-    if (blobs.length === 0 || blobs[0]?.pathname !== blobPathname) {
+    const userBlob = blobs.find(blob => blob.pathname === blobPathname);
+
+    if (!userBlob) {
       return NextResponse.json({ error: 'Username not found.' }, { status: 404 });
     }
 
-    const blobInfo = blobs[0];
-    const response = await fetch(blobInfo.url);
+    const response = await fetch(userBlob.url);
     
     if (!response.ok) {
         throw new Error(`Failed to download user data from Blob storage. Status: ${response.status}`);
