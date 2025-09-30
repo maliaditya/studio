@@ -1182,7 +1182,9 @@ function ResourcesPageContent() {
                                 <ChevronDown className={cn("h-4 w-4 transition-transform", (collapsedFolders.has(folder.id) && !searchTerm) && "-rotate-90", resourceFolders.every(f => f.parentId !== folder.id) && "invisible")} />
                                 <div className="flex items-center gap-2 flex-grow min-w-0">
                                   <Folder className="h-4 w-4 flex-shrink-0"/>
-                                  <span className='truncate'>{folder.name}</span>
+                                  <span className='truncate' title={folder.name}>
+                                    {folder.name.length > 25 ? `${folder.name.substring(0, 25)}...` : folder.name}
+                                  </span>
                                 </div>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleShareFolder(folder); }}>
                                     <Share className="h-4 w-4" />
