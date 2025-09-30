@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -17,6 +17,36 @@ interface DrawingCanvasProps {
 }
 
 type Tool = 'brush' | 'eraser' | 'rectangle' | 'circle' | 'text';
+
+const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: number, onSelectTool: (tool: Tool) => void, onClose: () => void }) => {
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                onClose();
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [onClose]);
+
+    return (
+        <div
+            ref={menuRef}
+            className="fixed z-[120] bg-popover border rounded-md shadow-lg p-1 flex flex-col gap-1"
+            style={{ top: y, left: x }}
+        >
+            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('brush')}><Brush className="mr-2 h-4 w-4"/> Brush</Button>
+            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('eraser')}><Eraser className="mr-2 h-4 w-4"/> Eraser</Button>
+            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('rectangle')}><RectangleHorizontal className="mr-2 h-4 w-4"/> Rectangle</Button>
+            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('circle')}><Circle className="mr-2 h-4 w-4"/> Circle</Button>
+            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('text')}><TypeIcon className="mr-2 h-4 w-4"/> Text</Button>
+        </div>
+    );
+};
 
 export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -34,7 +64,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
 
-  const [scale, setScale] = useState(1);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -112,8 +142,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     if (!canvas) return { x: 0, y: 0 };
     const rect = canvas.getBoundingClientRect();
     return {
-      x: (e.clientX - rect.left) / scale,
-      y: (e.clientY - rect.top) / scale,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
     };
   };
 
@@ -234,22 +264,19 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   };
 
   useEffect(() => {
-    const inputEl = textInputRef.current;
-    if (inputEl) {
-        if (isTextInput) {
-            inputEl.style.left = `${textInput.x * scale}px`;
-            inputEl.style.top = `${textInput.y * scale}px`;
-            inputEl.style.fontSize = `${lineWidth * 4 * scale}px`;
-            inputEl.style.display = 'block';
-            inputEl.value = textInput.value;
-            requestAnimationFrame(() => {
-                inputEl.focus();
-            });
-        } else {
-            inputEl.style.display = 'none';
-        }
+    if (isTextInput && textInputRef.current) {
+      textInputRef.current.style.left = `${textInput.x}px`;
+      textInputRef.current.style.top = `${textInput.y}px`;
+      textInputRef.current.style.fontSize = `${lineWidth * 4}px`;
+      textInputRef.current.style.display = 'block';
+      textInputRef.current.value = textInput.value;
+      requestAnimationFrame(() => {
+        textInputRef.current?.focus();
+      });
+    } else if (textInputRef.current) {
+      textInputRef.current.style.display = 'none';
     }
-  }, [isTextInput, textInput, lineWidth, scale]);
+  }, [isTextInput, textInput, lineWidth]);
 
 
   const handleSave = () => {
@@ -266,6 +293,11 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
       ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       saveToHistory();
     }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
+      e.preventDefault();
+      setContextMenu({ x: e.clientX, y: e.clientY });
   };
   
   if (!isOpen) return null;
@@ -290,11 +322,11 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         width={1200}
                         height={800}
                         className="cursor-crosshair"
-                        style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
                         onMouseDown={startInteraction}
                         onMouseMove={drawInteraction}
                         onMouseUp={stopInteraction}
                         onMouseLeave={stopInteraction}
+                        onContextMenu={handleContextMenu}
                     />
                     <input
                         ref={textInputRef}
@@ -309,11 +341,21 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         color: 'white',
                         width: 'auto',
                         minWidth: '50px',
-                        zIndex: 10,
-                        transformOrigin: 'top left',
+                        zIndex: 10
                         }}
                         className="p-1"
                     />
+                     {contextMenu && (
+                        <ToolsContextMenu
+                            x={contextMenu.x}
+                            y={contextMenu.y}
+                            onSelectTool={(newTool) => {
+                                setTool(newTool);
+                                setContextMenu(null);
+                            }}
+                            onClose={() => setContextMenu(null)}
+                        />
+                    )}
                 </div>
                 <div className="flex items-center justify-between mt-4">
                     <div className="flex items-center gap-2">
@@ -324,11 +366,6 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         <Button variant={tool === 'text' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('text')}><TypeIcon/></Button>
                         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 p-0 border-none bg-transparent" />
                         <Slider value={[lineWidth]} onValueChange={(val) => setLineWidth(val[0])} min={1} max={50} step={1} className="w-32" />
-                    </div>
-                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={() => setScale(s => Math.max(0.2, s - 0.1))}><ZoomOut/></Button>
-                        <Button variant="outline" size="icon" onClick={() => setScale(1)}>100%</Button>
-                        <Button variant="outline" size="icon" onClick={() => setScale(s => Math.min(3, s + 0.1))}><ZoomIn/></Button>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" size="icon" onClick={undo} disabled={historyIndex <= 0}><Undo/></Button>
