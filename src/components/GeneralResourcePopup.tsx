@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -393,13 +392,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
     
     const openDrawingCanvas = useCallback((point: ResourcePoint) => {
-        onClose(resource.id);
         authOpenDrawingCanvas({
             resourceId: resource.id,
             pointId: point.id,
             initialDrawing: point.drawing,
         });
-    }, [resource.id, onClose, authOpenDrawingCanvas]);
+    }, [resource.id, authOpenDrawingCanvas]);
     
     const renderContent = () => {
         switch (resource.type) {
@@ -545,3 +543,5 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         </>
     );
 }
+
+    
