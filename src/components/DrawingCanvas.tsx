@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X } from 'lucide-react';
+import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X, Hand } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -16,7 +16,7 @@ interface DrawingCanvasProps {
   onClose: () => void;
 }
 
-type Tool = 'brush' | 'eraser' | 'rectangle' | 'circle' | 'text';
+type Tool = 'brush' | 'eraser' | 'rectangle' | 'circle' | 'text' | 'pan';
 
 const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: number, onSelectTool: (tool: Tool) => void, onClose: () => void }) => {
     const menuRef = useRef<HTMLDivElement>(null);
@@ -37,13 +37,14 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
         <div
             ref={menuRef}
             className="fixed z-[120] bg-popover border rounded-md shadow-lg p-1 flex items-center gap-1"
-            style={{ top: y, left: x }}
+            style={{ top: `${y}px`, left: `${x}px` }}
         >
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('brush')}><Brush className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('eraser')}><Eraser className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('rectangle')}><RectangleHorizontal className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('circle')}><Circle className="h-4 w-4"/></Button>
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('text')}><TypeIcon className="h-4 w-4"/></Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('pan')}><Hand className="h-4 w-4"/></Button>
         </div>
     );
 };
