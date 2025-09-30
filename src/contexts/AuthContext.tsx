@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -12,7 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -1279,9 +1278,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   
     const today = startOfDay(new Date());
-    const scheduleDates = Object.keys(newSchedule)
-        .map(key => parseISO(key))
-        .filter(isValid);
+    const scheduleDates = Object.keys(newSchedule).map(parseISO).filter(isValid);
     
     const earliestDateInSchedule = scheduleDates.length > 0 ? min(scheduleDates) : today;
     const latestDateInSchedule = scheduleDates.length > 0 ? max(scheduleDates) : today;
@@ -1293,6 +1290,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     dateRange.forEach(date => {
       const dateKey = format(date, 'yyyy-MM-dd');
+      const dayOfWeek = getDay(date);
       const daySchedule = newSchedule[dateKey] || {};
       const activitiesInDay = new Set(
         Object.values(daySchedule)
@@ -1301,24 +1299,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       );
   
       settings.routines.forEach((routine: Activity) => {
-        const routineKey = `${routine.details}_${routine.type}_${routine.slot}`;
-        if (!activitiesInDay.has(routineKey)) {
-          const slot = routine.slot as keyof DailySchedule;
-          if (!daySchedule[slot]) {
-            daySchedule[slot] = [];
+          let shouldAdd = false;
+          if (routine.routine?.type === 'daily') {
+              shouldAdd = true;
+          } else if (routine.routine?.type === 'weekly') {
+              // Ensure routine.createdAt is a valid date string
+              const routineCreationDate = routine.createdAt ? parseISO(routine.createdAt) : null;
+              if (routineCreationDate && isValid(routineCreationDate)) {
+                  if (getDay(routineCreationDate) === dayOfWeek) {
+                      shouldAdd = true;
+                  }
+              } else {
+                  // Fallback for routines without a createdAt date: apply based on first log, or just add weekly.
+                  // For simplicity, we'll just add it weekly for now.
+                  // A more robust solution would involve storing the original schedule date with the routine.
+                  shouldAdd = true; 
+              }
           }
-          const newActivity: Activity = {
-            ...routine,
-            id: `${routine.type}-${dateKey}-${Math.random()}`,
-            completed: false,
-            completedAt: undefined,
-            focusSessionInitialStartTime: undefined,
-            focusSessionStartTime: undefined,
-            focusSessionEndTime: undefined,
-            focusSessionPauses: [],
-          };
-          (daySchedule[slot] as Activity[]).push(newActivity);
-        }
+
+          if (shouldAdd) {
+              const routineKey = `${routine.details}_${routine.type}_${routine.slot}`;
+              if (!activitiesInDay.has(routineKey)) {
+                  const slot = routine.slot as keyof DailySchedule;
+                  if (!daySchedule[slot]) daySchedule[slot] = [];
+                  (daySchedule[slot] as Activity[]).push({
+                      ...routine,
+                      id: `${routine.type}-${dateKey}-${Math.random()}`,
+                      completed: false,
+                      completedAt: undefined,
+                  });
+              }
+          }
       });
       newSchedule[dateKey] = daySchedule;
     });
@@ -2793,19 +2804,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null) => {
-    const newRoutines = (settings.routines || []).filter(r => 
-        !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot)
-    );
-    if (rule) {
-        newRoutines.push({
-            ...activity,
-            id: `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`,
-            completed: false,
-            routine: rule,
-            isRoutine: true,
-        });
-    }
-    setSettings(prev => ({...prev, routines: newRoutines}));
+    setSettings(prev => {
+      const newRoutines = (prev.routines || []).filter(r => 
+          !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot)
+      );
+      if (rule) {
+          newRoutines.push({
+              ...activity,
+              id: `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`,
+              completed: false,
+              routine: rule,
+              isRoutine: true,
+              createdAt: new Date().toISOString()
+          });
+      }
+      return {...prev, routines: newRoutines};
+    });
   };
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
@@ -2896,7 +2910,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3291,3 +3305,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
