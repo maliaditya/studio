@@ -3,7 +3,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from './ui/button';
-import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X } from 'lucide-react';
+import { Brush, Eraser, Trash2, Save, Undo, Redo, Palette, Circle, RectangleHorizontal, Type as TypeIcon, GripVertical, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -33,6 +33,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   
   const [startPoint, setStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [textInput, setTextInput] = useState({ x: 0, y: 0, value: '' });
+
+  const [scale, setScale] = useState(1);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -105,8 +107,18 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     }
   };
 
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+  };
+
   const startInteraction = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const { offsetX, offsetY } = e.nativeEvent;
+    const { x, y } = getCanvasCoordinates(e);
     
     if (isTextInput && textInputRef.current) {
         if (textInputRef.current.value) {
@@ -117,33 +129,29 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
     if (tool === 'text') {
       setIsTextInput(true);
-      setTextInput({ x: offsetX, y: offsetY, value: '' });
+      setTextInput({ x: x, y: y, value: '' });
       return;
     }
 
     setIsDrawing(true);
-    setStartPoint({ x: offsetX, y: offsetY });
+    setStartPoint({ x, y });
     const ctx = getContext();
     if (!ctx) return;
     
-    // For brush tools, we need to save the current state to history before drawing
-    // so that we can restore it on mouse up to prevent partial lines.
-    // For shapes, we restore on mouse move, so we don't need to save here.
     if (tool === 'brush' || tool === 'eraser') {
       saveToHistory();
     }
     
     ctx.beginPath();
-    ctx.moveTo(offsetX, offsetY);
+    ctx.moveTo(x, y);
   };
 
   const drawInteraction = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !startPoint) return;
     const ctx = getContext();
     if (!ctx) return;
-    const { offsetX, offsetY } = e.nativeEvent;
+    const { x, y } = getCanvasCoordinates(e);
 
-    // For shapes, restore canvas to pre-draw state on each move
     if (tool === 'rectangle' || tool === 'circle') {
       const lastState = history[historyIndex];
       if (lastState) {
@@ -158,18 +166,18 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     ctx.lineJoin = 'round';
 
     if (tool === 'brush' || tool === 'eraser') {
-      ctx.lineTo(offsetX, offsetY);
+      ctx.lineTo(x, y);
       ctx.stroke();
     } else if (tool === 'rectangle') {
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
-      ctx.strokeRect(startPoint.x, startPoint.y, offsetX - startPoint.x, offsetY - startPoint.y);
+      ctx.strokeRect(startPoint.x, startPoint.y, x - startPoint.x, y - startPoint.y);
     } else if (tool === 'circle') {
       ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
-      const radius = Math.sqrt(Math.pow(offsetX - startPoint.x, 2) + Math.pow(offsetY - startPoint.y, 2));
+      const radius = Math.sqrt(Math.pow(x - startPoint.x, 2) + Math.pow(y - startPoint.y, 2));
       ctx.arc(startPoint.x, startPoint.y, radius, 0, 2 * Math.PI);
       ctx.stroke();
     }
@@ -183,7 +191,6 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     if (!ctx || !startPoint) return;
 
     if (tool === 'rectangle' || tool === 'circle') {
-      // Final draw of the shape on release
       drawInteraction(e);
     } else {
         ctx.closePath();
@@ -230,9 +237,9 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const inputEl = textInputRef.current;
     if (inputEl) {
         if (isTextInput) {
-            inputEl.style.left = `${textInput.x}px`;
-            inputEl.style.top = `${textInput.y}px`;
-            inputEl.style.fontSize = `${lineWidth * 4}px`;
+            inputEl.style.left = `${textInput.x * scale}px`;
+            inputEl.style.top = `${textInput.y * scale}px`;
+            inputEl.style.fontSize = `${lineWidth * 4 * scale}px`;
             inputEl.style.display = 'block';
             inputEl.value = textInput.value;
             requestAnimationFrame(() => {
@@ -242,7 +249,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
             inputEl.style.display = 'none';
         }
     }
-  }, [isTextInput, textInput, lineWidth]);
+  }, [isTextInput, textInput, lineWidth, scale]);
 
 
   const handleSave = () => {
@@ -277,16 +284,17 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X className="h-4 w-4"/></Button>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="relative">
+                <div className="relative overflow-hidden w-[1200px] h-[800px] bg-gray-800 border border-gray-700 rounded-md">
                     <canvas
-                    ref={canvasRef}
-                    width={1200}
-                    height={800}
-                    className="border border-gray-700 rounded-md cursor-crosshair"
-                    onMouseDown={startInteraction}
-                    onMouseMove={drawInteraction}
-                    onMouseUp={stopInteraction}
-                    onMouseLeave={stopInteraction}
+                        ref={canvasRef}
+                        width={1200}
+                        height={800}
+                        className="cursor-crosshair"
+                        style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+                        onMouseDown={startInteraction}
+                        onMouseMove={drawInteraction}
+                        onMouseUp={stopInteraction}
+                        onMouseLeave={stopInteraction}
                     />
                     <input
                         ref={textInputRef}
@@ -302,6 +310,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         width: 'auto',
                         minWidth: '50px',
                         zIndex: 10,
+                        transformOrigin: 'top left',
                         }}
                         className="p-1"
                     />
@@ -315,6 +324,11 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                         <Button variant={tool === 'text' ? 'secondary' : 'outline'} size="icon" onClick={() => setTool('text')}><TypeIcon/></Button>
                         <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-8 h-8 p-0 border-none bg-transparent" />
                         <Slider value={[lineWidth]} onValueChange={(val) => setLineWidth(val[0])} min={1} max={50} step={1} className="w-32" />
+                    </div>
+                     <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={() => setScale(s => Math.max(0.2, s - 0.1))}><ZoomOut/></Button>
+                        <Button variant="outline" size="icon" onClick={() => setScale(1)}>100%</Button>
+                        <Button variant="outline" size="icon" onClick={() => setScale(s => Math.min(3, s + 0.1))}><ZoomIn/></Button>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" size="icon" onClick={undo} disabled={historyIndex <= 0}><Undo/></Button>
