@@ -36,7 +36,7 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
     return (
         <div
             ref={menuRef}
-            className="fixed z-[120] bg-popover border rounded-md shadow-lg p-1 flex items-center gap-1"
+            className="absolute z-[120] bg-popover border rounded-md shadow-lg p-1 flex items-center gap-1"
             style={{ top: `${y}px`, left: `${x}px` }}
         >
             <Button variant='ghost' size='icon' onClick={() => onSelectTool('brush')}><Brush className="h-4 w-4"/></Button>
@@ -50,6 +50,7 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
 
 export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const textInputRef = useRef<HTMLInputElement>(null);
   const imageUploadRef = useRef<HTMLInputElement>(null);
   
@@ -87,20 +88,17 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (!ctx || !canvasRef.current) return;
     
-    // Use requestAnimationFrame to ensure the canvas has been updated before saving history
-    requestAnimationFrame(() => {
-        const imageData = ctx.getImageData(0, 0, canvasRef.current!.width, canvasRef.current!.height);
-        setHistory(prevHistory => {
-            const newHistory = prevHistory.slice(0, historyIndex + 1);
-            newHistory.push(imageData);
-            if (newHistory.length > 30) { // Limit history size
-                newHistory.shift();
-            }
-            setHistoryIndex(newHistory.length - 1);
-            return newHistory;
-        });
-    });
-  }, [getContext, historyIndex]);
+    const imageData = ctx.getImageData(0, 0, canvasRef.current!.width, canvasRef.current!.height);
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(imageData);
+
+    if (newHistory.length > 30) {
+        newHistory.shift();
+    }
+    
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  }, [getContext, history, historyIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -177,9 +175,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (!ctx) return;
     
-    // Save state before drawing shape, not for brush/eraser which is continuous
-    if (tool === 'rectangle' || tool === 'circle') {
-      saveToHistory();
+    if (tool === 'brush' || tool === 'eraser') {
+      saveToHistory(); // Save before starting a new stroke
     }
     
     ctx.beginPath();
@@ -232,17 +229,18 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
     if (tool === 'rectangle' || tool === 'circle') {
       drawInteraction(e);
+      saveToHistory();
     } else {
         ctx.closePath();
     }
     
-    saveToHistory();
     setStartPoint(null);
   };
 
   const drawText = (text: string, x: number, y: number) => {
     const ctx = getContext();
     if (!ctx || !text) return;
+    saveToHistory();
     ctx.font = `${lineWidth * 4}px sans-serif`;
     ctx.fillStyle = color;
     ctx.textAlign = 'left';
@@ -299,6 +297,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   const clearCanvas = () => {
     const ctx = getContext();
     if (ctx && canvasRef.current) {
+      saveToHistory();
       ctx.fillStyle = '#111827';
       ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
       saveToHistory();
@@ -307,7 +306,10 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
 
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
       e.preventDefault();
-      setContextMenu({ x: e.clientX, y: e.clientY });
+      const rect = canvasContainerRef.current?.getBoundingClientRect();
+      if (rect) {
+          setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+      }
   };
   
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,6 +321,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
         img.onload = () => {
           const ctx = getContext();
           if (ctx) {
+            saveToHistory();
             ctx.drawImage(img, 0, 0, canvasRef.current!.width, canvasRef.current!.height);
             saveToHistory();
           }
@@ -354,7 +357,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}><X className="h-4 w-4"/></Button>
             </CardHeader>
             <CardContent className="p-0">
-                <div className="relative overflow-hidden w-[1200px] h-[800px] bg-gray-800 border border-gray-700 rounded-md">
+                <div ref={canvasContainerRef} className="relative overflow-hidden w-[1200px] h-[800px] bg-gray-800 border border-gray-700 rounded-md">
                     <canvas
                         ref={canvasRef}
                         width={1200}
