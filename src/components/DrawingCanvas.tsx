@@ -36,14 +36,14 @@ const ToolsContextMenu = ({ x, y, onSelectTool, onClose }: { x: number, y: numbe
     return (
         <div
             ref={menuRef}
-            className="fixed z-[120] bg-popover border rounded-md shadow-lg p-1 flex flex-col gap-1"
+            className="fixed z-[120] bg-popover border rounded-md shadow-lg p-1 flex items-center gap-1"
             style={{ top: y, left: x }}
         >
-            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('brush')}><Brush className="mr-2 h-4 w-4"/> Brush</Button>
-            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('eraser')}><Eraser className="mr-2 h-4 w-4"/> Eraser</Button>
-            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('rectangle')}><RectangleHorizontal className="mr-2 h-4 w-4"/> Rectangle</Button>
-            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('circle')}><Circle className="mr-2 h-4 w-4"/> Circle</Button>
-            <Button variant='ghost' size='sm' className="justify-start" onClick={() => onSelectTool('text')}><TypeIcon className="mr-2 h-4 w-4"/> Text</Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('brush')}><Brush className="h-4 w-4"/></Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('eraser')}><Eraser className="h-4 w-4"/></Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('rectangle')}><RectangleHorizontal className="h-4 w-4"/></Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('circle')}><Circle className="h-4 w-4"/></Button>
+            <Button variant='ghost' size='icon' onClick={() => onSelectTool('text')}><TypeIcon className="h-4 w-4"/></Button>
         </div>
     );
 };
