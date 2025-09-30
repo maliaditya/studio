@@ -86,12 +86,14 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     const ctx = getContext();
     if (ctx && canvasRef.current) {
       const imageData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
-      const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push(imageData);
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+      setHistory(prevHistory => {
+        const newHistory = prevHistory.slice(0, historyIndex + 1);
+        newHistory.push(imageData);
+        setHistoryIndex(newHistory.length - 1);
+        return newHistory;
+      });
     }
-  }, [getContext, history, historyIndex]);
+  }, [getContext, historyIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -113,7 +115,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     } else {
         saveToHistory();
     }
-  }, [isOpen, initialDrawing]); // `saveToHistory` removed to prevent loop
+  }, [isOpen, initialDrawing]);
 
   const undo = () => {
     if (historyIndex > 0) {
