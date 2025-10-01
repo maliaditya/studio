@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -220,7 +219,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         const loadAudio = async () => {
           if (resource.hasLocalAudio) {
             try {
-              const audioBlob = await getPdf(resource.id);
+              const audioBlob = await getAudio(resource.id);
               if (audioBlob) {
                 objectUrl = URL.createObjectURL(audioBlob);
                 setAudioSrc(objectUrl);
@@ -632,4 +631,3 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-    
