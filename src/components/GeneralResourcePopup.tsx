@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush, Youtube } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
@@ -14,10 +14,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getAudio, storeAudio, deleteAudio } from '@/lib/audioDB';
@@ -28,6 +24,25 @@ import { VisuallyHidden } from './ui/visually-hidden';
 import { HabitResourceCard } from './HabitResourceCard';
 import { MechanismResourceCard } from './MechanismResourceCard';
 import { DrawingCanvas } from './DrawingCanvas';
+
+const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+        const urlObj = new URL(url);
+        let videoId: string | null = null;
+        if (urlObj.hostname.includes('youtube.com')) {
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                videoId = urlObj.pathname.split('/shorts/')[1];
+            } else {
+                videoId = urlObj.searchParams.get('v');
+            }
+        } else if (urlObj.hostname.includes('youtu.be')) {
+            videoId = urlObj.pathname.slice(1);
+        }
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    } catch (e) {}
+    return null;
+};
 
 
 interface GeneralResourcePopupProps {
@@ -85,7 +100,7 @@ const buildPointTree = (points: ResourcePoint[]): (ResourcePoint & { children: R
 };
 
 
-const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, onOpenDrawingCanvas }: {
+const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentViewPopup, createResourceWithHierarchy, onSeekTo, currentTime, onOpenDrawingCanvas, onSetEndTime, onClearEndTime }: {
     points: (ResourcePoint & { children: ResourcePoint[] })[];
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void;
     onDelete: (pointId: string) => void;
@@ -95,6 +110,8 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
     onSeekTo: (timestamp: number) => void;
     currentTime: number;
     onOpenDrawingCanvas: (point: ResourcePoint) => void;
+    onSetEndTime: () => void;
+    onClearEndTime: () => void;
 }) => {
   return (
     <ul className="space-y-1 text-sm text-muted-foreground pr-2">
@@ -110,6 +127,13 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               onSeekTo={onSeekTo}
               currentTime={currentTime}
               onOpenDrawingCanvas={() => onOpenDrawingCanvas(point)}
+              onSetEndTime={() => {
+                const audioEl = document.querySelector(`audio[data-resource-id='${point.id}']`) as HTMLAudioElement;
+                if (audioEl) {
+                  onUpdate(point.id, { endTime: audioEl.currentTime });
+                }
+              }}
+              onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
           />
           {point.children.length > 0 && (
             <div className="pl-4 mt-1 border-l-2 border-dashed border-primary/20">
@@ -123,6 +147,8 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
                 onSeekTo={onSeekTo}
                 currentTime={currentTime}
                 onOpenDrawingCanvas={onOpenDrawingCanvas}
+                onSetEndTime={onSetEndTime}
+                onClearEndTime={onClearEndTime}
               />
             </div>
           )}
@@ -409,6 +435,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             initialDrawing: point.drawing,
         });
     }, [resource.id, authOpenDrawingCanvas]);
+
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     
     const renderContent = () => {
         switch (resource.type) {
@@ -418,6 +446,13 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return <MechanismResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
             case 'card':
             default:
+                if (youtubeEmbedUrl) {
+                    return (
+                        <div className="aspect-video w-full bg-black overflow-hidden">
+                            <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                        </div>
+                    );
+                }
                 return (
                     <PointTree
                         points={pointTree}
@@ -429,6 +464,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         onSeekTo={handleSeekTo}
                         currentTime={currentTime}
                         onOpenDrawingCanvas={openDrawingCanvas}
+                        onSetEndTime={() => { /* Implement if needed */ }}
+                        onClearEndTime={() => { /* Implement if needed */ }}
                     />
                 );
         }
@@ -516,7 +553,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                               </span>
                             </CardDescription>
                         )}
-                         {audioSrc && (
+                         {(audioSrc || youtubeEmbedUrl) && (
                             <div className="w-full space-y-2 pt-2">
                                 <div className="flex items-center gap-2">
                                      <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
@@ -548,7 +585,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </div>
                      <CardFooter className="p-3 border-t">
                          <div className="flex gap-2 w-full">
-                            {audioSrc && (
+                            {(audioSrc || youtubeEmbedUrl) && (
                               <div className="flex gap-2 w-full">
                                  <Input value={newAnnotation} onChange={e => setNewAnnotation(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddPoint('timestamp')} placeholder="Add a note at current time..." className="h-8 text-xs" />
                                  <Button size="sm" onClick={() => handleAddPoint('timestamp')}>Add Note</Button>
@@ -571,4 +608,3 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         </>
     );
 }
-
