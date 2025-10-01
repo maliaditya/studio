@@ -20,7 +20,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getAudio, storeAudio } from '@/lib/audioDB';
+import { getAudio, storeAudio, deleteAudio } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
 import { EditableResourcePoint } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
@@ -109,8 +109,6 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               onConvertToCard={() => createResourceWithHierarchy(point, 'card')}
               onSeekTo={onSeekTo}
               currentTime={currentTime}
-              onSetEndTime={() => onUpdate(point.id, { endTime: Math.max(0, currentTime) })}
-              onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
               onOpenDrawingCanvas={() => onOpenDrawingCanvas(point)}
           />
           {point.children.length > 0 && (
@@ -362,8 +360,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         switch (resource.type) {
             case 'habit': return <Zap className="h-5 w-5 text-primary"/>;
             case 'mechanism': return <Workflow className="h-5 w-5 text-primary"/>;
-            case 'card': return <Library className="h-5 w-5 text-primary"/>;
-            default: return <Library className="h-5 w-5 text-primary"/>;
+            case 'card': default: return <Library className="h-5 w-5 text-primary"/>;
         }
     };
 
@@ -380,6 +377,20 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       }
     };
     
+    const handleDeleteLocalAudio = async () => {
+        try {
+            await deleteAudio(resource.id);
+            onUpdate({ ...resource, hasLocalAudio: false, audioFileName: undefined });
+            setAudioSrc(null);
+            if (audioRef.current) {
+                audioRef.current.src = '';
+            }
+            setPlayingAudio(false);
+        } catch (error) {
+            console.error("Failed to delete audio from IndexedDB", error);
+        }
+    };
+
     const togglePlayAudio = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
         setPlayingAudio(prev => !prev);
@@ -437,7 +448,24 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                 {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
                             </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewOnPage}><View className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>View on Page</p></TooltipContent></Tooltip>
-                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}}><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent><p>Upload Audio</p></TooltipContent></Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); audioInputRef.current?.click();}} disabled={resource.hasLocalAudio}>
+                                        <Upload className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>{resource.hasLocalAudio ? 'Local audio already exists' : 'Upload Audio'}</p></TooltipContent>
+                            </Tooltip>
+                            {resource.hasLocalAudio && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={(e) => { e.stopPropagation(); handleDeleteLocalAudio(); }}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Delete Local Audio</p></TooltipContent>
+                                </Tooltip>
+                            )}
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('text')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Text</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('markdown')}><MessageSquare className="h-4 w-4 text-blue-500" /></Button></TooltipTrigger><TooltipContent><p>Add Markdown</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
@@ -544,4 +572,3 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     );
 }
 
-    
