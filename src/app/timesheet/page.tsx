@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -20,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip } from 'recharts';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -187,8 +186,8 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 case 'upskill': return findDurationInLogs(allUpskillLogs, 'reps');
                 case 'branding': return findDurationInLogs(brandingLogs, 'weight');
                 case 'lead-generation': return findDurationInLogs(allLeadGenLogs, 'weight');
-                case 'workout': return findDurationInLogs(allWorkoutLogs, 'weight'); // Assuming weight holds duration
-                case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'weight'); // Assuming weight holds duration
+                case 'workout': return findDurationInLogs(allWorkoutLogs, 'weight');
+                case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'reps');
                 default: return 0;
             }
         };
@@ -641,12 +640,12 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     return (
         <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0")}>
-                <CardHeader className={cn(isModal ? "p-4 border-b" : "")}>
+                <CardHeader className={cn(isModal ? "p-4 border-b flex-shrink-0" : "")}>
                     <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
                     <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
                 </CardHeader>
-                <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0" : "")}>
-                    <div className="flex flex-wrap items-center gap-4">
+                <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
+                    <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
                         <Popover>
                             <PopoverTrigger asChild>
                                 <Button variant={"outline"} className="w-auto sm:w-[280px] justify-start text-left font-normal">
@@ -709,3 +708,5 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
+    
