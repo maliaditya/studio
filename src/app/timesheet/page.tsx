@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Pie } from 'recharts';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -186,7 +186,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 case 'upskill': return findDurationInLogs(allUpskillLogs, 'reps');
                 case 'branding': return findDurationInLogs(brandingLogs, 'weight');
                 case 'lead-generation': return findDurationInLogs(allLeadGenLogs, 'weight');
-                case 'workout': return findDurationInLogs(allWorkoutLogs, 'weight');
+                case 'workout': return findDurationInLogs(allWorkoutLogs, 'reps');
                 case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'reps');
                 default: return 0;
             }
@@ -709,4 +709,3 @@ export default function TimesheetPage() {
     );
 }
 
-    
