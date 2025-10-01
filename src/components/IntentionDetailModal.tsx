@@ -492,6 +492,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
 
   const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0 && !linkedUpskillChildIds.has(currentItem!.id);
 
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(contentModalState.resource?.link);
+
   return (
     <>
       <Dialog open={true} onOpenChange={() => onClose(popupState.resourceId)}>
@@ -615,7 +617,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                                                 </div>
                                             ) : point.type === 'code' ? (
-                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
+                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
                                                     {point.text || ""}
                                                 </SyntaxHighlighter>
                                             ) : (
