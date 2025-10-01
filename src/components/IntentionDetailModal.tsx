@@ -413,48 +413,25 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     );
   };
   
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `intention-popup-${popupState.resourceId}`,
-  });
-
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    top: popupState.y,
-    left: popupState.x,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    willChange: 'transform',
-    zIndex: 70 + (popupState.level || 0),
-  };
-  
   if (!currentItem) return null;
 
   const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0 && !linkedUpskillChildIds.has(currentItem!.id);
 
   return (
     <>
-      <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-        <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
-          <DialogHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center" {...listeners}>
-              {navigationStack.length > 1 && (
-                <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-              )}
-              <div className="flex-grow min-w-0">
-                  <DialogTitle className="truncate text-base" title={currentItem.name}>Details for: {currentItem.name}</DialogTitle>
-              </div>
-               {isUpskillCuriosity && (
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleViewLinkedIntentions}>
-                    <LinkIcon className="h-4 w-4 text-primary" />
-                 </Button>
-               )}
-                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={() => onClose(popupState.resourceId)}>
-                  <X className="h-4 w-4" />
-                </Button>
+      <Dialog open={true} onOpenChange={() => onClose(popupState.resourceId)}>
+        <DialogContent className="sm:max-w-xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            {navigationStack.length > 1 && (
+              <Button variant="ghost" size="icon" onClick={handleGoBack} className="absolute left-4 top-4 h-7 w-7">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <DialogTitle className="text-center" title={currentItem.name}>Details for: {currentItem.name}</DialogTitle>
           </DialogHeader>
           <div className="flex-grow min-h-0">
-            <ScrollArea className="h-full">
-              <div className="space-y-4 p-3">
+            <ScrollArea className="h-full pr-4">
+              <div className="space-y-4">
                   {linkedItems.deepWork.length > 0 && (
                       <div>
                           <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work</h3>
@@ -486,8 +463,15 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
               </div>
             </ScrollArea>
           </div>
-        </Card>
-      </div>
+           {isUpskillCuriosity && (
+              <DialogFooter>
+                  <Button variant="outline" onClick={handleViewLinkedIntentions}>
+                      <LinkIcon className="mr-2 h-4 w-4" /> View Linked Intentions
+                  </Button>
+              </DialogFooter>
+            )}
+        </DialogContent>
+      </Dialog>
         
         {linkedIntentionsPopup && (
             <LinkedIntentionsPopupCard
