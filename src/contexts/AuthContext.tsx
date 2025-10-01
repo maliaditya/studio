@@ -1306,16 +1306,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (routine.routine?.type === 'daily') {
               shouldAdd = true;
           } else if (routine.routine?.type === 'weekly') {
-              // Ensure routine.createdAt is a valid date string
               const routineCreationDate = routine.createdAt ? parseISO(routine.createdAt) : null;
               if (routineCreationDate && isValid(routineCreationDate)) {
                   if (getDay(routineCreationDate) === dayOfWeek) {
                       shouldAdd = true;
                   }
               } else {
-                  // Fallback for routines without a createdAt date: apply based on first log, or just add weekly.
-                  // For simplicity, we'll just add it weekly for now.
-                  // A more robust solution would involve storing the original schedule date with the routine.
                   shouldAdd = true; 
               }
           }
@@ -3333,5 +3329,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
