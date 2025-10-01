@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -35,7 +36,7 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio } from '@/lib/audioDB';
+import { deleteAudio, clearAllData } from '@/lib/audioDB';
 import { PillarPopup } from '@/components/PillarPopup';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
 
@@ -82,6 +83,7 @@ interface AuthContextType {
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
+  clearAllLocalFiles: () => Promise<void>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -1408,12 +1410,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const pushDataToCloud = async () => {
-    if (!currentUser?.username) {
+    const username = currentUser?.username;
+    if (!username) {
         toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
     }
 
-    if (currentUser.username === 'demo') {
+    if (username === 'demo') {
         setIsDemoTokenModalOpen(true);
         return;
     }
@@ -1422,7 +1425,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         const allUserData = getAllUserData();
-        const requestBody = { username: currentUser.username, data: allUserData };
+        const requestBody = { username, data: allUserData };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2969,6 +2972,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const clearAllLocalFiles = async () => {
+    try {
+        await clearAllData();
+        
+        // Reset the state of resources
+        setResources(prev => prev.map(r => ({
+            ...r,
+            hasLocalAudio: false,
+            audioFileName: undefined,
+            hasLocalPdf: false,
+            pdfFileName: undefined,
+        })));
+
+        toast({ title: 'Success', description: 'All local file data (audio, PDFs) has been cleared from your browser and app state.' });
+    } catch (error) {
+        console.error('Failed to clear IndexedDB:', error);
+        toast({ title: 'Error', description: 'Could not clear local file storage. See console for details.', variant: 'destructive' });
+    }
+  };
+
   useEffect(() => {
     if (isLoadingState || !currentUser) return;
   
@@ -3044,6 +3067,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
+    clearAllLocalFiles,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3309,4 +3333,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 

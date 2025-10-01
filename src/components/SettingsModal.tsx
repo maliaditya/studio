@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -34,7 +35,6 @@ import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, S
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { clearAllData } from '@/lib/audioDB';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -60,7 +60,7 @@ const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'E
 
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes, clearAllLocalFiles } = useAuth();
   const { toast } = useToast();
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -333,16 +333,6 @@ ${JSON.stringify(finalTemplate, null, 2)}
     );
     handleSettingChange('routines', newRoutines);
     toast({ title: 'Routine Task Removed', description: `"${routineToRemove.details}" will no longer be carried forward.` });
-  };
-
-  const handleClearIndexedDB = async () => {
-    try {
-        await clearAllData();
-        toast({ title: 'Success', description: 'All local file data (audio, PDFs) has been cleared from your browser.' });
-    } catch (error) {
-        console.error('Failed to clear IndexedDB:', error);
-        toast({ title: 'Error', description: 'Could not clear local file storage. See console for details.', variant: 'destructive' });
-    }
   };
 
 
@@ -638,7 +628,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <Button id="clear-indexeddb" variant="destructive" size="sm">
-                                  <Trash2 className="mr-2 h-4 w-4" /> Clear IndexedDB
+                                  <Trash2 className="mr-2 h-4 w-4" /> Clear Local Files
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
@@ -650,7 +640,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleClearIndexedDB}>Yes, clear data</AlertDialogAction>
+                                    <AlertDialogAction onClick={clearAllLocalFiles}>Yes, clear data</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
