@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -153,50 +154,42 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const timeData = useMemo(() => {
         const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
             if (!activity.completed) return 0;
-        
+    
+            // Handle focus sessions first
+            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+                const pauseDurationsMs = (activity.focusSessionPauses || [])
+                    .filter(p => p.resumeTime)
+                    .reduce((sum, p) => sum + (p.resumeTime! - p.pauseTime), 0);
+                const totalWorkTimeMs = totalSessionMs - pauseDurationsMs;
+                return Math.round(totalWorkTimeMs / 60000);
+            }
+            
+            // Fallback for simple duration-based activities if no focus session
+            if (activity.duration) {
+                return activity.duration;
+            }
+
+            // Fallback for older log types if necessary
             const activityTaskInstanceIds = new Set(activity.taskIds || []);
+            if (activityTaskInstanceIds.size === 0) return 0;
             
             const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
                 const logForDay = logs.find(l => l.date === dateKey);
                 if (!logForDay) return 0;
                 return logForDay.exercises
-                    .filter((ex: any) => activityTaskInstanceIds.has(ex.id)) // Correctly match instance ID
+                    .filter((ex: any) => activityTaskInstanceIds.has(ex.id))
                     .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
             };
 
             switch(activity.type) {
-                case 'deepwork':
-                    return findDurationInLogs(allDeepWorkLogs, 'weight');
-                case 'upskill':
-                    return findDurationInLogs(allUpskillLogs, 'reps');
-                case 'branding':
-                    return findDurationInLogs(brandingLogs, 'weight');
-                case 'lead-generation':
-                    return findDurationInLogs(allLeadGenLogs, 'weight');
-                case 'workout': {
-                     const workoutLog = allWorkoutLogs.find(l => l.date === dateKey);
-                     if (workoutLog) {
-                         return workoutLog.exercises
-                             .filter(ex => activityTaskInstanceIds.has(ex.id))
-                             .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
-                     }
-                     return 0;
-                }
-                case 'mindset': {
-                    const mindsetLog = allMindProgrammingLogs.find(l => l.date === dateKey);
-                    if (mindsetLog) {
-                        return mindsetLog.exercises.filter(ex => activityTaskInstanceIds.has(ex.id))
-                                       .reduce((sum, ex) => sum + (ex.loggedSets.length * 15), 0);
-                    }
-                    return 0;
-                }
-                case 'interrupt':
-                case 'distraction':
-                case 'essentials':
-                case 'nutrition':
-                    return activity.duration || 0;
-                default:
-                    return parseDurationToMinutes(activityDurations[activity.id]);
+                case 'deepwork': return findDurationInLogs(allDeepWorkLogs, 'weight');
+                case 'upskill': return findDurationInLogs(allUpskillLogs, 'reps');
+                case 'branding': return findDurationInLogs(brandingLogs, 'weight');
+                case 'lead-generation': return findDurationInLogs(allLeadGenLogs, 'weight');
+                case 'workout': return findDurationInLogs(allWorkoutLogs, 'weight'); // Assuming weight holds duration
+                case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'weight'); // Assuming weight holds duration
+                default: return 0;
             }
         };
 
