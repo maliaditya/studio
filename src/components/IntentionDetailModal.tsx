@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from './ui/scroll-area';
-import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon } from 'lucide-react';
+import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon, Play, Pause } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -21,6 +21,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useDraggable } from '@dnd-kit/core';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
+import { getAudio } from '@/lib/audioDB';
+import ReactPlayer from 'react-player';
 
 interface IntentionDetailPopupProps {
   popupState: IntentionPopupState;
@@ -203,13 +205,20 @@ const LinkedIntentionsPopupCard = ({ popupState, onClose }: {
     );
 };
 
+const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
+
 
 export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPopupProps) {
   const { 
     deepWorkDefinitions, 
     upskillDefinitions, 
     resources, 
-    openGeneralPopup
+    openGeneralPopup,
+    globalVolume,
   } = useAuth();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
@@ -218,6 +227,13 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const [contentModalState, setContentModalState] = useState<{ isOpen: boolean; resource: Resource | null }>({ isOpen: false, resource: null });
 
   const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] } | null>(null);
+
+  const [playingAudio, setPlayingAudio] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const playerRef = useRef<ReactPlayer>(null);
+  const [audioSrc, setAudioSrc] = useState<string | null>(null);
 
   const linkedUpskillChildIds = useMemo(() => 
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
@@ -234,6 +250,69 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
       setNavigationStack([initialIntention]);
     }
   }, [popupState.resourceId, deepWorkDefinitions, upskillDefinitions]);
+
+  useEffect(() => {
+    if (!contentModalState.resource?.id) return;
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    
+    let objectUrl: string | null = null;
+    const loadAudio = async () => {
+      if (contentModalState.resource?.hasLocalAudio) {
+        try {
+          const audioBlob = await getAudio(contentModalState.resource.id);
+          if (audioBlob) {
+            objectUrl = URL.createObjectURL(audioBlob);
+            setAudioSrc(objectUrl);
+          } else {
+            setAudioSrc(null);
+          }
+        } catch (error) { console.error("Failed to load audio from DB:", error); setAudioSrc(null); }
+      } else { setAudioSrc(null); }
+    };
+    loadAudio();
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [contentModalState.resource]);
+  
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl || !audioSrc) return;
+    if (audioEl.src !== audioSrc) audioEl.src = audioSrc;
+    if (playingAudio) {
+      audioEl.volume = globalVolume;
+      audioEl.play().catch(e => console.error("Audio play failed:", e));
+    } else {
+      audioEl.pause();
+    }
+  }, [playingAudio, audioSrc, globalVolume]);
+
+  useEffect(() => {
+    const audioEl = audioRef.current;
+    if (!audioEl) return;
+    const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
+    const handleDurationChange = () => setDuration(audioEl.duration);
+    audioEl.addEventListener('timeupdate', handleTimeUpdate);
+    audioEl.addEventListener('durationchange', handleDurationChange);
+    return () => {
+      if (audioEl) {
+        audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+        audioEl.removeEventListener('durationchange', handleDurationChange);
+      }
+    };
+  }, []);
+
+  const handleSeekTo = (timestamp: number) => {
+    if (audioRef.current) {
+        audioRef.current.currentTime = timestamp;
+        if (audioRef.current.paused) {
+            setPlayingAudio(true);
+        }
+    }
+    if (playerRef.current) {
+        playerRef.current.seekTo(timestamp, 'seconds');
+        setPlayingAudio(true);
+    }
+  };
 
   const currentItem = navigationStack.length > 0 ? navigationStack[navigationStack.length - 1] : null;
 
@@ -480,22 +559,65 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                 <div className="flex-grow min-h-0">
                     <ScrollArea className="h-full">
                         <div className="p-6">
+                           <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
+                           {(contentModalState.resource?.hasLocalAudio || contentModalState.resource?.link) && (
+                                <div className="w-full space-y-2 pt-2 mb-4 p-2 rounded-md bg-muted/50">
+                                    <div className="flex items-center gap-2">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlayingAudio(p => !p)}>
+                                            {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                                        </Button>
+                                        <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={duration || 0}
+                                            value={currentTime}
+                                            onChange={(e) => {
+                                                const newTime = parseFloat(e.target.value);
+                                                setCurrentTime(newTime);
+                                                if (audioRef.current) audioRef.current.currentTime = newTime;
+                                                if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+                                            }}
+                                            className="w-full h-1 bg-primary/20 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
+                                    </div>
+                                    {contentModalState.resource?.audioFileName && (
+                                        <p className="text-xs text-muted-foreground truncate" title={contentModalState.resource.audioFileName}>
+                                        Now Playing: {contentModalState.resource.audioFileName}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+
                             <ul className="space-y-2 text-sm text-muted-foreground">
-                                {(contentModalState.resource?.points || []).map(point => (
-                                    <li key={point.id} className="flex items-start gap-2">
-                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />}
-                                        
-                                        {point.type === 'markdown' ? (
-                                            <div className="w-full prose dark:prose-invert prose-sm">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                            </div>
-                                        ) : (
-                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                        )}
-                                    </li>
-                                ))}
+                                {(contentModalState.resource?.points || []).map(point => {
+                                    if(point.type === 'timestamp') {
+                                        return (
+                                            <li key={point.id} className="flex items-start gap-2">
+                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
+                                                    {formatTime(point.timestamp || 0)}
+                                                </button>
+                                                <span className="break-words w-full pt-1" title={point.text}>{point.text}</span>
+                                            </li>
+                                        );
+                                    }
+                                    return (
+                                        <li key={point.id} className="flex items-start gap-2">
+                                            {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                            <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />}
+                                            
+                                            {point.type === 'markdown' ? (
+                                                <div className="w-full prose dark:prose-invert prose-sm">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                                </div>
+                                            ) : (
+                                                <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                            )}
+                                        </li>
+                                    )
+                                })}
                             </ul>
                         </div>
                     </ScrollArea>
