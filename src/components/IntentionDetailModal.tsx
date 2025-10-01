@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -215,6 +214,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
+  
+  const [contentModalState, setContentModalState] = useState<{ isOpen: boolean; resource: Resource | null }>({ isOpen: false, resource: null });
 
   const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] } | null>(null);
 
@@ -268,7 +269,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
     if (def.nodeType) return def.nodeType;
-    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
+    const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
     
     if (isParent) {
@@ -376,11 +377,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     const childResourceItems = (item.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r)
-        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
-            if (cardRef.current) {
-                openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
-            }
-        }} />);
+        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null })} />);
         
     return (
         <DeepWorkItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
@@ -400,11 +397,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     const childResourceItems = (item.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r)
-        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => {
-            if (cardRef.current) {
-                openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
-            }
-        }} />);
+        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null })} />);
 
     return (
         <UpskillItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
@@ -454,9 +447,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                            <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm"><Library className="h-4 w-4 text-blue-500" />Linked Resources</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
-                                  if (cardRef.current) {
-                                      openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
-                                  }
+                                  setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null });
                               }} />)}
                           </div>
                       </div>
@@ -480,6 +471,37 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                 onClose={() => setLinkedIntentionsPopup(null)}
             />
         )}
+        
+        <Dialog open={contentModalState.isOpen} onOpenChange={() => setContentModalState({ isOpen: false, resource: null })}>
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>{contentModalState.resource?.name}</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                    <ScrollArea className="h-full">
+                        <div className="p-6">
+                            <ul className="space-y-2 text-sm text-muted-foreground">
+                                {(contentModalState.resource?.points || []).map(point => (
+                                    <li key={point.id} className="flex items-start gap-2">
+                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />}
+                                        
+                                        {point.type === 'markdown' ? (
+                                            <div className="w-full prose dark:prose-invert prose-sm">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                            </div>
+                                        ) : (
+                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </ScrollArea>
+                </div>
+            </DialogContent>
+        </Dialog>
     </>
   );
 }
