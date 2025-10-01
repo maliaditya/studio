@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -24,6 +25,7 @@ import { VisuallyHidden } from './ui/visually-hidden';
 import { HabitResourceCard } from './HabitResourceCard';
 import { MechanismResourceCard } from './MechanismResourceCard';
 import { DrawingCanvas } from './DrawingCanvas';
+import ReactPlayer from 'react-player/youtube';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -180,7 +182,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
+    
     const audioRef = useRef<HTMLAudioElement>(null);
+    const playerRef = useRef<ReactPlayer>(null);
 
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
@@ -216,7 +220,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         const loadAudio = async () => {
           if (resource.hasLocalAudio) {
             try {
-              const audioBlob = await getAudio(resource.id);
+              const audioBlob = await getPdf(resource.id);
               if (audioBlob) {
                 objectUrl = URL.createObjectURL(audioBlob);
                 setAudioSrc(objectUrl);
@@ -370,6 +374,10 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 setPlayingAudio(true);
             }
         }
+        if (playerRef.current) {
+            playerRef.current.seekTo(timestamp, 'seconds');
+            setPlayingAudio(true);
+        }
     };
     
     const handleViewOnPage = (e: React.MouseEvent) => {
@@ -446,27 +454,37 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                 return <MechanismResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
             case 'card':
             default:
-                if (youtubeEmbedUrl) {
-                    return (
-                        <div className="aspect-video w-full bg-black overflow-hidden">
-                            <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
-                        </div>
-                    );
-                }
                 return (
-                    <PointTree
-                        points={pointTree}
-                        onUpdate={handleUpdatePoint}
-                        onDelete={handleDeletePoint}
-                        onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
-                        openContentViewPopup={(id, point, event) => openContentViewPopup(id, resource, point, event)}
-                        createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
-                        onSeekTo={handleSeekTo}
-                        currentTime={currentTime}
-                        onOpenDrawingCanvas={openDrawingCanvas}
-                        onSetEndTime={() => { /* Implement if needed */ }}
-                        onClearEndTime={() => { /* Implement if needed */ }}
-                    />
+                    <>
+                        {youtubeEmbedUrl && (
+                            <div className="aspect-video w-full bg-black overflow-hidden mb-4 rounded-md">
+                                <ReactPlayer
+                                    ref={playerRef}
+                                    url={resource.link!}
+                                    width="100%"
+                                    height="100%"
+                                    playing={playingAudio}
+                                    controls={true}
+                                    volume={globalVolume}
+                                    onProgress={(state) => setCurrentTime(state.playedSeconds)}
+                                    onDuration={setDuration}
+                                />
+                            </div>
+                        )}
+                        <PointTree
+                            points={pointTree}
+                            onUpdate={handleUpdatePoint}
+                            onDelete={handleDeletePoint}
+                            onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)}
+                            openContentViewPopup={(id, point, event) => openContentViewPopup(id, resource, point, event)}
+                            createResourceWithHierarchy={(point) => createResourceWithHierarchyAuth(resource, point, 'card')}
+                            onSeekTo={handleSeekTo}
+                            currentTime={currentTime}
+                            onOpenDrawingCanvas={openDrawingCanvas}
+                            onSetEndTime={() => { /* Implement if needed */ }}
+                            onClearEndTime={() => { /* Implement if needed */ }}
+                        />
+                    </>
                 );
         }
     };
@@ -565,7 +583,12 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                                         min="0"
                                         max={duration || 0}
                                         value={currentTime}
-                                        onChange={(e) => { if (audioRef.current) audioRef.current.currentTime = parseFloat(e.target.value); }}
+                                        onChange={(e) => {
+                                            const newTime = parseFloat(e.target.value);
+                                            setCurrentTime(newTime);
+                                            if (audioRef.current) audioRef.current.currentTime = newTime;
+                                            if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
+                                        }}
                                         className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer"
                                     />
                                     <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
@@ -608,3 +631,5 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         </>
     );
 }
+
+    
