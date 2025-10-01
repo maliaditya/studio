@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -11,6 +10,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +34,7 @@ import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, S
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { clearAllData } from '@/lib/audioDB';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -324,6 +335,16 @@ ${JSON.stringify(finalTemplate, null, 2)}
     toast({ title: 'Routine Task Removed', description: `"${routineToRemove.details}" will no longer be carried forward.` });
   };
 
+  const handleClearIndexedDB = async () => {
+    try {
+        await clearAllData();
+        toast({ title: 'Success', description: 'All local file data (audio, PDFs) has been cleared from your browser.' });
+    } catch (error) {
+        console.error('Failed to clear IndexedDB:', error);
+        toast({ title: 'Error', description: 'Could not clear local file storage. See console for details.', variant: 'destructive' });
+    }
+  };
+
 
   return (
     <>
@@ -600,8 +621,8 @@ ${JSON.stringify(finalTemplate, null, 2)}
                     </Button>
                   </div>
                   <Separator />
-                  <div className="space-y-2">
-                     <h3 className="font-semibold">Data Integrity</h3>
+                  <div className="space-y-4">
+                     <h3 className="font-semibold">Data Management</h3>
                      <div className="flex items-center justify-between">
                         <Label htmlFor="recalculate-types" className="font-normal text-sm text-muted-foreground">
                           Fix misclassified tasks (e.g., tasks showing as "Objective" that shouldn't be).
@@ -609,6 +630,30 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         <Button id="recalculate-types" variant="outline" size="sm" onClick={recalculateAndFixTaskTypes}>
                           <RefreshCw className="mr-2 h-4 w-4" /> Recalculate
                         </Button>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="clear-indexeddb" className="font-normal text-sm text-muted-foreground">
+                          Clear all locally stored files (audio, PDFs) from your browser.
+                        </Label>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button id="clear-indexeddb" variant="destructive" size="sm">
+                                  <Trash2 className="mr-2 h-4 w-4" /> Clear IndexedDB
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete all local audio and PDF files stored in your browser for this application.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleClearIndexedDB}>Yes, clear data</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                   </div>
                   <Separator />

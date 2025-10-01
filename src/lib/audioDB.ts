@@ -98,6 +98,37 @@ async function deleteItem(storeName: string, key: string): Promise<void> {
     });
 }
 
+export async function clearAllData(): Promise<void> {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME];
+      if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
+        console.log('No object stores found to clear.');
+        resolve();
+        return;
+      }
+      
+      const transaction = db.transaction(storesToClear, 'readwrite');
+  
+      transaction.oncomplete = () => {
+        console.log('All IndexedDB object stores have been cleared.');
+        resolve();
+      };
+  
+      transaction.onerror = (event) => {
+        console.error('Error clearing IndexedDB:', (event.target as IDBRequest).error);
+        reject(new Error('Failed to clear IndexedDB.'));
+      };
+  
+      storesToClear.forEach(storeName => {
+        if (db.objectStoreNames.contains(storeName)) {
+            const store = transaction.objectStore(storeName);
+            store.clear();
+        }
+      });
+    });
+}
+
 
 // Audio functions
 export const storeAudio = (key: string, audioBlob: Blob) => storeItem(AUDIO_STORE_NAME, key, audioBlob);
