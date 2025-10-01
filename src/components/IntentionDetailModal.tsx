@@ -593,39 +593,55 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                                     )}
                                 </div>
                             )}
+                            
+                            {youtubeEmbedUrl && (
+                                <div className="aspect-video w-full bg-black overflow-hidden mb-4 rounded-md">
+                                    <ReactPlayer
+                                        ref={playerRef}
+                                        url={contentModalState.resource?.link!}
+                                        width="100%"
+                                        height="100%"
+                                        playing={playingAudio}
+                                        controls={true}
+                                        volume={globalVolume}
+                                        onProgress={(state) => setCurrentTime(state.playedSeconds)}
+                                        onDuration={setDuration}
+                                    />
+                                </div>
+                            )}
 
                             <ul className="space-y-4">
-                                {(contentModalState.resource?.points || []).map(point => {
-                                    if(point.type === 'timestamp') {
-                                        return (
-                                            <li key={point.id} className="flex items-start gap-3 text-base">
-                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold mt-1 flex-shrink-0">
+                                {(contentModalState.resource?.points || []).map(point => (
+                                    <li key={point.id} className="p-4 rounded-lg bg-muted/30 border">
+                                        <div className="flex items-start gap-4">
+                                            {point.type === 'timestamp' ? (
+                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold mt-1 flex-shrink-0 bg-background px-2 py-1 rounded-md text-base">
                                                     {formatTime(point.timestamp || 0)}
                                                 </button>
-                                                <p className="pt-1">{point.text}</p>
-                                            </li>
-                                        );
-                                    }
-                                    return (
-                                        <li key={point.id} className="flex items-start gap-3">
-                                            {point.type === 'code' ? <Code className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" /> :
-                                            point.type === 'markdown' ? <MessageSquare className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" /> :
-                                            <ArrowRight className="h-5 w-5 mt-1 text-primary/50 flex-shrink-0" />}
-                                            
-                                            {point.type === 'markdown' ? (
-                                                <div className="prose dark:prose-invert max-w-none">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                                </div>
                                             ) : point.type === 'code' ? (
-                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
-                                                    {point.text || ""}
-                                                </SyntaxHighlighter>
+                                                <Code className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" />
+                                            ) : point.type === 'markdown' ? (
+                                                <MessageSquare className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" />
                                             ) : (
-                                                <p className="flex-grow pt-0.5">{point.text}</p>
+                                                <ArrowRight className="h-5 w-5 mt-1 text-primary/50 flex-shrink-0" />
                                             )}
-                                        </li>
-                                    )
-                                })}
+                                            
+                                            <div className="flex-grow min-w-0">
+                                                {point.type === 'markdown' ? (
+                                                    <div className="prose dark:prose-invert max-w-none">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                                    </div>
+                                                ) : point.type === 'code' ? (
+                                                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
+                                                        {point.text || ""}
+                                                    </SyntaxHighlighter>
+                                                ) : (
+                                                    <p className="pt-1 text-base">{point.text}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
                             </ul>
                         </div>
                     </ScrollArea>
