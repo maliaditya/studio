@@ -413,19 +413,28 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     );
   };
   
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `intention-popup-${popupState.resourceId}`,
+  });
+
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: popupState.y,
+    left: popupState.x,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    willChange: 'transform',
+    zIndex: 70 + (popupState.level || 0),
+  };
+  
   if (!currentItem) return null;
 
   const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0 && !linkedUpskillChildIds.has(currentItem!.id);
 
   return (
     <>
-      <Dialog open={true} onOpenChange={() => onClose(popupState.resourceId)}>
-        <DialogContent
-          ref={cardRef}
-          className="p-0 shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] sm:max-w-xl"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <DialogHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
+      <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+        <Card ref={cardRef} className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh]">
+          <DialogHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center" {...listeners}>
               {navigationStack.length > 1 && (
                 <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
                   <ArrowLeft className="h-4 w-4" />
@@ -439,6 +448,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     <LinkIcon className="h-4 w-4 text-primary" />
                  </Button>
                )}
+                <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={() => onClose(popupState.resourceId)}>
+                  <X className="h-4 w-4" />
+                </Button>
           </DialogHeader>
           <div className="flex-grow min-h-0">
             <ScrollArea className="h-full">
@@ -474,8 +486,8 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
               </div>
             </ScrollArea>
           </div>
-        </DialogContent>
-      </Dialog>
+        </Card>
+      </div>
         
         {linkedIntentionsPopup && (
             <LinkedIntentionsPopupCard
@@ -486,4 +498,3 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     </>
   );
 }
-
