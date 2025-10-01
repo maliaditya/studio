@@ -23,6 +23,8 @@ import { useDraggable } from '@dnd-kit/core';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from './ui/accordion';
 import { getAudio } from '@/lib/audioDB';
 import ReactPlayer from 'react-player';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface IntentionDetailPopupProps {
   popupState: IntentionPopupState;
@@ -560,7 +562,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     <ScrollArea className="h-full">
                         <div className="p-6">
                            <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-                           {(contentModalState.resource?.hasLocalAudio || contentModalState.resource?.link) && (
+                           {(contentModalState.resource?.hasLocalAudio || youtubeEmbedUrl) && (
                                 <div className="w-full space-y-2 pt-2 mb-4 p-2 rounded-md bg-muted/50">
                                     <div className="flex items-center gap-2">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlayingAudio(p => !p)}>
@@ -590,30 +592,34 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                                 </div>
                             )}
 
-                            <ul className="space-y-2 text-sm text-muted-foreground">
+                            <ul className="space-y-4">
                                 {(contentModalState.resource?.points || []).map(point => {
                                     if(point.type === 'timestamp') {
                                         return (
-                                            <li key={point.id} className="flex items-start gap-2">
-                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold text-xs mt-1.5 flex-shrink-0">
+                                            <li key={point.id} className="flex items-start gap-3 text-base">
+                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold mt-1 flex-shrink-0">
                                                     {formatTime(point.timestamp || 0)}
                                                 </button>
-                                                <span className="break-words w-full pt-1" title={point.text}>{point.text}</span>
+                                                <p className="pt-1">{point.text}</p>
                                             </li>
                                         );
                                     }
                                     return (
-                                        <li key={point.id} className="flex items-start gap-2">
-                                            {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                            point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                            <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />}
+                                        <li key={point.id} className="flex items-start gap-3">
+                                            {point.type === 'code' ? <Code className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" /> :
+                                            point.type === 'markdown' ? <MessageSquare className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" /> :
+                                            <ArrowRight className="h-5 w-5 mt-1 text-primary/50 flex-shrink-0" />}
                                             
                                             {point.type === 'markdown' ? (
-                                                <div className="w-full prose dark:prose-invert prose-sm">
+                                                <div className="prose dark:prose-invert max-w-none">
                                                     <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
                                                 </div>
+                                            ) : point.type === 'code' ? (
+                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
+                                                    {point.text || ""}
+                                                </SyntaxHighlighter>
                                             ) : (
-                                                <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                                <p className="flex-grow pt-0.5">{point.text}</p>
                                             )}
                                         </li>
                                     )
