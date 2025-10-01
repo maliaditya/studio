@@ -213,23 +213,10 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   } = useAuth();
   
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: `intention-popup-${popupState.resourceId}` });
   const cardRef = useRef<HTMLDivElement>(null);
 
   const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] } | null>(null);
 
-  const style: React.CSSProperties = {
-      position: 'fixed',
-      top: popupState.y,
-      left: popupState.x,
-      width: '24rem',
-      willChange: 'transform',
-      zIndex: 70 + popupState.level,
-  };
-  if (transform) {
-      style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
-  }
-  
   const linkedUpskillChildIds = useMemo(() => 
     new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []))
   , [upskillDefinitions]);
@@ -279,12 +266,14 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   };
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
+    if (def.nodeType) return def.nodeType;
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0 || (def.linkedResourceIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
-    if (isParent && !isChild) return 'Intention';
-    if (isParent && isChild) return 'Objective';
-    if (!isParent && isChild) return 'Action';
-    return 'Standalone';
+    
+    if (isParent) {
+        return isChild ? 'Objective' : 'Intention';
+    }
+    return isChild ? 'Action' : 'Standalone';
   }, [linkedDeepWorkChildIds]);
   
   const getIcon = (item: ExerciseDefinition) => {
@@ -432,16 +421,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     <>
       <Dialog open={true} onOpenChange={() => onClose(popupState.resourceId)}>
         <DialogContent
-          ref={setNodeRef}
-          className="p-0 shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] w-[24rem]"
-          style={style}
-          {...attributes}
+          ref={cardRef}
+          className="p-0 shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[70vh] sm:max-w-xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <DialogHeader className="p-2 flex-shrink-0 border-b flex flex-row items-center">
-              <div className="cursor-grab p-1 mr-1" {...listeners}>
-                <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-              </div>
               {navigationStack.length > 1 && (
                 <Button variant="ghost" size="icon" onClick={handleGoBack} className="mr-1 h-7 w-7">
                   <ArrowLeft className="h-4 w-4" />
@@ -502,3 +486,4 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     </>
   );
 }
+
