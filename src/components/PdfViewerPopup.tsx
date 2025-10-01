@@ -5,8 +5,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
-import { Loader2, ZoomIn, ZoomOut, GripVertical, X } from "lucide-react";
-import { getPdf } from "@/lib/audioDB";
+import { Loader2, ZoomIn, ZoomOut, GripVertical, X, Upload } from "lucide-react";
+import { getPdf, storePdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -22,7 +22,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState, settings, setSettings } = useAuth();
+    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources } = useAuth();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [file, setFile] = useState<Blob | null>(null);
@@ -31,6 +31,7 @@ export default function PdfViewerPopup() {
 
     const [isResizing, setIsResizing] = useState(false);
     const resizeStartRef = useRef({ x: 0, width: 0 });
+    const pdfUploadInputRef = useRef<HTMLInputElement>(null);
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'pdf-viewer-popup',
@@ -98,6 +99,23 @@ export default function PdfViewerPopup() {
         };
     }, [isResizing, handleMouseMove, handleMouseUp]);
 
+    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        const resource = pdfViewerState?.resource;
+        if (!file || !resource) return;
+
+        try {
+            await storePdf(resource.id, file);
+            setResources(prev => prev.map(r => 
+                r.id === resource.id ? { ...r, hasLocalPdf: true, pdfFileName: file.name } : r
+            ));
+            // Trigger a re-render/reload in the popup
+            setPdfViewerState(prev => prev ? { ...prev, resource: { ...resource, hasLocalPdf: true, pdfFileName: file.name } } : null);
+        } catch (error) {
+            console.error("Failed to store PDF:", error);
+        }
+    };
+
 
     if (!pdfViewerState || !pdfViewerState.isOpen) return null;
     
@@ -127,6 +145,7 @@ export default function PdfViewerPopup() {
 
     return (
         <div ref={setNodeRef} style={style}>
+            <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
             <Card className="h-[90vh] shadow-2xl border-2 border-primary/30 flex flex-col relative">
                 <CardHeader 
                     className="p-2 border-b flex flex-row items-center justify-between"
@@ -167,7 +186,10 @@ export default function PdfViewerPopup() {
                            </Document>
                        ) : (
                            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                               <p>Could not load PDF file.</p>
+                               <p className="mb-4">No PDF attached to this resource.</p>
+                               <Button onClick={() => pdfUploadInputRef.current?.click()}>
+                                   <Upload className="mr-2 h-4 w-4"/> Upload PDF
+                               </Button>
                            </div>
                        )}
                     </ScrollArea>
