@@ -952,21 +952,24 @@ function MyPlatePageContent() {
       distraction: 'Distractions',
       nutrition: 'Nutrition',
     };
-
+  
     dailyActivities.forEach((activity) => {
-        if (activity && typeof activity === 'object' && 'type' in activity) {
-            const mappedName = activityNameMap[activity.type];
-            if (mappedName && activity.completed) {
-                if (!totals[mappedName]) {
-                    totals[mappedName] = { time: 0, activities: [] };
-                }
-                const duration = parseDurationToMinutes(activityDurations[activity.id]);
-                totals[mappedName].time += duration;
-                totals[mappedName].activities.push({ name: activity.details, duration });
+      if (activity && typeof activity === 'object' && 'type' in activity) {
+        const mappedName = activityNameMap[activity.type as ActivityType];
+        if (mappedName) {
+          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking'].includes(activity.type);
+          if (isCompletedOrLogged) {
+            if (!totals[mappedName]) {
+              totals[mappedName] = { time: 0, activities: [] };
             }
+            const duration = parseDurationToMinutes(activityDurations[activity.id]);
+            totals[mappedName].time += duration;
+            totals[mappedName].activities.push({ name: activity.details, duration });
+          }
         }
+      }
     });
-
+  
     return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
   }, [schedule, selectedDateKey, activityDurations]);
   
@@ -1467,6 +1470,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
