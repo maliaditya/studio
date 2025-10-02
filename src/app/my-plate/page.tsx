@@ -45,7 +45,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { TimetablePageContent } from '@/app/timetable/page';
+import { TimesheetPageContent } from '@/app/timesheet/page';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -64,7 +64,7 @@ const activityColorMapping: Record<string, string> = {
     'Planning': 'hsl(197, 37%, 24%)',
     'Tracking': 'hsl(43, 74%, 66%)',
     'Interrupts': 'hsl(var(--destructive))',
-    'Distractions': 'hsl(0, 70%, 50%)',
+    'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(340, 82%, 56%)',
     'Free Time': 'hsl(var(--muted))',
 };
@@ -938,18 +938,18 @@ function MyPlatePageContent() {
   const timeAllocationData = useMemo(() => {
     const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
     const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-    const activityNameMap: Record<ActivityType, string> = {
-      deepwork: 'Deep Work',
-      upskill: 'Learning',
-      workout: 'Workout',
-      mindset: 'Mindset',
-      branding: 'Branding',
-      essentials: 'Essentials',
-      planning: 'Planning',
-      tracking: 'Tracking',
-      'lead-generation': 'Lead Gen',
+    const activityNameMap: Record<ActivityType, string> = { 
+      deepwork: 'Deep Work', 
+      upskill: 'Learning', 
+      workout: 'Workout', 
+      mindset: 'Mindset', 
+      branding: 'Branding', 
+      essentials: 'Essentials', 
+      planning: 'Planning', 
+      tracking: 'Tracking', 
+      'lead-generation': 'Lead Gen', 
       interrupt: 'Interrupts',
-      distraction: 'Distractions',
+      distraction: 'Distractions', 
       nutrition: 'Nutrition',
     };
   
@@ -957,7 +957,7 @@ function MyPlatePageContent() {
       if (activity && typeof activity === 'object' && 'type' in activity) {
         const mappedName = activityNameMap[activity.type as ActivityType];
         if (mappedName) {
-          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking'].includes(activity.type);
+          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials'].includes(activity.type);
           if (isCompletedOrLogged) {
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
@@ -1109,18 +1109,37 @@ function MyPlatePageContent() {
 
     const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
     
-    const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details);
-    const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : activityInfo.details;
+    // Find the core skill and then the relevant domain
+    const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details && cs.type === 'Specialization');
+    if (!coreSkill) return [];
     
-    if (!microSkillName) return [];
+    const domainId = coreSkill.domainId;
 
+    // Check if the specialization has an active learning plan
+    const hasLearningPlan = offerizationPlans[coreSkill.id]?.learningPlan &&
+        ((offerizationPlans[coreSkill.id]?.learningPlan?.audioVideoResources?.length ?? 0) > 0 || 
+         (offerizationPlans[coreSkill.id]?.learningPlan?.bookWebpageResources?.length ?? 0) > 0);
+
+    // Find all projects in the same domain
+    const domainProjects = projects.filter(p => p.domainId === domainId);
+    
     const getNodeType = pageType === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
     const targetNodeType = pageType === 'upskill' ? 'Curiosity' : 'Intention';
     
     const tasks = definitionSource
       .filter(def => {
         const nodeType = getNodeType(def as ExerciseDefinition);
-        return def.category === microSkillName && nodeType === targetNodeType;
+        if (nodeType !== targetNodeType) return false;
+        
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === def.category);
+        if (!microSkillInfo) return false;
+
+        const taskCoreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+        if (!taskCoreSkill || taskCoreSkill.domainId !== domainId) return false;
+
+        // An intention is available if it's linked to any project in the same domain OR if its specialization has a learning plan.
+        const isLinkedToDomainProject = (def.linkedProjectIds || []).some(projId => domainProjects.some(p => p.id === projId));
+        return isLinkedToDomainProject || (taskCoreSkill.id === coreSkill.id && hasLearningPlan);
       })
       .map(def => {
         const existingTask = logForDay?.exercises.find(ex => ex.definitionId === def.id);
@@ -1136,7 +1155,7 @@ function MyPlatePageContent() {
     });
 
     return tasks;
-}, [editingActivity, activityInfo, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, microSkillMap, getUpskillNodeType, getDeepWorkNodeType, coreSkills]);
+}, [activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, projects, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
 
 
   return (
@@ -1359,7 +1378,7 @@ function MyPlatePageContent() {
               </div>
           </DialogHeader>
           <div className="min-h-0">
-              <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} onWeekChange={setCurrentTimetableWeek} />
+              <TimesheetPageContent isModal={true} />
           </div>
         </DialogContent>
       </Dialog>
@@ -1470,11 +1489,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-
-
-
-
-
