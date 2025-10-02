@@ -954,9 +954,9 @@ function MyPlatePageContent() {
     };
 
     dailyActivities.forEach((activity) => {
-        if (activity && typeof activity === 'object' && 'type' in activity && activity.completed) {
+        if (activity && typeof activity === 'object' && 'type' in activity) {
             const mappedName = activityNameMap[activity.type];
-            if (mappedName) {
+            if (mappedName && activity.completed) {
                 if (!totals[mappedName]) {
                     totals[mappedName] = { time: 0, activities: [] };
                 }
@@ -1467,6 +1467,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
 
 
