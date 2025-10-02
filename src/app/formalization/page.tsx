@@ -253,36 +253,10 @@ function FormalizationPageContent() {
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
     
-    const updateResourceFormalization = useCallback((resourceId: string, formalizationData: Partial<FormalizationData>) => {
-        setResources(prevResources => {
-            const newResources = prevResources.map(res => {
-                if (res.id === resourceId) {
-                    return {
-                        ...res,
-                        formalization: {
-                            ...(res.formalization || {}),
-                            ...formalizationData
-                        }
-                    };
-                }
-                return res;
-            });
-
-            // If the currently selected resource was the one updated, update the local state too
-            if (selectedResource && selectedResource.id === resourceId) {
-                const updatedResource = newResources.find(r => r.id === resourceId);
-                if (updatedResource) {
-                    // This state update will be handled by the useEffect below
-                }
-            }
-            return newResources;
-        });
-    }, [setResources, selectedResource]);
-
     useEffect(() => {
         if (selectedResource && isResource(selectedResource)) {
             const updatedResource = resources.find(r => r.id === selectedResource.id);
-            if (updatedResource) {
+            if (updatedResource && JSON.stringify(selectedResource) !== JSON.stringify(updatedResource)) {
                 setSelectedResource(updatedResource);
             }
         }
@@ -348,6 +322,12 @@ function FormalizationPageContent() {
             audioEl.pause();
         }
     }, [playingAudio, audioSrc, globalVolume]);
+
+    const formatTime = (seconds: number): string => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
     
     const handleSeekTo = (timestamp: number) => {
         if (audioRef.current) {
@@ -362,12 +342,28 @@ function FormalizationPageContent() {
         }
     };
     
+    const handleUpdateFormalization = useCallback((resourceId: string, type: 'elements' | 'operations' | 'patterns', updatedItems: FormalizationItem[]) => {
+        setResources(prevResources => {
+            return prevResources.map(res => {
+                if (res.id === resourceId) {
+                    return {
+                        ...res,
+                        formalization: {
+                            ...(res.formalization || { elements: [], operations: [], patterns: [] }),
+                            [type]: updatedItems
+                        }
+                    };
+                }
+                return res;
+            });
+        });
+    }, [setResources]);
+    
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}`, properties: type === 'elements' ? {} : undefined };
         const currentItems = selectedResource.formalization?.[type] || [];
-        updateResourceFormalization(selectedResource.id, { [type]: [...currentItems, newItem] });
-        // Open the editor for the newly created item
+        handleUpdateFormalization(selectedResource.id, type, [...currentItems, newItem]);
         setEditingItem({ item: newItem, type });
     };
     
@@ -377,7 +373,7 @@ function FormalizationPageContent() {
         const updatedItems = currentItems.map(item =>
             item.id === id ? { ...item, text, properties: properties || item.properties } : item
         );
-        updateResourceFormalization(selectedResource.id, { [type]: updatedItems });
+        handleUpdateFormalization(selectedResource.id, type, updatedItems);
         setEditingItem(null);
     };
 
@@ -385,7 +381,7 @@ function FormalizationPageContent() {
         if (!selectedResource || !isResource(selectedResource)) return;
         const currentItems = selectedResource.formalization?.[type] || [];
         const updatedItems = currentItems.filter(item => item.id !== id);
-        updateResourceFormalization(selectedResource.id, { [type]: updatedItems });
+        handleUpdateFormalization(selectedResource.id, type, updatedItems);
     };
 
     const handleSave = () => {
