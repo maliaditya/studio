@@ -25,6 +25,7 @@ import { HabitResourceCard } from './HabitResourceCard';
 import { MechanismResourceCard } from './MechanismResourceCard';
 import { DrawingCanvas } from './DrawingCanvas';
 import ReactPlayer from 'react-player/youtube';
+import { format, parseISO } from 'date-fns';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -111,8 +112,8 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
     onSeekTo: (timestamp: number) => void;
     currentTime: number;
     onOpenDrawingCanvas: (point: ResourcePoint) => void;
-    onSetEndTime: () => void;
-    onClearEndTime: () => void;
+    onSetEndTime: (point: ResourcePoint) => void;
+    onClearEndTime: (pointId: string) => void;
 }) => {
   return (
     <ul className="space-y-1 text-sm text-muted-foreground pr-2">
@@ -128,13 +129,8 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
               onSeekTo={onSeekTo}
               currentTime={currentTime}
               onOpenDrawingCanvas={() => onOpenDrawingCanvas(point)}
-              onSetEndTime={() => {
-                const audioEl = document.querySelector(`audio[data-resource-id='${point.id}']`) as HTMLAudioElement;
-                if (audioEl) {
-                  onUpdate(point.id, { endTime: audioEl.currentTime });
-                }
-              }}
-              onClearEndTime={() => onUpdate(point.id, { endTime: undefined })}
+              onSetEndTime={() => onSetEndTime(point)}
+              onClearEndTime={() => onClearEndTime(point.id)}
           />
           {point.children.length > 0 && (
             <div className="pl-4 mt-1 border-l-2 border-dashed border-primary/20">
@@ -388,6 +384,22 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         }
     };
 
+    const handleSetEndTime = (point: ResourcePoint) => {
+        const audioEl = audioRef.current;
+        const player = playerRef.current;
+        let time: number | undefined;
+
+        if (audioEl && !audioEl.paused) time = audioEl.currentTime;
+        if (player) time = player.getCurrentTime();
+
+        if (time !== undefined) {
+            handleUpdatePoint(point.id, { endTime: time });
+        }
+    };
+    
+    const handleClearEndTime = (pointId: string) => {
+        handleUpdatePoint(pointId, { endTime: undefined });
+    };
 
     const getIcon = () => {
         switch (resource.type) {
@@ -480,8 +492,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             onSeekTo={handleSeekTo}
                             currentTime={currentTime}
                             onOpenDrawingCanvas={openDrawingCanvas}
-                            onSetEndTime={() => { /* Implement if needed */ }}
-                            onClearEndTime={() => { /* Implement if needed */ }}
+                            onSetEndTime={(point) => handleSetEndTime(point)}
+                            onClearEndTime={handleClearEndTime}
                         />
                     </>
                 );
@@ -492,7 +504,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     return (
         <>
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
-                <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} />
+                <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
                 <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
                 <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
                     <div className="absolute top-2 right-2 z-20 flex items-center">
@@ -630,4 +642,3 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         </>
     );
 }
-
