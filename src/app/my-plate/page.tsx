@@ -347,9 +347,10 @@ function MyPlatePageContent() {
                 break;
               case 'planning':
               case 'tracking':
-                totalMinutes = 30; break;
-              case 'lead-generation': totalMinutes = 45; break;
               case 'essentials':
+              case 'nutrition':
+                 totalMinutes = activity.duration || 30; break;
+              case 'lead-generation': totalMinutes = 45; break;
               case 'interrupt':
               case 'distraction':
                  totalMinutes = activity.duration || 0; break;
@@ -1100,59 +1101,31 @@ function MyPlatePageContent() {
   const availableTasksForModal = useMemo(() => {
     if (!activityInfo) return [];
 
-    const pageType = activityInfo.type;
-    const logForDay = pageType === 'upskill' 
-      ? allUpskillLogs.find(l => l.date === selectedDateKey) 
-      : pageType === 'deepwork' 
-          ? allDeepWorkLogs.find(l => l.date === selectedDateKey)
-          : brandingLogs.find(l => l.date === selectedDateKey);
-
-    const definitionSource = pageType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+    const sourceDefs = activityInfo.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
     
-    // Find the core skill and then the relevant domain
+    // Find the core skill that this activity is for.
     const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details && cs.type === 'Specialization');
     if (!coreSkill) return [];
     
-    const domainId = coreSkill.domainId;
-
-    // A specialization has a learning plan if it's in the offerization plans with a learningPlan object
     const hasLearningPlan = offerizationPlans[coreSkill.id]?.learningPlan &&
-        ((offerizationPlans[coreSkill.id]?.learningPlan?.audioVideoResources?.length ?? 0) > 0 || 
-         (offerizationPlans[coreSkill.id]?.learningPlan?.bookWebpageResources?.length ?? 0) > 0);
-
+        ((offerizationPlans[coreSkill.id]?.learningPlan?.audioVideoResources?.length || 0) > 0 || 
+         (offerizationPlans[coreSkill.id]?.learningPlan?.bookWebpageResources?.length || 0) > 0);
+         
     if (!hasLearningPlan) return [];
     
-    const getNodeType = pageType === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
-    const targetNodeType = pageType === 'upskill' ? 'Curiosity' : 'Intention';
+    const getNodeType = activityInfo.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
+    const targetNodeType = activityInfo.type === 'upskill' ? 'Curiosity' : 'Intention';
     
-    const tasks = definitionSource
-      .filter(def => {
-        const nodeType = getNodeType(def as ExerciseDefinition);
-        if (nodeType !== targetNodeType) return false;
+    return (sourceDefs || []).filter(def => {
+        if (getNodeType(def) !== targetNodeType) return false;
         
         const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === def.category);
         if (!microSkillInfo) return false;
 
         const taskCoreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (!taskCoreSkill || taskCoreSkill.id !== coreSkill.id) return false;
-
-        return true;
-      })
-      .map(def => {
-        const existingTask = logForDay?.exercises.find(ex => ex.definitionId === def.id);
-        return existingTask || {
-          id: `${def.id}-${Date.now()}`,
-          definitionId: def.id,
-          name: def.name,
-          category: def.category,
-          loggedSets: [],
-          targetSets: 1,
-          targetReps: '25',
-        };
+        return taskCoreSkill?.id === coreSkill.id;
     });
-
-    return tasks;
-}, [activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
+  }, [activityInfo, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
 
 
   return (
@@ -1304,7 +1277,7 @@ function MyPlatePageContent() {
                 if (!isOpen) setEditingActivity(null);
                 setIsLearningModalOpen(isOpen);
             }}
-            availableTasks={availableTasksForModal}
+            availableTasks={availableTasksForModal as WorkoutExercise[]}
             initialSelectedIds={editingActivity.activity.taskIds || []}
             onSave={handleSaveTaskSelection}
             pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
