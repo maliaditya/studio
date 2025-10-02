@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -24,6 +23,7 @@ import { getAudio } from '@/lib/audioDB';
 import ReactPlayer from 'react-player/youtube';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -57,6 +57,12 @@ const isImageUrl = (url: string | undefined): boolean => {
     } catch (e) {
         return false;
     }
+};
+
+const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
 };
 
 const CuriosityNode = ({
@@ -137,30 +143,42 @@ const CuriosityNode = ({
 
 type PropertyItem = { id: string; key: string; value: string };
 
-const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationItem | null; type: 'elements' | 'operations' | 'patterns'; onClose: () => void; onSave: (id: string, text: string, properties?: Record<string, any>) => void; }) => {
+const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: { 
+    item: FormalizationItem | null; 
+    type: 'elements' | 'operations' | 'patterns';
+    formalizationData?: FormalizationData;
+    onClose: () => void; 
+    onSave: (itemToSave: FormalizationItem) => void;
+}) => {
     const [text, setText] = useState('');
     const [properties, setProperties] = useState<PropertyItem[]>([]);
-
+    const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
+    const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
+    
     useEffect(() => {
-        if (item) {
-            setText(item.text);
-            const initialProps = item.properties ? 
-                Object.entries(item.properties).map(([key, value], index) => ({ id: `prop_${index}_${Date.now()}`, key, value }))
-                : [];
-            setProperties(initialProps);
-        }
+      if (item) {
+        setText(item.text);
+        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `${key}-${i}`, key, value })) : []);
+        setLinkedElementIds(item.linkedElementIds || []);
+        setLinkedOperationIds(item.linkedOperationIds || []);
+      }
     }, [item]);
 
     const handleSave = () => {
-        if (item) {
-            const propsAsObject = properties.reduce((acc, prop) => {
-                if (prop.key.trim()) {
-                    acc[prop.key.trim()] = prop.value;
-                }
+        if (!item) return;
+
+        const updatedItem: FormalizationItem = {
+            ...item,
+            text,
+            properties: properties.reduce((acc, prop) => {
+                if (prop.key.trim()) acc[prop.key.trim()] = prop.value;
                 return acc;
-            }, {} as Record<string, any>);
-            onSave(item.id, text, propsAsObject);
-        }
+            }, {} as Record<string, any>),
+            linkedElementIds: type === 'operations' ? linkedElementIds : undefined,
+            linkedOperationIds: type === 'patterns' ? linkedOperationIds : undefined,
+        };
+        
+        onSave(updatedItem);
     };
     
     const handlePropertyChange = (id: string, field: 'key' | 'value', newValue: string) => {
@@ -174,14 +192,19 @@ const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationI
     const handleDeleteProperty = (idToDelete: string) => {
         setProperties(prev => prev.filter(p => p.id !== idToDelete));
     };
+    
+    const handleLinkToggle = (id: string, linkType: 'element' | 'operation') => {
+        const updater = linkType === 'element' ? setLinkedElementIds : setLinkedOperationIds;
+        updater(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Edit {type.slice(0, -1)}</DialogTitle>
                 </DialogHeader>
-                <div className="py-4 space-y-4">
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                     <Textarea 
                         value={text}
                         onChange={(e) => setText(e.target.value)}
@@ -202,6 +225,36 @@ const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationI
                                 ))}
                             </div>
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                        </div>
+                    )}
+                    {type === 'operations' && (
+                        <div className="space-y-2">
+                            <Label>Link Elements</Label>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                <div className="space-y-1">
+                                    {(formalizationData?.elements || []).map(el => (
+                                        <div key={el.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
+                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                    {type === 'patterns' && (
+                         <div className="space-y-2">
+                            <Label>Link Operations</Label>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                <div className="space-y-1">
+                                    {(formalizationData?.operations || []).map(op => (
+                                        <div key={op.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`op-${op.id}`} checked={linkedOperationIds.includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
+                                            <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
                         </div>
                     )}
                 </div>
@@ -323,11 +376,6 @@ function FormalizationPageContent() {
         }
     }, [playingAudio, audioSrc, globalVolume]);
 
-    const formatTime = (seconds: number): string => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
     
     const handleSeekTo = (timestamp: number) => {
         if (audioRef.current) {
@@ -342,46 +390,64 @@ function FormalizationPageContent() {
         }
     };
     
-    const handleUpdateFormalization = useCallback((resourceId: string, type: 'elements' | 'operations' | 'patterns', updatedItems: FormalizationItem[]) => {
-        setResources(prevResources => {
-            return prevResources.map(res => {
-                if (res.id === resourceId) {
-                    return {
-                        ...res,
-                        formalization: {
-                            ...(res.formalization || { elements: [], operations: [], patterns: [] }),
-                            [type]: updatedItems
-                        }
-                    };
-                }
-                return res;
-            });
-        });
-    }, [setResources]);
-    
+    const updateResourceFormalization = (resourceId: string, updatedFormalization: FormalizationData) => {
+      setResources(prevResources =>
+        prevResources.map(res =>
+          res.id === resourceId
+            ? { ...res, formalization: updatedFormalization }
+            : res
+        )
+      );
+    };
+
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         if (!selectedResource || !isResource(selectedResource)) return;
-        const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}`, properties: type === 'elements' ? {} : undefined };
-        const currentItems = selectedResource.formalization?.[type] || [];
-        handleUpdateFormalization(selectedResource.id, type, [...currentItems, newItem]);
+        const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
+        if (type === 'operations') newItem.linkedElementIds = [];
+        if (type === 'patterns') newItem.linkedOperationIds = [];
+
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        const updatedItems = [...(currentFormalization[type] || []), newItem];
+        
+        updateResourceFormalization(selectedResource.id, { ...currentFormalization, [type]: updatedItems });
         setEditingItem({ item: newItem, type });
     };
     
-    const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string, properties?: Record<string, any>) => {
+    const handleUpdateItem = (itemToSave: FormalizationItem) => {
         if (!selectedResource || !isResource(selectedResource)) return;
-        const currentItems = selectedResource.formalization?.[type] || [];
-        const updatedItems = currentItems.map(item =>
-            item.id === id ? { ...item, text, properties: properties || item.properties } : item
+        
+        const type = editingItem!.type;
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        
+        const updatedItems = (currentFormalization[type] || []).map(item =>
+            item.id === itemToSave.id ? itemToSave : item
         );
-        handleUpdateFormalization(selectedResource.id, type, updatedItems);
+        
+        updateResourceFormalization(selectedResource.id, { ...currentFormalization, [type]: updatedItems });
         setEditingItem(null);
     };
 
     const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
         if (!selectedResource || !isResource(selectedResource)) return;
-        const currentItems = selectedResource.formalization?.[type] || [];
-        const updatedItems = currentItems.filter(item => item.id !== id);
-        handleUpdateFormalization(selectedResource.id, type, updatedItems);
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        const updatedItems = (currentFormalization[type] || []).filter(item => item.id !== id);
+        
+        let finalFormalization = { ...currentFormalization, [type]: updatedItems };
+        
+        // Cascade delete links
+        if(type === 'elements') {
+          finalFormalization.operations = (finalFormalization.operations || []).map(op => ({
+              ...op,
+              linkedElementIds: (op.linkedElementIds || []).filter(elId => elId !== id)
+          }));
+        } else if (type === 'operations') {
+          finalFormalization.patterns = (finalFormalization.patterns || []).map(p => ({
+              ...p,
+              linkedOperationIds: (p.linkedOperationIds || []).filter(opId => opId !== id)
+          }));
+        }
+        
+        updateResourceFormalization(selectedResource.id, finalFormalization);
     };
 
     const handleSave = () => {
@@ -408,26 +474,8 @@ function FormalizationPageContent() {
 
             return (
                 <Card className="h-full flex flex-col">
-                    {youtubeEmbedUrl ? (
-                         <div className="aspect-video w-full bg-black rounded-t-lg">
-                            <ReactPlayer
-                                ref={playerRef}
-                                url={selectedResource.link!}
-                                width="100%"
-                                height="100%"
-                                playing={playingAudio}
-                                controls={true}
-                                volume={globalVolume}
-                                onProgress={(state) => setCurrentTime(state.playedSeconds)}
-                                onDuration={setDuration}
-                            />
-                        </div>
-                    ) : imageEmbedUrl ? (
-                         <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
-                        </div>
-                    ) : audioSrc ? (
-                         <div className="p-3 border-b">
+                    {(audioSrc || youtubeEmbedUrl) && (
+                        <div className="p-3 border-b">
                             <div className="flex items-center gap-2">
                                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPlayingAudio(p => !p)}>
                                     {playingAudio ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -448,7 +496,26 @@ function FormalizationPageContent() {
                                 <span className="text-xs font-mono">{formatTime(duration)}</span>
                             </div>
                         </div>
-                    ) : null}
+                    )}
+                    {youtubeEmbedUrl ? (
+                         <div className="aspect-video w-full bg-black rounded-t-lg">
+                            <ReactPlayer
+                                ref={playerRef}
+                                url={selectedResource.link!}
+                                width="100%"
+                                height="100%"
+                                playing={playingAudio}
+                                controls={true}
+                                volume={globalVolume}
+                                onProgress={(state) => setCurrentTime(state.playedSeconds)}
+                                onDuration={setDuration}
+                            />
+                        </div>
+                    ) : imageEmbedUrl ? (
+                         <div className="aspect-video w-full bg-black relative rounded-t-lg">
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
+                        </div>
+                    ) : null }
                     <CardHeader>
                         <CardTitle className="truncate" title={selectedResource.name}>
                             <div className="flex items-center gap-2">
@@ -522,7 +589,30 @@ function FormalizationPageContent() {
     };
 
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'patterns', title: string, description: string) => {
-        const data = (isResource(selectedResource) && selectedResource.formalization?.[type]) || [];
+        const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
+        const data = formalizationData?.[type] || [];
+        
+        const reverseLinks = useMemo(() => {
+          if (!formalizationData) return new Map();
+          const map = new Map<string, string[]>();
+
+          if (type === 'elements') {
+              (formalizationData.operations || []).forEach(op => {
+                  (op.linkedElementIds || []).forEach(elId => {
+                      if (!map.has(elId)) map.set(elId, []);
+                      map.get(elId)!.push(op.text);
+                  });
+              });
+          } else if (type === 'operations') {
+              (formalizationData.patterns || []).forEach(p => {
+                  (p.linkedOperationIds || []).forEach(opId => {
+                      if (!map.has(opId)) map.set(opId, []);
+                      map.get(opId)!.push(p.text);
+                  });
+              });
+          }
+          return map;
+        }, [formalizationData, type]);
 
         return (
             <Card>
@@ -533,11 +623,16 @@ function FormalizationPageContent() {
                 <CardContent>
                     <ScrollArea className="h-64">
                         <div className="space-y-2">
-                            {data.map(item => (
+                            {data.map(item => {
+                                const linkedElements = type === 'operations' ? (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean) : [];
+                                const linkedOperations = type === 'patterns' ? (item.linkedOperationIds || []).map(id => formalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean) : [];
+                                const usedIn = reverseLinks.get(item.id) || [];
+                                
+                                return (
                                 <Card key={item.id} className="group relative">
                                     <CardContent className="p-3 text-sm">
                                         <p className="font-semibold">{item.text}</p>
-                                        {type === 'elements' && item.properties && (
+                                        {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                 {Object.entries(item.properties).map(([key, value]) => (
                                                     <div key={key}>
@@ -546,13 +641,37 @@ function FormalizationPageContent() {
                                                 ))}
                                             </div>
                                         )}
+                                        {linkedElements.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {linkedOperations.length > 0 && (
+                                             <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
+                                                 <div className="flex flex-wrap gap-1 mt-1">
+                                                    {linkedOperations.map((op, i) => <Badge key={i} variant="outline">{op}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {usedIn.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Used In:</h5>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {usedIn.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
                                     </CardContent>
                                     <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </Card>
-                            ))}
+                            )})}
                         </div>
                     </ScrollArea>
                     <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}><PlusCircle className="mr-2 h-4 w-4" /> Add {type.slice(0, -1)}</Button>
@@ -607,16 +726,13 @@ function FormalizationPageContent() {
                     </div>
                 </div>
             </div>
-             {editingItem && (
-                <ItemEditorModal
-                    item={editingItem.item}
-                    type={editingItem.type}
-                    onClose={() => setEditingItem(null)}
-                    onSave={(id, text, properties) => {
-                        handleUpdateItem(editingItem.type, id, text, properties);
-                    }}
-                />
-            )}
+            <ItemEditorModal
+                item={editingItem?.item || null}
+                type={editingItem?.type || 'elements'}
+                formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
+                onClose={() => setEditingItem(null)}
+                onSave={handleUpdateItem}
+            />
         </>
     );
 }
