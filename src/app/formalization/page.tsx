@@ -14,7 +14,7 @@ import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -154,14 +154,12 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     const [text, setText] = useState('');
     const [properties, setProperties] = useState<PropertyItem[]>([]);
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
-    const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
     
     useEffect(() => {
       if (item) {
         setText(item.text);
-        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `${key}-${i}`, key, value })) : []);
+        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `prop-${item.id}-${i}`, key, value })) : []);
         setLinkedElementIds(item.linkedElementIds || []);
-        setLinkedOperationIds(item.linkedOperationIds || []);
       }
     }, [item]);
 
@@ -171,12 +169,11 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         const updatedItem: FormalizationItem = {
             ...item,
             text,
-            properties: properties.reduce((acc, prop) => {
+            properties: type === 'elements' ? properties.reduce((acc, prop) => {
                 if (prop.key.trim()) acc[prop.key.trim()] = prop.value;
                 return acc;
-            }, {} as Record<string, any>),
-            linkedElementIds: type === 'operations' ? linkedElementIds : undefined,
-            linkedOperationIds: type === 'patterns' ? linkedOperationIds : undefined,
+            }, {} as Record<string, any>) : undefined,
+            linkedElementIds: (type === 'operations' || type === 'patterns') ? linkedElementIds : undefined,
         };
         
         onSave(updatedItem);
@@ -194,9 +191,8 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         setProperties(prev => prev.filter(p => p.id !== idToDelete));
     };
     
-    const handleLinkToggle = (id: string, linkType: 'element' | 'operation') => {
-        const updater = linkType === 'element' ? setLinkedElementIds : setLinkedOperationIds;
-        updater(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    const handleLinkToggle = (id: string) => {
+        setLinkedElementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
     return (
@@ -228,30 +224,15 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {type === 'operations' && (
+                    {(type === 'operations' || type === 'patterns') && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
                                 <div className="space-y-1">
                                     {(formalizationData?.elements || []).map(el => (
                                         <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
+                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
                                             <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-                    {type === 'patterns' && (
-                         <div className="space-y-2">
-                            <Label>Link Operations</Label>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                <div className="space-y-1">
-                                    {(formalizationData?.operations || []).map(op => (
-                                        <div key={op.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`op-${op.id}`} checked={linkedOperationIds.includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
-                                            <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
                                         </div>
                                     ))}
                                 </div>
@@ -404,9 +385,8 @@ function FormalizationPageContent() {
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
-        if (type === 'operations') newItem.linkedElementIds = [];
-        if (type === 'patterns') newItem.linkedOperationIds = [];
-
+        if (type === 'operations' || type === 'patterns') newItem.linkedElementIds = [];
+        
         const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
         const updatedItems = [...(currentFormalization[type] || []), newItem];
         
@@ -434,18 +414,18 @@ function FormalizationPageContent() {
         const updatedItems = (currentFormalization[type] || []).filter(item => item.id !== id);
         
         let finalFormalization = { ...currentFormalization, [type]: updatedItems };
-        
-        // Cascade delete links
-        if(type === 'elements') {
-          finalFormalization.operations = (finalFormalization.operations || []).map(op => ({
-              ...op,
-              linkedElementIds: (op.linkedElementIds || []).filter(elId => elId !== id)
-          }));
+
+        if (type === 'elements') {
+            finalFormalization.operations = (finalFormalization.operations || []).map(op => ({
+                ...op,
+                linkedElementIds: (op.linkedElementIds || []).filter(elId => elId !== id)
+            }));
+             finalFormalization.patterns = (finalFormalization.patterns || []).map(p => ({
+                ...p,
+                linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
+            }));
         } else if (type === 'operations') {
-          finalFormalization.patterns = (finalFormalization.patterns || []).map(p => ({
-              ...p,
-              linkedOperationIds: (p.linkedOperationIds || []).filter(opId => opId !== id)
-          }));
+            // No action needed as patterns link to elements now.
         }
         
         updateResourceFormalization(selectedResource.id, finalFormalization);
@@ -594,26 +574,24 @@ function FormalizationPageContent() {
         const data = formalizationData?.[type] || [];
         
         const reverseLinks = useMemo(() => {
-          if (!formalizationData) return new Map();
-          const map = new Map<string, string[]>();
+            if (!formalizationData) return new Map();
+            const map = new Map<string, {name: string, type: 'operation' | 'pattern'}[]>();
 
-          if (type === 'elements') {
-              (formalizationData.operations || []).forEach(op => {
-                  (op.linkedElementIds || []).forEach(elId => {
-                      if (!map.has(elId)) map.set(elId, []);
-                      map.get(elId)!.push(op.text);
-                  });
-              });
-          } else if (type === 'operations') {
-              (formalizationData.patterns || []).forEach(p => {
-                  (p.linkedOperationIds || []).forEach(opId => {
-                      if (!map.has(opId)) map.set(opId, []);
-                      map.get(opId)!.push(p.text);
-                  });
-              });
-          }
-          return map;
-        }, [formalizationData, type]);
+            (formalizationData.operations || []).forEach(op => {
+                (op.linkedElementIds || []).forEach(elId => {
+                    if (!map.has(elId)) map.set(elId, []);
+                    map.get(elId)!.push({ name: op.text, type: 'operation' });
+                });
+            });
+
+             (formalizationData.patterns || []).forEach(p => {
+                (p.linkedElementIds || []).forEach(elId => {
+                    if (!map.has(elId)) map.set(elId, []);
+                    map.get(elId)!.push({ name: p.text, type: 'pattern' });
+                });
+            });
+            return map;
+        }, [formalizationData]);
 
         return (
             <Card>
@@ -625,9 +603,8 @@ function FormalizationPageContent() {
                     <ScrollArea className="h-64">
                         <div className="space-y-2">
                             {data.map(item => {
-                                const linkedElements = type === 'operations' ? (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean) : [];
-                                const linkedOperations = type === 'patterns' ? (item.linkedOperationIds || []).map(id => formalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean) : [];
-                                const usedIn = reverseLinks.get(item.id) || [];
+                                const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                const usedIn = type === 'elements' ? (reverseLinks.get(item.id) || []) : [];
                                 
                                 return (
                                 <Card key={item.id} className="group relative">
@@ -642,7 +619,7 @@ function FormalizationPageContent() {
                                                 ))}
                                             </div>
                                         )}
-                                        {linkedElements.length > 0 && (
+                                        {(type === 'operations' || type === 'patterns') && linkedElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -650,19 +627,11 @@ function FormalizationPageContent() {
                                                 </div>
                                             </div>
                                         )}
-                                        {linkedOperations.length > 0 && (
-                                             <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedOperations.map((op, i) => <Badge key={i} variant="outline">{op}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {usedIn.length > 0 && (
+                                        {type === 'elements' && usedIn.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Used In:</h5>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {usedIn.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
+                                                 <div className="flex flex-wrap gap-1 mt-1">
+                                                    {usedIn.map((use, i) => <Badge key={i} variant={use.type === 'operation' ? 'outline' : 'default'}>{use.name}</Badge>)}
                                                 </div>
                                             </div>
                                         )}
@@ -723,7 +692,7 @@ function FormalizationPageContent() {
                     <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                         {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                         {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
-                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of operations and elements.')}
+                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of elements.')}
                     </div>
                 </div>
             </div>

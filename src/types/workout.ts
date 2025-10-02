@@ -302,7 +302,6 @@ export interface FormalizationItem {
   text: string;
   properties?: Record<string, any>;
   linkedElementIds?: string[];
-  linkedOperationIds?: string[];
 }
 
 export interface FormalizationData {
