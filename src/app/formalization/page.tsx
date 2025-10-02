@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,15 +10,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { getAudio } from '@/lib/audioDB';
+import ReactPlayer from 'react-player/youtube';
+
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -34,7 +37,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+        if (videoId) return `https://www.youtube.com/embed/${videoId}?enablejsapi=1`;
     } catch (e) {}
     return null;
 };
@@ -129,31 +132,58 @@ const CuriosityNode = ({
     );
 };
 
-const FormalizationItemCard = ({ item, onUpdate, onDelete, onEdit }: { item: FormalizationItem; onUpdate: (id: string, text: string) => void; onDelete: (id: string) => void; onEdit: (item: FormalizationItem) => void; }) => {
+const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationItem | null; type: string; onClose: () => void; onSave: (id: string, text: string) => void; }) => {
+    const [text, setText] = useState('');
+    
+    useEffect(() => {
+        if (item) {
+            setText(item.text);
+        }
+    }, [item]);
+
+    const handleSave = () => {
+        if (item) {
+            onSave(item.id, text);
+        }
+    };
+
     return (
-        <Card className="group relative">
-            <CardContent className="p-3 text-sm">
-                {item.text}
-            </CardContent>
-            <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(item)}><Edit className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(item.id)}><Trash2 className="h-4 w-4" /></Button>
-            </div>
-        </Card>
-    )
+        <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit {type}</DialogTitle>
+                </DialogHeader>
+                <Textarea 
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    autoFocus
+                    className="min-h-[200px]"
+                />
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSave}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 };
 
+
 function FormalizationPageContent() {
-    const { resources, setResources, coreSkills, upskillDefinitions } = useAuth();
+    const { resources, setResources, coreSkills, upskillDefinitions, openGeneralPopup, globalVolume } = useAuth();
     const { toast } = useToast();
     
     const [selectedSpecializationId, setSelectedSpecializationId] = useState<string>('');
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
 
-    const [formalizationData, setFormalizationData] = useState<FormalizationData>({
-        elements: [], operations: [], patterns: []
-    });
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'patterns'} | null>(null);
+
+    const [playingAudio, setPlayingAudio] = useState(false);
+    const [audioSrc, setAudioSrc] = useState<string | null>(null);
+    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const playerRef = useRef<ReactPlayer>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
 
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -176,73 +206,125 @@ function FormalizationPageContent() {
     }, [selectedSpecializationId, coreSkills, upskillDefinitions]);
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
-
-    const updateResourceFormalization = useCallback((resourceId: string, data: FormalizationData) => {
-        setResources(prevResources => {
-            const newResources = prevResources.map(res => 
-                res.id === resourceId ? { ...res, formalization: data } : res
-            );
-            const updatedResource = newResources.find(r => r.id === resourceId);
-            if (updatedResource) {
-                setSelectedResource(updatedResource);
-            }
-            return newResources;
-        });
-    }, [setResources]);
     
     useEffect(() => {
         if (selectedResource && isResource(selectedResource)) {
-            setFormalizationData(selectedResource.formalization || { elements: [], operations: [], patterns: [] });
-        } else {
-            setFormalizationData({ elements: [], operations: [], patterns: [] });
+            let objectUrl: string | null = null;
+            const loadAudio = async () => {
+                if (selectedResource.hasLocalAudio && selectedResource.id) {
+                    try {
+                        const audioBlob = await getAudio(selectedResource.id);
+                        if (audioBlob) {
+                            objectUrl = URL.createObjectURL(audioBlob);
+                            setAudioSrc(objectUrl);
+                        } else {
+                            setAudioSrc(null);
+                        }
+                    } catch (error) {
+                        console.error("Failed to load audio:", error);
+                        setAudioSrc(null);
+                    }
+                } else {
+                    setAudioSrc(null);
+                }
+            };
+            loadAudio();
+
+            return () => {
+                if (objectUrl) URL.revokeObjectURL(objectUrl);
+                setPlayingAudio(false);
+            };
         }
     }, [selectedResource]);
 
-    const handleSave = () => {
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl) return;
+        
+        const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
+        const handleDurationChange = () => setDuration(audioEl.duration);
+
+        audioEl.addEventListener('timeupdate', handleTimeUpdate);
+        audioEl.addEventListener('durationchange', handleDurationChange);
+
+        return () => {
+            if (audioEl) {
+                audioEl.removeEventListener('timeupdate', handleTimeUpdate);
+                audioEl.removeEventListener('durationchange', handleDurationChange);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const audioEl = audioRef.current;
+        if (!audioEl || !audioSrc) return;
+        if (audioEl.src !== audioSrc) audioEl.src = audioSrc;
+
+        if (playingAudio) {
+            audioEl.volume = globalVolume;
+            audioEl.play().catch(e => console.error("Audio play failed:", e));
+        } else {
+            audioEl.pause();
+        }
+    }, [playingAudio, audioSrc, globalVolume]);
+    
+    const handleSeekTo = (timestamp: number) => {
+        if (audioRef.current) {
+            audioRef.current.currentTime = timestamp;
+            if (audioRef.current.paused) {
+                setPlayingAudio(true);
+            }
+        }
+        if (playerRef.current) {
+            playerRef.current.seekTo(timestamp, 'seconds');
+            setPlayingAudio(true);
+        }
+    };
+    
+    const formatTime = (seconds: number): string => {
+        if (isNaN(seconds)) return '0:00';
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    const handleSave = (type: 'elements' | 'operations' | 'patterns', items: FormalizationItem[]) => {
         if (!selectedResource || !isResource(selectedResource)) {
             toast({ title: "Error", description: "No valid resource selected to save formalization data.", variant: "destructive" });
             return;
         }
-        updateResourceFormalization(selectedResource.id, formalizationData);
-        toast({ title: "Success", description: "Formalization data saved." });
+        
+        const updatedResource = {
+            ...selectedResource,
+            formalization: {
+                ...selectedResource.formalization,
+                [type]: items
+            }
+        };
+        setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
+        setSelectedResource(updatedResource);
     };
 
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
+        if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
-        const updatedData = { ...formalizationData, [type]: [...(formalizationData[type] || []), newItem] };
-        setFormalizationData(updatedData);
-        if (selectedResource && isResource(selectedResource)) {
-            updateResourceFormalization(selectedResource.id, updatedData);
-        }
+        const currentItems = selectedResource.formalization?.[type] || [];
+        handleSave(type, [...currentItems, newItem]);
         setEditingItem({ item: newItem, type });
     };
 
     const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string) => {
-        const updatedData = {
-            ...formalizationData,
-            [type]: (formalizationData[type] || []).map(item => item.id === id ? {...item, text} : item)
-        };
-        setFormalizationData(updatedData);
-        if (selectedResource && isResource(selectedResource)) {
-            updateResourceFormalization(selectedResource.id, updatedData);
-        }
+        if (!selectedResource || !isResource(selectedResource)) return;
+        const currentItems = selectedResource.formalization?.[type] || [];
+        const updatedItems = currentItems.map(item => item.id === id ? {...item, text} : item);
+        handleSave(type, updatedItems);
     };
 
     const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
-        const updatedData = {
-            ...formalizationData,
-            [type]: (formalizationData[type] || []).filter(item => item.id !== id)
-        };
-        setFormalizationData(updatedData);
-        if (selectedResource && isResource(selectedResource)) {
-            updateResourceFormalization(selectedResource.id, updatedData);
-        }
-    };
-    
-    const handleSaveEditItem = (newItemText: string) => {
-        if (!editingItem) return;
-        handleUpdateItem(editingItem.type, editingItem.item.id, newItemText);
-        setEditingItem(null);
+        if (!selectedResource || !isResource(selectedResource)) return;
+        const currentItems = selectedResource.formalization?.[type] || [];
+        const updatedItems = currentItems.filter(item => item.id !== id);
+        handleSave(type, updatedItems);
     };
 
     const renderSelectedResource = () => {
@@ -253,6 +335,8 @@ function FormalizationPageContent() {
                 </div>
             );
         }
+        
+        const formalization = (isResource(selectedResource) && selectedResource.formalization) || {};
 
         if (isResource(selectedResource)) {
             const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedResource.link);
@@ -261,18 +345,50 @@ function FormalizationPageContent() {
             return (
                 <Card className="h-full flex flex-col">
                     {youtubeEmbedUrl ? (
-                        <div className="aspect-video w-full bg-black rounded-t-lg">
-                             <iframe src={youtubeEmbedUrl} title={selectedResource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                         <div className="aspect-video w-full bg-black rounded-t-lg">
+                            <ReactPlayer
+                                ref={playerRef}
+                                url={selectedResource.link!}
+                                width="100%"
+                                height="100%"
+                                playing={playingAudio}
+                                controls={true}
+                                volume={globalVolume}
+                                onProgress={(state) => setCurrentTime(state.playedSeconds)}
+                                onDuration={setDuration}
+                            />
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
                             <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
                         </div>
+                    ) : audioSrc ? (
+                         <div className="p-3 border-b">
+                            <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setPlayingAudio(p => !p)}>
+                                    {playingAudio ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                </Button>
+                                <span className="text-xs font-mono">{formatTime(currentTime)}</span>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max={duration || 0}
+                                    value={currentTime}
+                                    onChange={(e) => {
+                                        const newTime = parseFloat(e.target.value);
+                                        setCurrentTime(newTime);
+                                        if (audioRef.current) audioRef.current.currentTime = newTime;
+                                    }}
+                                    className="w-full"
+                                />
+                                <span className="text-xs font-mono">{formatTime(duration)}</span>
+                            </div>
+                        </div>
                     ) : null}
                     <CardHeader>
                         <CardTitle className="truncate" title={selectedResource.name}>
                             <div className="flex items-center gap-2">
-                                {selectedResource.iconUrl ? <Image src={selectedResource.iconUrl} alt="favicon" width={16} height={16} /> : <Globe className="h-4 w-4" />}
+                                {selectedResource.type === 'card' ? <Library className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
                                 {selectedResource.name}
                             </div>
                         </CardTitle>
@@ -289,15 +405,31 @@ function FormalizationPageContent() {
                                 <ul className="space-y-3 pr-3">
                                     {(selectedResource.points || []).map((point) => (
                                         <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
-                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
-                                        {point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) 
-                                        : point.type === 'code' ? (
-                                            <div className="w-full text-xs">
-                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                                                    {point.text || ""}
-                                                </SyntaxHighlighter>
-                                            </div>
-                                        ) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                                            {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : 
+                                             point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : 
+                                             point.type === 'timestamp' ? (
+                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold mt-0.5 flex-shrink-0">
+                                                    {formatTime(point.timestamp || 0)}
+                                                </button>
+                                             ) :
+                                             <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                                             
+                                            {point.type === 'card' && point.resourceId ? (
+                                                <button
+                                                    onClick={(e) => openGeneralPopup(point.resourceId!, e)}
+                                                    className="text-left font-medium text-primary hover:underline"
+                                                >
+                                                    {point.text}
+                                                </button>
+                                            ) : point.type === 'markdown' ? (
+                                                <div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>
+                                            ) : point.type === 'code' ? (
+                                                <div className="w-full text-xs">
+                                                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                                        {point.text || ""}
+                                                    </SyntaxHighlighter>
+                                                </div>
+                                            ) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
                                         </li>
                                     ))}
                                 </ul>
@@ -305,9 +437,6 @@ function FormalizationPageContent() {
                             {selectedResource.description && selectedResource.type !== 'card' && <p className="text-sm text-muted-foreground">{selectedResource.description}</p>}
                          </ScrollArea>
                     </CardContent>
-                    <CardFooter>
-                        <Button onClick={handleSave} disabled={!isResource(selectedResource)}>Save Formalization</Button>
-                    </CardFooter>
                 </Card>
             );
         }
@@ -321,15 +450,13 @@ function FormalizationPageContent() {
                 <CardContent className="flex-grow">
                     <p className="text-sm text-muted-foreground">{selectedResource.description || "No description."}</p>
                 </CardContent>
-                <CardFooter>
-                    <Button onClick={handleSave} disabled={true}>Save Formalization</Button>
-                </CardFooter>
             </Card>
         );
     };
 
     return (
         <>
+             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
             <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
                 <Card className="col-span-1 flex flex-col">
                     <CardHeader>
@@ -367,69 +494,53 @@ function FormalizationPageContent() {
                     </div>
 
                     <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Elements</CardTitle>
-                                <CardDescription className="text-xs">Atomic concepts, formulas, code snippets.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ScrollArea className="h-64">
-                                    <div className="space-y-2">
-                                        {(formalizationData.elements || []).map(el => <FormalizationItemCard key={el.id} item={el} onUpdate={(id, text) => handleUpdateItem('elements', id, text)} onDelete={(id) => handleDeleteItem('elements', id)} onEdit={(item) => setEditingItem({ item, type: 'elements' })} />)}
-                                    </div>
-                                </ScrollArea>
-                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('elements')}><PlusCircle className="mr-2 h-4 w-4" /> Add Element</Button>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Operations</CardTitle>
-                                <CardDescription className="text-xs">How elements interact; inputs and outputs.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                               <ScrollArea className="h-64">
-                                    <div className="space-y-2">
-                                        {(formalizationData.operations || []).map(op => <FormalizationItemCard key={op.id} item={op} onUpdate={(id, text) => handleUpdateItem('operations', id, text)} onDelete={(id) => handleDeleteItem('operations', id)} onEdit={(item) => setEditingItem({ item, type: 'operations' })} />)}
-                                    </div>
-                                </ScrollArea>
-                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('operations')}><PlusCircle className="mr-2 h-4 w-4" /> Add Operation</Button>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Patterns</CardTitle>
-                                <CardDescription className="text-xs">Reusable templates of operations and elements.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ScrollArea className="h-64">
-                                    <div className="space-y-2">
-                                        {(formalizationData.patterns || []).map(pat => <FormalizationItemCard key={pat.id} item={pat} onUpdate={(id, text) => handleUpdateItem('patterns', id, text)} onDelete={(id) => handleDeleteItem('patterns', id)} onEdit={(item) => setEditingItem({ item, type: 'patterns' })}/>)}
-                                    </div>
-                                </ScrollArea>
-                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('patterns')}><PlusCircle className="mr-2 h-4 w-4" /> Add Pattern</Button>
-                            </CardContent>
-                        </Card>
+                        {(['elements', 'operations', 'patterns'] as const).map(type => {
+                            const data = (isResource(selectedResource) && selectedResource.formalization?.[type]) || [];
+                            const descriptions = {
+                                elements: 'Atomic concepts, formulas, code snippets.',
+                                operations: 'How elements interact; inputs and outputs.',
+                                patterns: 'Reusable templates of operations and elements.'
+                            };
+                            return (
+                                <Card key={type}>
+                                    <CardHeader>
+                                        <CardTitle className="capitalize">{type}</CardTitle>
+                                        <CardDescription className="text-xs">{descriptions[type]}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ScrollArea className="h-64">
+                                            <div className="space-y-2">
+                                                {data.map(item => (
+                                                    <Card key={item.id} className="group relative">
+                                                        <CardContent className="p-3 text-sm">
+                                                            {item.text}
+                                                        </CardContent>
+                                                        <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                                        </div>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        </ScrollArea>
+                                        <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}><PlusCircle className="mr-2 h-4 w-4" /> Add {type.slice(0,-1)}</Button>
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
                     </div>
                 </div>
             </div>
             {editingItem && (
-                <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Edit {editingItem.type.slice(0, -1)}</DialogTitle>
-                        </DialogHeader>
-                        <Textarea 
-                            defaultValue={editingItem.item.text}
-                            onBlur={(e) => handleSaveEditItem(e.target.value)}
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    handleSaveEditItem(e.currentTarget.value);
-                                }
-                            }}
-                        />
-                    </DialogContent>
-                </Dialog>
+                 <ItemEditorModal
+                    item={editingItem.item}
+                    type={editingItem.type.slice(0, -1)}
+                    onClose={() => setEditingItem(null)}
+                    onSave={(id, text) => {
+                        handleUpdateItem(editingItem.type, id, text);
+                        setEditingItem(null);
+                    }}
+                />
             )}
         </>
     );
