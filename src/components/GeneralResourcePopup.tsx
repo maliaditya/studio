@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -332,7 +333,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const handleAddPoint = (type: ResourcePoint['type']) => {
         let newPoint: ResourcePoint;
         if (type === 'timestamp') {
-          const newTimestamp = Math.max(0, currentTime);
+          const newTimestamp = Math.max(0, currentTime - (settings.timestampAnnotationOffset || 30));
           newPoint = { id: `point_${Date.now()}`, text: newAnnotation || 'New Note', type, timestamp: newTimestamp };
           setNewAnnotation('');
         } else {

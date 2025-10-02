@@ -737,6 +737,7 @@ export interface UserSettings {
   currentPurpose?: string;
   spacedRepetitionSlot?: SlotName;
   pdfViewerWidth?: number;
+  timestampAnnotationOffset?: number;
 }
 
 export interface ActiveFocusSession {
