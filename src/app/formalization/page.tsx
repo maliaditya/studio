@@ -14,7 +14,7 @@ import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -179,9 +179,14 @@ function FormalizationPageContent() {
 
     const updateResourceFormalization = useCallback((resourceId: string, data: FormalizationData) => {
         setResources(prevResources => {
-            return prevResources.map(res => 
+            const newResources = prevResources.map(res => 
                 res.id === resourceId ? { ...res, formalization: data } : res
             );
+            const updatedResource = newResources.find(r => r.id === resourceId);
+            if (updatedResource) {
+                setSelectedResource(updatedResource);
+            }
+            return newResources;
         });
     }, [setResources]);
     
@@ -204,22 +209,34 @@ function FormalizationPageContent() {
 
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
-        setFormalizationData(prev => ({...prev, [type]: [...(prev[type] || []), newItem]}));
+        const updatedData = { ...formalizationData, [type]: [...(formalizationData[type] || []), newItem] };
+        setFormalizationData(updatedData);
+        if (selectedResource && isResource(selectedResource)) {
+            updateResourceFormalization(selectedResource.id, updatedData);
+        }
         setEditingItem({ item: newItem, type });
     };
 
     const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string) => {
-        setFormalizationData(prev => ({
-            ...prev,
-            [type]: (prev[type] || []).map(item => item.id === id ? {...item, text} : item)
-        }));
+        const updatedData = {
+            ...formalizationData,
+            [type]: (formalizationData[type] || []).map(item => item.id === id ? {...item, text} : item)
+        };
+        setFormalizationData(updatedData);
+        if (selectedResource && isResource(selectedResource)) {
+            updateResourceFormalization(selectedResource.id, updatedData);
+        }
     };
 
     const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
-        setFormalizationData(prev => ({
-            ...prev,
-            [type]: (prev[type] || []).filter(item => item.id !== id)
-        }));
+        const updatedData = {
+            ...formalizationData,
+            [type]: (formalizationData[type] || []).filter(item => item.id !== id)
+        };
+        setFormalizationData(updatedData);
+        if (selectedResource && isResource(selectedResource)) {
+            updateResourceFormalization(selectedResource.id, updatedData);
+        }
     };
     
     const handleSaveEditItem = (newItemText: string) => {
@@ -289,7 +306,7 @@ function FormalizationPageContent() {
                          </ScrollArea>
                     </CardContent>
                     <CardFooter>
-                        <Button onClick={handleSave}>Save Formalization</Button>
+                        <Button onClick={handleSave} disabled={!isResource(selectedResource)}>Save Formalization</Button>
                     </CardFooter>
                 </Card>
             );
