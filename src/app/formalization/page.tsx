@@ -135,52 +135,44 @@ const CuriosityNode = ({
     );
 };
 
+type PropertyItem = { id: string; key: string; value: string };
+
 const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationItem | null; type: 'elements' | 'operations' | 'patterns'; onClose: () => void; onSave: (id: string, text: string, properties?: Record<string, any>) => void; }) => {
     const [text, setText] = useState('');
-    const [properties, setProperties] = useState<Record<string, any>>({});
+    const [properties, setProperties] = useState<PropertyItem[]>([]);
 
     useEffect(() => {
         if (item) {
             setText(item.text);
-            setProperties(item.properties || {});
+            const initialProps = item.properties ? 
+                Object.entries(item.properties).map(([key, value], index) => ({ id: `prop_${index}_${Date.now()}`, key, value }))
+                : [];
+            setProperties(initialProps);
         }
     }, [item]);
 
     const handleSave = () => {
         if (item) {
-            onSave(item.id, text, properties);
+            const propsAsObject = properties.reduce((acc, prop) => {
+                if (prop.key.trim()) {
+                    acc[prop.key.trim()] = prop.value;
+                }
+                return acc;
+            }, {} as Record<string, any>);
+            onSave(item.id, text, propsAsObject);
         }
     };
     
-    const handlePropertyChange = (key: string, value: string) => {
-        setProperties(prev => ({ ...prev, [key]: value }));
-    };
-    
-    const handleNewPropertyKeyChange = (oldKey: string, newKey: string) => {
-        setProperties(prev => {
-            const newProps: Record<string, any> = {};
-            Object.entries(prev).forEach(([k, v]) => {
-                if (k === oldKey) {
-                    if (newKey.trim()) newProps[newKey.trim()] = v;
-                } else {
-                    newProps[k] = v;
-                }
-            });
-            return newProps;
-        });
+    const handlePropertyChange = (id: string, field: 'key' | 'value', newValue: string) => {
+        setProperties(prev => prev.map(p => p.id === id ? { ...p, [field]: newValue } : p));
     };
     
     const handleAddProperty = () => {
-        const newKey = `new_property_${Object.keys(properties).length}`;
-        setProperties(prev => ({ ...prev, [newKey]: '' }));
+        setProperties(prev => [...prev, { id: `prop_${Date.now()}`, key: '', value: '' }]);
     };
 
-    const handleDeleteProperty = (keyToDelete: string) => {
-        setProperties(prev => {
-            const newProps = { ...prev };
-            delete newProps[keyToDelete];
-            return newProps;
-        });
+    const handleDeleteProperty = (idToDelete: string) => {
+        setProperties(prev => prev.filter(p => p.id !== idToDelete));
     };
 
     return (
@@ -201,11 +193,11 @@ const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationI
                         <div className="space-y-3">
                             <Label>Properties</Label>
                             <div className="space-y-2">
-                                {Object.entries(properties).map(([key, value]) => (
-                                    <div key={key} className="flex items-center gap-2">
-                                        <Input value={key} onChange={(e) => handleNewPropertyKeyChange(key, e.target.value)} placeholder="Property Name"/>
-                                        <Input value={value} onChange={(e) => handlePropertyChange(key, e.target.value)} placeholder="Value"/>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(key)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                {properties.map((prop) => (
+                                    <div key={prop.id} className="flex items-center gap-2">
+                                        <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
+                                        <Input value={prop.value} onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)} placeholder="Value"/>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                     </div>
                                 ))}
                             </div>
@@ -261,6 +253,41 @@ function FormalizationPageContent() {
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
     
+    const updateResourceFormalization = useCallback((resourceId: string, formalizationData: Partial<FormalizationData>) => {
+        setResources(prevResources => {
+            const newResources = prevResources.map(res => {
+                if (res.id === resourceId) {
+                    return {
+                        ...res,
+                        formalization: {
+                            ...(res.formalization || {}),
+                            ...formalizationData
+                        }
+                    };
+                }
+                return res;
+            });
+
+            // If the currently selected resource was the one updated, update the local state too
+            if (selectedResource && selectedResource.id === resourceId) {
+                const updatedResource = newResources.find(r => r.id === resourceId);
+                if (updatedResource) {
+                    // This state update will be handled by the useEffect below
+                }
+            }
+            return newResources;
+        });
+    }, [setResources, selectedResource]);
+
+    useEffect(() => {
+        if (selectedResource && isResource(selectedResource)) {
+            const updatedResource = resources.find(r => r.id === selectedResource.id);
+            if (updatedResource) {
+                setSelectedResource(updatedResource);
+            }
+        }
+    }, [resources, selectedResource]);
+
     useEffect(() => {
         if (selectedResource && isResource(selectedResource)) {
             let objectUrl: string | null = null;
@@ -335,44 +362,13 @@ function FormalizationPageContent() {
         }
     };
     
-    const formatTime = (seconds: number): string => {
-        if (isNaN(seconds)) return '0:00';
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    const updateResourceFormalization = useCallback((resourceId: string, formalizationData: Partial<FormalizationData>) => {
-        setResources(prevResources => {
-            return prevResources.map(res => {
-                if (res.id === resourceId) {
-                    return {
-                        ...res,
-                        formalization: {
-                            ...res.formalization,
-                            ...formalizationData
-                        }
-                    };
-                }
-                return res;
-            });
-        });
-    }, [setResources]);
-
-    useEffect(() => {
-        if (selectedResource && isResource(selectedResource)) {
-            const updatedResource = resources.find(r => r.id === selectedResource.id);
-            if (updatedResource) {
-                setSelectedResource(updatedResource);
-            }
-        }
-    }, [resources, selectedResource]);
-
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}`, properties: type === 'elements' ? {} : undefined };
         const currentItems = selectedResource.formalization?.[type] || [];
         updateResourceFormalization(selectedResource.id, { [type]: [...currentItems, newItem] });
+        // Open the editor for the newly created item
+        setEditingItem({ item: newItem, type });
     };
     
     const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string, properties?: Record<string, any>) => {
@@ -390,6 +386,15 @@ function FormalizationPageContent() {
         const currentItems = selectedResource.formalization?.[type] || [];
         const updatedItems = currentItems.filter(item => item.id !== id);
         updateResourceFormalization(selectedResource.id, { [type]: updatedItems });
+    };
+
+    const handleSave = () => {
+        if (!selectedResource || !isResource(selectedResource)) return;
+        
+        toast({
+            title: "Saved!",
+            description: "Your formalization data has been saved locally.",
+        });
     };
 
     const renderSelectedResource = () => {
@@ -500,6 +505,9 @@ function FormalizationPageContent() {
                             {selectedResource.description && selectedResource.type !== 'card' && <p className="text-sm text-muted-foreground">{selectedResource.description}</p>}
                          </ScrollArea>
                     </CardContent>
+                     <CardFooter>
+                        <Button onClick={handleSave} disabled={!isResource(selectedResource)}>Save Formalization</Button>
+                    </CardFooter>
                 </Card>
             );
         }
