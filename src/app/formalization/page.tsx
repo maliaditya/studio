@@ -9,30 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, ResourcePoint } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight } from 'lucide-react';
+import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import ReactPlayer from 'react-player/youtube';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-
-const getFaviconUrl = (link: string): string | undefined => {
-    try {
-        let url = link;
-        if (!url.startsWith('http')) {
-            url = `https://${url}`;
-        }
-        const urlObject = new URL(url);
-        return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
-    } catch (e) {
-        return undefined;
-    }
-};
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -143,6 +129,20 @@ const CuriosityNode = ({
     );
 };
 
+const FormalizationItemCard = ({ item, onUpdate, onDelete, onEdit }: { item: FormalizationItem; onUpdate: (id: string, text: string) => void; onDelete: (id: string) => void; onEdit: (item: FormalizationItem) => void; }) => {
+    return (
+        <Card className="group relative">
+            <CardContent className="p-3 text-sm">
+                {item.text}
+            </CardContent>
+            <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(item)}><Edit className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onDelete(item.id)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+        </Card>
+    )
+};
+
 function FormalizationPageContent() {
     const { resources, setResources, coreSkills, upskillDefinitions } = useAuth();
     const { toast } = useToast();
@@ -151,9 +151,10 @@ function FormalizationPageContent() {
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
 
     const [formalizationData, setFormalizationData] = useState<FormalizationData>({
-        elements: '', operations: '', patterns: ''
+        elements: [], operations: [], patterns: []
     });
-    
+    const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'patterns'} | null>(null);
+
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
     }, [coreSkills]);
@@ -178,24 +179,17 @@ function FormalizationPageContent() {
 
     const updateResourceFormalization = useCallback((resourceId: string, data: FormalizationData) => {
         setResources(prevResources => {
-            const newResources = prevResources.map(res => 
+            return prevResources.map(res => 
                 res.id === resourceId ? { ...res, formalization: data } : res
             );
-            return newResources;
         });
     }, [setResources]);
     
     useEffect(() => {
-        if (selectedResource) {
-            let initialFormalization: FormalizationData = { elements: '', operations: '', patterns: '' };
-            if (isResource(selectedResource) && selectedResource.formalization) {
-                 initialFormalization = selectedResource.formalization;
-            } else if (!isResource(selectedResource) && (selectedResource as any).description) {
-                initialFormalization = { elements: (selectedResource as any).description || '', operations: '', patterns: '' };
-            }
-            setFormalizationData(initialFormalization);
+        if (selectedResource && isResource(selectedResource)) {
+            setFormalizationData(selectedResource.formalization || { elements: [], operations: [], patterns: [] });
         } else {
-            setFormalizationData({ elements: '', operations: '', patterns: '' });
+            setFormalizationData({ elements: [], operations: [], patterns: [] });
         }
     }, [selectedResource]);
 
@@ -206,6 +200,32 @@ function FormalizationPageContent() {
         }
         updateResourceFormalization(selectedResource.id, formalizationData);
         toast({ title: "Success", description: "Formalization data saved." });
+    };
+
+    const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
+        const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
+        setFormalizationData(prev => ({...prev, [type]: [...(prev[type] || []), newItem]}));
+        setEditingItem({ item: newItem, type });
+    };
+
+    const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string) => {
+        setFormalizationData(prev => ({
+            ...prev,
+            [type]: (prev[type] || []).map(item => item.id === id ? {...item, text} : item)
+        }));
+    };
+
+    const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
+        setFormalizationData(prev => ({
+            ...prev,
+            [type]: (prev[type] || []).filter(item => item.id !== id)
+        }));
+    };
+    
+    const handleSaveEditItem = (newItemText: string) => {
+        if (!editingItem) return;
+        handleUpdateItem(editingItem.type, editingItem.item.id, newItemText);
+        setEditingItem(null);
     };
 
     const renderSelectedResource = () => {
@@ -225,7 +245,7 @@ function FormalizationPageContent() {
                 <Card className="h-full flex flex-col">
                     {youtubeEmbedUrl ? (
                         <div className="aspect-video w-full bg-black rounded-t-lg">
-                            <ReactPlayer url={youtubeEmbedUrl} width="100%" height="100%" controls />
+                             <iframe src={youtubeEmbedUrl} title={selectedResource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
@@ -240,8 +260,9 @@ function FormalizationPageContent() {
                             </div>
                         </CardTitle>
                         {selectedResource.link && (
-                            <CardDescription className="flex items-center gap-2 text-xs">
+                             <CardDescription className="flex items-center gap-2 text-xs">
                                 <a href={selectedResource.link} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">{selectedResource.link}</a>
+                                <a href={selectedResource.link} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-3 w-3"/></a>
                             </CardDescription>
                         )}
                     </CardHeader>
@@ -249,7 +270,7 @@ function FormalizationPageContent() {
                          <ScrollArea className="h-full">
                             {selectedResource.type === 'card' && selectedResource.points && (
                                 <ul className="space-y-3 pr-3">
-                                    {(selectedResource.points || []).map((point: ResourcePoint) => (
+                                    {(selectedResource.points || []).map((point) => (
                                         <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
                                         {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
                                         {point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) 
@@ -291,96 +312,111 @@ function FormalizationPageContent() {
     };
 
     return (
-        <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
-            {/* Left Sidebar */}
-            <Card className="col-span-1 flex flex-col">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
-                </CardHeader>
-                <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                    <Select value={selectedSpecializationId} onValueChange={setSelectedSpecializationId}>
-                        <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                        <SelectContent>
-                            {specializations.map(spec => (
-                                <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <ScrollArea className="flex-grow">
-                        <div className="space-y-1">
-                            {curiositiesForSpecialization.map(curiosity => (
-                                <CuriosityNode 
-                                    key={curiosity.id}
-                                    item={curiosity}
-                                    onSelect={setSelectedResource}
-                                    selectedId={selectedResource?.id || null}
-                                    allUpskillDefinitions={upskillDefinitions}
-                                    allResources={resources}
-                                />
-                            ))}
-                        </div>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+        <>
+            <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
+                <Card className="col-span-1 flex flex-col">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
+                        <Select value={selectedSpecializationId} onValueChange={setSelectedSpecializationId}>
+                            <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                            <SelectContent>
+                                {specializations.map(spec => (
+                                    <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <ScrollArea className="flex-grow">
+                            <div className="space-y-1">
+                                {curiositiesForSpecialization.map(curiosity => (
+                                    <CuriosityNode 
+                                        key={curiosity.id}
+                                        item={curiosity}
+                                        onSelect={setSelectedResource}
+                                        selectedId={selectedResource?.id || null}
+                                        allUpskillDefinitions={upskillDefinitions}
+                                        allResources={resources}
+                                    />
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
 
-            {/* Main Content */}
-            <div className="col-span-1 md:col-span-3 lg:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-1 h-full min-h-[600px]">
-                    {renderSelectedResource()}
-                </div>
+                <div className="col-span-1 md:col-span-3 lg:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-1 h-full min-h-[600px]">
+                        {renderSelectedResource()}
+                    </div>
 
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Elements</CardTitle>
-                            <CardDescription className="text-xs">Atomic concepts, formulas, code snippets.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Textarea 
-                                value={formalizationData.elements} 
-                                onChange={(e) => setFormalizationData(prev => ({...prev, elements: e.target.value}))}
-                                placeholder="Define one element per line..." 
-                                className="h-64"
-                                disabled={!isResource(selectedResource)}
-                            />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Operations</CardTitle>
-                            <CardDescription className="text-xs">How elements interact; inputs and outputs.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Textarea 
-                                value={formalizationData.operations} 
-                                onChange={(e) => setFormalizationData(prev => ({...prev, operations: e.target.value}))}
-                                placeholder="Describe an operation..." 
-                                className="h-64"
-                                disabled={!isResource(selectedResource)}
-                            />
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Patterns</CardTitle>
-                            <CardDescription className="text-xs">Reusable templates of operations and elements.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Textarea 
-                                value={formalizationData.patterns} 
-                                onChange={(e) => setFormalizationData(prev => ({...prev, patterns: e.target.value}))} 
-                                placeholder="Describe a pattern..." 
-                                className="h-64"
-                                disabled={!isResource(selectedResource)}
-                            />
-                        </CardContent>
-                    </Card>
+                    <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Elements</CardTitle>
+                                <CardDescription className="text-xs">Atomic concepts, formulas, code snippets.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-64">
+                                    <div className="space-y-2">
+                                        {(formalizationData.elements || []).map(el => <FormalizationItemCard key={el.id} item={el} onUpdate={(id, text) => handleUpdateItem('elements', id, text)} onDelete={(id) => handleDeleteItem('elements', id)} onEdit={(item) => setEditingItem({ item, type: 'elements' })} />)}
+                                    </div>
+                                </ScrollArea>
+                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('elements')}><PlusCircle className="mr-2 h-4 w-4" /> Add Element</Button>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Operations</CardTitle>
+                                <CardDescription className="text-xs">How elements interact; inputs and outputs.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                               <ScrollArea className="h-64">
+                                    <div className="space-y-2">
+                                        {(formalizationData.operations || []).map(op => <FormalizationItemCard key={op.id} item={op} onUpdate={(id, text) => handleUpdateItem('operations', id, text)} onDelete={(id) => handleDeleteItem('operations', id)} onEdit={(item) => setEditingItem({ item, type: 'operations' })} />)}
+                                    </div>
+                                </ScrollArea>
+                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('operations')}><PlusCircle className="mr-2 h-4 w-4" /> Add Operation</Button>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Patterns</CardTitle>
+                                <CardDescription className="text-xs">Reusable templates of operations and elements.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="h-64">
+                                    <div className="space-y-2">
+                                        {(formalizationData.patterns || []).map(pat => <FormalizationItemCard key={pat.id} item={pat} onUpdate={(id, text) => handleUpdateItem('patterns', id, text)} onDelete={(id) => handleDeleteItem('patterns', id)} onEdit={(item) => setEditingItem({ item, type: 'patterns' })}/>)}
+                                    </div>
+                                </ScrollArea>
+                                <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem('patterns')}><PlusCircle className="mr-2 h-4 w-4" /> Add Pattern</Button>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
-        </div>
+            {editingItem && (
+                <Dialog open={!!editingItem} onOpenChange={() => setEditingItem(null)}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Edit {editingItem.type.slice(0, -1)}</DialogTitle>
+                        </DialogHeader>
+                        <Textarea 
+                            defaultValue={editingItem.item.text}
+                            onBlur={(e) => handleSaveEditItem(e.target.value)}
+                            autoFocus
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    handleSaveEditItem(e.currentTarget.value);
+                                }
+                            }}
+                        />
+                    </DialogContent>
+                </Dialog>
+            )}
+        </>
     );
 }
-
 
 export default function FormalizationPage() {
     return (

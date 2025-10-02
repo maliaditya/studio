@@ -297,11 +297,18 @@ export interface GapAnalysis {
   strainReduction?: string;
 }
 
-export interface FormalizationData {
-    elements?: string;
-    operations?: string;
-    patterns?: string;
+export interface FormalizationItem {
+  id: string;
+  text: string;
+  properties?: Record<string, any>;
 }
+
+export interface FormalizationData {
+    elements?: FormalizationItem[];
+    operations?: FormalizationItem[];
+    patterns?: FormalizationItem[];
+}
+
 export interface ResourcePoint {
   id: string;
   text: string;
