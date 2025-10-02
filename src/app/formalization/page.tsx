@@ -24,6 +24,7 @@ import ReactPlayer from 'react-player/youtube';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -726,13 +727,15 @@ function FormalizationPageContent() {
                     </div>
                 </div>
             </div>
-            <ItemEditorModal
-                item={editingItem?.item || null}
-                type={editingItem?.type || 'elements'}
-                formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
-                onClose={() => setEditingItem(null)}
-                onSave={handleUpdateItem}
-            />
+            {editingItem && (
+                <ItemEditorModal
+                    item={editingItem.item}
+                    type={editingItem.type}
+                    formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
+                    onClose={() => setEditingItem(null)}
+                    onSave={handleUpdateItem}
+                />
+            )}
         </>
     );
 }
