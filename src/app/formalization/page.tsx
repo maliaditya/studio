@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -21,6 +22,8 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { getAudio } from '@/lib/audioDB';
 import ReactPlayer from 'react-player/youtube';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -132,33 +135,84 @@ const CuriosityNode = ({
     );
 };
 
-const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationItem | null; type: string; onClose: () => void; onSave: (id: string, text: string) => void; }) => {
+const ItemEditorModal = ({ item, type, onClose, onSave }: { item: FormalizationItem | null; type: 'elements' | 'operations' | 'patterns'; onClose: () => void; onSave: (id: string, text: string, properties?: Record<string, any>) => void; }) => {
     const [text, setText] = useState('');
-    
+    const [properties, setProperties] = useState<Record<string, any>>({});
+
     useEffect(() => {
         if (item) {
             setText(item.text);
+            setProperties(item.properties || {});
         }
     }, [item]);
 
     const handleSave = () => {
         if (item) {
-            onSave(item.id, text);
+            onSave(item.id, text, properties);
         }
+    };
+    
+    const handlePropertyChange = (key: string, value: string) => {
+        setProperties(prev => ({ ...prev, [key]: value }));
+    };
+    
+    const handleNewPropertyKeyChange = (oldKey: string, newKey: string) => {
+        setProperties(prev => {
+            const newProps: Record<string, any> = {};
+            Object.entries(prev).forEach(([k, v]) => {
+                if (k === oldKey) {
+                    if (newKey.trim()) newProps[newKey.trim()] = v;
+                } else {
+                    newProps[k] = v;
+                }
+            });
+            return newProps;
+        });
+    };
+    
+    const handleAddProperty = () => {
+        const newKey = `new_property_${Object.keys(properties).length}`;
+        setProperties(prev => ({ ...prev, [newKey]: '' }));
+    };
+
+    const handleDeleteProperty = (keyToDelete: string) => {
+        setProperties(prev => {
+            const newProps = { ...prev };
+            delete newProps[keyToDelete];
+            return newProps;
+        });
     };
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>Edit {type}</DialogTitle>
+                    <DialogTitle>Edit {type.slice(0, -1)}</DialogTitle>
                 </DialogHeader>
-                <Textarea 
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    autoFocus
-                    className="min-h-[200px]"
-                />
+                <div className="py-4 space-y-4">
+                    <Textarea 
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        autoFocus
+                        className="min-h-[100px]"
+                        placeholder="Enter the main text or name..."
+                    />
+                    {type === 'elements' && (
+                        <div className="space-y-3">
+                            <Label>Properties</Label>
+                            <div className="space-y-2">
+                                {Object.entries(properties).map(([key, value]) => (
+                                    <div key={key} className="flex items-center gap-2">
+                                        <Input value={key} onChange={(e) => handleNewPropertyKeyChange(key, e.target.value)} placeholder="Property Name"/>
+                                        <Input value={value} onChange={(e) => handlePropertyChange(key, e.target.value)} placeholder="Value"/>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(key)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                        </div>
+                    )}
+                </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleSave}>Save</Button>
@@ -288,43 +342,54 @@ function FormalizationPageContent() {
         return `${minutes}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const handleSave = (type: 'elements' | 'operations' | 'patterns', items: FormalizationItem[]) => {
-        if (!selectedResource || !isResource(selectedResource)) {
-            toast({ title: "Error", description: "No valid resource selected to save formalization data.", variant: "destructive" });
-            return;
-        }
-        
-        const updatedResource = {
-            ...selectedResource,
-            formalization: {
-                ...selectedResource.formalization,
-                [type]: items
+    const updateResourceFormalization = useCallback((resourceId: string, formalizationData: Partial<FormalizationData>) => {
+        setResources(prevResources => {
+            return prevResources.map(res => {
+                if (res.id === resourceId) {
+                    return {
+                        ...res,
+                        formalization: {
+                            ...res.formalization,
+                            ...formalizationData
+                        }
+                    };
+                }
+                return res;
+            });
+        });
+    }, [setResources]);
+
+    useEffect(() => {
+        if (selectedResource && isResource(selectedResource)) {
+            const updatedResource = resources.find(r => r.id === selectedResource.id);
+            if (updatedResource) {
+                setSelectedResource(updatedResource);
             }
-        };
-        setResources(prev => prev.map(res => res.id === updatedResource.id ? updatedResource : res));
-        setSelectedResource(updatedResource);
-    };
+        }
+    }, [resources, selectedResource]);
 
     const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
         if (!selectedResource || !isResource(selectedResource)) return;
-        const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
+        const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}`, properties: type === 'elements' ? {} : undefined };
         const currentItems = selectedResource.formalization?.[type] || [];
-        handleSave(type, [...currentItems, newItem]);
-        setEditingItem({ item: newItem, type });
+        updateResourceFormalization(selectedResource.id, { [type]: [...currentItems, newItem] });
     };
-
-    const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string) => {
+    
+    const handleUpdateItem = (type: 'elements' | 'operations' | 'patterns', id: string, text: string, properties?: Record<string, any>) => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const currentItems = selectedResource.formalization?.[type] || [];
-        const updatedItems = currentItems.map(item => item.id === id ? {...item, text} : item);
-        handleSave(type, updatedItems);
+        const updatedItems = currentItems.map(item =>
+            item.id === id ? { ...item, text, properties: properties || item.properties } : item
+        );
+        updateResourceFormalization(selectedResource.id, { [type]: updatedItems });
+        setEditingItem(null);
     };
 
     const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const currentItems = selectedResource.formalization?.[type] || [];
         const updatedItems = currentItems.filter(item => item.id !== id);
-        handleSave(type, updatedItems);
+        updateResourceFormalization(selectedResource.id, { [type]: updatedItems });
     };
 
     const renderSelectedResource = () => {
@@ -336,8 +401,6 @@ function FormalizationPageContent() {
             );
         }
         
-        const formalization = (isResource(selectedResource) && selectedResource.formalization) || {};
-
         if (isResource(selectedResource)) {
             const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedResource.link);
             const imageEmbedUrl = isImageUrl(selectedResource.link) ? selectedResource.link : null;
@@ -360,7 +423,7 @@ function FormalizationPageContent() {
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
                         </div>
                     ) : audioSrc ? (
                          <div className="p-3 border-b">
@@ -454,9 +517,49 @@ function FormalizationPageContent() {
         );
     };
 
+    const renderFormalizationSection = (type: 'elements' | 'operations' | 'patterns', title: string, description: string) => {
+        const data = (isResource(selectedResource) && selectedResource.formalization?.[type]) || [];
+
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle className="capitalize">{title}</CardTitle>
+                    <CardDescription className="text-xs">{description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-64">
+                        <div className="space-y-2">
+                            {data.map(item => (
+                                <Card key={item.id} className="group relative">
+                                    <CardContent className="p-3 text-sm">
+                                        <p className="font-semibold">{item.text}</p>
+                                        {type === 'elements' && item.properties && (
+                                            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                                                {Object.entries(item.properties).map(([key, value]) => (
+                                                    <div key={key}>
+                                                        <span className="font-medium text-foreground">{key}:</span> {String(value)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                    <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                    <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}><PlusCircle className="mr-2 h-4 w-4" /> Add {type.slice(0, -1)}</Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <>
-             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
+            <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
             <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
                 <Card className="col-span-1 flex flex-col">
                     <CardHeader>
@@ -494,51 +597,19 @@ function FormalizationPageContent() {
                     </div>
 
                     <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {(['elements', 'operations', 'patterns'] as const).map(type => {
-                            const data = (isResource(selectedResource) && selectedResource.formalization?.[type]) || [];
-                            const descriptions = {
-                                elements: 'Atomic concepts, formulas, code snippets.',
-                                operations: 'How elements interact; inputs and outputs.',
-                                patterns: 'Reusable templates of operations and elements.'
-                            };
-                            return (
-                                <Card key={type}>
-                                    <CardHeader>
-                                        <CardTitle className="capitalize">{type}</CardTitle>
-                                        <CardDescription className="text-xs">{descriptions[type]}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ScrollArea className="h-64">
-                                            <div className="space-y-2">
-                                                {data.map(item => (
-                                                    <Card key={item.id} className="group relative">
-                                                        <CardContent className="p-3 text-sm">
-                                                            {item.text}
-                                                        </CardContent>
-                                                        <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
-                                                        </div>
-                                                    </Card>
-                                                ))}
-                                            </div>
-                                        </ScrollArea>
-                                        <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}><PlusCircle className="mr-2 h-4 w-4" /> Add {type.slice(0,-1)}</Button>
-                                    </CardContent>
-                                </Card>
-                            )
-                        })}
+                        {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
+                        {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
+                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of operations and elements.')}
                     </div>
                 </div>
             </div>
-            {editingItem && (
-                 <ItemEditorModal
+             {editingItem && (
+                <ItemEditorModal
                     item={editingItem.item}
-                    type={editingItem.type.slice(0, -1)}
+                    type={editingItem.type}
                     onClose={() => setEditingItem(null)}
-                    onSave={(id, text) => {
-                        handleUpdateItem(editingItem.type, id, text);
-                        setEditingItem(null);
+                    onSave={(id, text, properties) => {
+                        handleUpdateItem(editingItem.type, id, text, properties);
                     }}
                 />
             )}
