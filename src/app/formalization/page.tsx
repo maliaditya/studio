@@ -14,6 +14,8 @@ import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import ReactPlayer from 'react-player/youtube';
 
 const getFaviconUrl = (link: string): string | undefined => {
     try {
@@ -25,6 +27,39 @@ const getFaviconUrl = (link: string): string | undefined => {
         return `https://www.google.com/s2/favicons?domain=${urlObject.hostname}&sz=32`;
     } catch (e) {
         return undefined;
+    }
+};
+
+const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+        const urlObj = new URL(url);
+        let videoId: string | null = null;
+        if (urlObj.hostname.includes('youtube.com')) {
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                videoId = urlObj.pathname.split('/shorts/')[1];
+            } else {
+                videoId = urlObj.searchParams.get('v');
+            }
+        } else if (urlObj.hostname.includes('youtu.be')) {
+            videoId = urlObj.pathname.slice(1);
+        }
+        if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    } catch (e) {}
+    return null;
+};
+
+const isImageUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
+    if (/\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(url)) {
+        return true;
+    }
+    try {
+        const urlObj = new URL(url);
+        const imageHosts = ['images.unsplash.com', 'plus.unsplash.com', 'upload.wikimedia.org'];
+        return imageHosts.includes(urlObj.hostname);
+    } catch (e) {
+        return false;
     }
 };
 
@@ -137,13 +172,9 @@ function FormalizationPageContent() {
 
     useEffect(() => {
         if (selectedResource) {
-            // Check if it's a Resource type with formalization
             if ('folderId' in selectedResource && selectedResource.formalization) {
                  setFormalizationData(selectedResource.formalization);
             } else if ('category' in selectedResource && (selectedResource as ExerciseDefinition).description) {
-                // It's an ExerciseDefinition, we can use its description as a starting point.
-                // Or maybe you want a separate formalization object for ExerciseDefinitions too.
-                // For now, let's just clear it or prepopulate from description.
                 setFormalizationData({ elements: (selectedResource as any).description || '', operations: '', patterns: '' });
             }
              else {
@@ -174,6 +205,69 @@ function FormalizationPageContent() {
     };
     
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
+
+    const renderSelectedResource = () => {
+        if (!selectedResource) {
+            return (
+                <div className="flex items-center justify-center h-full border-2 border-dashed rounded-lg">
+                    <p className="text-muted-foreground">Select an item from the sidebar</p>
+                </div>
+            );
+        }
+
+        if (isResource(selectedResource)) {
+            const youtubeEmbedUrl = getYouTubeEmbedUrl(selectedResource.link);
+            const imageEmbedUrl = isImageUrl(selectedResource.link) ? selectedResource.link : null;
+
+            return (
+                <Card className="h-full flex flex-col">
+                    {youtubeEmbedUrl ? (
+                        <div className="aspect-video w-full bg-black rounded-t-lg">
+                            <ReactPlayer url={youtubeEmbedUrl} width="100%" height="100%" controls />
+                        </div>
+                    ) : imageEmbedUrl ? (
+                         <div className="aspect-video w-full bg-black relative rounded-t-lg">
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
+                        </div>
+                    ) : null}
+                    <CardHeader>
+                        <CardTitle className="truncate" title={selectedResource.name}>
+                            <div className="flex items-center gap-2">
+                                {selectedResource.iconUrl ? <Image src={selectedResource.iconUrl} alt="favicon" width={16} height={16} /> : <Globe className="h-4 w-4" />}
+                                {selectedResource.name}
+                            </div>
+                        </CardTitle>
+                        {selectedResource.link && (
+                            <CardDescription className="flex items-center gap-2 text-xs">
+                                <a href={selectedResource.link} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">{selectedResource.link}</a>
+                            </CardDescription>
+                        )}
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                        <p className="text-sm text-muted-foreground">{selectedResource.description || "No description."}</p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button onClick={handleSave}>Save Formalization</Button>
+                    </CardFooter>
+                </Card>
+            );
+        }
+
+        // Fallback for ExerciseDefinition
+        return (
+             <Card className="h-full flex flex-col">
+                <CardHeader>
+                    <CardTitle className="truncate" title={selectedResource.name}>{selectedResource.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow">
+                    <p className="text-sm text-muted-foreground">{selectedResource.description || "No description."}</p>
+                </CardContent>
+                <CardFooter>
+                    <Button onClick={handleSave}>Save Formalization</Button>
+                </CardFooter>
+            </Card>
+        );
+    };
 
     return (
         <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
@@ -211,39 +305,7 @@ function FormalizationPageContent() {
             {/* Main Content */}
             <div className="col-span-1 md:col-span-3 lg:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-1">
-                    {selectedResource ? (
-                         <Card className="h-full">
-                            <CardHeader>
-                                <CardTitle className="truncate" title={selectedResource.name}>{selectedResource.name}</CardTitle>
-                                {isResource(selectedResource) && selectedResource.link && (
-                                     <CardDescription className="flex items-center gap-2 text-xs text-muted-foreground truncate">
-                                        {selectedResource.iconUrl ? (
-                                            <Image src={selectedResource.iconUrl} alt="favicon" width={14} height={14} unoptimized />
-                                        ) : (
-                                            <Globe className="h-3 w-3" />
-                                        )}
-                                        <a href={selectedResource.link} target="_blank" rel="noopener noreferrer" className="hover:underline truncate">{selectedResource.link}</a>
-                                     </CardDescription>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                {isResource(selectedResource) && selectedResource.description ? (
-                                    <p className="text-sm text-muted-foreground">{selectedResource.description}</p>
-                                ) : !isResource(selectedResource) && selectedResource.description ? (
-                                    <p className="text-sm text-muted-foreground">{selectedResource.description}</p>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground italic">No description provided.</p>
-                                )}
-                            </CardContent>
-                            <CardFooter>
-                                <Button onClick={handleSave} disabled={!isResource(selectedResource)}>Save Formalization</Button>
-                            </CardFooter>
-                        </Card>
-                    ) : (
-                        <div className="flex items-center justify-center h-full border-2 border-dashed rounded-lg">
-                            <p className="text-muted-foreground">Select an item from the sidebar</p>
-                        </div>
-                    )}
+                    {renderSelectedResource()}
                 </div>
 
                 <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -306,7 +368,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-    
-
-    
