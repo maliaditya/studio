@@ -9,13 +9,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink } from 'lucide-react';
+import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, ResourcePoint } from '@/types/workout';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import ReactPlayer from 'react-player/youtube';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 const getFaviconUrl = (link: string): string | undefined => {
     try {
@@ -170,41 +174,39 @@ function FormalizationPageContent() {
         );
     }, [selectedSpecializationId, coreSkills, upskillDefinitions]);
 
+    const isResource = (item: any): item is Resource => item && 'folderId' in item;
+
+    const updateResourceFormalization = useCallback((resourceId: string, data: FormalizationData) => {
+        setResources(prevResources => {
+            const newResources = prevResources.map(res => 
+                res.id === resourceId ? { ...res, formalization: data } : res
+            );
+            return newResources;
+        });
+    }, [setResources]);
+    
     useEffect(() => {
         if (selectedResource) {
-            if ('folderId' in selectedResource && selectedResource.formalization) {
-                 setFormalizationData(selectedResource.formalization);
-            } else if ('category' in selectedResource && (selectedResource as ExerciseDefinition).description) {
-                setFormalizationData({ elements: (selectedResource as any).description || '', operations: '', patterns: '' });
+            let initialFormalization: FormalizationData = { elements: '', operations: '', patterns: '' };
+            if (isResource(selectedResource) && selectedResource.formalization) {
+                 initialFormalization = selectedResource.formalization;
+            } else if (!isResource(selectedResource) && (selectedResource as any).description) {
+                initialFormalization = { elements: (selectedResource as any).description || '', operations: '', patterns: '' };
             }
-             else {
-                setFormalizationData({ elements: '', operations: '', patterns: '' });
-            }
+            setFormalizationData(initialFormalization);
+        } else {
+            setFormalizationData({ elements: '', operations: '', patterns: '' });
         }
     }, [selectedResource]);
 
     const handleSave = () => {
-        if (!selectedResource || !('folderId' in selectedResource)) {
+        if (!selectedResource || !isResource(selectedResource)) {
             toast({ title: "Error", description: "No valid resource selected to save formalization data.", variant: "destructive" });
             return;
         }
-
-        const resourceId = selectedResource.id;
-        setResources(prevResources => 
-            prevResources.map(res => {
-                if (res.id === resourceId) {
-                    return {
-                        ...res,
-                        formalization: formalizationData
-                    };
-                }
-                return res;
-            })
-        );
+        updateResourceFormalization(selectedResource.id, formalizationData);
         toast({ title: "Success", description: "Formalization data saved." });
     };
-    
-    const isResource = (item: any): item is Resource => item && 'folderId' in item;
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -243,8 +245,27 @@ function FormalizationPageContent() {
                             </CardDescription>
                         )}
                     </CardHeader>
-                    <CardContent className="flex-grow">
-                        <p className="text-sm text-muted-foreground">{selectedResource.description || "No description."}</p>
+                    <CardContent className="flex-grow min-h-0">
+                         <ScrollArea className="h-full">
+                            {selectedResource.type === 'card' && selectedResource.points && (
+                                <ul className="space-y-3 pr-3">
+                                    {(selectedResource.points || []).map((point: ResourcePoint) => (
+                                        <li key={point.id} className="flex items-start gap-3 text-sm text-muted-foreground group/item">
+                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> : <ArrowRight className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" />}
+                                        {point.type === 'markdown' ? (<div className="w-full prose dark:prose-invert prose-sm"><ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown></div>) 
+                                        : point.type === 'code' ? (
+                                            <div className="w-full text-xs">
+                                                <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                                    {point.text || ""}
+                                                </SyntaxHighlighter>
+                                            </div>
+                                        ) : (<span className="break-words w-full" title={point.text}>{point.text}</span>)}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {selectedResource.description && selectedResource.type !== 'card' && <p className="text-sm text-muted-foreground">{selectedResource.description}</p>}
+                         </ScrollArea>
                     </CardContent>
                     <CardFooter>
                         <Button onClick={handleSave}>Save Formalization</Button>
@@ -263,7 +284,7 @@ function FormalizationPageContent() {
                     <p className="text-sm text-muted-foreground">{selectedResource.description || "No description."}</p>
                 </CardContent>
                 <CardFooter>
-                    <Button onClick={handleSave}>Save Formalization</Button>
+                    <Button onClick={handleSave} disabled={true}>Save Formalization</Button>
                 </CardFooter>
             </Card>
         );
@@ -304,7 +325,7 @@ function FormalizationPageContent() {
 
             {/* Main Content */}
             <div className="col-span-1 md:col-span-3 lg:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 h-full min-h-[600px]">
                     {renderSelectedResource()}
                 </div>
 
@@ -320,7 +341,7 @@ function FormalizationPageContent() {
                                 onChange={(e) => setFormalizationData(prev => ({...prev, elements: e.target.value}))}
                                 placeholder="Define one element per line..." 
                                 className="h-64"
-                                disabled={!selectedResource}
+                                disabled={!isResource(selectedResource)}
                             />
                         </CardContent>
                     </Card>
@@ -335,7 +356,7 @@ function FormalizationPageContent() {
                                 onChange={(e) => setFormalizationData(prev => ({...prev, operations: e.target.value}))}
                                 placeholder="Describe an operation..." 
                                 className="h-64"
-                                disabled={!selectedResource}
+                                disabled={!isResource(selectedResource)}
                             />
                         </CardContent>
                     </Card>
@@ -350,7 +371,7 @@ function FormalizationPageContent() {
                                 onChange={(e) => setFormalizationData(prev => ({...prev, patterns: e.target.value}))} 
                                 placeholder="Describe a pattern..." 
                                 className="h-64"
-                                disabled={!selectedResource}
+                                disabled={!isResource(selectedResource)}
                             />
                         </CardContent>
                     </Card>
