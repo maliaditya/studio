@@ -957,7 +957,7 @@ function MyPlatePageContent() {
       if (activity && typeof activity === 'object' && 'type' in activity) {
         const mappedName = activityNameMap[activity.type as ActivityType];
         if (mappedName) {
-          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials'].includes(activity.type);
+          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials', 'nutrition'].includes(activity.type);
           if (isCompletedOrLogged) {
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
@@ -1115,13 +1115,12 @@ function MyPlatePageContent() {
     
     const domainId = coreSkill.domainId;
 
-    // Check if the specialization has an active learning plan
+    // A specialization has a learning plan if it's in the offerization plans with a learningPlan object
     const hasLearningPlan = offerizationPlans[coreSkill.id]?.learningPlan &&
         ((offerizationPlans[coreSkill.id]?.learningPlan?.audioVideoResources?.length ?? 0) > 0 || 
          (offerizationPlans[coreSkill.id]?.learningPlan?.bookWebpageResources?.length ?? 0) > 0);
 
-    // Find all projects in the same domain
-    const domainProjects = projects.filter(p => p.domainId === domainId);
+    if (!hasLearningPlan) return [];
     
     const getNodeType = pageType === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
     const targetNodeType = pageType === 'upskill' ? 'Curiosity' : 'Intention';
@@ -1135,11 +1134,9 @@ function MyPlatePageContent() {
         if (!microSkillInfo) return false;
 
         const taskCoreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (!taskCoreSkill || taskCoreSkill.domainId !== domainId) return false;
+        if (!taskCoreSkill || taskCoreSkill.id !== coreSkill.id) return false;
 
-        // An intention is available if it's linked to any project in the same domain OR if its specialization has a learning plan.
-        const isLinkedToDomainProject = (def.linkedProjectIds || []).some(projId => domainProjects.some(p => p.id === projId));
-        return isLinkedToDomainProject || (taskCoreSkill.id === coreSkill.id && hasLearningPlan);
+        return true;
       })
       .map(def => {
         const existingTask = logForDay?.exercises.find(ex => ex.definitionId === def.id);
@@ -1155,7 +1152,7 @@ function MyPlatePageContent() {
     });
 
     return tasks;
-}, [activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, projects, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
+}, [activityInfo, allUpskillLogs, allDeepWorkLogs, brandingLogs, selectedDateKey, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
 
 
   return (
