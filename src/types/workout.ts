@@ -297,6 +297,11 @@ export interface GapAnalysis {
   strainReduction?: string;
 }
 
+export interface FormalizationData {
+    elements?: string;
+    operations?: string;
+    patterns?: string;
+}
 export interface ResourcePoint {
   id: string;
   text: string;
@@ -382,6 +387,8 @@ export interface Resource {
   
   // For 3D Model
   modelUrl?: string;
+
+  formalization?: FormalizationData;
 }
 
 export interface ResourceFolder {
@@ -771,9 +778,7 @@ export interface RepetitionData {
 
 export interface DailyReviewLog {
     date: string; // YYYY-MM-DD
-    totalReviews: number;
-    successes: number;
-    failures: number;
+    completedResourceIds: string[];
 }
 
 export interface PlaybackRequest {
