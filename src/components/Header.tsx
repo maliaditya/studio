@@ -167,6 +167,7 @@ function NavigationMenu() {
     { href: '/skill', label: 'Skill' },
     { href: '/deep-work', label: 'Deep Work' },
     { href: '/resources', label: 'Resources' },
+    { href: '/formalization', label: 'Formalization' },
   ];
 
   const dropdownLinks = [
