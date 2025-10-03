@@ -156,20 +156,25 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     const [properties, setProperties] = useState<PropertyItem[]>([]);
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
     const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
+    const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
     
     useEffect(() => {
       if (item) {
         setText(item.text);
-        if (type === 'elements' && item.properties) {
-          setProperties(Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })));
+        if (type === 'elements') {
+          setProperties(item.properties ? Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })) : []);
+          setLinkedOperationIds(item.linkedOperationIds || []);
         } else {
           setProperties([]);
+          setLinkedOperationIds([]);
         }
+
         if (type === 'operations' || type === 'components') {
             setLinkedElementIds(item.linkedElementIds || []);
         } else {
             setLinkedElementIds([]);
         }
+        
         if (type === 'components') {
             setLinkedComponentIds(item.linkedComponentIds || []);
         } else {
@@ -189,6 +194,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                 return acc;
             }, {} as Record<string, any>) : undefined,
             linkedElementIds: (type === 'operations' || type === 'components') ? linkedElementIds : undefined,
+            linkedOperationIds: type === 'elements' ? linkedOperationIds : undefined,
             linkedComponentIds: type === 'components' ? linkedComponentIds : undefined,
         };
         
@@ -207,11 +213,13 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         setProperties(prev => prev.filter(p => p.id !== idToDelete));
     };
     
-    const handleLinkToggle = (id: string, linkType: 'element' | 'component') => {
+    const handleLinkToggle = (id: string, linkType: 'element' | 'component' | 'operation') => {
         if (linkType === 'element') {
             setLinkedElementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
-        } else {
+        } else if (linkType === 'component') {
             setLinkedComponentIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+        } else if (linkType === 'operation') {
+            setLinkedOperationIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
         }
     };
 
@@ -227,8 +235,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     
     const availableComponents = useMemo(() => {
         if (!formalizationData?.components) return [];
-        const linkedComponentOfParent = item && 'linkedComponentIds' in item ? item.linkedComponentIds || [] : [];
-        return formalizationData.components.filter(c => c.id !== item?.id && !linkedComponentOfParent.includes(c.id));
+        return formalizationData.components.filter(c => c.id !== item?.id);
     }, [formalizationData, item]);
 
 
@@ -247,37 +254,52 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                         placeholder="Enter the main text or name..."
                     />
                     {type === 'elements' && (
-                        <div className="space-y-3">
-                            <Label>Properties</Label>
-                            <div className="space-y-2">
-                                {properties.map((prop) => (
-                                    <div key={prop.id} className="flex items-center gap-2">
-                                        <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                        <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Value or Link Component..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <Input
-                                                  className="m-2 w-[calc(100%-1rem)]"
-                                                  placeholder="Type a value..."
-                                                  defaultValue={prop.value}
-                                                  onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
-                                                />
-                                                <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                {availableComponents.map(p => (
-                                                  <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                        <>
+                          <div className="space-y-3">
+                              <Label>Properties</Label>
+                              <div className="space-y-2">
+                                  {properties.map((prop) => (
+                                      <div key={prop.id} className="flex items-center gap-2">
+                                          <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
+                                          <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
+                                              <SelectTrigger>
+                                                  <SelectValue placeholder="Value or Link Component..." />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                  <Input
+                                                    className="m-2 w-[calc(100%-1rem)]"
+                                                    placeholder="Type a value..."
+                                                    defaultValue={prop.value}
+                                                    onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                  />
+                                                  <SelectItem value="--none--">-- Clear --</SelectItem>
+                                                  {availableComponents.map(p => (
+                                                    <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                  ))}
+                                              </SelectContent>
+                                          </Select>
+                                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                      </div>
+                                  ))}
+                              </div>
+                              <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                          </div>
+                           <div className="space-y-2">
+                                <Label>Link Operations</Label>
+                                <ScrollArea className="h-40 border rounded-md p-2">
+                                    <div className="space-y-1">
+                                        {(formalizationData?.operations || []).map(op => (
+                                            <div key={op.id} className="flex items-center space-x-2">
+                                                <Checkbox id={`op-${op.id}`} checked={linkedOperationIds.includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
+                                                <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </ScrollArea>
                             </div>
-                            <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
-                        </div>
+                        </>
                     )}
-                    {(type === 'operations' || type === 'components') && (
+                    {type === 'components' && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -327,9 +349,9 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
         return formalizationData?.components?.find(c => c.id === componentId);
     }, [componentId, formalizationData]);
 
-    const getLinkedOperations = (elementId: string) => {
-        if (!formalizationData?.operations) return [];
-        return formalizationData.operations.filter(op => op.linkedElementIds?.includes(elementId));
+    const getLinkedOperations = (element: FormalizationItem) => {
+        if (!formalizationData?.operations || !element.linkedOperationIds) return [];
+        return formalizationData.operations.filter(op => element.linkedOperationIds?.includes(op.id));
     };
 
     const linkedComponents = useMemo(() => {
@@ -422,7 +444,7 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                                     <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
                                         <p className="font-medium text-foreground">Operations:</p>
                                         <ul className="list-disc list-inside">
-                                            {getLinkedOperations(el.id).map(op => (
+                                            {getLinkedOperations(el).map(op => (
                                                 <li key={op.id}>{op.text}</li>
                                             ))}
                                         </ul>
@@ -592,6 +614,7 @@ function FormalizationPageContent() {
     const handleAddItem = (type: 'elements' | 'operations' | 'components') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
+        if (type === 'elements') newItem.linkedOperationIds = [];
         if (type === 'operations' || type === 'components') newItem.linkedElementIds = [];
         if (type === 'components') newItem.linkedComponentIds = [];
         
@@ -624,13 +647,14 @@ function FormalizationPageContent() {
         let finalFormalization: FormalizationData = { ...currentFormalization, [type]: updatedItems };
 
         if (type === 'elements') {
-            finalFormalization.operations = (finalFormalization.operations || []).map(op => ({
-                ...op,
-                linkedElementIds: (op.linkedElementIds || []).filter(elId => elId !== id)
-            }));
              finalFormalization.components = (finalFormalization.components || []).map(p => ({
                 ...p,
                 linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
+            }));
+        } else if (type === 'operations') {
+            finalFormalization.elements = (finalFormalization.elements || []).map(el => ({
+                ...el,
+                linkedOperationIds: (el.linkedOperationIds || []).filter(opId => opId !== id)
             }));
         } else if (type === 'components') {
             finalFormalization.elements = (finalFormalization.elements || []).map(el => {
@@ -651,15 +675,6 @@ function FormalizationPageContent() {
         }
         
         updateResourceFormalization(selectedResource.id, finalFormalization);
-    };
-
-    const handleSave = () => {
-        if (!selectedResource || !isResource(selectedResource)) return;
-        
-        toast({
-            title: "Saved!",
-            description: "Your formalization data has been saved locally.",
-        });
     };
     
     const openMindMapForElement = (elementId: string) => {
@@ -870,20 +885,20 @@ function FormalizationPageContent() {
             });
         
             const hiddenOperationIds = new Set<string>();
-            hiddenElementIds.forEach(elId => {
-                formalizationData.operations?.forEach(op => {
-                    if (op.linkedElementIds?.includes(elId)) {
-                        hiddenOperationIds.add(op.id);
+            if (type === 'operations') {
+                formalizationData.elements?.forEach(el => {
+                    if(hiddenElementIds.has(el.id)) {
+                        (el.linkedOperationIds || []).forEach(opId => hiddenOperationIds.add(opId));
                     }
                 });
-            });
+            }
         
             return {
                 components: hiddenComponentIds,
                 elements: hiddenElementIds,
                 operations: hiddenOperationIds,
             };
-        }, [formalizationData]);
+        }, [formalizationData, type]);
         
         let data: FormalizationItem[] = [];
         if (formalizationData) {
@@ -918,9 +933,10 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea>
+                    <ScrollArea className="h-72">
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
+                                const linkedOperations = (item.linkedOperationIds || []).map(id => formalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
                                 const linkedComponents = (item.linkedComponentIds || []).map(id => formalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
                                 
@@ -954,7 +970,15 @@ function FormalizationPageContent() {
                                                 })}
                                             </div>
                                         )}
-                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
+                                        {type === 'elements' && linkedOperations.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {linkedOperations.map((op, i) => <Badge key={i} variant="secondary">{op}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {type === 'components' && linkedElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
