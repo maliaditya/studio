@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -259,22 +260,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {type === 'operations' && (
-                        <div className="space-y-2">
-                            <Label>Link Elements</Label>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                <div className="space-y-1">
-                                    {(formalizationData?.elements || []).map(el => (
-                                        <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
-                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-                    {type === 'components' && (
+                    {(type === 'operations' || type === 'components') && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -636,7 +622,48 @@ function FormalizationPageContent() {
 
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
-        const data = formalizationData?.[type] || [];
+    
+        const allComponents = formalizationData?.components || [];
+        const allElements = formalizationData?.elements || [];
+        const allOperations = formalizationData?.operations || [];
+    
+        // 1. Find all components linked inside element properties
+        const linkedComponentIds = new Set<string>(
+            allElements.flatMap(el => 
+                Object.values(el.properties || {})
+            )
+        );
+    
+        // 2. Find all elements linked to those components
+        const hiddenElementIds = new Set<string>(
+            allComponents
+                .filter(comp => linkedComponentIds.has(comp.id))
+                .flatMap(comp => comp.linkedElementIds || [])
+        );
+    
+        // 3. Find all operations linked to those hidden elements
+        const hiddenOperationIds = new Set<string>(
+            allOperations
+                .filter(op => 
+                    (op.linkedElementIds || []).some(elId => hiddenElementIds.has(elId))
+                )
+                .map(op => op.id)
+        );
+    
+        let data;
+        switch (type) {
+            case 'components':
+                data = allComponents.filter(comp => !linkedComponentIds.has(comp.id));
+                break;
+            case 'elements':
+                data = allElements.filter(el => !hiddenElementIds.has(el.id));
+                break;
+            case 'operations':
+                data = allOperations.filter(op => !hiddenOperationIds.has(op.id));
+                break;
+            default:
+                data = [];
+        }
         
         const reverseElementLinks = useMemo(() => {
             if (!formalizationData) return new Map();
@@ -820,3 +847,4 @@ export default function FormalizationPage() {
     
 
     
+
