@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -482,6 +483,7 @@ function FormalizationPageContent() {
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
 
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'components'} | null>(null);
+    const audioWasPlayingBeforeModal = useRef(false);
 
     const [playingAudio, setPlayingAudio] = useState(false);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -516,6 +518,16 @@ function FormalizationPageContent() {
     }, [selectedFormalizationSpecId, coreSkills, upskillDefinitions]);
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
+
+    useEffect(() => {
+        if (editingItem && playingAudio) {
+            audioWasPlayingBeforeModal.current = true;
+            setPlayingAudio(false);
+        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
+            setPlayingAudio(true);
+            audioWasPlayingBeforeModal.current = false;
+        }
+    }, [editingItem, playingAudio]);
     
     useEffect(() => {
         if (selectedResource && isResource(selectedResource)) {
@@ -1102,3 +1114,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
+```
