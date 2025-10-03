@@ -874,35 +874,62 @@ function FormalizationPageContent() {
         globalItems.operations.forEach((item, id) => displayItems.operations.set(id, item));
         globalItems.components.forEach((item, id) => displayItems.components.set(id, item));
         
-        // --- NEW LOGIC ---
-        // Find all component IDs that are used as property values in any element being displayed.
-        const linkedAsPropertyIds = new Set<string>();
-        displayItems.elements.forEach(element => {
-          if (element.properties) {
-            Object.values(element.properties).forEach(value => {
-              if (typeof value === 'string' && value.startsWith('item_')) { // Assuming component IDs start with 'item_'
-                const comp = fullFormalizationData.components.find(c => c.id === value);
-                if (comp) {
-                    linkedAsPropertyIds.add(comp.id);
-                }
-              }
-            });
-          }
-        });
+        const encapsulatedIds = new Set<string>();
+        const queue: string[] = [];
 
-        // Filter out components that are linked as properties, unless they are part of the local resource's own components.
-        const localComponentIds = new Set(localItems.components.map(c => c.id));
-        const filteredComponents = Array.from(displayItems.components.values()).filter(comp => {
-            if (linkedAsPropertyIds.has(comp.id)) {
-                return localComponentIds.has(comp.id);
+        // 1. Find all components used as properties
+        fullFormalizationData.elements.forEach(element => {
+            if (element.properties) {
+                Object.values(element.properties).forEach(value => {
+                    if (typeof value === 'string' && value.startsWith('item_')) {
+                        queue.push(value);
+                        encapsulatedIds.add(value);
+                    }
+                });
             }
-            return true;
         });
+    
+        // 2. Traverse and find all children
+        const allItemsMap = new Map([
+            ...fullFormalizationData.components.map(i => [i.id, i]),
+            ...fullFormalizationData.elements.map(i => [i.id, i]),
+            ...fullFormalizationData.operations.map(i => [i.id, i]),
+        ]);
+
+        const visited = new Set<string>();
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const item = allItemsMap.get(currentId);
+            if (!item) continue;
+
+            const children = [
+                ...(item.linkedElementIds || []),
+                ...(item.linkedComponentIds || []),
+                ...(item.linkedOperationIds || []),
+            ];
+
+            children.forEach(childId => {
+                if (!encapsulatedIds.has(childId)) {
+                    encapsulatedIds.add(childId);
+                    queue.push(childId);
+                }
+            });
+        }
+        
+        // 3. Filter the display items
+        const localItemIds = new Set([
+            ...localItems.elements.map(i => i.id),
+            ...localItems.operations.map(i => i.id),
+            ...localItems.components.map(i => i.id),
+        ]);
 
         return {
-            elements: Array.from(displayItems.elements.values()),
-            operations: Array.from(displayItems.operations.values()),
-            components: filteredComponents,
+            elements: Array.from(displayItems.elements.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
+            operations: Array.from(displayItems.operations.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
+            components: Array.from(displayItems.components.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
         };
     }, [selectedResource, resources, fullFormalizationData]);
 
