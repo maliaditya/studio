@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -155,7 +154,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, []);
 
     const allDefinitions = useMemo(() => {
-      const { elements = [], operations = [], components = [] } = resources.reduce((acc, resource) => {
+      const { elements = [], operations = [], components = [] } = (resources || []).reduce((acc, resource) => {
         if (resource.formalization) {
           if (resource.formalization.elements) {
             acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element' as const, category: 'Formalization', name: e.text })));
@@ -178,7 +177,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
       const map = new Map<string, string[]>();
       allDefinitions.forEach(def => {
         const formalizationDef = def as FormalizationItem;
-        let childIds: string[] = [
+        let allChildIds: string[] = [
             ...((def as ExerciseDefinition).linkedDeepWorkIds || []), 
             ...((def as ExerciseDefinition).linkedUpskillIds || []),
             ...((def as ExerciseDefinition).linkedResourceIds || []),
@@ -186,13 +185,13 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         ];
 
         if (formalizationDef.type === 'formalization_element' && formalizationDef.properties) {
-          childIds.push(...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val)));
+          allChildIds.push(...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val)));
         }
         if ((def as Resource).points) {
-            childIds.push(...(def as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
+            allChildIds.push(...(def as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
         }
 
-        childIds.forEach(childId => {
+        allChildIds.forEach(childId => {
             if (!map.has(childId)) map.set(childId, []);
             map.get(childId)!.push(def.id);
         });
@@ -272,21 +271,21 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             if (!definition) return;
     
             // Expand children
-            let childIds: string[] = [
-                ...((definition as ExerciseDefinition).linkedDeepWorkIds || []),
+            let allChildIds: string[] = [
+                ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                 ...((definition as ExerciseDefinition).linkedResourceIds || []),
                 ...((definition as FormalizationItem).linkedElementIds || []),
             ];
             
             if (definition.type === 'formalization_element' && definition.properties) {
-                childIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
             }
             if ((definition as Resource).points) {
-                childIds.push(...(definition as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
+                allChildIds.push(...(definition as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
             }
 
-            const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId));
+            const childrenToLoad = allChildIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId));
             
             if (childrenToLoad.length > 0) {
                 madeChanges = true;
@@ -338,20 +337,20 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
 
-        let childIds: string[] = [
+        let allChildIds: string[] = [
             ...((currentNodeDef as ExerciseDefinition).linkedDeepWorkIds || []), 
             ...((currentNodeDef as ExerciseDefinition).linkedUpskillIds || []),
             ...((currentNodeDef as ExerciseDefinition).linkedResourceIds || []),
             ...((currentNodeDef as FormalizationItem).linkedElementIds || []),
         ];
         if (currentNodeDef.type === 'formalization_element' && currentNodeDef.properties) {
-            childIds.push(...Object.values(currentNodeDef.properties).filter(val => allDefinitions.has(val)));
+            allChildIds.push(...Object.values(currentNodeDef.properties).filter(val => allDefinitions.has(val)));
         }
         if ((currentNodeDef as Resource).points) {
-            childIds.push(...(currentNodeDef as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
+            allChildIds.push(...(currentNodeDef as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
         }
 
-        const validChildIds = childIds.filter(id => allDefinitions.has(id));
+        const validChildIds = allChildIds.filter(id => allDefinitions.has(id));
 
         const nodesToUpdate = new Map<string, { x: number; y: number }>();
         const edgesToUpdate = new Set<string>();
@@ -632,16 +631,15 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource & Pattern & MetaRule & FormalizationItem);
                             if (!definition) return null;
                             
-                            const allChildIds = [
+                            let allChildIds: string[] = [
                                 ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
                                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                                 ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
-                                ...((definition as Pattern).linkedElementIds || []),
                                 ...((definition as FormalizationItem).linkedElementIds || []),
                             ];
 
                             if (definition.type === 'formalization_element' && definition.properties) {
-                                childIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                                allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
                             }
 
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
@@ -1077,7 +1075,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
   const handleToggleUpskillLink = (upskillId: string) => {
     setEditableLinkedUpskillIds(prev =>
       prev.includes(upskillId)
-        ? prev.filter(id => id !== upskillId)
+        ? prev.filter(id => id !== id)
         : [...prev, upskillId]
     );
   };
@@ -1321,3 +1319,4 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
   );
 }
 
+    
