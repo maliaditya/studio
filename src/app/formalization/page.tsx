@@ -540,12 +540,14 @@ function FormalizationPageContent() {
 
     useEffect(() => {
         const audio = audioRef.current;
-        if (editingItem && playingAudio && audio) {
+        if (!audio) return;
+
+        if (editingItem && playingAudio) {
             audioWasPlayingBeforeModal.current = true;
             audioTimeBeforeModal.current = audio.currentTime;
             audio.pause();
             setPlayingAudio(false);
-        } else if (!editingItem && audioWasPlayingBeforeModal.current && audio) {
+        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
             audio.currentTime = audioTimeBeforeModal.current;
             audio.play().catch(e => console.error("Audio resume failed:", e));
             setPlayingAudio(true);
@@ -779,48 +781,48 @@ function FormalizationPageContent() {
         }
       }, []);
 
-      const fullFormalizationData = useMemo(() => {
+    const fullFormalizationData = useMemo(() => {
         const allDefinitions = new Map<string, any>();
         const globalItems = {
             elements: new Map<string, FormalizationItem>(),
             operations: new Map<string, FormalizationItem>(),
             components: new Map<string, FormalizationItem>(),
         };
-    
-        // Pass 1: Collect all item definitions
+
+        // Pass 1: Collect all item definitions from all resources
         resources.forEach(res => {
             (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element' }));
             (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation' }));
             (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component' }));
         });
-    
+
         // Pass 2: Recursively find all dependencies for global items
         const globalIds = new Set<string>();
         const collectDependencies = (itemId: string, visited: Set<string>) => {
             if (!itemId || visited.has(itemId)) return;
             visited.add(itemId);
-    
+
             const item = allDefinitions.get(itemId);
             if (!item) return;
-    
+
             globalIds.add(itemId);
-    
+
             const children = [
                 ...(item.linkedElementIds || []),
                 ...(item.linkedComponentIds || []),
                 ...(item.linkedOperationIds || []),
-                ...(item.properties ? Object.values(item.properties) : [])
+                ...(item.properties ? Object.values(item.properties).filter(val => allDefinitions.has(val)) : [])
             ];
-    
+
             children.forEach(childId => collectDependencies(childId, visited));
         };
-    
+        
         resources.forEach(res => {
             (res.formalization?.elements || []).filter(el => el.isGlobal).forEach(el => collectDependencies(el.id, new Set()));
             (res.formalization?.components || []).filter(c => c.isGlobal).forEach(c => collectDependencies(c.id, new Set()));
         });
         
-        // Pass 3: Populate global maps
+        // Pass 3: Populate global maps with full definitions
         globalIds.forEach(id => {
             const item = allDefinitions.get(id);
             if (item) {
@@ -829,8 +831,8 @@ function FormalizationPageContent() {
                 else if (item.type === 'component') globalItems.components.set(id, item);
             }
         });
-    
-        // Pass 4: Merge local data
+
+        // Pass 4: Merge local data with global data
         const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
         
         const combined = {
@@ -838,11 +840,11 @@ function FormalizationPageContent() {
             operations: new Map(globalItems.operations),
             components: new Map(globalItems.components),
         };
-    
+
         (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
         (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
         (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
-    
+        
         return {
             elements: Array.from(combined.elements.values()),
             operations: Array.from(combined.operations.values()),
@@ -1024,7 +1026,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-72 pr-1">
+                    <ScrollArea className="pr-1">
                         <div className="space-y-2 p-4 pt-0">
                             {filteredData.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
