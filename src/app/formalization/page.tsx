@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -872,13 +873,38 @@ function FormalizationPageContent() {
         globalItems.elements.forEach((item, id) => displayItems.elements.set(id, item));
         globalItems.operations.forEach((item, id) => displayItems.operations.set(id, item));
         globalItems.components.forEach((item, id) => displayItems.components.set(id, item));
+        
+        // --- NEW LOGIC ---
+        // Find all component IDs that are used as property values in any element being displayed.
+        const linkedAsPropertyIds = new Set<string>();
+        displayItems.elements.forEach(element => {
+          if (element.properties) {
+            Object.values(element.properties).forEach(value => {
+              if (typeof value === 'string' && value.startsWith('item_')) { // Assuming component IDs start with 'item_'
+                const comp = fullFormalizationData.components.find(c => c.id === value);
+                if (comp) {
+                    linkedAsPropertyIds.add(comp.id);
+                }
+              }
+            });
+          }
+        });
+
+        // Filter out components that are linked as properties, unless they are part of the local resource's own components.
+        const localComponentIds = new Set(localItems.components.map(c => c.id));
+        const filteredComponents = Array.from(displayItems.components.values()).filter(comp => {
+            if (linkedAsPropertyIds.has(comp.id)) {
+                return localComponentIds.has(comp.id);
+            }
+            return true;
+        });
 
         return {
             elements: Array.from(displayItems.elements.values()),
             operations: Array.from(displayItems.operations.values()),
-            components: Array.from(displayItems.components.values()),
+            components: filteredComponents,
         };
-    }, [selectedResource, resources]);
+    }, [selectedResource, resources, fullFormalizationData]);
 
 
     const renderSelectedResource = () => {
