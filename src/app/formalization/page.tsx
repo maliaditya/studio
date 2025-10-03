@@ -844,6 +844,18 @@ function FormalizationPageContent() {
         };
     }, [selectedResource, resources]);
 
+    const allDefinitionsMap = useMemo(() => {
+        const map = new Map<string, any>();
+        resources.forEach(res => {
+            if (res.formalization) {
+                res.formalization.elements?.forEach(item => map.set(item.id, { ...item, _type: 'element' }));
+                res.formalization.operations?.forEach(item => map.set(item.id, { ...item, _type: 'operation' }));
+                res.formalization.components?.forEach(item => map.set(item.id, { ...item, _type: 'component' }));
+            }
+        });
+        return map;
+    }, [resources]);
+
     const itemsToDisplay = useMemo(() => {
         const localItems = isResource(selectedResource) && selectedResource.formalization ? {
             elements: selectedResource.formalization.elements || [],
@@ -877,32 +889,29 @@ function FormalizationPageContent() {
         const encapsulatedIds = new Set<string>();
         const queue: string[] = [];
 
-        // 1. Find all components used as properties
-        fullFormalizationData.elements.forEach(element => {
+        // 1. Find all components used as properties in ANY element from ANY resource
+        resources.forEach(res => {
+          (res.formalization?.elements || []).forEach(element => {
             if (element.properties) {
                 Object.values(element.properties).forEach(value => {
-                    if (typeof value === 'string' && value.startsWith('item_')) {
+                    const itemDef = allDefinitionsMap.get(value);
+                    if (itemDef && itemDef._type === 'component') {
                         queue.push(value);
                         encapsulatedIds.add(value);
                     }
                 });
             }
+          });
         });
     
-        // 2. Traverse and find all children
-        const allItemsMap = new Map([
-            ...fullFormalizationData.components.map(i => [i.id, i]),
-            ...fullFormalizationData.elements.map(i => [i.id, i]),
-            ...fullFormalizationData.operations.map(i => [i.id, i]),
-        ]);
-
+        // 2. Traverse and find all children of these encapsulated components
         const visited = new Set<string>();
         while(queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
 
-            const item = allItemsMap.get(currentId);
+            const item = allDefinitionsMap.get(currentId);
             if (!item) continue;
 
             const children = [
@@ -911,7 +920,7 @@ function FormalizationPageContent() {
                 ...(item.linkedOperationIds || []),
             ];
 
-            children.forEach(childId => {
+            children.forEach((childId: string) => {
                 if (!encapsulatedIds.has(childId)) {
                     encapsulatedIds.add(childId);
                     queue.push(childId);
@@ -931,7 +940,7 @@ function FormalizationPageContent() {
             operations: Array.from(displayItems.operations.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
             components: Array.from(displayItems.components.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
         };
-    }, [selectedResource, resources, fullFormalizationData]);
+    }, [selectedResource, resources, allDefinitionsMap]);
 
 
     const renderSelectedResource = () => {
@@ -1258,3 +1267,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
