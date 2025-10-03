@@ -300,7 +300,7 @@ export interface GapAnalysis {
 export interface FormalizationItem {
     id: string;
     text: string;
-    properties?: Record<string, any>;
+    properties?: Record<string, string>;
     linkedElementIds?: string[];
 }
 
@@ -822,3 +822,4 @@ export interface DailyLearningLog {
     date: string;
     completedResourceIds: string[];
 }
+

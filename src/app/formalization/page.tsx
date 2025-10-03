@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -158,7 +159,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     useEffect(() => {
       if (item) {
         setText(item.text);
-        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `prop-${item.id}-${i}`, key, value })) : []);
+        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `prop-${item.id}-${i}-${Math.random()}`, key, value })) : []);
         setLinkedElementIds(item.linkedElementIds || []);
       }
     }, [item]);
@@ -184,7 +185,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     };
     
     const handleAddProperty = () => {
-        setProperties(prev => [...prev, { id: `prop_${Date.now()}`, key: '', value: '' }]);
+        setProperties(prev => [...prev, { id: `prop_${Date.now()}_${Math.random()}`, key: '', value: '' }]);
     };
 
     const handleDeleteProperty = (idToDelete: string) => {
@@ -216,7 +217,23 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 {properties.map((prop) => (
                                     <div key={prop.id} className="flex items-center gap-2">
                                         <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                        <Input value={prop.value} onChange={(e) => handlePropertyChange(prop.id, 'value', e.target.value)} placeholder="Value"/>
+                                        <Select onValueChange={(val) => handlePropertyChange(prop.id, 'value', val)} defaultValue={prop.value}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Value or Link Pattern..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <Input
+                                                  className="m-2 w-[calc(100%-1rem)]"
+                                                  placeholder="Type a value..."
+                                                  defaultValue={prop.value}
+                                                  onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                />
+                                                <SelectItem value="">-- Clear --</SelectItem>
+                                                {(formalizationData?.patterns || []).map(p => (
+                                                  <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                     </div>
                                 ))}
@@ -432,8 +449,6 @@ function FormalizationPageContent() {
                 ...p,
                 linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
             }));
-        } else if (type === 'operations') {
-            // No action needed as patterns link to elements now.
         }
         
         updateResourceFormalization(selectedResource.id, finalFormalization);
@@ -502,7 +517,7 @@ function FormalizationPageContent() {
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
                         </div>
                     ) : null }
                     <CardHeader>
@@ -581,7 +596,7 @@ function FormalizationPageContent() {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
         const data = formalizationData?.[type] || [];
         
-        const reverseLinks = useMemo(() => {
+        const reverseElementLinks = useMemo(() => {
             if (!formalizationData) return new Map();
             const map = new Map<string, {name: string, type: 'operation' | 'pattern'}[]>();
 
@@ -612,7 +627,7 @@ function FormalizationPageContent() {
                         <div className="space-y-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                const usedIn = type === 'elements' ? (reverseLinks.get(item.id) || []) : [];
+                                const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []) : [];
                                 
                                 return (
                                 <Card key={item.id} className="group relative">
@@ -620,11 +635,19 @@ function FormalizationPageContent() {
                                         <p className="font-semibold">{item.text}</p>
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
-                                                {Object.entries(item.properties).map(([key, value]) => (
-                                                    <div key={key}>
-                                                        <span className="font-medium text-foreground">{key}:</span> {String(value)}
-                                                    </div>
-                                                ))}
+                                                {Object.entries(item.properties).map(([key, value]) => {
+                                                    const pattern = formalizationData?.patterns?.find(p => p.id === value);
+                                                    return (
+                                                        <div key={key} className="flex items-center gap-2">
+                                                            <span className="font-medium text-foreground">{key}:</span>
+                                                            {pattern ? (
+                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{pattern.text}</Badge>
+                                                            ) : (
+                                                                String(value)
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                         {(type === 'operations' || type === 'patterns') && linkedElements.length > 0 && (
@@ -724,3 +747,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
