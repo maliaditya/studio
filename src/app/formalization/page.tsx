@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -669,7 +670,7 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-64">
+                    <ScrollArea>
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
@@ -815,3 +816,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
+    
