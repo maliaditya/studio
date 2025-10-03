@@ -651,12 +651,12 @@ function FormalizationPageContent() {
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                 {Object.entries(item.properties).map(([key, value]) => {
-                                                    const pattern = formalizationData?.components?.find(p => p.id === value);
+                                                    const component = formalizationData?.components?.find(p => p.id === value);
                                                     return (
                                                         <div key={key} className="flex items-center gap-2">
                                                             <span className="font-medium text-foreground">{key}:</span>
-                                                            {pattern ? (
-                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{pattern.text}</Badge>
+                                                            {component ? (
+                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
                                                             ) : (
                                                                 String(value)
                                                             )}
@@ -675,7 +675,7 @@ function FormalizationPageContent() {
                                         )}
                                         {type === 'elements' && usedIn.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Used In:</h5>
+                                                <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
                                                  <div className="flex flex-wrap gap-1 mt-1">
                                                     {usedIn.map((use, i) => <Badge key={i} variant={use.type === 'operation' ? 'outline' : 'default'}>{use.name}</Badge>)}
                                                 </div>
@@ -761,6 +761,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
