@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -227,7 +227,8 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     
     const availableComponents = useMemo(() => {
         if (!formalizationData?.components) return [];
-        return formalizationData.components.filter(c => c.id !== item?.id);
+        const linkedComponentOfParent = item && 'linkedComponentIds' in item ? item.linkedComponentIds || [] : [];
+        return formalizationData.components.filter(c => c.id !== item?.id && !linkedComponentOfParent.includes(c.id));
     }, [formalizationData, item]);
 
 
@@ -700,7 +701,12 @@ function FormalizationPageContent() {
             const imageEmbedUrl = isImageUrl(selectedResource.link) ? selectedResource.link : null;
 
             return (
-                <Card className="h-full flex flex-col">
+                <Card className="h-full flex flex-col relative group">
+                    <div className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => openGeneralPopup(selectedResource.id, e)}>
+                        <Expand className="h-4 w-4" />
+                      </Button>
+                    </div>
                     {(audioSrc || youtubeEmbedUrl) && (
                         <div className="p-3 border-b">
                             <div className="flex items-center gap-2">
@@ -795,9 +801,6 @@ function FormalizationPageContent() {
                             {selectedResource.description && selectedResource.type !== 'card' && <p className="text-sm text-muted-foreground">{selectedResource.description}</p>}
                          </ScrollArea>
                     </CardContent>
-                     <CardFooter>
-                        <Button onClick={handleSave} disabled={!isResource(selectedResource)}>Save Formalization</Button>
-                    </CardFooter>
                 </Card>
             );
         }
