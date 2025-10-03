@@ -227,8 +227,8 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     }
     
     const availableComponents = useMemo(() => {
-        return formalizationData?.components || [];
-    }, [formalizationData]);
+        return (formalizationData?.components || []).filter(c => c.id !== item?.id);
+    }, [formalizationData, item]);
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -295,7 +295,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Label>Link Components</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
                                 <div className="space-y-1">
-                                    {availableComponents.filter(c => c.id !== item?.id).map(comp => (
+                                    {availableComponents.map(comp => (
                                         <div key={comp.id} className="flex items-center space-x-2">
                                             <Checkbox id={`comp-${comp.id}`} checked={linkedComponentIds.includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
                                             <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
@@ -787,38 +787,40 @@ function FormalizationPageContent() {
         }, [formalizationData]);
 
         const hiddenIds = useMemo(() => {
-            if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
-            
             const hiddenComponentIds = new Set<string>();
-            (formalizationData.elements || []).forEach(el => {
-                if (el.properties) {
-                    Object.values(el.properties).forEach(val => {
-                        if (formalizationData.components?.some(c => c.id === val)) {
-                            hiddenComponentIds.add(val);
+            if (formalizationData?.elements) {
+                for (const el of formalizationData.elements) {
+                    if (el.properties) {
+                        for (const propVal of Object.values(el.properties)) {
+                            if (formalizationData.components?.some(c => c.id === propVal)) {
+                                hiddenComponentIds.add(propVal);
+                            }
                         }
-                    });
+                    }
                 }
-            });
-    
+            }
+
             const hiddenElementIds = new Set<string>();
             hiddenComponentIds.forEach(compId => {
-                const component = formalizationData.components?.find(c => c.id === compId);
-                (component?.linkedElementIds || []).forEach(elId => hiddenElementIds.add(elId));
+                const component = formalizationData?.components?.find(c => c.id === compId);
+                if (component?.linkedElementIds) {
+                    component.linkedElementIds.forEach(elId => hiddenElementIds.add(elId));
+                }
             });
-    
+
             const hiddenOperationIds = new Set<string>();
             hiddenElementIds.forEach(elId => {
-                (formalizationData.operations || []).forEach(op => {
+                formalizationData?.operations?.forEach(op => {
                     if (op.linkedElementIds?.includes(elId)) {
                         hiddenOperationIds.add(op.id);
                     }
                 });
             });
-    
+
             return {
                 components: hiddenComponentIds,
                 elements: hiddenElementIds,
-                operations: hiddenOperationIds
+                operations: hiddenOperationIds,
             };
         }, [formalizationData]);
 
