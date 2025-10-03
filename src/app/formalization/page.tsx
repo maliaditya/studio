@@ -156,6 +156,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     const [text, setText] = useState('');
     const [properties, setProperties] = useState<PropertyItem[]>([]);
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
+    const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
     
     useEffect(() => {
       if (item) {
@@ -169,6 +170,11 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
             setLinkedElementIds(item.linkedElementIds || []);
         } else {
             setLinkedElementIds([]);
+        }
+        if (type === 'components') {
+            setLinkedComponentIds(item.linkedComponentIds || []);
+        } else {
+            setLinkedComponentIds([]);
         }
       }
     }, [item, type]);
@@ -184,6 +190,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                 return acc;
             }, {} as Record<string, any>) : undefined,
             linkedElementIds: (type === 'operations' || type === 'components') ? linkedElementIds : undefined,
+            linkedComponentIds: type === 'components' ? linkedComponentIds : undefined,
         };
         
         onSave(updatedItem);
@@ -201,8 +208,12 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         setProperties(prev => prev.filter(p => p.id !== idToDelete));
     };
     
-    const handleLinkToggle = (id: string) => {
-        setLinkedElementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    const handleLinkToggle = (id: string, linkType: 'element' | 'component') => {
+        if (linkType === 'element') {
+            setLinkedElementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+        } else {
+            setLinkedComponentIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+        }
     };
 
     const handleSelectChange = (propId: string, value: string) => {
@@ -217,8 +228,9 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     
     const availableComponents = useMemo(() => {
         if (!formalizationData?.components) return [];
-        return formalizationData.components;
-    }, [formalizationData]);
+        // When editing a component, don't show it in its own list of linkable components
+        return formalizationData.components.filter(c => c.id !== item?.id);
+    }, [formalizationData, item]);
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -272,8 +284,23 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 <div className="space-y-1">
                                     {(formalizationData?.elements || []).map(el => (
                                         <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
+                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
                                             <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                    {type === 'components' && (
+                        <div className="space-y-2">
+                            <Label>Link Components</Label>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                <div className="space-y-1">
+                                    {availableComponents.map(comp => (
+                                        <div key={comp.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`comp-${comp.id}`} checked={linkedComponentIds.includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
+                                            <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
                                         </div>
                                     ))}
                                 </div>
@@ -506,6 +533,7 @@ function FormalizationPageContent() {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
         if (type === 'operations' || type === 'components') newItem.linkedElementIds = [];
+        if (type === 'components') newItem.linkedComponentIds = [];
         
         const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         const updatedItems = [...(currentFormalization[type] || []), newItem];
@@ -543,6 +571,23 @@ function FormalizationPageContent() {
              finalFormalization.components = (finalFormalization.components || []).map(p => ({
                 ...p,
                 linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
+            }));
+        } else if (type === 'components') {
+            // Also remove this component from properties of elements and from linkedComponentIds of other components
+            finalFormalization.elements = (finalFormalization.elements || []).map(el => {
+                const newProps = { ...el.properties };
+                let changed = false;
+                Object.entries(newProps).forEach(([key, value]) => {
+                    if (value === id) {
+                        delete newProps[key];
+                        changed = true;
+                    }
+                });
+                return changed ? { ...el, properties: newProps } : el;
+            });
+            finalFormalization.components = (finalFormalization.components || []).map(comp => ({
+                ...comp,
+                linkedComponentIds: (comp.linkedComponentIds || []).filter(cId => cId !== id)
             }));
         }
         
@@ -696,45 +741,7 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
-        let data;
-        if (!formalizationData) {
-            data = [];
-        } else {
-            const allComponents = formalizationData?.components || [];
-            const linkedComponentIds = new Set<string>(
-                (formalizationData.elements || []).flatMap(el => 
-                    Object.values(el.properties || {})
-                )
-            );
-            
-            const elementsInLinkedComponents = new Set<string>(
-                allComponents
-                    .filter(comp => linkedComponentIds.has(comp.id))
-                    .flatMap(comp => comp.linkedElementIds || [])
-            );
-
-            const operationsForHiddenElements = new Set<string>(
-                (formalizationData.operations || [])
-                    .filter(op => 
-                        (op.linkedElementIds || []).some(elId => elementsInLinkedComponents.has(elId))
-                    )
-                    .map(op => op.id)
-            );
-
-            switch (type) {
-                case 'components':
-                    data = allComponents.filter(comp => !linkedComponentIds.has(comp.id));
-                    break;
-                case 'elements':
-                    data = (formalizationData.elements || []).filter(el => !elementsInLinkedComponents.has(el.id));
-                    break;
-                case 'operations':
-                    data = (formalizationData.operations || []).filter(op => !operationsForHiddenElements.has(op.id));
-                    break;
-                default:
-                    data = [];
-            }
-        }
+        const data = formalizationData ? (formalizationData[type] || []) : [];
         
         const reverseElementLinks = useMemo(() => {
             if (!formalizationData) return new Map();
@@ -755,6 +762,32 @@ function FormalizationPageContent() {
             });
             return map;
         }, [formalizationData]);
+        
+        const reverseComponentLinks = useMemo(() => {
+            if (!formalizationData) return new Map();
+            const map = new Map<string, {name: string, type: 'component' | 'element_property'}[]>();
+
+            // Find where components are linked in other components
+            (formalizationData.components || []).forEach(parentComp => {
+                (parentComp.linkedComponentIds || []).forEach(childCompId => {
+                    if (!map.has(childCompId)) map.set(childCompId, []);
+                    map.get(childCompId)!.push({ name: parentComp.text, type: 'component' });
+                });
+            });
+            
+            // Find where components are used as properties in elements
+            (formalizationData.elements || []).forEach(el => {
+                if (el.properties) {
+                    Object.values(el.properties).forEach(propValue => {
+                        if (map.has(propValue)) { // if this prop value is a component ID
+                            map.get(propValue)!.push({ name: el.text, type: 'element_property' });
+                        }
+                    });
+                }
+            });
+
+            return map;
+        }, [formalizationData]);
 
         return (
             <Card>
@@ -772,7 +805,9 @@ function FormalizationPageContent() {
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []).map(link => link.name) : [];
+                                const linkedComponents = (item.linkedComponentIds || []).map(id => formalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
+                                const usedInElements = type === 'elements' ? (reverseElementLinks.get(item.id) || []).map(link => link.name) : [];
+                                const usedInComponents = type === 'components' ? (reverseComponentLinks.get(item.id) || []) : [];
                                 
                                 return (
                                 <Card key={item.id} className="group relative">
@@ -801,7 +836,7 @@ function FormalizationPageContent() {
                                                 })}
                                             </div>
                                         )}
-                                        {type === 'operations' && linkedElements.length > 0 && (
+                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -809,19 +844,27 @@ function FormalizationPageContent() {
                                                 </div>
                                             </div>
                                         )}
-                                        {type === 'components' && linkedElements.length > 0 && (
+                                        {type === 'components' && linkedComponents.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                                <h5 className="font-medium text-xs text-muted-foreground">Components:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                    {linkedComponents.map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
                                                 </div>
                                             </div>
                                         )}
-                                        {type === 'elements' && usedIn.length > 0 && (
+                                        {type === 'elements' && usedInElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
                                                  <div className="flex flex-wrap gap-1 mt-1">
-                                                    {usedIn.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
+                                                    {usedInElements.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                         {type === 'components' && usedInComponents.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Used In:</h5>
+                                                 <div className="flex flex-wrap gap-1 mt-1">
+                                                    {usedInComponents.map((link, i) => <Badge key={i} variant="default" className={link.type === 'element_property' ? 'bg-blue-100 text-blue-800' : ''}>{link.name}</Badge>)}
                                                 </div>
                                             </div>
                                         )}
@@ -931,5 +974,6 @@ export default function FormalizationPage() {
     
 
     
+
 
 

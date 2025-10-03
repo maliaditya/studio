@@ -302,12 +302,13 @@ export interface FormalizationItem {
     text: string;
     properties?: Record<string, string>;
     linkedElementIds?: string[];
+    linkedComponentIds?: string[];
 }
 
 export interface FormalizationData {
   elements: FormalizationItem[];
   operations: FormalizationItem[];
-  patterns: FormalizationItem[];
+  components: FormalizationItem[];
 }
 
 export interface ResourcePoint {
@@ -822,4 +823,5 @@ export interface DailyLearningLog {
     date: string;
     completedResourceIds: string[];
 }
+
 
