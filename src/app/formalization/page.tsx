@@ -949,7 +949,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-72">
+                    <ScrollArea>
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => formalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
