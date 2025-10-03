@@ -159,8 +159,6 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
     const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
     const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
-    const audioWasPlayingBeforeModal = useRef(false);
-    const audioTimeBeforeModal = useRef(0);
     
     useEffect(() => {
       if (item) {
@@ -534,8 +532,6 @@ function FormalizationPageContent() {
     const [collapsedCuriosities, setCollapsedCuriosities] = useState<Set<string>>(new Set());
 
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'components'} | null>(null);
-    const audioWasPlayingBeforeModal = useRef(false);
-    const audioTimeBeforeModal = useRef(0);
 
     const [playingAudio, setPlayingAudio] = useState(false);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -572,19 +568,9 @@ function FormalizationPageContent() {
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
     
     useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-    
         if (editingItem && playingAudio) {
-            audioWasPlayingBeforeModal.current = true;
-            audioTimeBeforeModal.current = audio.currentTime;
-            audio.pause();
+            audioRef.current?.pause();
             setPlayingAudio(false);
-        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
-            audio.currentTime = audioTimeBeforeModal.current;
-            audio.play().catch(e => console.error("Audio resume failed:", e));
-            setPlayingAudio(true);
-            audioWasPlayingBeforeModal.current = false;
         }
     }, [editingItem, playingAudio]);
     
@@ -861,16 +847,27 @@ function FormalizationPageContent() {
         const allVisibleElements = Array.from(combinedElementsMap.values());
         
         const allOpsMap = new Map<string, FormalizationItem>();
-        const allCompsMap = new Map<string, FormalizationItem>();
         specResources.forEach(r => {
             (r.formalization?.operations || []).forEach(op => allOpsMap.set(op.id, op));
-            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
         });
 
+        // Show all operations from the selected resource, plus any linked from visible elements.
+        const visibleOperationsSet = new Set<FormalizationItem>();
+        (localData?.operations || []).forEach(op => visibleOperationsSet.add(op));
         const allLinkedOpIds = new Set(allVisibleElements.flatMap(el => el.linkedOperationIds || []));
-        const visibleOperations = Array.from(allLinkedOpIds).map(id => allOpsMap.get(id)).filter((op): op is FormalizationItem => !!op);
+        allLinkedOpIds.forEach(id => {
+            const op = allOpsMap.get(id);
+            if (op) {
+                visibleOperationsSet.add(op);
+            }
+        });
         
         const visibleComponents = [...(localData?.components || [])];
+        const allCompsMap = new Map<string, FormalizationItem>();
+        specResources.forEach(r => {
+            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
+        });
+        
         const allLinkedComponentIdsAsProps = new Set(allVisibleElements.flatMap(el => Object.values(el.properties || {})));
         
         const recursivelyFindLinkedComponents = (componentId: string, visited: Set<string> = new Set()): FormalizationItem[] => {
@@ -896,18 +893,16 @@ function FormalizationPageContent() {
         });
         
         Array.from(allLinkedComponentIdsAsProps).forEach(compId => {
-            if (!visibleComponents.some(c => c.id === compId)) {
-                recursivelyFindLinkedComponents(compId).forEach(c => {
-                    if (!visibleComponents.some(vc => vc.id === c.id)) {
-                        visibleComponents.push(c);
-                    }
-                });
-            }
+            recursivelyFindLinkedComponents(compId).forEach(c => {
+                if (!visibleComponents.some(vc => vc.id === c.id)) {
+                    visibleComponents.push(c);
+                }
+            });
         });
 
         return {
             elements: allVisibleElements,
-            operations: visibleOperations,
+            operations: Array.from(visibleOperationsSet),
             components: [...new Map(visibleComponents.map(item => [item.id, item])).values()],
         };
     }, [selectedFormalizationSpecId, selectedResource, getSpecResources, resources]);
@@ -952,9 +947,11 @@ function FormalizationPageContent() {
 
     const itemsToDisplay = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
-        const allElementsInSpec = specResources.flatMap(r => r.formalization?.elements || []);
+        if (!specResources) return { elements: [], operations: [], components: [] };
         
-        // Find all components used as properties in any element.
+        const allElementsInSpec = specResources.flatMap(r => r.formalization?.elements || []);
+        const allComponentsInSpec = specResources.flatMap(r => r.formalization?.components || []);
+
         const encapsulatedComponentIds = new Set<string>();
         allElementsInSpec.forEach(el => {
             if (el.properties) {
@@ -965,10 +962,9 @@ function FormalizationPageContent() {
                 });
             }
         });
-
-        // Recursively find all children of these encapsulated components.
+        
         const allEncapsulatedItemIds = new Set<string>();
-        const allCompsMap = new Map(specResources.flatMap(r => r.formalization?.components || []).map(c => [c.id, c]));
+        const allCompsMap = new Map(allComponentsInSpec.map(c => [c.id, c]));
 
         const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
@@ -987,33 +983,22 @@ function FormalizationPageContent() {
             }
         }
 
-        const allElementsMap = new Map(specResources.flatMap(r => r.formalization?.elements || []).map(el => [el.id, el]));
+        const allElementsMap = new Map(allElementsInSpec.map(el => [el.id, el]));
         allElementsInSpec.forEach(el => {
             if (allEncapsulatedItemIds.has(el.id)) {
                 (el.linkedOperationIds || []).forEach(opId => allEncapsulatedItemIds.add(opId));
             }
         });
-
-        let visibleElements = fullFormalizationData.elements;
-        let visibleOperations = fullFormalizationData.operations;
-        let visibleComponents = fullFormalizationData.components;
-
-        if (hideLinked.elements) {
-            visibleElements = visibleElements.filter(item => !allEncapsulatedItemIds.has(item.id));
-        }
-        if (hideLinked.operations) {
-            visibleOperations = visibleOperations.filter(item => !allEncapsulatedItemIds.has(item.id));
-        }
-        if (hideLinked.components) {
-            visibleComponents = visibleComponents.filter(item => !allEncapsulatedItemIds.has(item.id));
-        }
+        
+        const isSelectedResourceGlobal = (isResource(selectedResource) && selectedResource) ? 
+            (selectedResource.formalization?.elements || []).some(el => el.isGlobal) : false;
 
         return {
-            elements: visibleElements,
-            operations: visibleOperations,
-            components: visibleComponents,
+            elements: fullFormalizationData.elements.filter(item => hideLinked.elements ? !allEncapsulatedItemIds.has(item.id) : true),
+            operations: fullFormalizationData.operations.filter(item => hideLinked.operations ? !allEncapsulatedItemIds.has(item.id) : true),
+            components: fullFormalizationData.components.filter(item => hideLinked.components ? !allEncapsulatedItemIds.has(item.id) : true),
         };
-    }, [fullFormalizationData, hideLinked, getSpecResources, selectedFormalizationSpecId]);
+    }, [fullFormalizationData, hideLinked, selectedFormalizationSpecId, getSpecResources, selectedResource]);
     
     const handleToggleCollapseAll = () => {
         const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
@@ -1378,3 +1363,6 @@ export default function FormalizationPage() {
 
 
 
+
+
+    
