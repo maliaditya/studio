@@ -1029,7 +1029,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="max-h-72 overflow-y-auto">
+                    <div className="h-96 overflow-y-auto">
                         <div className="space-y-2 p-4 pt-0">
                             {data.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -1199,5 +1199,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
