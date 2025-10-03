@@ -638,7 +638,7 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-64">
+                    <ScrollArea>
                         <div className="space-y-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
@@ -761,6 +761,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
