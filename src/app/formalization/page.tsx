@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -671,7 +669,7 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea>
+                    <ScrollArea className="h-64">
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
@@ -796,14 +794,16 @@ function FormalizationPageContent() {
                     onSave={handleUpdateItem}
                 />
             )}
-            {isMindMapModalOpen && (
-                <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-                  <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-                    <DialogHeader className="sr-only"><DialogTitle>Mind Map</DialogTitle></DialogHeader>
-                    <MindMapViewer showControls={false} rootId={mindMapRootId} />
-                  </DialogContent>
-                </Dialog>
-            )}
+            <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+              <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogHeader className="p-4 border-b">
+                  <DialogTitle>Mind Map</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                  <MindMapViewer showControls={false} rootId={mindMapRootId} />
+                </div>
+              </DialogContent>
+            </Dialog>
         </>
     );
 }
