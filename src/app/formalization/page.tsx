@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -784,6 +783,7 @@ function FormalizationPageContent() {
                                         const newTime = parseFloat(e.target.value);
                                         setCurrentTime(newTime);
                                         if (audioRef.current) audioRef.current.currentTime = newTime;
+                                        if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
                                     }}
                                     className="w-full"
                                 />
@@ -881,13 +881,21 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const specFormalizationData = useMemo(() => {
             const globalElements: FormalizationItem[] = [];
+            const globalComponents: FormalizationItem[] = [];
+            
             resources.forEach(res => {
-                if (res.formalization && res.formalization.elements) {
-                    globalElements.push(...res.formalization.elements.filter(el => el.isGlobal));
+                if (res.formalization) {
+                    if (res.formalization.elements) {
+                        globalElements.push(...res.formalization.elements.filter(el => el.isGlobal));
+                    }
+                    if (res.formalization.components) {
+                        globalComponents.push(...res.formalization.components.filter(c => c.isGlobal));
+                    }
                 }
             });
             return {
                 elements: globalElements.filter((el, index, self) => index === self.findIndex(t => t.id === el.id)), // Unique global elements
+                components: globalComponents.filter((c, index, self) => index === self.findIndex(t => t.id === c.id)), // Unique global components
             };
         }, [resources]);
     
@@ -897,20 +905,18 @@ function FormalizationPageContent() {
             const hiddenComponentIds = new Set<string>();
             if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
             
-            formalizationData.elements?.forEach(el => {
-              if (el.properties) {
-                Object.values(el.properties).forEach(val => {
-                  if (formalizationData.components?.some(c => c.id === val)) {
-                    hiddenComponentIds.add(val);
-                  }
-                });
-              }
+            const allComponents = [...(formalizationData.components || []), ...specFormalizationData.components];
+
+            allComponents.forEach(comp => {
+                if(comp.linkedComponentIds) {
+                    comp.linkedComponentIds.forEach(childId => hiddenComponentIds.add(childId));
+                }
             });
 
             const findChildren = (compId: string, visited: Set<string>) => {
               if (visited.has(compId)) return;
               visited.add(compId);
-              const comp = formalizationData.components?.find(c => c.id === compId);
+              const comp = allComponents.find(c => c.id === compId);
               if (comp?.linkedComponentIds) {
                 comp.linkedComponentIds.forEach(childId => {
                   hiddenComponentIds.add(childId);
@@ -924,7 +930,7 @@ function FormalizationPageContent() {
         
             const hiddenElementIds = new Set<string>();
             hiddenComponentIds.forEach(compId => {
-                const component = formalizationData.components?.find(c => c.id === compId);
+                const component = allComponents.find(c => c.id === compId);
                 if (component?.linkedElementIds) {
                     component.linkedElementIds.forEach(elId => hiddenElementIds.add(elId));
                 }
@@ -932,7 +938,8 @@ function FormalizationPageContent() {
         
             const hiddenOperationIds = new Set<string>();
             if (type === 'operations') {
-                formalizationData.elements?.forEach(el => {
+                 const allElements = [...(formalizationData.elements || []), ...specFormalizationData.elements];
+                allElements.forEach(el => {
                     if(hiddenElementIds.has(el.id)) {
                         (el.linkedOperationIds || []).forEach(opId => hiddenOperationIds.add(opId));
                     }
@@ -944,7 +951,7 @@ function FormalizationPageContent() {
                 elements: hiddenElementIds,
                 operations: hiddenOperationIds,
             };
-        }, [formalizationData, type]);
+        }, [formalizationData, type, specFormalizationData]);
         
         let data: FormalizationItem[] = [];
         if (formalizationData) {
@@ -953,6 +960,10 @@ function FormalizationPageContent() {
                 sourceData = [...sourceData, ...specFormalizationData.elements];
                 sourceData = sourceData.filter((el, index, self) => index === self.findIndex(t => t.id === el.id));
             }
+             if (type === 'components') {
+                sourceData = [...sourceData, ...specFormalizationData.components];
+                sourceData = sourceData.filter((c, index, self) => index === self.findIndex(t => t.id === c.id));
+            }
             if (hideLinked[type]) {
                 data = sourceData.filter(item => !hiddenIds[type].has(item.id));
             } else {
@@ -960,11 +971,13 @@ function FormalizationPageContent() {
             }
         } else if (type === 'elements') {
             data = specFormalizationData.elements;
+        } else if (type === 'components') {
+            data = specFormalizationData.components;
         }
         
         return (
             <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-row items-center justify-between p-4">
                     <div>
                         <CardTitle className="capitalize">{title}</CardTitle>
                         <CardDescription className="text-xs">{description}</CardDescription>
@@ -978,25 +991,25 @@ function FormalizationPageContent() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent>
-                    <ScrollArea>
-                        <div className="space-y-2 pr-2">
+                <CardContent className="p-0">
+                    <ScrollArea className="h-72">
+                        <div className="space-y-2 p-4 pt-0">
                             {data.map(item => {
-                                const linkedOperations = (item.linkedOperationIds || []).map(id => formalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
-                                const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                const linkedComponents = (item.linkedComponentIds || []).map(id => formalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
+                                const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
+                                const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
                                 
                                 return (
                                 <Card key={item.id} className="group relative">
                                     <CardContent className="p-3 text-sm">
                                         <div className="flex items-center justify-between">
-                                            <p className="font-semibold">{item.text}</p>
+                                            <button className="font-semibold text-left w-full" onClick={() => type === 'components' && setDetailPopupComponentId(item.id)}>{item.text}</button>
                                             {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
                                         </div>
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                 {Object.entries(item.properties).map(([key, value]) => {
-                                                    const component = formalizationData?.components?.find(p => p.id === value);
+                                                    const component = fullFormalizationData?.components?.find(p => p.id === value);
                                                     return (
                                                         <div key={key} className="flex items-center gap-2">
                                                             <span className="font-medium text-foreground">{key}:</span>
@@ -1056,7 +1069,7 @@ function FormalizationPageContent() {
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </Card>
-                            )})}
+                            })}
                         </div>
                     </ScrollArea>
                 </CardContent>
@@ -1148,3 +1161,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
+    
