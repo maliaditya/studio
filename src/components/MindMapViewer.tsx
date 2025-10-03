@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { GitBranch, BookCopy, GitMerge, ZoomIn, ZoomOut, Expand, Shrink, RefreshCw, Briefcase, Share2, Package, Globe, ArrowRight, ArrowLeft, Linkedin, Youtube, Rocket, Workflow, Calendar, Check, AlertTriangle, ArrowDown, HeartPulse, LayoutDashboard, Magnet, Activity as ActivityIcon, PlusCircle, Link as LinkIcon, Save, MinusCircle, Folder, ExternalLink, Lightbulb, Focus, Frame, Flashlight, Flag, Bolt, Library } from 'lucide-react';
-import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType, DailySchedule } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
+import type { ExerciseDefinition, Release, DatedWorkout, ActivityType as ActivityTypeType, Resource, ResourceFolder as ResourceFolderType, DailySchedule, Pattern, MetaRule } from '@/types/workout'; // Renaming imported ActivityType to avoid conflict with lucide-react
 import { TransformWrapper, TransformComponent, type ReactZoomPanPinchRef, useControls } from 'react-zoom-pan-pinch';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -230,7 +230,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
             const childIds = [
-                ...(definition.linkedDeepWorkIds || []), 
+                ...(definition.linkedDeepWorkIds || []),
                 ...(definition.linkedUpskillIds || []),
                 ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
                 ...((definition as Pattern).linkedElementIds || []),
@@ -269,6 +269,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         setNodes(new Map([[rootId, { x: centerX, y: centerY }]]));
         setEdges(new Set());
+        // Auto-expand when a single element is viewed.
+        setTimeout(() => setIsAutoExpanding(true), 100);
     }, [rootId]);
 
     const handleExpandAll = useCallback(() => {
@@ -1217,16 +1219,9 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
 
     const isExpandable = node.children.length > 0;
     
-    const { openGeneralPopup } = useAuth();
-    const handleNodeClick = (e: React.MouseEvent) => {
-        if (node.type === 'card' || node.type === 'link') {
-            openGeneralPopup(node.id, e);
-        } else if (node.category === 'FocusArea') {
-            const isParent = (node.linkedDeepWorkIds?.length ?? 0) > 0 || (node.linkedUpskillIds?.length ?? 0) > 0 || (node.linkedResourceIds?.length ?? 0) > 0;
-            const isChild = linkedDeepWorkChildIds.has(node.id);
-            if (isParent && !isChild) {
-                openIntentionPopup(node.id);
-            }
+    const handleClick = (e: React.MouseEvent) => {
+        if (node.category === 'FocusArea') {
+            openIntentionPopup(node.id);
         }
     }
     const isUpskillNode = upskillDefinitions.some(d => d.id === node.definitionId);
@@ -1236,7 +1231,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     return (
         <div key={node.id} className="flex items-center" onMouseEnter={() => handleNodeMouseEnter(node)} onMouseLeave={handleNodeMouseLeave}>
             <div className="flex flex-col items-center">
-                <div className={nodeClass} onClick={handleNodeClick}>
+                <div className={nodeClass} onClick={handleClick}>
                     <div className="flex items-center gap-2">
                         {isExpandable && (
                             <button onClick={(e) => { e.stopPropagation(); toggleNode(node.id); }} className="p-1 rounded-full hover:bg-muted -ml-1">
@@ -1361,3 +1356,4 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     </>
   );
 }
+
