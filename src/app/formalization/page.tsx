@@ -251,10 +251,18 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
 
 
 function FormalizationPageContent() {
-    const { resources, setResources, coreSkills, upskillDefinitions, openGeneralPopup, globalVolume } = useAuth();
+    const { 
+        resources, 
+        setResources, 
+        coreSkills, 
+        upskillDefinitions, 
+        openGeneralPopup, 
+        globalVolume,
+        selectedFormalizationSpecId,
+        setSelectedFormalizationSpecId,
+    } = useAuth();
     const { toast } = useToast();
     
-    const [selectedSpecializationId, setSelectedSpecializationId] = useState<string>('');
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
 
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'patterns'} | null>(null);
@@ -271,8 +279,8 @@ function FormalizationPageContent() {
     }, [coreSkills]);
 
     const curiositiesForSpecialization = useMemo(() => {
-        if (!selectedSpecializationId) return [];
-        const spec = coreSkills.find(s => s.id === selectedSpecializationId);
+        if (!selectedFormalizationSpecId) return [];
+        const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
         if (!spec) return [];
         
         const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
@@ -284,7 +292,7 @@ function FormalizationPageContent() {
         return upskillDefinitions.filter(def => 
             microSkillNames.has(def.category) && !allChildIds.has(def.id)
         );
-    }, [selectedSpecializationId, coreSkills, upskillDefinitions]);
+    }, [selectedFormalizationSpecId, coreSkills, upskillDefinitions]);
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
     
@@ -659,7 +667,7 @@ function FormalizationPageContent() {
                         <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
                     </CardHeader>
                     <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                        <Select value={selectedSpecializationId} onValueChange={setSelectedSpecializationId}>
+                        <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
                             <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
                             <SelectContent>
                                 {specializations.map(spec => (

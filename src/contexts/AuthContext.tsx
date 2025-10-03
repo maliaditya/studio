@@ -345,6 +345,8 @@ interface AuthContextType {
   setSelectedProjectId: React.Dispatch<React.SetStateAction<string | null>>;
   selectedCompanyId: string | null;
   setSelectedCompanyId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedFormalizationSpecId: string | null;
+  setSelectedFormalizationSpecId: React.Dispatch<React.SetStateAction<string | null>>;
   autoSuggestions: Record<string, AutoSuggestionEntry[]>;
   setAutoSuggestions: React.Dispatch<React.SetStateAction<Record<string, AutoSuggestionEntry[]>>>;
   recentItems: Array<(ExerciseDefinition | Project) & { type: string }>;
@@ -538,6 +540,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [selectedFormalizationSpecId, setSelectedFormalizationSpecId] = useState<string | null>(null);
   
   // Focus Session
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
@@ -1102,7 +1105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       },
       ui: {
         pinnedFolderIds: Array.from(pinnedFolderIds), activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder,
-        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems,
+        selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems,
         selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId,
         activeFocusSession, isAgendaDocked,
         recentItems,
@@ -1110,7 +1113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs
   ]);
 
   const saveState = useCallback(() => {
@@ -1217,6 +1220,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSelectedUpskillTask(uiData.selectedUpskillTask || null);
     setSelectedDeepWorkTask(uiData.selectedDeepWorkTask || null);
     setSelectedMicroSkill(uiData.selectedMicroSkill || null);
+    setSelectedFormalizationSpecId(uiData.selectedFormalizationSpecId || null);
     setExpandedItems(uiData.expandedItems || []);
     setSelectedDomainId(uiData.selectedDomainId || null);
     setSelectedSkillId(uiData.selectedSkillId || null);
@@ -3139,6 +3143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
+    selectedFormalizationSpecId, setSelectedFormalizationSpecId,
     microSkillMap,
     permanentlyLoggedTaskIds,
     getDescendantLeafNodes,
@@ -3329,6 +3334,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

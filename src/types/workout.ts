@@ -298,16 +298,16 @@ export interface GapAnalysis {
 }
 
 export interface FormalizationItem {
-  id: string;
-  text: string;
-  properties?: Record<string, any>;
-  linkedElementIds?: string[];
+    id: string;
+    text: string;
+    properties?: Record<string, any>;
+    linkedElementIds?: string[];
 }
 
 export interface FormalizationData {
-    elements?: FormalizationItem[];
-    operations?: FormalizationItem[];
-    patterns?: FormalizationItem[];
+  elements: FormalizationItem[];
+  operations: FormalizationItem[];
+  patterns: FormalizationItem[];
 }
 
 export interface ResourcePoint {
