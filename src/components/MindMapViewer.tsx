@@ -154,23 +154,23 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, []);
 
     const allDefinitions = useMemo(() => {
-      const { elements = [], operations = [], components = [] } = (resources || []).reduce((acc, resource) => {
-        if (resource.formalization) {
-          if (resource.formalization.elements) {
-            acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element' as const, category: 'Formalization', name: e.text })));
-          }
-          if (resource.formalization.operations) {
-            acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation' as const, category: 'Formalization', name: o.text })));
-          }
-          if (resource.formalization.components) {
-            acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component' as const, category: 'Formalization', name: c.text })));
-          }
-        }
-        return acc;
-      }, { elements: [] as any[], operations: [] as any[], components: [] as any[] });
-      
-      const allItems: (ExerciseDefinition | Resource | Pattern | MetaRule | FormalizationItem)[] = [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...patterns, ...metaRules, ...elements, ...operations, ...components];
-      return new Map(allItems.map(def => [def.id, def]));
+        const { elements = [], operations = [], components = [] } = (resources || []).reduce((acc, resource) => {
+            if (resource.formalization) {
+                if (resource.formalization.elements) {
+                    acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element' as const, category: 'Formalization', name: e.text })));
+                }
+                if (resource.formalization.operations) {
+                    acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation' as const, category: 'Formalization', name: o.text })));
+                }
+                if (resource.formalization.components) {
+                    acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component' as const, category: 'Formalization', name: c.text })));
+                }
+            }
+            return acc;
+        }, { elements: [] as any[], operations: [] as any[], components: [] as any[] });
+        
+        const allItems: (ExerciseDefinition | Resource | Pattern | MetaRule | FormalizationItem)[] = [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...patterns, ...metaRules, ...elements, ...operations, ...components];
+        return new Map(allItems.map(def => [def.id, def]));
     }, [deepWorkDefinitions, upskillDefinitions, resources, patterns, metaRules]);
     
     const parentMap = useMemo(() => {
@@ -353,10 +353,18 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const nodesToUpdate = new Map<string, { x: number; y: number }>();
         const edgesToUpdate = new Set<string>();
 
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
+
         validChildIds.forEach((childId, index) => {
             if (!nodes.has(childId)) {
-                const x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((validChildIds.length - 1) * (CARD_WIDTH + 20) / 2);
-                const y = currentNodePos.y + (CARD_HEIGHT + VERTICAL_SPACING);
+                let x, y;
+                if (isElementMindMap) {
+                    x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((validChildIds.length - 1) * (CARD_WIDTH + 20) / 2);
+                    y = currentNodePos.y + (CARD_HEIGHT + VERTICAL_SPACING);
+                } else {
+                    x = currentNodePos.x + HORIZONTAL_SPACING;
+                    y = currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((validChildIds.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                }
                 nodesToUpdate.set(childId, { x, y });
             }
             const edgeId1 = `${nodeId}-${childId}`;
@@ -374,7 +382,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, runCollisionDetection]);
+    }, [nodes, edges, allDefinitions, rootId, runCollisionDetection]);
   
     const handleRevealParents = useCallback((nodeId: string) => {
         const currentNodePos = nodes.get(nodeId);
@@ -593,7 +601,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     return (
         <div ref={containerRef} className="w-full h-full relative bg-background">
             <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
-                <TransformWrapper ref={transformWrapperRef} disabled={isDragging} initialScale={0.7} panning={{disabled: true}}>
+                <TransformWrapper ref={transformWrapperRef} initialScale={0.7} panning={{disabled: true}}>
                     <Controls />
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
                         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
@@ -1177,7 +1185,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
         "border-transparent"
     );
 
-    const isExpandable = node.children.length > 0;
+    const isExpandable = node.children.length > 0 || (inlineAddInfo && inlineAddInfo.parentReleaseId === node.id);
     
     const handleClick = (e: React.MouseEvent) => {
         if (node.category === 'FocusArea') {
