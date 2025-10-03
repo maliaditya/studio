@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -1123,7 +1122,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 p-4">
+            <div className="h-screen flex flex-col gap-4 p-4">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
@@ -1206,4 +1205,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
