@@ -278,7 +278,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                     <div className="space-y-1">
                                         {(formalizationData?.operations || []).map(op => (
                                             <div key={op.id} className="flex items-center space-x-2">
-                                                <Checkbox id={`op-${op.id}`} checked={linkedOperationIds.includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
+                                                <Checkbox id={`op-${op.id}`} checked={(linkedOperationIds || []).includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
                                                 <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
                                             </div>
                                         ))}
@@ -294,7 +294,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 <div className="space-y-1">
                                     {(formalizationData?.elements || []).map(el => (
                                         <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
+                                            <Checkbox id={`el-${el.id}`} checked={(linkedElementIds || []).includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
                                             <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
                                         </div>
                                     ))}
@@ -309,7 +309,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 <div className="space-y-1">
                                     {availableComponents.map(comp => (
                                         <div key={comp.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`comp-${comp.id}`} checked={linkedComponentIds.includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
+                                            <Checkbox id={`comp-${comp.id}`} checked={(linkedComponentIds || []).includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
                                             <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
                                         </div>
                                     ))}
@@ -712,42 +712,53 @@ function FormalizationPageContent() {
     };
     
     const fullFormalizationData = useMemo(() => {
-        const globalItems = {
-            elements: new Map<string, FormalizationItem>(),
-            operations: new Map<string, FormalizationItem>(),
-            components: new Map<string, FormalizationItem>(),
-        };
-
-        // First, gather all global items from all resources
-        resources.forEach(res => {
-            if (res.formalization) {
-                (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalItems.elements.set(el.id, el));
-                (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalItems.operations.set(op.id, op));
-                (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalItems.components.set(c.id, c));
-            }
-        });
-
-        // Start with the local data of the selected resource
-        const localData: FormalizationData = (isResource(selectedResource) && selectedResource.formalization)
-            ? JSON.parse(JSON.stringify(selectedResource.formalization))
-            : { elements: [], operations: [], components: [] };
-        
-        const combinedData = {
-            elements: new Map(localData.elements.map(item => [item.id, item])),
-            operations: new Map(localData.operations.map(item => [item.id, item])),
-            components: new Map(localData.components.map(item => [item.id, item])),
-        };
-
-        // Now, merge globals, overwriting any local entry with a matching global one
-        globalItems.elements.forEach((item, id) => combinedData.elements.set(id, item));
-        globalItems.operations.forEach((item, id) => combinedData.operations.set(id, item));
-        globalItems.components.forEach((item, id) => combinedData.components.set(id, item));
-
-        return {
-            elements: Array.from(combinedData.elements.values()),
-            operations: Array.from(combinedData.operations.values()),
-            components: Array.from(combinedData.components.values()),
-        };
+      const globals = {
+        elements: new Map<string, FormalizationItem>(),
+        operations: new Map<string, FormalizationItem>(),
+        components: new Map<string, FormalizationItem>(),
+      };
+    
+      // 1. Gather all global items from all resources into a definitive map.
+      resources.forEach(res => {
+        if (res.formalization?.elements) {
+          res.formalization.elements.filter(el => el.isGlobal).forEach(el => globals.elements.set(el.id, el));
+        }
+        if (res.formalization?.operations) {
+          res.formalization.operations.filter(op => op.isGlobal).forEach(op => globals.operations.set(op.id, op));
+        }
+        if (res.formalization?.components) {
+          res.formalization.components.filter(c => c.isGlobal).forEach(c => globals.components.set(c.id, c));
+        }
+      });
+    
+      // 2. Start with the local data of the selected resource.
+      const localData: FormalizationData = (isResource(selectedResource) && selectedResource.formalization)
+        ? JSON.parse(JSON.stringify(selectedResource.formalization))
+        : { elements: [], operations: [], components: [] };
+    
+      // 3. Create combined maps, starting with the definitive global items.
+      const combined = {
+        elements: new Map(globals.elements),
+        operations: new Map(globals.operations),
+        components: new Map(globals.components),
+      };
+    
+      // 4. Add local items only if a global version doesn't already exist.
+      (localData.elements || []).forEach(item => {
+        if (!combined.elements.has(item.id)) combined.elements.set(item.id, item);
+      });
+      (localData.operations || []).forEach(item => {
+        if (!combined.operations.has(item.id)) combined.operations.set(item.id, item);
+      });
+      (localData.components || []).forEach(item => {
+        if (!combined.components.has(item.id)) combined.components.set(item.id, item);
+      });
+    
+      return {
+        elements: Array.from(combined.elements.values()),
+        operations: Array.from(combined.operations.values()),
+        components: Array.from(combined.components.values()),
+      };
     }, [selectedResource, resources]);
 
 
@@ -924,7 +935,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="pr-1">
+                    <ScrollArea className="h-72 pr-1">
                         <div className="space-y-2 p-4 pt-0">
                             {filteredData.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -1093,6 +1104,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
-
