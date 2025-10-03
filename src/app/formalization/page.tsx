@@ -632,7 +632,6 @@ function FormalizationPageContent() {
                 linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
             }));
         } else if (type === 'components') {
-            // Also remove this component from properties of elements and from linkedComponentIds of other components
             finalFormalization.elements = (finalFormalization.elements || []).map(el => {
                 const newProps = { ...el.properties };
                 let changed = false;
@@ -667,6 +666,25 @@ function FormalizationPageContent() {
         setIsMindMapModalOpen(true);
     };
 
+    const handleToggleGlobal = (elementId: string) => {
+        const allResourcesToUpdate = resources.map(res => {
+            if (res.formalization && res.formalization.elements) {
+                let elementFound = false;
+                const updatedElements = res.formalization.elements.map(el => {
+                    if (el.id === elementId) {
+                        elementFound = true;
+                        return { ...el, isGlobal: !el.isGlobal };
+                    }
+                    return el;
+                });
+                if (elementFound) {
+                    return { ...res, formalization: { ...res.formalization, elements: updatedElements }};
+                }
+            }
+            return res;
+        });
+        setResources(allResourcesToUpdate);
+    };
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -722,7 +740,7 @@ function FormalizationPageContent() {
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
                         </div>
                     ) : null }
                     <CardHeader>
@@ -784,7 +802,6 @@ function FormalizationPageContent() {
             );
         }
 
-        // Fallback for ExerciseDefinition
         return (
              <Card className="h-full flex flex-col">
                 <CardHeader>
@@ -798,13 +815,24 @@ function FormalizationPageContent() {
     };
 
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
+        const specFormalizationData = useMemo(() => {
+            const globalElements: FormalizationItem[] = [];
+            resources.forEach(res => {
+                if (res.formalization && res.formalization.elements) {
+                    globalElements.push(...res.formalization.elements.filter(el => el.isGlobal));
+                }
+            });
+            return {
+                elements: globalElements.filter((el, index, self) => index === self.findIndex(t => t.id === el.id)), // Unique global elements
+            };
+        }, [resources]);
+    
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
         const hiddenIds = useMemo(() => {
             const hiddenComponentIds = new Set<string>();
             if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
             
-            // Find all components linked as properties
             formalizationData.elements?.forEach(el => {
               if (el.properties) {
                 Object.values(el.properties).forEach(val => {
@@ -815,7 +843,6 @@ function FormalizationPageContent() {
               }
             });
 
-            // Recursively find all children of hidden components
             const findChildren = (compId: string, visited: Set<string>) => {
               if (visited.has(compId)) return;
               visited.add(compId);
@@ -858,11 +885,17 @@ function FormalizationPageContent() {
         let data: FormalizationItem[] = [];
         if (formalizationData) {
             let sourceData = formalizationData[type] || [];
+            if (type === 'elements') {
+                sourceData = [...sourceData, ...specFormalizationData.elements];
+                sourceData = sourceData.filter((el, index, self) => index === self.findIndex(t => t.id === el.id));
+            }
             if (hideLinked[type]) {
                 data = sourceData.filter(item => !hiddenIds[type].has(item.id));
             } else {
                 data = sourceData;
             }
+        } else if (type === 'elements') {
+            data = specFormalizationData.elements;
         }
         
         return (
@@ -891,7 +924,10 @@ function FormalizationPageContent() {
                                 return (
                                 <Card key={item.id} className="group relative">
                                     <CardContent className="p-3 text-sm">
-                                        <p className="font-semibold">{item.text}</p>
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-semibold">{item.text}</p>
+                                            {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
+                                        </div>
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                 {Object.entries(item.properties).map(([key, value]) => {
@@ -933,6 +969,11 @@ function FormalizationPageContent() {
                                         )}
                                     </CardContent>
                                     <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {type === 'elements' && (
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleGlobal(item.id)}>
+                                            <Globe className={cn("h-4 w-4", item.isGlobal && "text-blue-500")} />
+                                          </Button>
+                                        )}
                                         {type === 'elements' && (
                                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
                                             <GitMerge className="h-4 w-4" />

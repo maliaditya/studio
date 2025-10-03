@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type ExerciseCategory = 
@@ -303,6 +302,7 @@ export interface FormalizationItem {
     properties?: Record<string, string>;
     linkedElementIds?: string[];
     linkedComponentIds?: string[];
+    isGlobal?: boolean;
 }
 
 export interface FormalizationData {
@@ -823,5 +823,3 @@ export interface DailyLearningLog {
     date: string;
     completedResourceIds: string[];
 }
-
-
