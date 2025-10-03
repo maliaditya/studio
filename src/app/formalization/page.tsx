@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -527,6 +528,7 @@ function FormalizationPageContent() {
             setPlayingAudio(false);
         } else if (!editingItem && audioWasPlayingBeforeModal.current && audio) {
             audio.currentTime = audioTimeBeforeModal.current;
+            audio.play().catch(e => console.error("Audio resume failed:", e));
             setPlayingAudio(true);
             audioWasPlayingBeforeModal.current = false;
         }
@@ -877,7 +879,7 @@ function FormalizationPageContent() {
             </Card>
         );
     };
-
+    
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const specFormalizationData = useMemo(() => {
             const globalElements: FormalizationItem[] = [];
@@ -894,11 +896,11 @@ function FormalizationPageContent() {
                 }
             });
             return {
-                elements: globalElements.filter((el, index, self) => index === self.findIndex(t => t.id === el.id)), // Unique global elements
-                components: globalComponents.filter((c, index, self) => index === self.findIndex(t => t.id === c.id)), // Unique global components
+                elements: globalElements.filter((el, index, self) => index === self.findIndex(t => t.id === el.id)),
+                components: globalComponents.filter((c, index, self) => index === self.findIndex(t => t.id === c.id)),
             };
         }, [resources]);
-    
+
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
         const hiddenIds = useMemo(() => {
@@ -992,7 +994,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-72">
+                    <ScrollArea>
                         <div className="space-y-2 p-4 pt-0">
                             {data.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -1069,13 +1071,13 @@ function FormalizationPageContent() {
                                         <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </Card>
-                            })}
+                            )})}
                         </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
         );
-    }
+    };
 
     return (
         <>
@@ -1161,5 +1163,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-    
