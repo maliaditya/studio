@@ -886,61 +886,79 @@ function FormalizationPageContent() {
         globalItems.operations.forEach((item, id) => displayItems.operations.set(id, item));
         globalItems.components.forEach((item, id) => displayItems.components.set(id, item));
         
+        // --- This is the corrected encapsulation logic ---
         const encapsulatedIds = new Set<string>();
-        const queue: string[] = [];
-
-        // 1. Find all components used as properties in ANY element from ANY resource
+        const propertyLinkedComponentIds = new Set<string>();
+        
+        // 1. Find all components linked via properties from ANY element across ALL resources.
         resources.forEach(res => {
-          (res.formalization?.elements || []).forEach(element => {
-            if (element.properties) {
-                Object.values(element.properties).forEach(value => {
-                    const itemDef = allDefinitionsMap.get(value);
-                    if (itemDef && itemDef._type === 'component') {
-                        queue.push(value);
-                        encapsulatedIds.add(value);
-                    }
-                });
-            }
-          });
+            (res.formalization?.elements || []).forEach(element => {
+                if (element.properties) {
+                    Object.values(element.properties).forEach(value => {
+                        const itemDef = allDefinitionsMap.get(value);
+                        if (itemDef && itemDef._type === 'component') {
+                            propertyLinkedComponentIds.add(value);
+                        }
+                    });
+                }
+            });
         });
-    
-        // 2. Traverse and find all children of these encapsulated components
+        
+        const queue: string[] = Array.from(propertyLinkedComponentIds);
+        
+        // 2. Traverse and find all children of these encapsulated components.
         const visited = new Set<string>();
-        while(queue.length > 0) {
+        while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
-
+            encapsulatedIds.add(currentId);
+    
             const item = allDefinitionsMap.get(currentId);
             if (!item) continue;
-
+    
             const children = [
                 ...(item.linkedElementIds || []),
                 ...(item.linkedComponentIds || []),
                 ...(item.linkedOperationIds || []),
             ];
-
+    
             children.forEach((childId: string) => {
-                if (!encapsulatedIds.has(childId)) {
-                    encapsulatedIds.add(childId);
+                if (!visited.has(childId)) {
                     queue.push(childId);
                 }
             });
         }
-        
-        // 3. Filter the display items
+        // --- End of corrected logic ---
+
         const localItemIds = new Set([
             ...localItems.elements.map(i => i.id),
             ...localItems.operations.map(i => i.id),
             ...localItems.components.map(i => i.id),
         ]);
+        
+        const applyHideFilter = (items: Map<string, FormalizationItem>, type: 'elements' | 'operations' | 'components') => {
+            const allLinkedIds = new Set<string>();
+            if (hideLinked[type]) {
+                for (const item of displayItems.elements.values()) { (item.linkedOperationIds || []).forEach(id => allLinkedIds.add(id)); }
+                for (const item of displayItems.components.values()) { (item.linkedElementIds || []).forEach(id => allLinkedIds.add(id)); (item.linkedComponentIds || []).forEach(id => allLinkedIds.add(id)); }
+                for (const item of displayItems.elements.values()) { Object.values(item.properties || {}).forEach(id => allLinkedIds.add(id)); }
+            }
+
+            return Array.from(items.values()).filter(item => {
+                if (encapsulatedIds.has(item.id)) {
+                    return localItemIds.has(item.id);
+                }
+                return hideLinked[type] ? !allLinkedIds.has(item.id) || localItemIds.has(item.id) : true;
+            });
+        };
 
         return {
-            elements: Array.from(displayItems.elements.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
-            operations: Array.from(displayItems.operations.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
-            components: Array.from(displayItems.components.values()).filter(item => !encapsulatedIds.has(item.id) || localItemIds.has(item.id)),
+            elements: applyHideFilter(displayItems.elements, 'elements'),
+            operations: applyHideFilter(displayItems.operations, 'operations'),
+            components: applyHideFilter(displayItems.components, 'components'),
         };
-    }, [selectedResource, resources, allDefinitionsMap]);
+    }, [selectedResource, resources, allDefinitionsMap, hideLinked]);
 
 
     const renderSelectedResource = () => {
@@ -1078,7 +1096,7 @@ function FormalizationPageContent() {
         const data: FormalizationItem[] = (itemsToDisplay?.[type] || []);
         
         return (
-            <div className="flex flex-col h-full">
+            <div className="h-full flex flex-col">
                 <Card className="flex flex-col h-full">
                     <CardHeader className="flex flex-row items-center justify-between p-4 flex-shrink-0">
                         <div>
@@ -1184,7 +1202,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-screen flex flex-col gap-4 p-4">
+            <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 p-4">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
@@ -1267,4 +1285,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
