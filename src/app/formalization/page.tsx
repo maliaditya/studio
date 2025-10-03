@@ -141,10 +141,11 @@ const CuriosityNode = ({
 
 type PropertyItem = { id: string; key: string; value: string };
 
-const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: { 
+const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave }: { 
     item: FormalizationItem | null; 
     type: 'elements' | 'operations' | 'components';
     formalizationData?: FormalizationData;
+    globalContext?: FormalizationData;
     onClose: () => void; 
     onSave: (itemToSave: FormalizationItem) => void;
 }) => {
@@ -224,7 +225,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>{getModalTitle()}</DialogTitle>
                 </DialogHeader>
@@ -236,82 +237,109 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                         className="min-h-[100px]"
                         placeholder="Enter the main text or name..."
                     />
-                    {type === 'elements' && (
-                        <>
-                          <div className="space-y-3">
-                              <Label>Properties</Label>
-                              <div className="space-y-2">
-                                  {properties.map((prop) => (
-                                      <div key={prop.id} className="flex items-center gap-2">
-                                          <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                          <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
-                                              <SelectTrigger>
-                                                  <SelectValue placeholder="Value or Link Component..." />
-                                              </SelectTrigger>
-                                              <SelectContent>
-                                                  <Input
-                                                    className="m-2 w-[calc(100%-1rem)]"
-                                                    placeholder="Type a value..."
-                                                    defaultValue={prop.value}
-                                                    onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
-                                                  />
-                                                  <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                  {availableComponents.map(p => (
-                                                    <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                  ))}
-                                              </SelectContent>
-                                          </Select>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                      </div>
-                                  ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {type === 'elements' && (
+                            <>
+                              <div className="space-y-3">
+                                  <Label>Properties</Label>
+                                  <div className="space-y-2">
+                                      {properties.map((prop) => (
+                                          <div key={prop.id} className="flex items-center gap-2">
+                                              <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
+                                              <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
+                                                  <SelectTrigger>
+                                                      <SelectValue placeholder="Value or Link Component..." />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                      <Input
+                                                        className="m-2 w-[calc(100%-1rem)]"
+                                                        placeholder="Type a value..."
+                                                        defaultValue={prop.value}
+                                                        onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                      />
+                                                      <SelectItem value="--none--">-- Clear --</SelectItem>
+                                                      <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                                                      {availableComponents.map(p => (
+                                                        <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                      ))}
+                                                      {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                                                      {(globalContext?.components || []).map(p => (
+                                                        <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                      ))}
+                                                  </SelectContent>
+                                              </Select>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                                          </div>
+                                      ))}
+                                  </div>
+                                  <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                               </div>
-                              <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
-                          </div>
-                           <div className="space-y-2">
-                                <Label>Link Operations</Label>
-                                <ScrollArea className="h-40 border rounded-md p-2">
-                                    <div className="space-y-1">
-                                        {(formalizationData?.operations || []).map(op => (
-                                            <div key={op.id} className="flex items-center space-x-2">
-                                                <Checkbox id={`op-${op.id}`} checked={(linkedOperationIds || []).includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
-                                                <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                            </div>
-                        </>
-                    )}
-                    {type === 'components' && (
-                        <div className="space-y-2">
-                            <Label>Link Elements</Label>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                <div className="space-y-1">
-                                    {(formalizationData?.elements || []).map(el => (
-                                        <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={(linkedElementIds || []).includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
-                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                               <div className="space-y-2">
+                                    <Label>Link Operations</Label>
+                                    <ScrollArea className="h-40 border rounded-md p-2">
+                                        <div className="space-y-1">
+                                            {(formalizationData?.operations || []).map(op => (
+                                                <div key={op.id} className="flex items-center space-x-2">
+                                                    <Checkbox id={`op-${op.id}`} checked={(linkedOperationIds || []).includes(op.id)} onCheckedChange={() => handleLinkToggle(op.id, 'operation')} />
+                                                    <Label htmlFor={`op-${op.id}`} className="font-normal">{op.text}</Label>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                    </ScrollArea>
                                 </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-                    {type === 'components' && (
-                        <div className="space-y-2">
-                            <Label>Link Components</Label>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                <div className="space-y-1">
-                                    {availableComponents.map(comp => (
-                                        <div key={comp.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`comp-${comp.id}`} checked={(linkedComponentIds || []).includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
-                                            <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
+                            </>
+                        )}
+                        {type === 'components' && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Link Elements</Label>
+                                    <ScrollArea className="h-40 border rounded-md p-2">
+                                        <Label className="px-2 py-1.5 text-xs font-semibold">Local Elements</Label>
+                                        <div className="space-y-1">
+                                            {(formalizationData?.elements || []).map(el => (
+                                                <div key={el.id} className="flex items-center space-x-2">
+                                                    <Checkbox id={`el-${el.id}`} checked={(linkedElementIds || []).includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
+                                                    <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                                </div>
+                                            ))}
                                         </div>
-                                    ))}
+                                        {(globalContext?.elements || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Elements</Label>}
+                                        <div className="space-y-1">
+                                            {(globalContext?.elements || []).map(el => (
+                                                <div key={el.id} className="flex items-center space-x-2">
+                                                    <Checkbox id={`el-${el.id}`} checked={(linkedElementIds || []).includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id, 'element')} />
+                                                    <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
                                 </div>
-                            </ScrollArea>
-                        </div>
-                    )}
+                                <div className="space-y-2">
+                                    <Label>Link Components</Label>
+                                    <ScrollArea className="h-40 border rounded-md p-2">
+                                        <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                                        <div className="space-y-1">
+                                            {availableComponents.map(comp => (
+                                                <div key={comp.id} className="flex items-center space-x-2">
+                                                    <Checkbox id={`comp-${comp.id}`} checked={(linkedComponentIds || []).includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
+                                                    <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                                        <div className="space-y-1">
+                                            {(globalContext?.components || []).filter(c => c.id !== item?.id).map(comp => (
+                                                <div key={comp.id} className="flex items-center space-x-2">
+                                                    <Checkbox id={`comp-${comp.id}`} checked={(linkedComponentIds || []).includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
+                                                    <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -780,50 +808,45 @@ function FormalizationPageContent() {
         }
       }, []);
       
-    const fullFormalizationData = useMemo(() => {
-        // 1. Get all resources and curiosities within the selected specialization
-        const spec = specializations.find(s => s.id === selectedFormalizationSpecId);
-        if (!spec) return { elements: [], operations: [], components: [] };
+    const getSpecResources = useCallback((specId: string | null): Resource[] => {
+        if (!specId) return [];
+        const spec = specializations.find(s => s.id === specId);
+        if (!spec) return [];
         
         const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
-        
         const curiositiesInSpec = upskillDefinitions.filter(def => microSkillNames.has(def.category));
-        const curiositiesInSpecIds = new Set(curiositiesInSpec.map(c => c.id));
         
         const resourcesInSpec: Resource[] = [];
         const visitedResourceIds = new Set<string>();
         const queue = [...curiositiesInSpec];
 
-        while(queue.length > 0) {
+        while (queue.length > 0) {
             const current = queue.shift()!;
-            if (current.linkedResourceIds) {
-                current.linkedResourceIds.forEach(resId => {
-                    if (!visitedResourceIds.has(resId)) {
-                        const resource = resources.find(r => r.id === resId);
-                        if (resource) {
-                            resourcesInSpec.push(resource);
-                            visitedResourceIds.add(resId);
-                        }
+            (current.linkedResourceIds || []).forEach(resId => {
+                if (!visitedResourceIds.has(resId)) {
+                    const resource = resources.find(r => r.id === resId);
+                    if (resource) {
+                        resourcesInSpec.push(resource);
+                        visitedResourceIds.add(resId);
                     }
-                });
-            }
-            if (current.linkedUpskillIds) {
-                current.linkedUpskillIds.forEach(childId => {
-                    const childDef = upskillDefinitions.find(d => d.id === childId);
-                    if (childDef) queue.push(childDef);
-                });
-            }
+                }
+            });
+            (current.linkedUpskillIds || []).forEach(childId => {
+                const childDef = upskillDefinitions.find(d => d.id === childId);
+                if (childDef) queue.push(childDef);
+            });
         }
-        
-        // 2. From this set, find all global elements
-        const globalElements = resourcesInSpec
+        return resourcesInSpec;
+    }, [specializations, upskillDefinitions, resources]);
+      
+    const fullFormalizationData = useMemo(() => {
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        const globalElements = specResources
             .flatMap(res => res.formalization?.elements || [])
             .filter(el => el.isGlobal);
 
-        // 3. Get local data from the currently selected resource/curiosity
-        const localData = isResource(selectedResource) || selectedResource ? selectedResource.formalization : null;
+        const localData = (isResource(selectedResource) || selectedResource) ? selectedResource.formalization : null;
         
-        // 4. Combine them, giving precedence to local if there are ID conflicts (though unlikely)
         const combinedElementsMap = new Map<string, FormalizationItem>();
 
         globalElements.forEach(item => combinedElementsMap.set(item.id, item));
@@ -831,29 +854,24 @@ function FormalizationPageContent() {
         
         const allVisibleElements = Array.from(combinedElementsMap.values());
         
-        // 5. Find all linked operations and components from the visible elements
-        const allLinkedOpIds = new Set(allVisibleElements.flatMap(el => el.linkedOperationIds || []));
-        const allLinkedComponentIdsAsProps = new Set(allVisibleElements.flatMap(el => Object.values(el.properties || {})));
-        
-        // 6. Get all operations and components from ALL resources to create a complete map
         const allOpsMap = new Map<string, FormalizationItem>();
         const allCompsMap = new Map<string, FormalizationItem>();
-        resources.forEach(r => {
+        specResources.forEach(r => {
             (r.formalization?.operations || []).forEach(op => allOpsMap.set(op.id, op));
             (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
         });
 
+        const allLinkedOpIds = new Set(allVisibleElements.flatMap(el => el.linkedOperationIds || []));
         const visibleOperations = Array.from(allLinkedOpIds).map(id => allOpsMap.get(id)).filter((op): op is FormalizationItem => !!op);
         
-        let visibleComponents = (localData?.components || []);
-
-        const recursivelyFindLinkedComponents = (componentId: string, visited: Set<string> = new Set()) => {
+        const visibleComponents = [...(localData?.components || [])];
+        const allLinkedComponentIdsAsProps = new Set(allVisibleElements.flatMap(el => Object.values(el.properties || {})));
+        
+        const recursivelyFindLinkedComponents = (componentId: string, visited: Set<string> = new Set()): FormalizationItem[] => {
             if (visited.has(componentId)) return [];
             visited.add(componentId);
-
             const component = allCompsMap.get(componentId);
             if (!component) return [];
-
             let linkedComps = [component];
             (component.linkedComponentIds || []).forEach(childId => {
                 linkedComps = [...linkedComps, ...recursivelyFindLinkedComponents(childId, visited)];
@@ -863,7 +881,11 @@ function FormalizationPageContent() {
 
         (localData?.components || []).forEach(comp => {
             (comp.linkedComponentIds || []).forEach(childId => {
-                visibleComponents = [...visibleComponents, ...recursivelyFindLinkedComponents(childId)];
+                recursivelyFindLinkedComponents(childId).forEach(c => {
+                    if (!visibleComponents.some(vc => vc.id === c.id)) {
+                        visibleComponents.push(c);
+                    }
+                });
             });
         });
         
@@ -876,33 +898,63 @@ function FormalizationPageContent() {
                 });
             }
         });
-        
+
         return {
             elements: allVisibleElements,
             operations: visibleOperations,
             components: [...new Map(visibleComponents.map(item => [item.id, item])).values()],
         };
+    }, [selectedFormalizationSpecId, selectedResource, getSpecResources, resources]);
 
-    }, [selectedFormalizationSpecId, coreSkills, upskillDefinitions, resources, selectedResource]);
+    const globalContextData = useMemo(() => {
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        const globalElements = specResources
+            .flatMap(res => res.formalization?.elements || [])
+            .filter(el => el.isGlobal);
+        
+        const globalComponentIds = new Set(globalElements.flatMap(el => Object.values(el.properties || {})));
+        
+        const allCompsMap = new Map<string, FormalizationItem>();
+        specResources.forEach(r => {
+            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
+        });
+
+        const globalComponents: FormalizationItem[] = [];
+        const visited = new Set<string>();
+        const queue = Array.from(globalComponentIds);
+        
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+
+            const component = allCompsMap.get(currentId);
+            if (component) {
+                globalComponents.push(component);
+                (component.linkedComponentIds || []).forEach(childId => {
+                    if (!visited.has(childId)) queue.push(childId);
+                });
+            }
+        }
+        
+        return {
+            elements: globalElements,
+            components: globalComponents,
+            operations: [], // Operations are typically local to elements
+        };
+    }, [selectedFormalizationSpecId, getSpecResources, resources]);
 
 
     const itemsToDisplay = useMemo(() => {
         const { elements, operations, components } = fullFormalizationData;
 
-        // Find all items that are encapsulated (linked as properties) anywhere
+        const allSpecResources = getSpecResources(selectedFormalizationSpecId);
         const allElementsMap = new Map<string, FormalizationItem>();
-        resources.forEach(r => {
-            (r.formalization?.elements || []).forEach(el => allElementsMap.set(el.id, el));
-        });
         const allComponentsMap = new Map<string, FormalizationItem>();
-        resources.forEach(r => {
+        allSpecResources.forEach(r => {
+            (r.formalization?.elements || []).forEach(el => allElementsMap.set(el.id, el));
             (r.formalization?.components || []).forEach(c => allComponentsMap.set(c.id, c));
         });
-        const allOperationsMap = new Map<string, FormalizationItem>();
-        resources.forEach(r => {
-            (r.formalization?.operations || []).forEach(op => allOperationsMap.set(op.id, op));
-        });
-
 
         const encapsulatedComponentIds = new Set<string>();
         for (const el of allElementsMap.values()) {
@@ -915,7 +967,6 @@ function FormalizationPageContent() {
             }
         }
         
-        // Recursively find all children of encapsulated components
         const allEncapsulatedIds = new Set<string>();
         const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
@@ -927,27 +978,21 @@ function FormalizationPageContent() {
 
             const component = allComponentsMap.get(currentId);
             if (component) {
-                (component.linkedElementIds || []).forEach(childId => queue.push(childId));
+                (component.linkedElementIds || []).forEach(childId => allEncapsulatedIds.add(childId));
                 (component.linkedComponentIds || []).forEach(childId => queue.push(childId));
             }
-            
-            const element = allElementsMap.get(currentId);
-            if (element) {
-                (element.linkedOperationIds || []).forEach(childId => queue.push(childId));
-            }
         }
-
-        const filterEncapsulated = <T extends FormalizationItem>(items: T[]): T[] => {
+        
+        const filterEncapsulated = (items: FormalizationItem[]): FormalizationItem[] => {
             return items.filter(item => !allEncapsulatedIds.has(item.id));
         };
         
         let finalItems = {
             elements: filterEncapsulated(elements),
-            operations: filterEncapsulated(operations),
+            operations,
             components: filterEncapsulated(components),
         };
         
-        // Then, apply the "hide linked" toggle
         const allLinkedIdsInView = new Set<string>();
         finalItems.elements.forEach(item => {
             (item.linkedOperationIds || []).forEach(id => allLinkedIdsInView.add(id));
@@ -965,7 +1010,7 @@ function FormalizationPageContent() {
         if (hideLinked.components) finalItems.components = finalItems.components.filter(item => !allLinkedIdsInView.has(item.id));
 
         return finalItems;
-    }, [fullFormalizationData, resources, hideLinked]);
+    }, [fullFormalizationData, getSpecResources, selectedFormalizationSpecId, resources, hideLinked]);
     
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1208,7 +1253,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-screen flex flex-col">
+            <div className="h-[calc(100vh-4rem-1px)] flex flex-col">
                 <header className="flex-shrink-0 p-4 border-b">
                     <div className="flex justify-between items-center">
                         <div>
@@ -1265,6 +1310,7 @@ function FormalizationPageContent() {
                     item={editingItem.item}
                     type={editingItem.type}
                     formalizationData={fullFormalizationData}
+                    globalContext={globalContextData}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                 />
@@ -1299,4 +1345,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
