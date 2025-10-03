@@ -517,6 +517,7 @@ function FormalizationPageContent() {
         if (editingItem && playingAudio && audio) {
             audioWasPlayingBeforeModal.current = true;
             audioTimeBeforeModal.current = audio.currentTime;
+            audio.pause();
             setPlayingAudio(false);
         } else if (!editingItem && audioWasPlayingBeforeModal.current && audio) {
             audio.currentTime = audioTimeBeforeModal.current;
@@ -709,36 +710,34 @@ function FormalizationPageContent() {
     };
 
     const fullFormalizationData = useMemo(() => {
-        const localData = (isResource(selectedResource) && selectedResource.formalization)
-            ? JSON.parse(JSON.stringify(selectedResource.formalization)) as FormalizationData
-            : { elements: [], operations: [], components: [] };
+      const localData: FormalizationData = (isResource(selectedResource) && selectedResource.formalization)
+        ? JSON.parse(JSON.stringify(selectedResource.formalization))
+        : { elements: [], operations: [], components: [] };
     
-        const globalData: { elements: Map<string, FormalizationItem>, operations: Map<string, FormalizationItem>, components: Map<string, FormalizationItem> } = {
-            elements: new Map(),
-            operations: new Map(),
-            components: new Map(),
-        };
+      const globalElements = new Map<string, FormalizationItem>();
+      const globalOps = new Map<string, FormalizationItem>();
+      const globalComps = new Map<string, FormalizationItem>();
     
-        resources.forEach(res => {
-            if (res.formalization) {
-                (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalData.elements.set(el.id, el));
-                (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalData.operations.set(op.id, op));
-                (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalData.components.set(c.id, c));
-            }
-        });
+      resources.forEach(res => {
+        if (res.formalization) {
+          (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalElements.set(el.id, el));
+          (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalOps.set(op.id, op));
+          (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalComps.set(c.id, c));
+        }
+      });
     
-        const combineAndUnique = <T extends { id: string }>(arr1: T[], globalArr: T[]): T[] => {
-            const map = new Map<string, T>();
-            arr1.forEach(item => map.set(item.id, item));
-            globalArr.forEach(item => map.set(item.id, item));
-            return Array.from(map.values());
-        };
+      const combineAndUnique = (localItems: FormalizationItem[], globalItemsMap: Map<string, FormalizationItem>) => {
+        const combinedMap = new Map<string, FormalizationItem>();
+        localItems.forEach(item => combinedMap.set(item.id, item));
+        globalItemsMap.forEach((item, id) => combinedMap.set(id, item));
+        return Array.from(combinedMap.values());
+      };
     
-        return {
-            elements: combineAndUnique(localData.elements, Array.from(globalData.elements.values())),
-            operations: combineAndUnique(localData.operations, Array.from(globalData.operations.values())),
-            components: combineAndUnique(localData.components, Array.from(globalData.components.values())),
-        };
+      return {
+        elements: combineAndUnique(localData.elements || [], globalElements),
+        operations: combineAndUnique(localData.operations || [], globalOps),
+        components: combineAndUnique(localData.components || [], globalComps),
+      };
     }, [selectedResource, resources]);
 
 
@@ -874,102 +873,30 @@ function FormalizationPageContent() {
     };
     
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
-        const specFormalizationData = useMemo(() => {
-            const globalElements: FormalizationItem[] = [];
-            const globalComponents: FormalizationItem[] = [];
-            
-            resources.forEach(res => {
-                if (res.formalization) {
-                    if (res.formalization.elements) {
-                        globalElements.push(...res.formalization.elements.filter(el => el.isGlobal));
-                    }
-                    if (res.formalization.components) {
-                        globalComponents.push(...res.formalization.components.filter(c => c.isGlobal));
-                    }
-                }
-            });
-            return {
-                elements: globalElements.filter((el, index, self) => index === self.findIndex(t => t.id === el.id)),
-                components: globalComponents.filter((c, index, self) => index === self.findIndex(t => t.id === c.id)),
-            };
-        }, [resources]);
-
-        const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
-    
-        const hiddenIds = useMemo(() => {
-            const hiddenComponentIds = new Set<string>();
-            if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
-            
-            const allComponents = [...(formalizationData.components || []), ...specFormalizationData.components];
-
-            allComponents.forEach(comp => {
-                if(comp.linkedComponentIds) {
-                    comp.linkedComponentIds.forEach(childId => hiddenComponentIds.add(childId));
-                }
-            });
-
-            const findChildren = (compId: string, visited: Set<string>) => {
-              if (visited.has(compId)) return;
-              visited.add(compId);
-              const comp = allComponents.find(c => c.id === compId);
-              if (comp?.linkedComponentIds) {
-                comp.linkedComponentIds.forEach(childId => {
-                  hiddenComponentIds.add(childId);
-                  findChildren(childId, visited);
-                });
-              }
-            };
-            
-            const initialHidden = Array.from(hiddenComponentIds);
-            initialHidden.forEach(id => findChildren(id, new Set()));
+        const data: FormalizationItem[] = (fullFormalizationData?.[type] || []);
         
-            const hiddenElementIds = new Set<string>();
-            hiddenComponentIds.forEach(compId => {
-                const component = allComponents.find(c => c.id === compId);
-                if (component?.linkedElementIds) {
-                    component.linkedElementIds.forEach(elId => hiddenElementIds.add(elId));
-                }
-            });
-        
-            const hiddenOperationIds = new Set<string>();
-            if (type === 'operations') {
-                 const allElements = [...(formalizationData.elements || []), ...specFormalizationData.elements];
-                allElements.forEach(el => {
-                    if(hiddenElementIds.has(el.id)) {
-                        (el.linkedOperationIds || []).forEach(opId => hiddenOperationIds.add(opId));
-                    }
+        let filteredData = data;
+        if (hideLinked[type]) {
+            const hiddenIds = new Set<string>();
+            if (type === 'components') {
+                data.forEach(item => {
+                    if (item.linkedComponentIds) item.linkedComponentIds.forEach(id => hiddenIds.add(id));
                 });
             }
-        
-            return {
-                components: hiddenComponentIds,
-                elements: hiddenElementIds,
-                operations: hiddenOperationIds,
-            };
-        }, [formalizationData, type, specFormalizationData]);
-        
-        let data: FormalizationItem[] = [];
-        if (formalizationData) {
-            let sourceData = formalizationData[type] || [];
             if (type === 'elements') {
-                sourceData = [...sourceData, ...specFormalizationData.elements];
-                sourceData = sourceData.filter((el, index, self) => index === self.findIndex(t => t.id === el.id));
+                 data.forEach(item => {
+                    if (item.properties) {
+                         Object.values(item.properties).forEach(val => {
+                            if (fullFormalizationData.components.some(c => c.id === val)) {
+                                hiddenIds.add(val);
+                            }
+                         });
+                    }
+                });
             }
-             if (type === 'components') {
-                sourceData = [...sourceData, ...specFormalizationData.components];
-                sourceData = sourceData.filter((c, index, self) => index === self.findIndex(t => t.id === c.id));
-            }
-            if (hideLinked[type]) {
-                data = sourceData.filter(item => !hiddenIds[type].has(item.id));
-            } else {
-                data = sourceData;
-            }
-        } else if (type === 'elements') {
-            data = specFormalizationData.elements;
-        } else if (type === 'components') {
-            data = specFormalizationData.components;
+            filteredData = data.filter(item => !hiddenIds.has(item.id));
         }
-        
+
         return (
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between p-4">
@@ -987,9 +914,9 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea>
+                    <ScrollArea className="h-72">
                         <div className="space-y-2 p-4 pt-0">
-                            {data.map(item => {
+                            {filteredData.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
                                 const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
                                 const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
@@ -1156,4 +1083,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
