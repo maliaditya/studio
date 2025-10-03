@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -258,6 +259,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     useEffect(() => {
         if (!isAutoExpanding) return;
     
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         let madeChanges = false;
         const newNodesMap = new Map<string, { x: number; y: number }>();
         const newEdgesSet = new Set<string>();
@@ -271,7 +273,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     
             // Expand children
             let childIds: string[] = [
-                ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
+                ...((definition as ExerciseDefinition).linkedDeepWorkIds || []),
                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                 ...((definition as ExerciseDefinition).linkedResourceIds || []),
                 ...((definition as FormalizationItem).linkedElementIds || []),
@@ -290,10 +292,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 childrenToLoad.forEach((childId, index) => {
                     if (!newNodesMap.has(childId)) {
-                        newNodesMap.set(childId, {
-                            x: pos.x + HORIZONTAL_SPACING, 
-                            y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((childrenToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
-                        });
+                        const x = isElementMindMap ? pos.x + (index * (CARD_WIDTH + 20)) - ((childrenToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : pos.x + HORIZONTAL_SPACING;
+                        const y = isElementMindMap ? pos.y + (CARD_HEIGHT + VERTICAL_SPACING) : pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((childrenToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                        newNodesMap.set(childId, { x, y });
                     }
                     newEdgesSet.add(`${nodeId}-${childId}`);
                 });
@@ -307,10 +308,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                      if (!newNodesMap.has(parentId)) {
-                        newNodesMap.set(parentId, {
-                            x: pos.x - HORIZONTAL_SPACING, 
-                            y: pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
-                        });
+                        const x = isElementMindMap ? pos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : pos.x - HORIZONTAL_SPACING;
+                        const y = isElementMindMap ? pos.y - (CARD_HEIGHT + VERTICAL_SPACING) : pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                        newNodesMap.set(parentId, { x, y });
                     }
                     newEdgesSet.add(`${parentId}-${nodeId}`);
                 });
@@ -330,9 +330,10 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         } else {
             setIsAutoExpanding(false);
         }
-    }, [isAutoExpanding, nodes, allDefinitions, parentMap, runCollisionDetection]);
+    }, [isAutoExpanding, nodes, allDefinitions, parentMap, runCollisionDetection, rootId]);
 
     const handleExpandChildren = useCallback((nodeId: string) => {
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         const currentNodeDef = allDefinitions.get(nodeId) as (Resource & Pattern & FormalizationItem);
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
@@ -357,10 +358,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         validChildIds.forEach((childId, index) => {
             if (!nodes.has(childId)) {
-                nodesToUpdate.set(childId, {
-                    x: currentNodePos.x + HORIZONTAL_SPACING, 
-                    y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((validChildIds.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
-                });
+                const x = isElementMindMap ? currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((validChildIds.length - 1) * (CARD_WIDTH + 20) / 2) : currentNodePos.x + HORIZONTAL_SPACING;
+                const y = isElementMindMap ? currentNodePos.y + (CARD_HEIGHT + VERTICAL_SPACING) : currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((validChildIds.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                nodesToUpdate.set(childId, { x, y });
             }
             const edgeId1 = `${nodeId}-${childId}`;
             const edgeId2 = `${childId}-${nodeId}`;
@@ -377,9 +377,10 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, runCollisionDetection]);
+    }, [nodes, edges, allDefinitions, runCollisionDetection, rootId]);
   
     const handleRevealParents = useCallback((nodeId: string) => {
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodePos) return;
 
@@ -391,10 +392,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
-                 nodesToUpdate.set(parentId, {
-                    x: currentNodePos.x - HORIZONTAL_SPACING,
-                    y: currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2),
-                });
+                 const x = isElementMindMap ? currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : currentNodePos.x - HORIZONTAL_SPACING;
+                 const y = isElementMindMap ? currentNodePos.y - (CARD_HEIGHT + VERTICAL_SPACING) : currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                 nodesToUpdate.set(parentId, { x, y });
             }
             const edgeId1 = `${parentId}-${nodeId}`;
             const edgeId2 = `${nodeId}-${parentId}`;
@@ -411,7 +411,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection]);
+    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection, rootId]);
     
     const handleDragEnd = (event: DragEndEvent) => {
         setIsDragging(false);
@@ -560,17 +560,35 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [allDefinitions, allDeepWorkLogs, allUpskillLogs]);
     
     const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
-        const sourceIsLeft = sourcePos.x < targetPos.x;
-        const startX = sourceIsLeft ? sourcePos.x + CARD_WIDTH : sourcePos.x;
-        const startY = sourcePos.y + CARD_HEIGHT / 2;
-        const endX = sourceIsLeft ? targetPos.x : targetPos.x + CARD_WIDTH;
-        const endY = targetPos.y + CARD_HEIGHT / 2;
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         
-        const dx = endX - startX;
-        const controlPointX1 = startX + dx / 2;
-        const controlPointX2 = endX - dx / 2;
-        
-        return `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
+        if (isElementMindMap) {
+            const startX = sourcePos.x + CARD_WIDTH / 2;
+            const startY = sourcePos.y + CARD_HEIGHT;
+            const endX = targetPos.x + CARD_WIDTH / 2;
+            const endY = targetPos.y;
+            
+            const dx = endX - startX;
+            const dy = endY - startY;
+            
+            const controlY1 = startY + dy / 2;
+            const controlY2 = endY - dy / 2;
+            
+            return `M ${startX},${startY} C ${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
+
+        } else {
+            const sourceIsLeft = sourcePos.x < targetPos.x;
+            const startX = sourceIsLeft ? sourcePos.x + CARD_WIDTH : sourcePos.x;
+            const startY = sourcePos.y + CARD_HEIGHT / 2;
+            const endX = sourceIsLeft ? targetPos.x : targetPos.x + CARD_WIDTH;
+            const endY = targetPos.y + CARD_HEIGHT / 2;
+            
+            const dx = endX - startX;
+            const controlPointX1 = startX + dx / 2;
+            const controlPointX2 = endX - dx / 2;
+            
+            return `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
+        }
     };
 
     const Controls = () => {
@@ -623,7 +641,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             ];
 
                             if (definition.type === 'formalization_element' && definition.properties) {
-                                allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                                childIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
                             }
 
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
@@ -1302,3 +1320,4 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     </>
   );
 }
+
