@@ -158,6 +158,8 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
     const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
     const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
+    const audioWasPlayingBeforeModal = useRef(false);
+    const audioTimeBeforeModal = useRef(0);
     
     useEffect(() => {
       if (item) {
@@ -708,36 +710,44 @@ function FormalizationPageContent() {
         });
         setResources(allResourcesToUpdate);
     };
-
+    
     const fullFormalizationData = useMemo(() => {
-      const localData: FormalizationData = (isResource(selectedResource) && selectedResource.formalization)
-        ? JSON.parse(JSON.stringify(selectedResource.formalization))
-        : { elements: [], operations: [], components: [] };
-    
-      const globalElements = new Map<string, FormalizationItem>();
-      const globalOps = new Map<string, FormalizationItem>();
-      const globalComps = new Map<string, FormalizationItem>();
-    
-      resources.forEach(res => {
-        if (res.formalization) {
-          (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalElements.set(el.id, el));
-          (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalOps.set(op.id, op));
-          (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalComps.set(c.id, c));
-        }
-      });
-    
-      const combineAndUnique = (localItems: FormalizationItem[], globalItemsMap: Map<string, FormalizationItem>) => {
-        const combinedMap = new Map<string, FormalizationItem>();
-        localItems.forEach(item => combinedMap.set(item.id, item));
-        globalItemsMap.forEach((item, id) => combinedMap.set(id, item));
-        return Array.from(combinedMap.values());
-      };
-    
-      return {
-        elements: combineAndUnique(localData.elements || [], globalElements),
-        operations: combineAndUnique(localData.operations || [], globalOps),
-        components: combineAndUnique(localData.components || [], globalComps),
-      };
+        const globalItems = {
+            elements: new Map<string, FormalizationItem>(),
+            operations: new Map<string, FormalizationItem>(),
+            components: new Map<string, FormalizationItem>(),
+        };
+
+        // First, gather all global items from all resources
+        resources.forEach(res => {
+            if (res.formalization) {
+                (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalItems.elements.set(el.id, el));
+                (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalItems.operations.set(op.id, op));
+                (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalItems.components.set(c.id, c));
+            }
+        });
+
+        // Start with the local data of the selected resource
+        const localData: FormalizationData = (isResource(selectedResource) && selectedResource.formalization)
+            ? JSON.parse(JSON.stringify(selectedResource.formalization))
+            : { elements: [], operations: [], components: [] };
+        
+        const combinedData = {
+            elements: new Map(localData.elements.map(item => [item.id, item])),
+            operations: new Map(localData.operations.map(item => [item.id, item])),
+            components: new Map(localData.components.map(item => [item.id, item])),
+        };
+
+        // Now, merge globals, overwriting any local entry with a matching global one
+        globalItems.elements.forEach((item, id) => combinedData.elements.set(id, item));
+        globalItems.operations.forEach((item, id) => combinedData.operations.set(id, item));
+        globalItems.components.forEach((item, id) => combinedData.components.set(id, item));
+
+        return {
+            elements: Array.from(combinedData.elements.values()),
+            operations: Array.from(combinedData.operations.values()),
+            components: Array.from(combinedData.components.values()),
+        };
     }, [selectedResource, resources]);
 
 
@@ -914,7 +924,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-72">
+                    <ScrollArea className="pr-1">
                         <div className="space-y-2 p-4 pt-0">
                             {filteredData.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -1083,5 +1093,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
