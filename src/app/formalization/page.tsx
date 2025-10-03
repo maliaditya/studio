@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -11,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -227,23 +226,23 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     }
     
     const availableComponents = useMemo(() => {
-      if (!formalizationData?.components) return [];
-      
-      const findDescendants = (compId: string, allComps: FormalizationItem[]): string[] => {
-          let children: string[] = [];
-          const comp = allComps.find(c => c.id === compId);
-          if (comp && comp.linkedComponentIds) {
-              children = [...comp.linkedComponentIds];
-              comp.linkedComponentIds.forEach(childId => {
-                  children = [...children, ...findDescendants(childId, allComps)];
-              });
-          }
-          return children;
-      };
+        if (!formalizationData?.components) return [];
+        
+        const findDescendants = (compId: string, allComps: FormalizationItem[]): string[] => {
+            let children: string[] = [];
+            const comp = allComps.find(c => c.id === compId);
+            if (comp && comp.linkedComponentIds) {
+                children = [...comp.linkedComponentIds];
+                comp.linkedComponentIds.forEach(childId => {
+                    children = [...children, ...findDescendants(childId, allComps)];
+                });
+            }
+            return children;
+        };
 
-      const selfAndDescendants = item ? [item.id, ...findDescendants(item.id, formalizationData.components)] : [];
-
-      return formalizationData.components.filter(c => !selfAndDescendants.includes(c.id));
+        const selfAndDescendants = item ? [item.id, ...findDescendants(item.id, formalizationData.components)] : [];
+        
+        return formalizationData.components.filter(c => !selfAndDescendants.includes(c.id));
     }, [formalizationData, item]);
 
 
@@ -363,7 +362,10 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
         <Dialog open={!!componentId} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent className="max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle>Component: {component.text}</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Blocks className="h-5 w-5 text-primary" />
+                        {component.text}
+                    </DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
                     {linkedComponents.length > 0 && (
@@ -373,7 +375,10 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                           {linkedComponents.map(c => (
                             <Card key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSubComponent(c.id)}>
                               <CardHeader className="p-4">
-                                <CardTitle className="text-base">Component: {c.text}</CardTitle>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                  <Blocks className="h-4 w-4 text-primary" />
+                                  {c.text}
+                                </CardTitle>
                               </CardHeader>
                             </Card>
                           ))}
@@ -384,7 +389,10 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                         {linkedElements.map(el => (
                             <Card key={el.id}>
                                 <CardHeader className="p-4">
-                                    <CardTitle className="text-base">Element: {el.text}</CardTitle>
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                      <Database className="h-4 w-4 text-primary" />
+                                      {el.text}
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-4 pt-0 space-y-2">
                                     {el.properties && Object.keys(el.properties).length > 0 && (
@@ -1089,3 +1097,4 @@ export default function FormalizationPage() {
 
 
 
+    
