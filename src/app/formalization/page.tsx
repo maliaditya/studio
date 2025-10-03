@@ -162,27 +162,12 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     useEffect(() => {
       if (item) {
         setText(item.text);
-        if (type === 'elements') {
-          setProperties(item.properties ? Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })) : []);
-          setLinkedOperationIds(item.linkedOperationIds || []);
-        } else {
-          setProperties([]);
-          setLinkedOperationIds([]);
-        }
-
-        if (type === 'operations' || type === 'components') {
-            setLinkedElementIds(item.linkedElementIds || []);
-        } else {
-            setLinkedElementIds([]);
-        }
-        
-        if (type === 'components') {
-            setLinkedComponentIds(item.linkedComponentIds || []);
-        } else {
-            setLinkedComponentIds([]);
-        }
+        setProperties(item.properties ? Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })) : []);
+        setLinkedElementIds(item.linkedElementIds || []);
+        setLinkedComponentIds(item.linkedComponentIds || []);
+        setLinkedOperationIds(item.linkedOperationIds || []);
       }
-    }, [item, type]);
+    }, [item]);
 
     const handleSave = () => {
         if (!item) return;
@@ -194,7 +179,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                 if (prop.key.trim()) acc[prop.key.trim()] = prop.value;
                 return acc;
             }, {} as Record<string, any>) : undefined,
-            linkedElementIds: (type === 'operations' || type === 'components') ? linkedElementIds : undefined,
+            linkedElementIds: type === 'components' ? linkedElementIds : undefined,
             linkedOperationIds: type === 'elements' ? linkedOperationIds : undefined,
             linkedComponentIds: type === 'components' ? linkedComponentIds : undefined,
         };
@@ -406,54 +391,61 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                         </div>
                       </div>
                     )}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {linkedElements.map(el => (
-                            <Card key={el.id}>
-                                <CardHeader className="p-4">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                      <Database className="h-4 w-4 text-primary" />
-                                      {el.text}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-0 space-y-2">
-                                    {el.properties && Object.keys(el.properties).length > 0 && (
-                                        <div className="text-xs text-muted-foreground space-y-1">
-                                            <p className="font-medium text-foreground">Properties:</p>
-                                            <ul className="list-disc list-inside">
-                                                {Object.entries(el.properties).map(([key, value]) => {
-                                                    const linkedComp = formalizationData?.components?.find(c => c.id === value);
-                                                    return (
-                                                      <li key={key}>
-                                                          <span className="font-semibold">{key}:</span>{' '}
-                                                          {linkedComp ? (
-                                                              <Badge
-                                                                  variant="secondary"
-                                                                  className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                                  onClick={() => onOpenSubComponent(linkedComp.id)}
-                                                              >
-                                                                  {linkedComp.text}
-                                                              </Badge>
-                                                          ) : (
-                                                              value
-                                                          )}
-                                                      </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-                                        <p className="font-medium text-foreground">Operations:</p>
-                                        <ul className="list-disc list-inside">
-                                            {getLinkedOperations(el).map(op => (
-                                                <li key={op.id}>{op.text}</li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
+                    {linkedElements.length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="text-sm font-semibold">Linked Elements</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {linkedElements.map(el => (
+                                    <Card key={el.id}>
+                                        <CardHeader className="p-4">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                            <Database className="h-4 w-4 text-primary" />
+                                            {el.text}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-4 pt-0 space-y-2">
+                                            {el.properties && Object.keys(el.properties).length > 0 && (
+                                                <div className="text-xs text-muted-foreground space-y-1">
+                                                    <p className="font-medium text-foreground">Properties:</p>
+                                                    <ul className="list-disc list-inside">
+                                                        {Object.entries(el.properties).map(([key, value]) => {
+                                                            const linkedComp = formalizationData?.components?.find(c => c.id === value);
+                                                            return (
+                                                            <li key={key}>
+                                                                <span className="font-semibold">{key}:</span>{' '}
+                                                                {linkedComp ? (
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                                        onClick={() => onOpenSubComponent(linkedComp.id)}
+                                                                    >
+                                                                        {linkedComp.text}
+                                                                    </Badge>
+                                                                ) : (
+                                                                    value
+                                                                )}
+                                                            </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {getLinkedOperations(el).length > 0 && (
+                                                <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                                                    <p className="font-medium text-foreground">Operations:</p>
+                                                    <ul className="list-disc list-inside">
+                                                        {getLinkedOperations(el).map(op => (
+                                                            <li key={op.id}>{op.text}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {linkedElements.length === 0 && linkedComponents.length === 0 && (
                       <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
                     )}
@@ -631,9 +623,6 @@ function FormalizationPageContent() {
     const handleAddItem = (type: 'elements' | 'operations' | 'components') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
-        if (type === 'elements') newItem.linkedOperationIds = [];
-        if (type === 'operations' || type === 'components') newItem.linkedElementIds = [];
-        if (type === 'components') newItem.linkedComponentIds = [];
         
         const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         const updatedItems = [...(currentFormalization[type] || []), newItem];
@@ -723,28 +712,32 @@ function FormalizationPageContent() {
         const localData = (isResource(selectedResource) && selectedResource.formalization)
             ? JSON.parse(JSON.stringify(selectedResource.formalization)) as FormalizationData
             : { elements: [], operations: [], components: [] };
-        
-        const globalData: FormalizationData = { elements: [], operations: [], components: [] };
-        
+    
+        const globalData: { elements: Map<string, FormalizationItem>, operations: Map<string, FormalizationItem>, components: Map<string, FormalizationItem> } = {
+            elements: new Map(),
+            operations: new Map(),
+            components: new Map(),
+        };
+    
         resources.forEach(res => {
             if (res.formalization) {
-                globalData.elements.push(...(res.formalization.elements || []).filter(el => el.isGlobal));
-                globalData.operations.push(...(res.formalization.operations || []).filter(op => op.isGlobal));
-                globalData.components.push(...(res.formalization.components || []).filter(c => c.isGlobal));
+                (res.formalization.elements || []).filter(el => el.isGlobal).forEach(el => globalData.elements.set(el.id, el));
+                (res.formalization.operations || []).filter(op => op.isGlobal).forEach(op => globalData.operations.set(op.id, op));
+                (res.formalization.components || []).filter(c => c.isGlobal).forEach(c => globalData.components.set(c.id, c));
             }
         });
-        
-        const combineAndUnique = <T extends { id: string }>(arr1: T[], arr2: T[]): T[] => {
+    
+        const combineAndUnique = <T extends { id: string }>(arr1: T[], globalArr: T[]): T[] => {
             const map = new Map<string, T>();
             arr1.forEach(item => map.set(item.id, item));
-            arr2.forEach(item => map.set(item.id, item));
+            globalArr.forEach(item => map.set(item.id, item));
             return Array.from(map.values());
         };
-        
+    
         return {
-            elements: combineAndUnique(localData.elements, globalData.elements),
-            operations: combineAndUnique(localData.operations, globalData.operations),
-            components: combineAndUnique(localData.components, globalData.components),
+            elements: combineAndUnique(localData.elements, Array.from(globalData.elements.values())),
+            operations: combineAndUnique(localData.operations, Array.from(globalData.operations.values())),
+            components: combineAndUnique(localData.components, Array.from(globalData.components.values())),
         };
     }, [selectedResource, resources]);
 
@@ -1129,7 +1122,7 @@ function FormalizationPageContent() {
                 <ItemEditorModal
                     item={editingItem.item}
                     type={editingItem.type}
-                    formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
+                    formalizationData={fullFormalizationData}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                 />
@@ -1163,3 +1156,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
