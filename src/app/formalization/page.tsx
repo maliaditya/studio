@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { MindMapViewer } from '@/components/MindMapViewer';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -159,10 +160,18 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     useEffect(() => {
       if (item) {
         setText(item.text);
-        setProperties(item.properties ? Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })) : []);
-        setLinkedElementIds(item.linkedElementIds || []);
+        if (type === 'elements' && item.properties) {
+          setProperties(Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })));
+        } else {
+          setProperties([]);
+        }
+        if (type === 'operations' || type === 'components') {
+            setLinkedElementIds(item.linkedElementIds || []);
+        } else {
+            setLinkedElementIds([]);
+        }
       }
-    }, [item]);
+    }, [item, type]);
 
     const handleSave = () => {
         if (!item) return;
@@ -251,7 +260,22 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {(type === 'operations' || type === 'components') && (
+                    {type === 'operations' && (
+                        <div className="space-y-2">
+                            <Label>Link Elements</Label>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                <div className="space-y-1">
+                                    {(formalizationData?.elements || []).map(el => (
+                                        <div key={el.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
+                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                    {type === 'components' && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -300,6 +324,9 @@ function FormalizationPageContent() {
     const playerRef = useRef<ReactPlayer>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+
+    const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+    const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
 
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -448,7 +475,7 @@ function FormalizationPageContent() {
         const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         const updatedItems = (currentFormalization[type] || []).filter(item => item.id !== id);
         
-        let finalFormalization = { ...currentFormalization, [type]: updatedItems };
+        let finalFormalization: FormalizationData = { ...currentFormalization, [type]: updatedItems };
 
         if (type === 'elements') {
             finalFormalization.operations = (finalFormalization.operations || []).map(op => ({
@@ -472,6 +499,12 @@ function FormalizationPageContent() {
             description: "Your formalization data has been saved locally.",
         });
     };
+    
+    const openMindMapForElement = (elementId: string) => {
+        setMindMapRootId(elementId);
+        setIsMindMapModalOpen(true);
+    };
+
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -638,58 +671,69 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea>
-                        <div className="space-y-2">
-                            {data.map(item => {
-                                const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []) : [];
-                                
-                                return (
-                                <Card key={item.id} className="group relative">
-                                    <CardContent className="p-3 text-sm">
-                                        <p className="font-semibold">{item.text}</p>
-                                        {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
-                                            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
-                                                {Object.entries(item.properties).map(([key, value]) => {
-                                                    const component = formalizationData?.components?.find(p => p.id === value);
-                                                    return (
-                                                        <div key={key} className="flex items-center gap-2">
-                                                            <span className="font-medium text-foreground">{key}:</span>
-                                                            {component ? (
-                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
-                                                            ) : (
-                                                                String(value)
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
+                    <div className="space-y-2">
+                        {data.map(item => {
+                            const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                            const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []) : [];
+                            
+                            return (
+                            <Card key={item.id} className="group relative">
+                                <CardContent className="p-3 text-sm">
+                                    <p className="font-semibold">{item.text}</p>
+                                    {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
+                                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                                            {Object.entries(item.properties).map(([key, value]) => {
+                                                const component = formalizationData?.components?.find(p => p.id === value);
+                                                return (
+                                                    <div key={key} className="flex items-center gap-2">
+                                                        <span className="font-medium text-foreground">{key}:</span>
+                                                        {component ? (
+                                                            <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
+                                                        ) : (
+                                                            String(value)
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {type === 'operations' && linkedElements.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t">
+                                            <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
                                             </div>
-                                        )}
-                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
-                                                </div>
+                                        </div>
+                                    )}
+                                    {type === 'components' && linkedElements.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t">
+                                            <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
                                             </div>
-                                        )}
-                                        {type === 'elements' && usedIn.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {usedIn.map((use, i) => <Badge key={i} variant={use.type === 'operation' ? 'outline' : 'default'}>{use.name}</Badge>)}
-                                                </div>
+                                        </div>
+                                    )}
+                                    {type === 'elements' && usedIn.length > 0 && (
+                                        <div className="mt-2 pt-2 border-t">
+                                            <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
+                                             <div className="flex flex-wrap gap-1 mt-1">
+                                                {usedIn.map((use, i) => <Badge key={i} variant={use.type === 'operation' ? 'outline' : 'default'}>{use.name}</Badge>)}
                                             </div>
-                                        )}
-                                    </CardContent>
-                                    <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
-                                    </div>
-                                </Card>
-                            )})}
-                        </div>
-                    </ScrollArea>
+                                        </div>
+                                    )}
+                                </CardContent>
+                                <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {type === 'elements' && (
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
+                                        <GitMerge className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                </div>
+                            </Card>
+                        )})}
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -750,6 +794,14 @@ function FormalizationPageContent() {
                     onSave={handleUpdateItem}
                 />
             )}
+            {isMindMapModalOpen && (
+                <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+                  <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                    <DialogHeader className="sr-only"><DialogTitle>Mind Map</DialogTitle></DialogHeader>
+                    <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootId} />
+                  </DialogContent>
+                </Dialog>
+            )}
         </>
     );
 }
@@ -761,6 +813,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
