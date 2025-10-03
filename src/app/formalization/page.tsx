@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -11,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye, ChevronsDown, ChevronsUp } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -70,6 +69,8 @@ const CuriosityNode = ({
     selectedId,
     allUpskillDefinitions,
     allResources,
+    collapsedIds,
+    onToggleCollapse,
 }: {
     item: ExerciseDefinition;
     level?: number;
@@ -77,8 +78,10 @@ const CuriosityNode = ({
     selectedId: string | null;
     allUpskillDefinitions: ExerciseDefinition[];
     allResources: Resource[];
+    collapsedIds: Set<string>;
+    onToggleCollapse: (id: string) => void;
 }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const isExpanded = !collapsedIds.has(item.id);
 
     const childItems = (item.linkedUpskillIds || [])
         .map(id => allUpskillDefinitions.find(d => d.id === id))
@@ -97,7 +100,7 @@ const CuriosityNode = ({
                 )}
             >
                 {(childItems.length > 0 || linkedResources.length > 0) && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onToggleCollapse(item.id); }}>
                         <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
                     </Button>
                 )}
@@ -116,6 +119,8 @@ const CuriosityNode = ({
                             selectedId={selectedId}
                             allUpskillDefinitions={allUpskillDefinitions}
                             allResources={allResources}
+                            collapsedIds={collapsedIds}
+                            onToggleCollapse={onToggleCollapse}
                         />
                     ))}
                     {linkedResources.map(resource => (
@@ -526,6 +531,7 @@ function FormalizationPageContent() {
     const { toast } = useToast();
     
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
+    const [collapsedCuriosities, setCollapsedCuriosities] = useState<Set<string>>(new Set());
 
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'components'} | null>(null);
     const audioWasPlayingBeforeModal = useRef(false);
@@ -945,70 +951,78 @@ function FormalizationPageContent() {
     }, [selectedFormalizationSpecId, getSpecResources, resources]);
 
     const itemsToDisplay = useMemo(() => {
-        const allSpecResources = getSpecResources(selectedFormalizationSpecId);
-        const allElementsInSpec = allSpecResources.flatMap(r => r.formalization?.elements || []);
-    
-        // 1. Find all components that are used as properties in any element.
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        const allElementsInSpec = specResources.flatMap(r => r.formalization?.elements || []);
+        
+        // Find all components used as properties in any element.
         const encapsulatedComponentIds = new Set<string>();
         allElementsInSpec.forEach(el => {
-          if (el.properties) {
-            Object.values(el.properties).forEach(value => {
-              if (value && typeof value === 'string' && value.startsWith('item_')) {
-                encapsulatedComponentIds.add(value);
-              }
-            });
-          }
+            if (el.properties) {
+                Object.values(el.properties).forEach(value => {
+                    if (value && typeof value === 'string' && value.startsWith('item_')) {
+                        encapsulatedComponentIds.add(value);
+                    }
+                });
+            }
         });
-    
-        // 2. Recursively find all children of these encapsulated components.
+
+        // Recursively find all children of these encapsulated components.
         const allEncapsulatedItemIds = new Set<string>();
-        const allCompsMap = new Map(allSpecResources.flatMap(r => r.formalization?.components || []).map(c => [c.id, c]));
-    
+        const allCompsMap = new Map(specResources.flatMap(r => r.formalization?.components || []).map(c => [c.id, c]));
+
         const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
         while (queue.length > 0) {
-          const currentId = queue.shift()!;
-          if (visited.has(currentId)) continue;
-          visited.add(currentId);
-          allEncapsulatedItemIds.add(currentId);
-    
-          const component = allCompsMap.get(currentId);
-          if (component) {
-            (component.linkedElementIds || []).forEach(elId => allEncapsulatedItemIds.add(elId));
-            (component.linkedComponentIds || []).forEach(childId => {
-              if (!visited.has(childId)) queue.push(childId);
-            });
-          }
+            const currentId = queue.shift()!;
+            if (visited.has(currentId)) continue;
+            visited.add(currentId);
+            allEncapsulatedItemIds.add(currentId);
+
+            const component = allCompsMap.get(currentId);
+            if (component) {
+                (component.linkedElementIds || []).forEach(elId => allEncapsulatedItemIds.add(elId));
+                (component.linkedComponentIds || []).forEach(childId => {
+                    if (!visited.has(childId)) queue.push(childId);
+                });
+            }
         }
-    
-        // Also find all operations linked to the encapsulated elements.
+
+        const allElementsMap = new Map(specResources.flatMap(r => r.formalization?.elements || []).map(el => [el.id, el]));
         allElementsInSpec.forEach(el => {
-          if (allEncapsulatedItemIds.has(el.id)) {
-            (el.linkedOperationIds || []).forEach(opId => allEncapsulatedItemIds.add(opId));
-          }
+            if (allEncapsulatedItemIds.has(el.id)) {
+                (el.linkedOperationIds || []).forEach(opId => allEncapsulatedItemIds.add(opId));
+            }
         });
-    
-        // 3. Now, filter each category based on the `hideLinked` state and the encapsulated set.
+
         let visibleElements = fullFormalizationData.elements;
         let visibleOperations = fullFormalizationData.operations;
         let visibleComponents = fullFormalizationData.components;
-    
+
         if (hideLinked.elements) {
-          visibleElements = visibleElements.filter(item => !allEncapsulatedItemIds.has(item.id));
+            visibleElements = visibleElements.filter(item => !allEncapsulatedItemIds.has(item.id));
         }
         if (hideLinked.operations) {
-          visibleOperations = visibleOperations.filter(item => !allEncapsulatedItemIds.has(item.id));
+            visibleOperations = visibleOperations.filter(item => !allEncapsulatedItemIds.has(item.id));
         }
         if (hideLinked.components) {
-          visibleComponents = visibleComponents.filter(item => !allEncapsulatedItemIds.has(item.id));
+            visibleComponents = visibleComponents.filter(item => !allEncapsulatedItemIds.has(item.id));
         }
-    
+
         return {
-          elements: visibleElements,
-          operations: visibleOperations,
-          components: visibleComponents,
+            elements: visibleElements,
+            operations: visibleOperations,
+            components: visibleComponents,
         };
-      }, [fullFormalizationData, getSpecResources, selectedFormalizationSpecId, hideLinked]);
+    }, [fullFormalizationData, hideLinked, getSpecResources, selectedFormalizationSpecId]);
+    
+    const handleToggleCollapseAll = () => {
+        const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
+        if (collapsedCuriosities.size === allIds.size) {
+            setCollapsedCuriosities(new Set());
+        } else {
+            setCollapsedCuriosities(allIds);
+        }
+    };
     
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1271,7 +1285,17 @@ function FormalizationPageContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                                <div className="flex">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
+                                        <ChevronsUp className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
+                                        <ChevronsDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
                             <ScrollArea className="flex-grow">
@@ -1284,6 +1308,12 @@ function FormalizationPageContent() {
                                             selectedId={selectedResource?.id || null}
                                             allUpskillDefinitions={upskillDefinitions}
                                             allResources={resources}
+                                            collapsedIds={collapsedCuriosities}
+                                            onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
+                                                const newSet = new Set(prev);
+                                                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                                                return newSet;
+                                            })}
                                         />
                                     ))}
                                 </div>
@@ -1343,6 +1373,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
