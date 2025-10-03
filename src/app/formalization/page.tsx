@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -410,6 +410,7 @@ function FormalizationPageContent() {
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
     const [detailPopupComponentId, setDetailPopupComponentId] = useState<string | null>(null);
+    const [hideLinked, setHideLinked] = useState<Record<'elements' | 'operations' | 'components', boolean>>({ elements: true, operations: true, components: true });
 
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -763,7 +764,6 @@ function FormalizationPageContent() {
             if (!formalizationData) return new Map();
             const map = new Map<string, {name: string, type: 'component' | 'element_property'}[]>();
 
-            // Find where components are linked in other components
             (formalizationData.components || []).forEach(parentComp => {
                 (parentComp.linkedComponentIds || []).forEach(childCompId => {
                     if (!map.has(childCompId)) map.set(childCompId, []);
@@ -771,7 +771,6 @@ function FormalizationPageContent() {
                 });
             });
             
-            // Find where components are used as properties in elements
             (formalizationData.elements || []).forEach(el => {
                 if (el.properties) {
                     Object.values(el.properties).forEach(propValue => {
@@ -787,7 +786,6 @@ function FormalizationPageContent() {
             return map;
         }, [formalizationData]);
 
-        // This is the core logic for the cascading filter
         const hiddenIds = useMemo(() => {
             if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
             
@@ -827,16 +825,11 @@ function FormalizationPageContent() {
 
         let data: FormalizationItem[] = [];
         if (formalizationData) {
-            switch(type) {
-                case 'elements':
-                    data = (formalizationData.elements || []).filter(item => !hiddenIds.elements.has(item.id));
-                    break;
-                case 'operations':
-                    data = (formalizationData.operations || []).filter(item => !hiddenIds.operations.has(item.id));
-                    break;
-                case 'components':
-                    data = (formalizationData.components || []).filter(item => !hiddenIds.components.has(item.id));
-                    break;
+            let sourceData = formalizationData[type] || [];
+            if (hideLinked[type]) {
+                data = sourceData.filter(item => !hiddenIds[type].has(item.id));
+            } else {
+                data = sourceData;
             }
         }
         
@@ -847,9 +840,14 @@ function FormalizationPageContent() {
                         <CardTitle className="capitalize">{title}</CardTitle>
                         <CardDescription className="text-xs">{description}</CardDescription>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
-                        <PlusCircle className="h-4 w-4 text-green-500"/>
-                    </Button>
+                    <div className="flex items-center">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHideLinked(prev => ({...prev, [type]: !prev[type]}))}>
+                           <EyeOff className={cn("h-4 w-4", !hideLinked[type] && "text-primary")} />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
+                            <PlusCircle className="h-4 w-4 text-green-500"/>
+                        </Button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea>
