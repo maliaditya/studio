@@ -800,7 +800,7 @@ function FormalizationPageContent() {
                 <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                   <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="sr-only"><DialogTitle>Mind Map</DialogTitle></DialogHeader>
-                    <MindMapViewer showControls={false} rootFocusAreaId={mindMapRootId} />
+                    <MindMapViewer showControls={false} rootId={mindMapRootId} />
                   </DialogContent>
                 </Dialog>
             )}
@@ -815,4 +815,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
