@@ -260,7 +260,22 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {(type === 'operations' || type === 'components') && (
+                    {type === 'operations' && (
+                        <div className="space-y-2">
+                            <Label>Link Elements</Label>
+                            <ScrollArea className="h-40 border rounded-md p-2">
+                                <div className="space-y-1">
+                                    {(formalizationData?.elements || []).map(el => (
+                                        <div key={el.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
+                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                    {type === 'components' && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -656,7 +671,7 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <ScrollArea className="h-64">
+                    <ScrollArea>
                         <div className="space-y-2 pr-2">
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
@@ -683,7 +698,15 @@ function FormalizationPageContent() {
                                                 })}
                                             </div>
                                         )}
-                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
+                                        {type === 'operations' && linkedElements.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {type === 'components' && linkedElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -792,3 +815,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
