@@ -227,10 +227,8 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     }
     
     const availableComponents = useMemo(() => {
-        if (!formalizationData?.components) return [];
-        // When editing a component, don't show it in its own list of linkable components
-        return formalizationData.components.filter(c => c.id !== item?.id);
-    }, [formalizationData, item]);
+        return formalizationData?.components || [];
+    }, [formalizationData]);
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -297,7 +295,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Label>Link Components</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
                                 <div className="space-y-1">
-                                    {availableComponents.map(comp => (
+                                    {availableComponents.filter(c => c.id !== item?.id).map(comp => (
                                         <div key={comp.id} className="flex items-center space-x-2">
                                             <Checkbox id={`comp-${comp.id}`} checked={linkedComponentIds.includes(comp.id)} onCheckedChange={() => handleLinkToggle(comp.id, 'component')} />
                                             <Label htmlFor={`comp-${comp.id}`} className="font-normal">{comp.text}</Label>
@@ -741,8 +739,6 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
-        const data = formalizationData ? (formalizationData[type] || []) : [];
-        
         const reverseElementLinks = useMemo(() => {
             if (!formalizationData) return new Map();
             const map = new Map<string, {name: string, type: 'operation' | 'component'}[]>();
@@ -779,8 +775,10 @@ function FormalizationPageContent() {
             (formalizationData.elements || []).forEach(el => {
                 if (el.properties) {
                     Object.values(el.properties).forEach(propValue => {
-                        if (map.has(propValue)) { // if this prop value is a component ID
-                            map.get(propValue)!.push({ name: el.text, type: 'element_property' });
+                        const component = formalizationData.components?.find(c => c.id === propValue);
+                        if (component) {
+                           if (!map.has(component.id)) map.set(component.id, []);
+                           map.get(component.id)!.push({ name: el.text, type: 'element_property' });
                         }
                     });
                 }
@@ -789,6 +787,59 @@ function FormalizationPageContent() {
             return map;
         }, [formalizationData]);
 
+        // This is the core logic for the cascading filter
+        const hiddenIds = useMemo(() => {
+            if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
+            
+            const hiddenComponentIds = new Set<string>();
+            (formalizationData.elements || []).forEach(el => {
+                if (el.properties) {
+                    Object.values(el.properties).forEach(val => {
+                        if (formalizationData.components?.some(c => c.id === val)) {
+                            hiddenComponentIds.add(val);
+                        }
+                    });
+                }
+            });
+    
+            const hiddenElementIds = new Set<string>();
+            hiddenComponentIds.forEach(compId => {
+                const component = formalizationData.components?.find(c => c.id === compId);
+                (component?.linkedElementIds || []).forEach(elId => hiddenElementIds.add(elId));
+            });
+    
+            const hiddenOperationIds = new Set<string>();
+            hiddenElementIds.forEach(elId => {
+                (formalizationData.operations || []).forEach(op => {
+                    if (op.linkedElementIds?.includes(elId)) {
+                        hiddenOperationIds.add(op.id);
+                    }
+                });
+            });
+    
+            return {
+                components: hiddenComponentIds,
+                elements: hiddenElementIds,
+                operations: hiddenOperationIds
+            };
+        }, [formalizationData]);
+
+
+        let data: FormalizationItem[] = [];
+        if (formalizationData) {
+            switch(type) {
+                case 'elements':
+                    data = (formalizationData.elements || []).filter(item => !hiddenIds.elements.has(item.id));
+                    break;
+                case 'operations':
+                    data = (formalizationData.operations || []).filter(item => !hiddenIds.operations.has(item.id));
+                    break;
+                case 'components':
+                    data = (formalizationData.components || []).filter(item => !hiddenIds.components.has(item.id));
+                    break;
+            }
+        }
+        
         return (
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -970,10 +1021,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-    
-
-    
-
-
-
