@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { MindMapViewer } from '@/components/MindMapViewer';
+import { useDraggable, DndContext, type DragEndEvent } from '@dnd-kit/core';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -327,15 +328,34 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     );
 };
 
-const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenSubComponent }: {
-    componentId: string | null;
+interface ComponentPopupState {
+    id: string;
+    x: number;
+    y: number;
+}
+
+const ComponentDetailPopup = ({ popupState, formalizationData, onClose, onOpenSubComponent }: { 
+    popupState: ComponentPopupState;
     formalizationData?: FormalizationData;
-    onClose: () => void;
-    onOpenSubComponent: (id: string) => void;
+    onClose: (id: string) => void;
+    onOpenSubComponent: (id: string, event: React.MouseEvent) => void;
 }) => {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+      id: `component-popup-${popupState.id}`,
+    });
+
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: popupState.y,
+        left: popupState.x,
+        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+        willChange: 'transform',
+        zIndex: 120,
+    };
+    
     const component = useMemo(() => {
-        return formalizationData?.components?.find(c => c.id === componentId);
-    }, [componentId, formalizationData]);
+        return formalizationData?.components?.find(c => c.id === popupState.id);
+    }, [popupState.id, formalizationData]);
 
     const getLinkedOperations = (element: FormalizationItem) => {
         if (!formalizationData?.operations || !element.linkedOperationIds) return [];
@@ -355,108 +375,112 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
     if (!component) return null;
 
     return (
-        <Dialog open={!!componentId} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Blocks className="h-5 w-5 text-primary" />
-                        {component.text}
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-                    {linkedComponents.length > 0 && (
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-semibold">Linked Components</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {linkedComponents.map(subComponent => {
-                            const subComponentElements = formalizationData?.elements.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
-                            return (
-                                <Card key={subComponent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSubComponent(subComponent.id)}>
-                                <CardHeader className="p-4 pb-2">
-                                    <CardTitle className="text-base flex items-center gap-2">
-                                        <Blocks className="h-4 w-4 text-primary" />
-                                        {subComponent.text}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 pt-2">
-                                    {subComponentElements.length > 0 ? (
-                                        <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                            {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
-                                        </ul>
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground">No elements linked.</p>
-                                    )}
-                                </CardContent>
-                                </Card>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {linkedElements.length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="text-sm font-semibold">Linked Elements</h4>
+        <div ref={setNodeRef} style={style} {...attributes}>
+            <Card className="w-[800px] max-h-[70vh] flex flex-col shadow-2xl border-2 border-primary/30 bg-card">
+                <CardHeader className="p-3 relative cursor-grab flex-shrink-0" {...listeners}>
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Blocks className="h-5 w-5 text-primary" />
+                            {component.text}
+                        </CardTitle>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(component!.id); }}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <div className="flex-grow min-h-0 overflow-y-auto">
+                    <CardContent className="p-4 pt-0 space-y-4">
+                        {linkedComponents.length > 0 && (
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-semibold">Linked Components</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {linkedElements.map(el => (
-                                    <Card key={el.id}>
-                                        <CardHeader className="p-4">
-                                            <CardTitle className="text-base flex items-center gap-2">
-                                            <Database className="h-4 w-4 text-primary" />
-                                            {el.text}
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-4 pt-0 space-y-2">
-                                            {el.properties && Object.keys(el.properties).length > 0 && (
-                                                <div className="text-xs text-muted-foreground space-y-1">
-                                                    <p className="font-medium text-foreground">Properties:</p>
-                                                    <ul className="list-disc list-inside">
-                                                        {Object.entries(el.properties).map(([key, value]) => {
-                                                            const linkedComp = formalizationData?.components?.find(c => c.id === value);
-                                                            return (
-                                                            <li key={key}>
-                                                                <span className="font-semibold">{key}:</span>{' '}
-                                                                {linkedComp ? (
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                                        onClick={() => onOpenSubComponent(linkedComp.id)}
-                                                                    >
-                                                                        {linkedComp.text}
-                                                                    </Badge>
-                                                                ) : (
-                                                                    value
-                                                                )}
-                                                            </li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            {getLinkedOperations(el).length > 0 && (
-                                                <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-                                                    <p className="font-medium text-foreground">Operations:</p>
-                                                    <ul className="list-disc list-inside">
-                                                        {getLinkedOperations(el).map(op => (
-                                                            <li key={op.id}>{op.text}</li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </CardContent>
+                              {linkedComponents.map(subComponent => {
+                                const subComponentElements = formalizationData?.elements.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
+                                return (
+                                    <Card key={subComponent.id} className="cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
+                                    <CardHeader className="p-4 pb-2">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <Blocks className="h-4 w-4 text-primary" />
+                                            {subComponent.text}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-4 pt-2">
+                                        {subComponentElements.length > 0 ? (
+                                            <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                                {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
+                                            </ul>
+                                        ) : (
+                                            <p className="text-xs text-muted-foreground">No elements linked.</p>
+                                        )}
+                                    </CardContent>
                                     </Card>
-                                ))}
+                                );
+                              })}
                             </div>
-                        </div>
-                    )}
-                    {linkedElements.length === 0 && linkedComponents.length === 0 && (
-                      <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
-                    )}
+                          </div>
+                        )}
+                        {linkedElements.length > 0 && (
+                            <div className="space-y-2">
+                                <h4 className="text-sm font-semibold">Linked Elements</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {linkedElements.map(el => (
+                                        <Card key={el.id}>
+                                            <CardHeader className="p-4">
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                <Database className="h-4 w-4 text-primary" />
+                                                {el.text}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-4 pt-0 space-y-2">
+                                                {el.properties && Object.keys(el.properties).length > 0 && (
+                                                    <div className="text-xs text-muted-foreground space-y-1">
+                                                        <p className="font-medium text-foreground">Properties:</p>
+                                                        <ul className="list-disc list-inside">
+                                                            {Object.entries(el.properties).map(([key, value]) => {
+                                                                const linkedComp = formalizationData?.components?.find(c => c.id === value);
+                                                                return (
+                                                                <li key={key}>
+                                                                    <span className="font-semibold">{key}:</span>{' '}
+                                                                    {linkedComp ? (
+                                                                        <Badge
+                                                                            variant="secondary"
+                                                                            className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                                            onClick={(e) => onOpenSubComponent(linkedComp.id, e)}
+                                                                        >
+                                                                            {linkedComp.text}
+                                                                        </Badge>
+                                                                    ) : (
+                                                                        value
+                                                                    )}
+                                                                </li>
+                                                                );
+                                                            })}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {getLinkedOperations(el).length > 0 && (
+                                                    <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                                                        <p className="font-medium text-foreground">Operations:</p>
+                                                        <ul className="list-disc list-inside">
+                                                            {getLinkedOperations(el).map(op => (
+                                                                <li key={op.id}>{op.text}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {linkedElements.length === 0 && linkedComponents.length === 0 && (
+                        <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
+                        )}
+                    </CardContent>
                 </div>
-                 <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Close</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </Card>
+        </div>
     );
 };
 
@@ -489,7 +513,7 @@ function FormalizationPageContent() {
 
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
-    const [detailPopupComponentId, setDetailPopupComponentId] = useState<string | null>(null);
+    const [componentPopups, setComponentPopups] = useState<Map<string, ComponentPopupState>>(new Map());
     const [hideLinked, setHideLinked] = useState<Record<'elements' | 'operations' | 'components', boolean>>({ elements: true, operations: true, components: true });
 
     const specializations = useMemo(() => {
@@ -711,84 +735,119 @@ function FormalizationPageContent() {
         setResources(allResourcesToUpdate);
     };
 
-    const fullFormalizationData = useMemo(() => {
-      const allDefinitions = new Map<string, any>();
-      resources.forEach(res => {
-        (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element' }));
-        (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation' }));
-        (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component' }));
-      });
-  
-      const collectDependencies = (itemId: string, visited: Set<string>): Set<string> => {
-        if (visited.has(itemId)) return new Set();
-        visited.add(itemId);
-  
-        const item = allDefinitions.get(itemId);
-        if (!item) return new Set([itemId]);
-  
-        let dependencies = new Set<string>([itemId]);
-  
-        const processIds = (ids: string[] | undefined) => {
-          (ids || []).forEach(childId => {
-            collectDependencies(childId, visited).forEach(dep => dependencies.add(dep));
-          });
-        };
-  
-        processIds(item.linkedElementIds);
-        processIds(item.linkedComponentIds);
-        processIds(item.linkedOperationIds);
-  
-        if (item.type === 'element' && item.properties) {
-          Object.values(item.properties).forEach(value => {
-            if (allDefinitions.has(value as string)) {
-              collectDependencies(value as string, visited).forEach(dep => dependencies.add(dep));
-            }
-          });
-        }
-  
-        return dependencies;
-      };
-  
-      const globalIds = new Set<string>();
-      resources.forEach(res => {
-        (res.formalization?.elements || []).forEach(el => {
-          if (el.isGlobal) {
-            collectDependencies(el.id, new Set()).forEach(dep => globalIds.add(dep));
-          }
+    const openComponentPopup = useCallback((componentId: string, event: React.MouseEvent) => {
+        setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            const parentRect = (event.target as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
+            
+            const newPopup: ComponentPopupState = {
+                id: componentId,
+                x: parentRect ? parentRect.right + 10 : event.clientX,
+                y: parentRect ? parentRect.top : event.clientY,
+            };
+            newPopups.set(componentId, newPopup);
+            return newPopups;
         });
-      });
-  
-      const globals = {
-        elements: new Map<string, FormalizationItem>(),
-        operations: new Map<string, FormalizationItem>(),
-        components: new Map<string, FormalizationItem>(),
-      };
-  
-      globalIds.forEach(id => {
-        const item = allDefinitions.get(id);
-        if (item) {
-          if (item.type === 'element') globals.elements.set(id, item);
-          else if (item.type === 'operation') globals.operations.set(id, item);
-          else if (item.type === 'component') globals.components.set(id, item);
+    }, []);
+
+    const closeComponentPopup = useCallback((componentId: string) => {
+        setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            newPopups.delete(componentId);
+            return newPopups;
+        });
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, delta } = event;
+        const activeId = active.id as string;
+    
+        if (activeId.startsWith('component-popup-')) {
+          const componentId = activeId.replace('component-popup-', '');
+          setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(componentId);
+            if (popup) {
+              newPopups.set(componentId, {
+                ...popup,
+                x: popup.x + delta.x,
+                y: popup.y + delta.y,
+              });
+            }
+            return newPopups;
+          });
         }
-      });
-  
-      const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
-      const combined = {
-        elements: new Map(globals.elements),
-        operations: new Map(globals.operations),
-        components: new Map(globals.components),
-      };
-  
-      (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
-      (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
-      (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
-  
-      return {
-        elements: Array.from(combined.elements.values()),
-        operations: Array.from(combined.operations.values()),
-        components: Array.from(combined.components.values()),
-      };
+      }, []);
+
+      const fullFormalizationData = useMemo(() => {
+        const allDefinitions = new Map<string, any>();
+        const globalItems = {
+            elements: new Map<string, FormalizationItem>(),
+            operations: new Map<string, FormalizationItem>(),
+            components: new Map<string, FormalizationItem>(),
+        };
+    
+        // Pass 1: Collect all item definitions
+        resources.forEach(res => {
+            (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element' }));
+            (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation' }));
+            (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component' }));
+        });
+    
+        // Pass 2: Recursively find all dependencies for global items
+        const globalIds = new Set<string>();
+        const collectDependencies = (itemId: string, visited: Set<string>) => {
+            if (!itemId || visited.has(itemId)) return;
+            visited.add(itemId);
+    
+            const item = allDefinitions.get(itemId);
+            if (!item) return;
+    
+            globalIds.add(itemId);
+    
+            const children = [
+                ...(item.linkedElementIds || []),
+                ...(item.linkedComponentIds || []),
+                ...(item.linkedOperationIds || []),
+                ...(item.properties ? Object.values(item.properties) : [])
+            ];
+    
+            children.forEach(childId => collectDependencies(childId, visited));
+        };
+    
+        resources.forEach(res => {
+            (res.formalization?.elements || []).filter(el => el.isGlobal).forEach(el => collectDependencies(el.id, new Set()));
+            (res.formalization?.components || []).filter(c => c.isGlobal).forEach(c => collectDependencies(c.id, new Set()));
+        });
+        
+        // Pass 3: Populate global maps
+        globalIds.forEach(id => {
+            const item = allDefinitions.get(id);
+            if (item) {
+                if (item.type === 'element') globalItems.elements.set(id, item);
+                else if (item.type === 'operation') globalItems.operations.set(id, item);
+                else if (item.type === 'component') globalItems.components.set(id, item);
+            }
+        });
+    
+        // Pass 4: Merge local data
+        const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
+        
+        const combined = {
+            elements: new Map(globalItems.elements),
+            operations: new Map(globalItems.operations),
+            components: new Map(globalItems.components),
+        };
+    
+        (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
+        (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
+        (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
+    
+        return {
+            elements: Array.from(combined.elements.values()),
+            operations: Array.from(combined.operations.values()),
+            components: Array.from(combined.components.values()),
+        };
     }, [selectedResource, resources]);
 
 
@@ -965,7 +1024,7 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="h-auto max-h-72 pr-1">
+                    <ScrollArea className="h-72 pr-1">
                         <div className="space-y-2 p-4 pt-0">
                             {filteredData.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -976,7 +1035,7 @@ function FormalizationPageContent() {
                                 <Card key={item.id} className="group relative">
                                     <CardContent className="p-3 text-sm">
                                         <div className="flex items-center justify-between">
-                                            <button className="font-semibold text-left w-full" onClick={() => type === 'components' && setDetailPopupComponentId(item.id)}>{item.text}</button>
+                                            <button className="font-semibold text-left w-full" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)}>{item.text}</button>
                                             {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
                                         </div>
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
@@ -990,7 +1049,7 @@ function FormalizationPageContent() {
                                                                 <Badge
                                                                   variant="secondary"
                                                                   className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                                  onClick={() => setDetailPopupComponentId(component.id)}
+                                                                  onClick={(e) => openComponentPopup(component.id, e)}
                                                                 >
                                                                   {component.text}
                                                                 </Badge>
@@ -1051,7 +1110,7 @@ function FormalizationPageContent() {
     };
 
     return (
-        <>
+        <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
             <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
                 <Card className="col-span-1 flex flex-col">
@@ -1105,14 +1164,15 @@ function FormalizationPageContent() {
                     onSave={handleUpdateItem}
                 />
             )}
-             {detailPopupComponentId && (
+             {Array.from(componentPopups.values()).map(popupState => (
                 <ComponentDetailPopup
-                    componentId={detailPopupComponentId}
+                    key={popupState.id}
+                    popupState={popupState}
                     formalizationData={fullFormalizationData}
-                    onClose={() => setDetailPopupComponentId(null)}
-                    onOpenSubComponent={(id) => setDetailPopupComponentId(id)}
+                    onClose={closeComponentPopup}
+                    onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
                 />
-            )}
+            ))}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
               <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="p-4 border-b">
@@ -1123,7 +1183,7 @@ function FormalizationPageContent() {
                 </div>
               </DialogContent>
             </Dialog>
-        </>
+        </DndContext>
     );
 }
 
@@ -1134,4 +1194,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
