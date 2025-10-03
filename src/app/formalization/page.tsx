@@ -63,12 +63,6 @@ const isImageUrl = (url: string | undefined): boolean => {
     }
 };
 
-const formatTime = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-};
-
 const CuriosityNode = ({
     item,
     level = 0,
@@ -539,20 +533,20 @@ function FormalizationPageContent() {
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
 
     useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
-
-        if (editingItem && playingAudio) {
-            audioWasPlayingBeforeModal.current = true;
-            audioTimeBeforeModal.current = audio.currentTime;
-            audio.pause();
-            setPlayingAudio(false);
-        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
-            audio.currentTime = audioTimeBeforeModal.current;
-            audio.play().catch(e => console.error("Audio resume failed:", e));
-            setPlayingAudio(true);
-            audioWasPlayingBeforeModal.current = false;
-        }
+      const audio = audioRef.current;
+      if (!audio) return;
+  
+      if (editingItem && playingAudio) {
+          audioWasPlayingBeforeModal.current = true;
+          audioTimeBeforeModal.current = audio.currentTime;
+          audio.pause();
+          setPlayingAudio(false);
+      } else if (!editingItem && audioWasPlayingBeforeModal.current) {
+          audio.currentTime = audioTimeBeforeModal.current;
+          audio.play().catch(e => console.error("Audio resume failed:", e));
+          setPlayingAudio(true);
+          audioWasPlayingBeforeModal.current = false;
+      }
     }, [editingItem, playingAudio]);
     
     useEffect(() => {
@@ -789,40 +783,38 @@ function FormalizationPageContent() {
             components: new Map<string, FormalizationItem>(),
         };
 
-        // Pass 1: Collect all item definitions from all resources
         resources.forEach(res => {
-            (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element' }));
-            (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation' }));
-            (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component' }));
+            (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element', resourceId: res.id }));
+            (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation', resourceId: res.id }));
+            (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component', resourceId: res.id }));
         });
 
-        // Pass 2: Recursively find all dependencies for global items
         const globalIds = new Set<string>();
         const collectDependencies = (itemId: string, visited: Set<string>) => {
             if (!itemId || visited.has(itemId)) return;
             visited.add(itemId);
-
+    
             const item = allDefinitions.get(itemId);
             if (!item) return;
-
+    
             globalIds.add(itemId);
-
+    
             const children = [
                 ...(item.linkedElementIds || []),
                 ...(item.linkedComponentIds || []),
                 ...(item.linkedOperationIds || []),
                 ...(item.properties ? Object.values(item.properties).filter(val => allDefinitions.has(val)) : [])
             ];
-
+    
             children.forEach(childId => collectDependencies(childId, visited));
         };
-        
-        resources.forEach(res => {
-            (res.formalization?.elements || []).filter(el => el.isGlobal).forEach(el => collectDependencies(el.id, new Set()));
-            (res.formalization?.components || []).filter(c => c.isGlobal).forEach(c => collectDependencies(c.id, new Set()));
+
+        allDefinitions.forEach(item => {
+            if (item.isGlobal) {
+                collectDependencies(item.id, new Set());
+            }
         });
-        
-        // Pass 3: Populate global maps with full definitions
+
         globalIds.forEach(id => {
             const item = allDefinitions.get(id);
             if (item) {
@@ -832,7 +824,6 @@ function FormalizationPageContent() {
             }
         });
 
-        // Pass 4: Merge local data with global data
         const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
         
         const combined = {
@@ -849,6 +840,39 @@ function FormalizationPageContent() {
             elements: Array.from(combined.elements.values()),
             operations: Array.from(combined.operations.values()),
             components: Array.from(combined.components.values()),
+        };
+    }, [selectedResource, resources]);
+
+    const itemsToDisplay = useMemo(() => {
+        const localData = isResource(selectedResource) ? selectedResource.formalization : null;
+        if (!localData && !resources.some(r => r.formalization)) return { elements: [], operations: [], components: [] };
+    
+        const globalItems = { elements: new Map(), operations: new Map(), components: new Map() };
+    
+        resources.forEach(res => {
+            if (res.formalization) {
+                res.formalization.elements.forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
+                res.formalization.operations.forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
+                res.formalization.components.forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
+            }
+        });
+        
+        const displayItems = {
+            elements: new Map(globalItems.elements),
+            operations: new Map(globalItems.operations),
+            components: new Map(globalItems.components),
+        };
+
+        if (localData) {
+            localData.elements?.forEach(el => displayItems.elements.set(el.id, el));
+            localData.operations?.forEach(op => displayItems.operations.set(op.id, op));
+            localData.components?.forEach(c => displayItems.components.set(c.id, c));
+        }
+
+        return {
+            elements: Array.from(displayItems.elements.values()),
+            operations: Array.from(displayItems.operations.values()),
+            components: Array.from(displayItems.components.values()),
         };
     }, [selectedResource, resources]);
 
@@ -985,7 +1009,7 @@ function FormalizationPageContent() {
     };
     
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
-        const data: FormalizationItem[] = (fullFormalizationData?.[type] || []);
+        const data: FormalizationItem[] = (itemsToDisplay?.[type] || []);
         
         let filteredData = data;
         if (hideLinked[type]) {
@@ -1196,3 +1220,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
