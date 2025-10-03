@@ -478,6 +478,11 @@ const ComponentDetailPopup = ({ popupState, formalizationData, onClose, onOpenSu
     );
 };
 
+function formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
 
 function FormalizationPageContent() {
     const { 
@@ -532,12 +537,6 @@ function FormalizationPageContent() {
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
     
-    const formatTime = (seconds: number): string => {
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${minutes}:${secs.toString().padStart(2, '0')}`;
-    };
-
     useEffect(() => {
         const audio = audioRef.current;
         if (!audio) return;
@@ -782,12 +781,6 @@ function FormalizationPageContent() {
       }, []);
       
     const fullFormalizationData = useMemo(() => {
-        const globalItems = {
-            elements: new Map<string, FormalizationItem>(),
-            operations: new Map<string, FormalizationItem>(),
-            components: new Map<string, FormalizationItem>(),
-        };
-
         const allItemsMap = new Map<string, any>();
         resources.forEach(res => {
             if (res.formalization) {
@@ -797,34 +790,41 @@ function FormalizationPageContent() {
             }
         });
 
-        const globalIdSet = new Set<string>();
-        const queue: string[] = Array.from(allItemsMap.values()).filter(item => item.isGlobal).map(item => item.id);
+        const globalItems = {
+            elements: new Map<string, FormalizationItem>(),
+            operations: new Map<string, FormalizationItem>(),
+            components: new Map<string, FormalizationItem>(),
+        };
+
+        const globalSeedIds = Array.from(allItemsMap.values())
+            .filter(item => item.isGlobal)
+            .map(item => item.id);
+        
+        const queue: string[] = [...globalSeedIds];
+        const processed = new Set<string>();
 
         while (queue.length > 0) {
             const currentId = queue.shift()!;
-            if (globalIdSet.has(currentId)) continue;
-            globalIdSet.add(currentId);
+            if (processed.has(currentId)) continue;
+            processed.add(currentId);
 
             const item = allItemsMap.get(currentId);
             if (!item) continue;
             
+            if (item.type === 'element') globalItems.elements.set(item.id, item);
+            else if (item.type === 'operation') globalItems.operations.set(item.id, item);
+            else if (item.type === 'component') globalItems.components.set(item.id, item);
+
             const children = [
                 ...(item.linkedElementIds || []),
                 ...(item.linkedComponentIds || []),
                 ...(item.linkedOperationIds || []),
                 ...(item.properties ? Object.values(item.properties) : [])
-            ].filter(id => allItemsMap.has(id));
+            ].filter((id): id is string => typeof id === 'string' && allItemsMap.has(id));
 
             queue.push(...children);
         }
-
-        globalIdSet.forEach(id => {
-            const item = allItemsMap.get(id);
-            if (item.type === 'element') globalItems.elements.set(id, item);
-            else if (item.type === 'operation') globalItems.operations.set(id, item);
-            else if (item.type === 'component') globalItems.components.set(id, item);
-        });
-
+        
         const localData = isResource(selectedResource) ? selectedResource.formalization : null;
         
         const combined = {
@@ -836,7 +836,7 @@ function FormalizationPageContent() {
         (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
         (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
         (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
-
+        
         return {
             elements: Array.from(combined.elements.values()),
             operations: Array.from(combined.operations.values()),
@@ -845,9 +845,12 @@ function FormalizationPageContent() {
     }, [selectedResource, resources]);
 
     const itemsToDisplay = useMemo(() => {
-        const localData = isResource(selectedResource) ? selectedResource.formalization : null;
-        if (!localData && !resources.some(r => r.formalization)) return { elements: [], operations: [], components: [] };
-        
+        const localItems = isResource(selectedResource) && selectedResource.formalization ? {
+            elements: selectedResource.formalization.elements || [],
+            operations: selectedResource.formalization.operations || [],
+            components: selectedResource.formalization.components || [],
+        } : { elements: [], operations: [], components: [] };
+    
         const globalItems = {
             elements: new Map<string, FormalizationItem>(),
             operations: new Map<string, FormalizationItem>(),
@@ -862,16 +865,14 @@ function FormalizationPageContent() {
         });
         
         const displayItems = {
-            elements: new Map(globalItems.elements),
-            operations: new Map(globalItems.operations),
-            components: new Map(globalItems.components),
+            elements: new Map(localItems.elements.map(item => [item.id, item])),
+            operations: new Map(localItems.operations.map(item => [item.id, item])),
+            components: new Map(localItems.components.map(item => [item.id, item])),
         };
         
-        if (localData) {
-            (localData.elements || []).forEach(el => displayItems.elements.set(el.id, el));
-            (localData.operations || []).forEach(op => displayItems.operations.set(op.id, op));
-            (localData.components || []).forEach(c => displayItems.components.set(c.id, c));
-        }
+        globalItems.elements.forEach((item, id) => displayItems.elements.set(id, item));
+        globalItems.operations.forEach((item, id) => displayItems.operations.set(id, item));
+        globalItems.components.forEach((item, id) => displayItems.components.set(id, item));
 
         return {
             elements: Array.from(displayItems.elements.values()),
@@ -879,6 +880,7 @@ function FormalizationPageContent() {
             components: Array.from(displayItems.components.values()),
         };
     }, [selectedResource, resources]);
+
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1015,150 +1017,153 @@ function FormalizationPageContent() {
         const data: FormalizationItem[] = (itemsToDisplay?.[type] || []);
         
         return (
-            <Card className="flex flex-col h-full">
-                <CardHeader className="flex flex-row items-center justify-between p-4 flex-shrink-0">
-                    <div>
-                        <CardTitle className="capitalize">{title}</CardTitle>
-                        <CardDescription className="text-xs">{description}</CardDescription>
-                    </div>
-                    <div className="flex items-center">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHideLinked(prev => ({...prev, [type]: !prev[type]}))}>
-                           <EyeOff className={cn("h-4 w-4", !hideLinked[type] && "text-primary")} />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
-                            <PlusCircle className="h-4 w-4 text-green-500"/>
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0 flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        <div className="space-y-2 p-4 pt-0">
-                            {data.map(item => {
-                                const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
-                                const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
-                                
-                                return (
-                                <Card key={item.id} className="group relative">
-                                    <CardContent className="p-3 text-sm">
-                                        <div className="flex items-center justify-between">
-                                            <button className="font-semibold text-left w-full" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)}>{item.text}</button>
-                                            {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
-                                        </div>
-                                        {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
-                                            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
-                                                {Object.entries(item.properties).map(([key, value]) => {
-                                                    const component = fullFormalizationData?.components?.find(p => p.id === value);
-                                                    return (
-                                                        <div key={key} className="flex items-center gap-2">
-                                                            <span className="font-medium text-foreground">{key}:</span>
-                                                            {component ? (
-                                                                <Badge
-                                                                  variant="secondary"
-                                                                  className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                                  onClick={(e) => openComponentPopup(component.id, e)}
-                                                                >
-                                                                  {component.text}
-                                                                </Badge>
-                                                            ) : (
-                                                                String(value)
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                        {type === 'elements' && linkedOperations.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedOperations.map((op, i) => <Badge key={i} variant="secondary">{op}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {type === 'components' && linkedElements.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {type === 'components' && linkedComponents.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Components:</h5>
-                                                <div className="flex flex-wrap gap-1 mt-1">
-                                                    {linkedComponents.map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                    <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {type === 'elements' && (
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleGlobal(item.id)}>
-                                            <Globe className={cn("h-4 w-4", item.isGlobal && "text-blue-500")} />
-                                          </Button>
-                                        )}
-                                        {type === 'elements' && (
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
-                                            <GitMerge className="h-4 w-4" />
-                                          </Button>
-                                        )}
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
-                                    </div>
-                                </Card>
-                            )})}
+            <div className="flex flex-col h-full">
+                <Card className="flex flex-col h-full">
+                    <CardHeader className="flex flex-row items-center justify-between p-4 flex-shrink-0">
+                        <div>
+                            <CardTitle className="capitalize">{title}</CardTitle>
+                            <CardDescription className="text-xs">{description}</CardDescription>
                         </div>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+                        <div className="flex items-center">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHideLinked(prev => ({...prev, [type]: !prev[type]}))}>
+                            <EyeOff className={cn("h-4 w-4", !hideLinked[type] && "text-primary")} />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
+                                <PlusCircle className="h-4 w-4 text-green-500"/>
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0 flex-grow min-h-0">
+                        <ScrollArea className="h-full">
+                            <div className="space-y-2 p-4 pt-0">
+                                {data.map(item => {
+                                    const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
+                                    const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                    const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
+                                    
+                                    return (
+                                    <Card key={item.id} className="group relative">
+                                        <CardContent className="p-3 text-sm">
+                                            <div className="flex items-center justify-between">
+                                                <button className="font-semibold text-left w-full" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)}>{item.text}</button>
+                                                {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
+                                            </div>
+                                            {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
+                                                <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                                                    {Object.entries(item.properties).map(([key, value]) => {
+                                                        const component = fullFormalizationData?.components?.find(p => p.id === value);
+                                                        return (
+                                                            <div key={key} className="flex items-center gap-2">
+                                                                <span className="font-medium text-foreground">{key}:</span>
+                                                                {component ? (
+                                                                    <Badge
+                                                                    variant="secondary"
+                                                                    className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                                    onClick={(e) => openComponentPopup(component.id, e)}
+                                                                    >
+                                                                    {component.text}
+                                                                    </Badge>
+                                                                ) : (
+                                                                    String(value)
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {type === 'elements' && linkedOperations.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t">
+                                                    <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {linkedOperations.map((op, i) => <Badge key={i} variant="secondary">{op}</Badge>)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {type === 'components' && linkedElements.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t">
+                                                    <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {type === 'components' && linkedComponents.length > 0 && (
+                                                <div className="mt-2 pt-2 border-t">
+                                                    <h5 className="font-medium text-xs text-muted-foreground">Components:</h5>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {linkedComponents.map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                        <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {type === 'elements' && (
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleGlobal(item.id)}>
+                                                <Globe className={cn("h-4 w-4", item.isGlobal && "text-blue-500")} />
+                                            </Button>
+                                            )}
+                                            {type === 'elements' && (
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
+                                                <GitMerge className="h-4 w-4" />
+                                            </Button>
+                                            )}
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                        </div>
+                                    </Card>
+                                )})}
+                            </div>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </div>
         );
     };
 
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-full grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
-                <Card className="col-span-1 flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                        <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
-                            <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                            <SelectContent>
-                                {specializations.map(spec => (
-                                    <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <ScrollArea className="flex-grow">
-                            <div className="space-y-1">
-                                {curiositiesForSpecialization.map(curiosity => (
-                                    <CuriosityNode 
-                                        key={curiosity.id}
-                                        item={curiosity}
-                                        onSelect={setSelectedResource}
-                                        selectedId={selectedResource?.id || null}
-                                        allUpskillDefinitions={upskillDefinitions}
-                                        allResources={resources}
-                                    />
-                                ))}
-                            </div>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
+            <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 p-4">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-grow min-h-0">
+                    <Card className="lg:col-span-1 flex flex-col min-h-0">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
+                            <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
+                                <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                                <SelectContent>
+                                    {specializations.map(spec => (
+                                        <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <ScrollArea className="flex-grow">
+                                <div className="space-y-1">
+                                    {curiositiesForSpecialization.map(curiosity => (
+                                        <CuriosityNode 
+                                            key={curiosity.id}
+                                            item={curiosity}
+                                            onSelect={setSelectedResource}
+                                            selectedId={selectedResource?.id || null}
+                                            allUpskillDefinitions={upskillDefinitions}
+                                            allResources={resources}
+                                        />
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
 
-                <div className="col-span-1 md:col-span-3 lg:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-1 h-full min-h-[600px]">
-                        {renderSelectedResource()}
-                    </div>
-
-                    <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
-                        {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
-                        {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
+                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="lg:col-span-1 h-full min-h-0">
+                            {renderSelectedResource()}
+                        </div>
+                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+                            {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
+                            {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
+                            {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1201,3 +1206,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
