@@ -945,19 +945,21 @@ function FormalizationPageContent() {
     }, [selectedFormalizationSpecId, getSpecResources, resources]);
 
 
-    const itemsToDisplay = useMemo(() => {
+     const itemsToDisplay = useMemo(() => {
         const { elements, operations, components } = fullFormalizationData;
 
         const allSpecResources = getSpecResources(selectedFormalizationSpecId);
         const allElementsMap = new Map<string, FormalizationItem>();
         const allComponentsMap = new Map<string, FormalizationItem>();
+        
+        // This time, gather ALL elements and components from the entire specialization's resources
         allSpecResources.forEach(r => {
             (r.formalization?.elements || []).forEach(el => allElementsMap.set(el.id, el));
             (r.formalization?.components || []).forEach(c => allComponentsMap.set(c.id, c));
         });
-
+        
         const encapsulatedComponentIds = new Set<string>();
-        for (const el of allElementsMap.values()) {
+        for (const el of allElementsMap.values()) { // Iterate over ALL elements now
             if (el.properties) {
                 for (const value of Object.values(el.properties)) {
                     if (allComponentsMap.has(value)) {
@@ -967,50 +969,66 @@ function FormalizationPageContent() {
             }
         }
         
-        const allEncapsulatedIds = new Set<string>();
+        const allEncapsulatedItemIds = new Set<string>();
         const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
         while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
-            allEncapsulatedIds.add(currentId);
+            allEncapsulatedItemIds.add(currentId);
 
             const component = allComponentsMap.get(currentId);
             if (component) {
-                (component.linkedElementIds || []).forEach(childId => allEncapsulatedIds.add(childId));
-                (component.linkedComponentIds || []).forEach(childId => queue.push(childId));
+                (component.linkedElementIds || []).forEach(childId => {
+                    allEncapsulatedItemIds.add(childId);
+                    const childElement = allElementsMap.get(childId);
+                    if (childElement) {
+                        (childElement.linkedOperationIds || []).forEach(opId => allEncapsulatedItemIds.add(opId));
+                    }
+                });
+                (component.linkedComponentIds || []).forEach(childId => {
+                    if (!visited.has(childId)) queue.push(childId);
+                });
             }
         }
         
         const filterEncapsulated = (items: FormalizationItem[]): FormalizationItem[] => {
-            return items.filter(item => !allEncapsulatedIds.has(item.id));
+            return items.filter(item => {
+                const localData = selectedResource?.formalization;
+                const isLocal = (localData?.elements?.some(e => e.id === item.id)) ||
+                                (localData?.operations?.some(o => o.id === item.id)) ||
+                                (localData?.components?.some(c => c.id === item.id));
+                return isLocal || !allEncapsulatedItemIds.has(item.id);
+            });
         };
         
-        let finalItems = {
-            elements: filterEncapsulated(elements),
-            operations,
-            components: filterEncapsulated(components),
-        };
+        let visibleElements = filterEncapsulated(elements);
+        let visibleOperations = operations; // Operations are linked, so their visibility depends on elements.
+        let visibleComponents = filterEncapsulated(components);
         
         const allLinkedIdsInView = new Set<string>();
-        finalItems.elements.forEach(item => {
+        visibleElements.forEach(item => {
             (item.linkedOperationIds || []).forEach(id => allLinkedIdsInView.add(id));
             if (item.properties) {
                 Object.values(item.properties).forEach(id => allLinkedIdsInView.add(id));
             }
         });
-        finalItems.components.forEach(item => {
+        visibleComponents.forEach(item => {
             (item.linkedElementIds || []).forEach(id => allLinkedIdsInView.add(id));
             (item.linkedComponentIds || []).forEach(id => allLinkedIdsInView.add(id));
         });
         
-        if (hideLinked.elements) finalItems.elements = finalItems.elements.filter(item => !allLinkedIdsInView.has(item.id));
-        if (hideLinked.operations) finalItems.operations = finalItems.operations.filter(item => !allLinkedIdsInView.has(item.id));
-        if (hideLinked.components) finalItems.components = finalItems.components.filter(item => !allLinkedIdsInView.has(item.id));
+        if (hideLinked.elements) visibleElements = visibleElements.filter(item => !allLinkedIdsInView.has(item.id));
+        if (hideLinked.operations) visibleOperations = visibleOperations.filter(item => !allLinkedIdsInView.has(item.id));
+        if (hideLinked.components) visibleComponents = visibleComponents.filter(item => !allLinkedIdsInView.has(item.id));
 
-        return finalItems;
-    }, [fullFormalizationData, getSpecResources, selectedFormalizationSpecId, resources, hideLinked]);
+        return {
+            elements: visibleElements,
+            operations: visibleOperations,
+            components: visibleComponents,
+        };
+    }, [fullFormalizationData, getSpecResources, selectedFormalizationSpecId, resources, hideLinked, selectedResource]);
     
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1345,5 +1363,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
