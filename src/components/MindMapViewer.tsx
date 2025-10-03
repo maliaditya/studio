@@ -101,7 +101,7 @@ interface MindMapViewerProps {
 
 const CARD_WIDTH = 192;
 const CARD_HEIGHT = 90;
-const VERTICAL_SPACING = 20;
+const VERTICAL_SPACING = 40;
 const HORIZONTAL_SPACING = 240;
 
 // Sub-component for the new interactive map
@@ -336,7 +336,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (!currentNodeDef || !currentNodePos) return;
 
         let allChildIds: string[] = [
-            ...((currentNodeDef as ExerciseDefinition).linkedDeepWorkIds || []), 
+            ...((currentNodeDef as ExerciseDefinition).linkedDeepWorkIds || []),
             ...((currentNodeDef as ExerciseDefinition).linkedUpskillIds || []),
             ...((currentNodeDef as ExerciseDefinition).linkedResourceIds || []),
             ...((currentNodeDef as FormalizationItem).linkedElementIds || []),
@@ -385,12 +385,19 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         const nodesToUpdate = new Map<string, { x: number; y: number }>();
         const edgesToUpdate = new Set<string>();
+        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
 
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
-                 const x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2);
-                 const y = currentNodePos.y - (CARD_HEIGHT + VERTICAL_SPACING);
-                 nodesToUpdate.set(parentId, { x, y });
+                let x, y;
+                if(isElementMindMap) {
+                    x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2);
+                    y = currentNodePos.y - (CARD_HEIGHT + VERTICAL_SPACING);
+                } else {
+                    x = currentNodePos.x - HORIZONTAL_SPACING;
+                    y = currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                }
+                nodesToUpdate.set(parentId, { x, y });
             }
             const edgeId1 = `${parentId}-${nodeId}`;
             const edgeId2 = `${nodeId}-${parentId}`;
@@ -407,7 +414,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection]);
+    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection, rootId]);
     
     const handleDragEnd = (event: DragEndEvent) => {
         setIsDragging(false);
@@ -556,35 +563,18 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [allDefinitions, allDeepWorkLogs, allUpskillLogs]);
     
     const getPath = (sourcePos: {x:number, y:number}, targetPos: {x:number, y:number}) => {
-        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
+        const startX = sourcePos.x + CARD_WIDTH / 2;
+        const startY = sourcePos.y + CARD_HEIGHT;
+        const endX = targetPos.x + CARD_WIDTH / 2;
+        const endY = targetPos.y;
         
-        if (isElementMindMap) {
-            const startX = sourcePos.x + CARD_WIDTH / 2;
-            const startY = sourcePos.y + CARD_HEIGHT;
-            const endX = targetPos.x + CARD_WIDTH / 2;
-            const endY = targetPos.y;
-            
-            const dx = endX - startX;
-            const dy = endY - startY;
-            
-            const controlY1 = startY + dy / 2;
-            const controlY2 = endY - dy / 2;
-            
-            return `M ${startX},${startY} C ${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
-
-        } else {
-            const sourceIsLeft = sourcePos.x < targetPos.x;
-            const startX = sourceIsLeft ? sourcePos.x + CARD_WIDTH : sourcePos.x;
-            const startY = sourcePos.y + CARD_HEIGHT / 2;
-            const endX = sourceIsLeft ? targetPos.x : targetPos.x + CARD_WIDTH;
-            const endY = targetPos.y + CARD_HEIGHT / 2;
-            
-            const dx = endX - startX;
-            const controlPointX1 = startX + dx / 2;
-            const controlPointX2 = endX - dx / 2;
-            
-            return `M ${startX},${startY} C ${controlPointX1},${startY} ${controlPointX2},${endY} ${endX},${endY}`;
-        }
+        const dx = endX - startX;
+        const dy = endY - startY;
+        
+        const controlY1 = startY + dy / 2;
+        const controlY2 = endY - dy / 2;
+        
+        return `M ${startX},${startY} C ${startX},${controlY1} ${endX},${controlY2} ${endX},${endY}`;
     };
 
     const Controls = () => {
@@ -603,7 +593,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     return (
         <div ref={containerRef} className="w-full h-full relative bg-background">
             <DndContext sensors={sensors} onDragStart={() => setIsDragging(true)} onDragEnd={handleDragEnd}>
-                <TransformWrapper ref={transformWrapperRef} disabled={isDragging} initialScale={0.7}>
+                <TransformWrapper ref={transformWrapperRef} disabled={isDragging} initialScale={0.7} panning={{disabled: true}}>
                     <Controls />
                     <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }} contentStyle={{ width: '200vw', height: '200vh' }}>
                         <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
@@ -687,8 +677,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
     const showProgress = estimatedHours > 0;
     
     let nodeType = definition.type || 'unknown';
-    let nodeCategory: string = (definition as ExerciseDefinition).category;
-    
+
     if (definition.category === 'Formalization') {
         if (definition.type === 'formalization_element') nodeType = 'Element';
         else if (definition.type === 'component') nodeType = 'Component';
@@ -903,9 +892,12 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     };
 
     if (rootId) {
-        const rootNode = buildDeepWorkTree(rootId) || buildUpskillTree(rootId);
-        if (rootNode) {
-            return {id: 'root-wrapper', name: 'Root', category: 'System', children: [rootNode]}
+        const rootDef = deepWorkDefinitions.find(d => d.id === rootId) || upskillDefinitions.find(d => d.id === rootId) || resources.find(r => r.id === rootId);
+        if (rootDef) {
+            const rootNode = buildDeepWorkTree(rootId) || buildUpskillTree(rootId) || getNode(rootDef, rootDef.type || 'Resource', []);
+            if (rootNode) {
+                return {id: 'root-wrapper', name: 'Root', category: 'System', children: [rootNode]};
+            }
         }
     }
     
