@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -155,38 +154,44 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, []);
 
     const allDefinitions = useMemo(() => {
-        const formalizationItems = [
-            ...patterns.map(p => ({ ...p, type: 'component', category: 'Formalization' })),
-            ...metaRules.map(r => ({ ...r, type: 'meta-rule', category: 'Formalization' })),
-        ];
-        return new Map(
-            [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...formalizationItems].map(def => [def.id, def])
-        );
+      const formalizationItems: any[] = [];
+      const { elements = [], operations = [], components = [] } = resources.reduce((acc, resource) => {
+        if (resource.formalization) {
+          acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element', category: 'Formalization', name: e.text })));
+          acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation', category: 'Formalization', name: o.text })));
+          acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component', category: 'Formalization', name: c.text })));
+        }
+        return acc;
+      }, { elements: [] as any[], operations: [] as any[], components: [] as any[] });
+
+      formalizationItems.push(...elements, ...operations, ...components);
+      
+      const allItems = [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...patterns, ...metaRules, ...formalizationItems];
+      return new Map(allItems.map(def => [def.id, def]));
     }, [deepWorkDefinitions, upskillDefinitions, resources, patterns, metaRules]);
     
     const parentMap = useMemo(() => {
-        const map = new Map<string, string[]>();
-        allDefinitions.forEach(def => {
-            let childIds: string[] = [
-                ...((def as ExerciseDefinition).linkedDeepWorkIds || []), 
-                ...((def as ExerciseDefinition).linkedUpskillIds || []),
-                ...((def as ExerciseDefinition).linkedResourceIds || []),
-                ...((def as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
-            ];
-            
-            const formalizationDef = def as FormalizationItem;
-            if (formalizationDef.type === 'component' || formalizationDef.type === 'operation') {
-                childIds = [...childIds, ...(formalizationDef.linkedElementIds || [])];
-            } else if (formalizationDef.type === 'formalization_element' && formalizationDef.properties) {
-                childIds = [...childIds, ...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val))];
-            }
-    
-            childIds.forEach(childId => {
-                if (!map.has(childId)) map.set(childId, []);
-                map.get(childId)!.push(def.id);
-            });
+      const map = new Map<string, string[]>();
+      allDefinitions.forEach(def => {
+        const formalizationDef = def as FormalizationItem;
+        let childIds: string[] = [
+            ...((def as ExerciseDefinition).linkedDeepWorkIds || []), 
+            ...((def as ExerciseDefinition).linkedUpskillIds || []),
+            ...((def as ExerciseDefinition).linkedResourceIds || []),
+            ...((def as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+            ...((formalizationDef).linkedElementIds || []),
+        ];
+
+        if (formalizationDef.type === 'formalization_element' && formalizationDef.properties) {
+          childIds = [...childIds, ...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val))];
+        }
+
+        childIds.forEach(childId => {
+            if (!map.has(childId)) map.set(childId, []);
+            map.get(childId)!.push(def.id);
         });
-        return map;
+      });
+      return map;
     }, [allDefinitions]);
 
     const runCollisionDetection = useCallback((currentNodes: Map<string, { x: number, y: number }>) => {
@@ -256,7 +261,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const nodesToScan = Array.from(nodes.entries());
     
         nodesToScan.forEach(([nodeId, pos]) => {
-            const definition = allDefinitions.get(nodeId) as (Resource & Pattern & FormalizationItem);
+            const definition = allDefinitions.get(nodeId) as (Resource & FormalizationItem);
             if (!definition) return;
     
             // Expand children
@@ -264,13 +269,14 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                 ...((definition as ExerciseDefinition).linkedResourceIds || []),
+                ...((definition).linkedElementIds || []),
             ];
-             if (definition.type === 'component' || definition.type === 'operation') {
-                childIds = [...childIds, ...(definition.linkedElementIds || [])];
-            } else if (definition.type === 'formalization_element' && definition.properties) {
-                childIds = [...childIds, ...Object.values(definition.properties).filter(val => allDefinitions.has(val))];
-            } else if (definition.points) {
-                childIds = [...childIds, ...definition.points.filter(p => p.resourceId).map(p => p.resourceId!)];
+
+            if (definition.type === 'formalization_element' && definition.properties) {
+                childIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+            }
+            if (definition.points) {
+                childIds.push(...definition.points.filter(p => p.resourceId).map(p => p.resourceId!));
             }
 
             const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId));
@@ -322,17 +328,22 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [isAutoExpanding, nodes, allDefinitions, parentMap, runCollisionDetection]);
 
     const handleExpandChildren = useCallback((nodeId: string) => {
-        const currentNodeDef = allDefinitions.get(nodeId) as (Resource & Pattern);
+        const currentNodeDef = allDefinitions.get(nodeId) as (Resource & Pattern & FormalizationItem);
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
 
-        let childIds = [
-            ...(currentNodeDef.linkedDeepWorkIds || []), 
-            ...(currentNodeDef.linkedUpskillIds || []),
-            ...(currentNodeDef.linkedResourceIds || []),
-            ...(currentNodeDef.points || []).filter(p => p.resourceId).map(p => p.resourceId!),
-            ...(currentNodeDef.linkedElementIds || []),
+        let childIds: string[] = [
+            ...((currentNodeDef as ExerciseDefinition).linkedDeepWorkIds || []), 
+            ...((currentNodeDef as ExerciseDefinition).linkedUpskillIds || []),
+            ...((currentNodeDef as ExerciseDefinition).linkedResourceIds || []),
+            ...((currentNodeDef as FormalizationItem).linkedElementIds || []),
         ];
+        if (currentNodeDef.type === 'formalization_element' && currentNodeDef.properties) {
+            childIds.push(...Object.values(currentNodeDef.properties).filter(val => allDefinitions.has(val)));
+        }
+        if (currentNodeDef.points) {
+            childIds.push(...currentNodeDef.points.filter(p => p.resourceId).map(p => p.resourceId!));
+        }
 
         const validChildIds = childIds.filter(id => allDefinitions.has(id));
 
@@ -569,14 +580,6 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             </div>
         );
     };
-
-    const linkedDeepWorkChildIds = useMemo(() => {
-        return new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
-    }, [deepWorkDefinitions]);
-    
-    const linkedUpskillChildIds = useMemo(() => {
-        return new Set<string>((upskillDefinitions || []).flatMap(def => def.linkedUpskillIds || []));
-    }, [upskillDefinitions]);
 
     return (
         <div ref={containerRef} className="w-full h-full relative bg-background">
