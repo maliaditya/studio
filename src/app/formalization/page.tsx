@@ -227,8 +227,25 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     }
     
     const availableComponents = useMemo(() => {
-        return (formalizationData?.components || []).filter(c => c.id !== item?.id);
+      if (!formalizationData?.components) return [];
+      
+      const findDescendants = (compId: string, allComps: FormalizationItem[]): string[] => {
+          let children: string[] = [];
+          const comp = allComps.find(c => c.id === compId);
+          if (comp && comp.linkedComponentIds) {
+              children = [...comp.linkedComponentIds];
+              comp.linkedComponentIds.forEach(childId => {
+                  children = [...children, ...findDescendants(childId, allComps)];
+              });
+          }
+          return children;
+      };
+
+      const selfAndDescendants = item ? [item.id, ...findDescendants(item.id, formalizationData.components)] : [];
+
+      return formalizationData.components.filter(c => !selfAndDescendants.includes(c.id));
     }, [formalizationData, item]);
+
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -329,6 +346,11 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
         if (!component || !component.linkedElementIds || !formalizationData?.elements) return [];
         return formalizationData.elements.filter(el => component.linkedElementIds?.includes(el.id));
     }, [component, formalizationData]);
+    
+    const linkedComponents = useMemo(() => {
+      if (!component || !component.linkedComponentIds || !formalizationData?.components) return [];
+      return formalizationData.components.filter(c => component.linkedComponentIds?.includes(c.id));
+    }, [component, formalizationData]);
 
     const getLinkedOperations = (elementId: string) => {
         if (!formalizationData?.operations) return [];
@@ -344,6 +366,20 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                     <DialogTitle>Component: {component.text}</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    {linkedComponents.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-semibold">Linked Components</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {linkedComponents.map(c => (
+                            <Card key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSubComponent(c.id)}>
+                              <CardHeader className="p-4">
+                                <CardTitle className="text-base">Component: {c.text}</CardTitle>
+                              </CardHeader>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {linkedElements.map(el => (
                             <Card key={el.id}>
@@ -389,7 +425,9 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                             </Card>
                         ))}
                     </div>
-                    {linkedElements.length === 0 && <p className="text-muted-foreground text-center">No elements linked to this component.</p>}
+                    {linkedElements.length === 0 && linkedComponents.length === 0 && (
+                      <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
+                    )}
                 </div>
                  <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Close</Button>
@@ -816,6 +854,15 @@ function FormalizationPageContent() {
                     }
                 }
             }
+             if (formalizationData?.components) {
+                for (const comp of formalizationData.components) {
+                    if (comp.linkedComponentIds) {
+                        for (const childId of comp.linkedComponentIds) {
+                            hiddenComponentIds.add(childId);
+                        }
+                    }
+                }
+            }
 
             const hiddenElementIds = new Set<string>();
             hiddenComponentIds.forEach(compId => {
@@ -1039,5 +1086,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
