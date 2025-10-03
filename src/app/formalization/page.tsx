@@ -227,22 +227,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     
     const availableComponents = useMemo(() => {
         if (!formalizationData?.components) return [];
-        
-        const findDescendants = (compId: string, allComps: FormalizationItem[]): string[] => {
-            let children: string[] = [];
-            const comp = allComps.find(c => c.id === compId);
-            if (comp && comp.linkedComponentIds) {
-                children = [...comp.linkedComponentIds];
-                comp.linkedComponentIds.forEach(childId => {
-                    children = [...children, ...findDescendants(childId, allComps)];
-                });
-            }
-            return children;
-        };
-
-        const selfAndDescendants = item ? [item.id, ...findDescendants(item.id, formalizationData.components)] : [];
-        
-        return formalizationData.components.filter(c => !selfAndDescendants.includes(c.id));
+        return formalizationData.components.filter(c => c.id !== item?.id);
     }, [formalizationData, item]);
 
 
@@ -341,20 +326,20 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
         return formalizationData?.components?.find(c => c.id === componentId);
     }, [componentId, formalizationData]);
 
-    const linkedElements = useMemo(() => {
-        if (!component || !component.linkedElementIds || !formalizationData?.elements) return [];
-        return formalizationData.elements.filter(el => component.linkedElementIds?.includes(el.id));
-    }, [component, formalizationData]);
-    
-    const linkedComponents = useMemo(() => {
-      if (!component || !component.linkedComponentIds || !formalizationData?.components) return [];
-      return formalizationData.components.filter(c => component.linkedComponentIds?.includes(c.id));
-    }, [component, formalizationData]);
-
     const getLinkedOperations = (elementId: string) => {
         if (!formalizationData?.operations) return [];
         return formalizationData.operations.filter(op => op.linkedElementIds?.includes(elementId));
     };
+
+    const linkedComponents = useMemo(() => {
+        if (!component || !component.linkedComponentIds || !formalizationData?.components) return [];
+        return formalizationData.components.filter(c => component.linkedComponentIds?.includes(c.id));
+    }, [component, formalizationData]);
+
+    const linkedElements = useMemo(() => {
+        if (!component || !component.linkedElementIds || !formalizationData?.elements) return [];
+        return formalizationData.elements.filter(el => component.linkedElementIds?.includes(el.id));
+    }, [component, formalizationData]);
     
     if (!component) return null;
 
@@ -372,16 +357,28 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
                       <div className="space-y-2">
                         <h4 className="text-sm font-semibold">Linked Components</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {linkedComponents.map(c => (
-                            <Card key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSubComponent(c.id)}>
-                              <CardHeader className="p-4">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                  <Blocks className="h-4 w-4 text-primary" />
-                                  {c.text}
-                                </CardTitle>
-                              </CardHeader>
-                            </Card>
-                          ))}
+                          {linkedComponents.map(subComponent => {
+                            const subComponentElements = formalizationData?.elements.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
+                            return (
+                                <Card key={subComponent.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSubComponent(subComponent.id)}>
+                                <CardHeader className="p-4 pb-2">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Blocks className="h-4 w-4 text-primary" />
+                                        {subComponent.text}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-2">
+                                    {subComponentElements.length > 0 ? (
+                                        <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                            {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">No elements linked.</p>
+                                    )}
+                                </CardContent>
+                                </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -803,100 +800,61 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
-        const reverseElementLinks = useMemo(() => {
-            if (!formalizationData) return new Map();
-            const map = new Map<string, {name: string, type: 'operation' | 'component'}[]>();
-
-            (formalizationData.operations || []).forEach(op => {
-                (op.linkedElementIds || []).forEach(elId => {
-                    if (!map.has(elId)) map.set(elId, []);
-                    map.get(elId)!.push({ name: op.text, type: 'operation' });
-                });
-            });
-
-             (formalizationData.components || []).forEach(p => {
-                (p.linkedElementIds || []).forEach(elId => {
-                    if (!map.has(elId)) map.set(elId, []);
-                    map.get(elId)!.push({ name: p.text, type: 'component' });
-                });
-            });
-            return map;
-        }, [formalizationData]);
-        
-        const reverseComponentLinks = useMemo(() => {
-            if (!formalizationData) return new Map();
-            const map = new Map<string, {name: string, type: 'component' | 'element_property'}[]>();
-
-            (formalizationData.components || []).forEach(parentComp => {
-                (parentComp.linkedComponentIds || []).forEach(childCompId => {
-                    if (!map.has(childCompId)) map.set(childCompId, []);
-                    map.get(childCompId)!.push({ name: parentComp.text, type: 'component' });
-                });
-            });
-            
-            (formalizationData.elements || []).forEach(el => {
-                if (el.properties) {
-                    Object.values(el.properties).forEach(propValue => {
-                        const component = formalizationData.components?.find(c => c.id === propValue);
-                        if (component) {
-                           if (!map.has(component.id)) map.set(component.id, []);
-                           map.get(component.id)!.push({ name: el.text, type: 'element_property' });
-                        }
-                    });
-                }
-            });
-
-            return map;
-        }, [formalizationData]);
-
         const hiddenIds = useMemo(() => {
             const hiddenComponentIds = new Set<string>();
-            if (formalizationData?.elements) {
-                for (const el of formalizationData.elements) {
-                    if (el.properties) {
-                        for (const propVal of Object.values(el.properties)) {
-                            if (formalizationData.components?.some(c => c.id === propVal)) {
-                                hiddenComponentIds.add(propVal);
-                            }
-                        }
-                    }
-                }
-            }
-             if (formalizationData?.components) {
-                for (const comp of formalizationData.components) {
-                    if (comp.linkedComponentIds) {
-                        for (const childId of comp.linkedComponentIds) {
-                            hiddenComponentIds.add(childId);
-                        }
-                    }
-                }
-            }
+            if (!formalizationData) return { components: new Set(), elements: new Set(), operations: new Set() };
+            
+            // Find all components linked as properties
+            formalizationData.elements?.forEach(el => {
+              if (el.properties) {
+                Object.values(el.properties).forEach(val => {
+                  if (formalizationData.components?.some(c => c.id === val)) {
+                    hiddenComponentIds.add(val);
+                  }
+                });
+              }
+            });
 
+            // Recursively find all children of hidden components
+            const findChildren = (compId: string, visited: Set<string>) => {
+              if (visited.has(compId)) return;
+              visited.add(compId);
+              const comp = formalizationData.components?.find(c => c.id === compId);
+              if (comp?.linkedComponentIds) {
+                comp.linkedComponentIds.forEach(childId => {
+                  hiddenComponentIds.add(childId);
+                  findChildren(childId, visited);
+                });
+              }
+            };
+            
+            const initialHidden = Array.from(hiddenComponentIds);
+            initialHidden.forEach(id => findChildren(id, new Set()));
+        
             const hiddenElementIds = new Set<string>();
             hiddenComponentIds.forEach(compId => {
-                const component = formalizationData?.components?.find(c => c.id === compId);
+                const component = formalizationData.components?.find(c => c.id === compId);
                 if (component?.linkedElementIds) {
                     component.linkedElementIds.forEach(elId => hiddenElementIds.add(elId));
                 }
             });
-
+        
             const hiddenOperationIds = new Set<string>();
             hiddenElementIds.forEach(elId => {
-                formalizationData?.operations?.forEach(op => {
+                formalizationData.operations?.forEach(op => {
                     if (op.linkedElementIds?.includes(elId)) {
                         hiddenOperationIds.add(op.id);
                     }
                 });
             });
-
+        
             return {
                 components: hiddenComponentIds,
                 elements: hiddenElementIds,
                 operations: hiddenOperationIds,
             };
         }, [formalizationData]);
-
-
+        
         let data: FormalizationItem[] = [];
         if (formalizationData) {
             let sourceData = formalizationData[type] || [];
@@ -929,8 +887,6 @@ function FormalizationPageContent() {
                             {data.map(item => {
                                 const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
                                 const linkedComponents = (item.linkedComponentIds || []).map(id => formalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
-                                const usedInElements = type === 'elements' ? (reverseElementLinks.get(item.id) || []).map(link => link.name) : [];
-                                const usedInComponents = type === 'components' ? (reverseComponentLinks.get(item.id) || []) : [];
                                 
                                 return (
                                 <Card key={item.id} className="group relative">
@@ -972,22 +928,6 @@ function FormalizationPageContent() {
                                                 <h5 className="font-medium text-xs text-muted-foreground">Components:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
                                                     {linkedComponents.map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {type === 'elements' && usedInElements.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {usedInElements.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
-                                                </div>
-                                            </div>
-                                        )}
-                                         {type === 'components' && usedInComponents.length > 0 && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <h5 className="font-medium text-xs text-muted-foreground">Used In:</h5>
-                                                 <div className="flex flex-wrap gap-1 mt-1">
-                                                    {usedInComponents.map((link, i) => <Badge key={i} variant="default" className={link.type === 'element_property' ? 'bg-blue-100 text-blue-800' : ''}>{link.name}</Badge>)}
                                                 </div>
                                             </div>
                                         )}
@@ -1094,7 +1034,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
-
-    
