@@ -214,6 +214,11 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         if (type === 'components') return 'Edit Component';
         return `Edit ${type.slice(0, -1)}`;
     }
+    
+    const availableComponents = useMemo(() => {
+        if (!formalizationData?.components) return [];
+        return formalizationData.components;
+    }, [formalizationData]);
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -248,7 +253,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                                   onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
                                                 />
                                                 <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                {formalizationData?.components?.map(p => (
+                                                {availableComponents.map(p => (
                                                   <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -285,6 +290,73 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     );
 };
 
+const ComponentDetailPopup = ({ componentId, formalizationData, onClose }: {
+    componentId: string | null;
+    formalizationData?: FormalizationData;
+    onClose: () => void;
+}) => {
+    const component = useMemo(() => {
+        return formalizationData?.components?.find(c => c.id === componentId);
+    }, [componentId, formalizationData]);
+
+    const linkedElements = useMemo(() => {
+        if (!component || !component.linkedElementIds || !formalizationData?.elements) return [];
+        return formalizationData.elements.filter(el => component.linkedElementIds?.includes(el.id));
+    }, [component, formalizationData]);
+
+    const getLinkedOperations = (elementId: string) => {
+        if (!formalizationData?.operations) return [];
+        return formalizationData.operations.filter(op => op.linkedElementIds?.includes(elementId));
+    };
+    
+    if (!component) return null;
+
+    return (
+        <Dialog open={!!componentId} onOpenChange={(isOpen) => !isOpen && onClose()}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Component: {component.text}</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                    {linkedElements.map(el => (
+                        <Card key={el.id}>
+                            <CardHeader>
+                                <CardTitle className="text-base">Element: {el.text}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {el.properties && Object.keys(el.properties).length > 0 && (
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                        <p className="font-medium text-foreground">Properties:</p>
+                                        <ul className="list-disc list-inside">
+                                            {Object.entries(el.properties).map(([key, value]) => (
+                                                <li key={key}>
+                                                    <span className="font-semibold">{key}:</span> {formalizationData?.components?.find(c => c.id === value)?.text || value}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                                    <p className="font-medium text-foreground">Operations:</p>
+                                    <ul className="list-disc list-inside">
+                                        {getLinkedOperations(el.id).map(op => (
+                                            <li key={op.id}>{op.text}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                    {linkedElements.length === 0 && <p className="text-muted-foreground text-center">No elements linked to this component.</p>}
+                </div>
+                 <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 function FormalizationPageContent() {
     const { 
@@ -312,6 +384,7 @@ function FormalizationPageContent() {
 
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     const [mindMapRootId, setMindMapRootId] = useState<string | null>(null);
+    const [detailPopupComponentId, setDetailPopupComponentId] = useState<string | null>(null);
 
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -623,46 +696,44 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
     
-        const allComponents = formalizationData?.components || [];
-        const allElements = formalizationData?.elements || [];
-        const allOperations = formalizationData?.operations || [];
-    
-        // 1. Find all components linked inside element properties
-        const linkedComponentIds = new Set<string>(
-            allElements.flatMap(el => 
-                Object.values(el.properties || {})
-            )
-        );
-    
-        // 2. Find all elements linked to those components
-        const hiddenElementIds = new Set<string>(
-            allComponents
-                .filter(comp => linkedComponentIds.has(comp.id))
-                .flatMap(comp => comp.linkedElementIds || [])
-        );
-    
-        // 3. Find all operations linked to those hidden elements
-        const hiddenOperationIds = new Set<string>(
-            allOperations
-                .filter(op => 
-                    (op.linkedElementIds || []).some(elId => hiddenElementIds.has(elId))
-                )
-                .map(op => op.id)
-        );
-    
         let data;
-        switch (type) {
-            case 'components':
-                data = allComponents.filter(comp => !linkedComponentIds.has(comp.id));
-                break;
-            case 'elements':
-                data = allElements.filter(el => !hiddenElementIds.has(el.id));
-                break;
-            case 'operations':
-                data = allOperations.filter(op => !hiddenOperationIds.has(op.id));
-                break;
-            default:
-                data = [];
+        if (!formalizationData) {
+            data = [];
+        } else {
+            const allComponents = formalizationData?.components || [];
+            const linkedComponentIds = new Set<string>(
+                (formalizationData.elements || []).flatMap(el => 
+                    Object.values(el.properties || {})
+                )
+            );
+            
+            const elementsInLinkedComponents = new Set<string>(
+                allComponents
+                    .filter(comp => linkedComponentIds.has(comp.id))
+                    .flatMap(comp => comp.linkedElementIds || [])
+            );
+
+            const operationsForHiddenElements = new Set<string>(
+                (formalizationData.operations || [])
+                    .filter(op => 
+                        (op.linkedElementIds || []).some(elId => elementsInLinkedComponents.has(elId))
+                    )
+                    .map(op => op.id)
+            );
+
+            switch (type) {
+                case 'components':
+                    data = allComponents.filter(comp => !linkedComponentIds.has(comp.id));
+                    break;
+                case 'elements':
+                    data = (formalizationData.elements || []).filter(el => !elementsInLinkedComponents.has(el.id));
+                    break;
+                case 'operations':
+                    data = (formalizationData.operations || []).filter(op => !operationsForHiddenElements.has(op.id));
+                    break;
+                default:
+                    data = [];
+            }
         }
         
         const reverseElementLinks = useMemo(() => {
@@ -715,7 +786,13 @@ function FormalizationPageContent() {
                                                         <div key={key} className="flex items-center gap-2">
                                                             <span className="font-medium text-foreground">{key}:</span>
                                                             {component ? (
-                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
+                                                                <Badge
+                                                                  variant="secondary"
+                                                                  className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                                  onClick={() => setDetailPopupComponentId(component.id)}
+                                                                >
+                                                                  {component.text}
+                                                                </Badge>
                                                             ) : (
                                                                 String(value)
                                                             )}
@@ -822,6 +899,13 @@ function FormalizationPageContent() {
                     onSave={handleUpdateItem}
                 />
             )}
+             {detailPopupComponentId && (
+                <ComponentDetailPopup
+                    componentId={detailPopupComponentId}
+                    formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
+                    onClose={() => setDetailPopupComponentId(null)}
+                />
+            )}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
               <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="p-4 border-b">
@@ -847,4 +931,5 @@ export default function FormalizationPage() {
     
 
     
+
 
