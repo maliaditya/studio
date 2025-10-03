@@ -531,22 +531,28 @@ function FormalizationPageContent() {
     }, [selectedFormalizationSpecId, coreSkills, upskillDefinitions]);
 
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
+    
+    const formatTime = (seconds: number): string => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    };
 
     useEffect(() => {
-      const audio = audioRef.current;
-      if (!audio) return;
-  
-      if (editingItem && playingAudio) {
-          audioWasPlayingBeforeModal.current = true;
-          audioTimeBeforeModal.current = audio.currentTime;
-          audio.pause();
-          setPlayingAudio(false);
-      } else if (!editingItem && audioWasPlayingBeforeModal.current) {
-          audio.currentTime = audioTimeBeforeModal.current;
-          audio.play().catch(e => console.error("Audio resume failed:", e));
-          setPlayingAudio(true);
-          audioWasPlayingBeforeModal.current = false;
-      }
+        const audio = audioRef.current;
+        if (!audio) return;
+    
+        if (editingItem && playingAudio) {
+            audioWasPlayingBeforeModal.current = true;
+            audioTimeBeforeModal.current = audio.currentTime;
+            audio.pause();
+            setPlayingAudio(false);
+        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
+            audio.currentTime = audioTimeBeforeModal.current;
+            audio.play().catch(e => console.error("Audio resume failed:", e));
+            setPlayingAudio(true);
+            audioWasPlayingBeforeModal.current = false;
+        }
     }, [editingItem, playingAudio]);
     
     useEffect(() => {
@@ -774,68 +780,64 @@ function FormalizationPageContent() {
           });
         }
       }, []);
-
+      
     const fullFormalizationData = useMemo(() => {
-        const allDefinitions = new Map<string, any>();
-        const globalItems = {
+        const allGlobalItems = {
             elements: new Map<string, FormalizationItem>(),
             operations: new Map<string, FormalizationItem>(),
             components: new Map<string, FormalizationItem>(),
         };
-
+    
+        const allItemsMap = new Map<string, any>();
         resources.forEach(res => {
-            (res.formalization?.elements || []).forEach(el => allDefinitions.set(el.id, { ...el, type: 'element', resourceId: res.id }));
-            (res.formalization?.operations || []).forEach(op => allDefinitions.set(op.id, { ...op, type: 'operation', resourceId: res.id }));
-            (res.formalization?.components || []).forEach(c => allDefinitions.set(c.id, { ...c, type: 'component', resourceId: res.id }));
-        });
-
-        const globalIds = new Set<string>();
-        const collectDependencies = (itemId: string, visited: Set<string>) => {
-            if (!itemId || visited.has(itemId)) return;
-            visited.add(itemId);
-    
-            const item = allDefinitions.get(itemId);
-            if (!item) return;
-    
-            globalIds.add(itemId);
-    
-            const children = [
-                ...(item.linkedElementIds || []),
-                ...(item.linkedComponentIds || []),
-                ...(item.linkedOperationIds || []),
-                ...(item.properties ? Object.values(item.properties).filter(val => allDefinitions.has(val)) : [])
-            ];
-    
-            children.forEach(childId => collectDependencies(childId, visited));
-        };
-
-        allDefinitions.forEach(item => {
-            if (item.isGlobal) {
-                collectDependencies(item.id, new Set());
+            if (res.formalization) {
+                res.formalization.elements?.forEach(el => allItemsMap.set(el.id, { ...el, type: 'element', resourceId: res.id }));
+                res.formalization.operations?.forEach(op => allItemsMap.set(op.id, { ...op, type: 'operation', resourceId: res.id }));
+                res.formalization.components?.forEach(c => allItemsMap.set(c.id, { ...c, type: 'component', resourceId: res.id }));
             }
         });
 
-        globalIds.forEach(id => {
-            const item = allDefinitions.get(id);
+        const globalRootIds = Array.from(allItemsMap.values()).filter(item => item.isGlobal).map(item => item.id);
+        const globalIdSet = new Set<string>();
+        const queue = [...globalRootIds];
+        
+        while(queue.length > 0) {
+            const currentId = queue.shift()!;
+            if (globalIdSet.has(currentId)) continue;
+            globalIdSet.add(currentId);
+
+            const item = allItemsMap.get(currentId);
             if (item) {
-                if (item.type === 'element') globalItems.elements.set(id, item);
-                else if (item.type === 'operation') globalItems.operations.set(id, item);
-                else if (item.type === 'component') globalItems.components.set(id, item);
+                const children = [
+                    ...(item.linkedElementIds || []),
+                    ...(item.linkedComponentIds || []),
+                    ...(item.linkedOperationIds || []),
+                    ...(item.properties ? Object.values(item.properties) : [])
+                ].filter(id => allItemsMap.has(id));
+                
+                queue.push(...children);
             }
+        }
+        
+        globalIdSet.forEach(id => {
+            const item = allItemsMap.get(id);
+            if (item.type === 'element') allGlobalItems.elements.set(id, item);
+            else if (item.type === 'operation') allGlobalItems.operations.set(id, item);
+            else if (item.type === 'component') allGlobalItems.components.set(id, item);
         });
 
         const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
         
         const combined = {
-            elements: new Map(globalItems.elements),
-            operations: new Map(globalItems.operations),
-            components: new Map(globalItems.components),
+            elements: new Map(allGlobalItems.elements),
+            operations: new Map(allGlobalItems.operations),
+            components: new Map(allGlobalItems.components),
         };
-
+    
         (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
         (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
         (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
-        
+    
         return {
             elements: Array.from(combined.elements.values()),
             operations: Array.from(combined.operations.values()),
@@ -851,9 +853,9 @@ function FormalizationPageContent() {
     
         resources.forEach(res => {
             if (res.formalization) {
-                res.formalization.elements.forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
-                res.formalization.operations.forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
-                res.formalization.components.forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
+                res.formalization.elements?.forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
+                res.formalization.operations?.forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
+                res.formalization.components?.forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
             }
         });
         
@@ -875,7 +877,6 @@ function FormalizationPageContent() {
             components: Array.from(displayItems.components.values()),
         };
     }, [selectedResource, resources]);
-
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1011,28 +1012,6 @@ function FormalizationPageContent() {
     const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const data: FormalizationItem[] = (itemsToDisplay?.[type] || []);
         
-        let filteredData = data;
-        if (hideLinked[type]) {
-            const hiddenIds = new Set<string>();
-            if (type === 'components') {
-                data.forEach(item => {
-                    if (item.linkedComponentIds) item.linkedComponentIds.forEach(id => hiddenIds.add(id));
-                });
-            }
-            if (type === 'elements') {
-                 data.forEach(item => {
-                    if (item.properties) {
-                         Object.values(item.properties).forEach(val => {
-                            if (fullFormalizationData.components.some(c => c.id === val)) {
-                                hiddenIds.add(val);
-                            }
-                         });
-                    }
-                });
-            }
-            filteredData = data.filter(item => !hiddenIds.has(item.id));
-        }
-
         return (
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between p-4">
@@ -1050,9 +1029,9 @@ function FormalizationPageContent() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <ScrollArea className="pr-1">
+                    <div className="max-h-72 overflow-y-auto">
                         <div className="space-y-2 p-4 pt-0">
-                            {filteredData.map(item => {
+                            {data.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
                                 const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
                                 const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
@@ -1129,7 +1108,7 @@ function FormalizationPageContent() {
                                 </Card>
                             )})}
                         </div>
-                    </ScrollArea>
+                    </div>
                 </CardContent>
             </Card>
         );
@@ -1220,4 +1199,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
