@@ -718,6 +718,36 @@ function FormalizationPageContent() {
         setResources(allResourcesToUpdate);
     };
 
+    const fullFormalizationData = useMemo(() => {
+        const localData = (isResource(selectedResource) && selectedResource.formalization)
+            ? JSON.parse(JSON.stringify(selectedResource.formalization)) as FormalizationData
+            : { elements: [], operations: [], components: [] };
+        
+        const globalData: FormalizationData = { elements: [], operations: [], components: [] };
+        
+        resources.forEach(res => {
+            if (res.formalization) {
+                globalData.elements.push(...(res.formalization.elements || []).filter(el => el.isGlobal));
+                globalData.operations.push(...(res.formalization.operations || []).filter(op => op.isGlobal));
+                globalData.components.push(...(res.formalization.components || []).filter(c => c.isGlobal));
+            }
+        });
+        
+        const combineAndUnique = <T extends { id: string }>(arr1: T[], arr2: T[]): T[] => {
+            const map = new Map<string, T>();
+            arr1.forEach(item => map.set(item.id, item));
+            arr2.forEach(item => map.set(item.id, item));
+            return Array.from(map.values());
+        };
+        
+        return {
+            elements: combineAndUnique(localData.elements, globalData.elements),
+            operations: combineAndUnique(localData.operations, globalData.operations),
+            components: combineAndUnique(localData.components, globalData.components),
+        };
+    }, [selectedResource, resources]);
+
+
     const renderSelectedResource = () => {
         if (!selectedResource) {
             return (
@@ -1092,7 +1122,7 @@ function FormalizationPageContent() {
              {detailPopupComponentId && (
                 <ComponentDetailPopup
                     componentId={detailPopupComponentId}
-                    formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
+                    formalizationData={fullFormalizationData}
                     onClose={() => setDetailPopupComponentId(null)}
                     onOpenSubComponent={(id) => setDetailPopupComponentId(id)}
                 />
