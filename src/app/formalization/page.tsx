@@ -315,10 +315,11 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     );
 };
 
-const ComponentDetailPopup = ({ componentId, formalizationData, onClose }: {
+const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenSubComponent }: {
     componentId: string | null;
     formalizationData?: FormalizationData;
     onClose: () => void;
+    onOpenSubComponent: (id: string) => void;
 }) => {
     const component = useMemo(() => {
         return formalizationData?.components?.find(c => c.id === componentId);
@@ -353,11 +354,25 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose }: {
                                     <div className="text-xs text-muted-foreground space-y-1">
                                         <p className="font-medium text-foreground">Properties:</p>
                                         <ul className="list-disc list-inside">
-                                            {Object.entries(el.properties).map(([key, value]) => (
-                                                <li key={key}>
-                                                    <span className="font-semibold">{key}:</span> {formalizationData?.components?.find(c => c.id === value)?.text || value}
-                                                </li>
-                                            ))}
+                                            {Object.entries(el.properties).map(([key, value]) => {
+                                                const linkedComp = formalizationData?.components?.find(c => c.id === value);
+                                                return (
+                                                  <li key={key}>
+                                                      <span className="font-semibold">{key}:</span>{' '}
+                                                      {linkedComp ? (
+                                                          <Badge
+                                                              variant="secondary"
+                                                              className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                              onClick={() => onOpenSubComponent(linkedComp.id)}
+                                                          >
+                                                              {linkedComp.text}
+                                                          </Badge>
+                                                      ) : (
+                                                          value
+                                                      )}
+                                                  </li>
+                                                );
+                                            })}
                                         </ul>
                                     </div>
                                 )}
@@ -998,6 +1013,7 @@ function FormalizationPageContent() {
                     componentId={detailPopupComponentId}
                     formalizationData={isResource(selectedResource) ? selectedResource.formalization : undefined}
                     onClose={() => setDetailPopupComponentId(null)}
+                    onOpenSubComponent={(id) => setDetailPopupComponentId(id)}
                 />
             )}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
@@ -1021,3 +1037,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
