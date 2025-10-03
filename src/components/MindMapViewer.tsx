@@ -157,9 +157,15 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
       const formalizationItems: any[] = [];
       const { elements = [], operations = [], components = [] } = resources.reduce((acc, resource) => {
         if (resource.formalization) {
-          acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element', category: 'Formalization', name: e.text })));
-          acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation', category: 'Formalization', name: o.text })));
-          acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component', category: 'Formalization', name: c.text })));
+          if (resource.formalization.elements) {
+            acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element', category: 'Formalization', name: e.text })));
+          }
+          if (resource.formalization.operations) {
+            acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation', category: 'Formalization', name: o.text })));
+          }
+          if (resource.formalization.components) {
+            acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component', category: 'Formalization', name: c.text })));
+          }
         }
         return acc;
       }, { elements: [] as any[], operations: [] as any[], components: [] as any[] });
@@ -178,12 +184,14 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             ...((def as ExerciseDefinition).linkedDeepWorkIds || []), 
             ...((def as ExerciseDefinition).linkedUpskillIds || []),
             ...((def as ExerciseDefinition).linkedResourceIds || []),
-            ...((def as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
             ...((formalizationDef).linkedElementIds || []),
         ];
 
         if (formalizationDef.type === 'formalization_element' && formalizationDef.properties) {
-          childIds = [...childIds, ...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val))];
+          childIds.push(...Object.values(formalizationDef.properties).filter(val => allDefinitions.has(val)));
+        }
+        if ((def as Resource).points) {
+            childIds.push(...(def as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
         }
 
         childIds.forEach(childId => {
@@ -261,7 +269,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const nodesToScan = Array.from(nodes.entries());
     
         nodesToScan.forEach(([nodeId, pos]) => {
-            const definition = allDefinitions.get(nodeId) as (Resource & FormalizationItem);
+            const definition = allDefinitions.get(nodeId) as (Resource & Pattern & FormalizationItem);
             if (!definition) return;
     
             // Expand children
@@ -269,14 +277,14 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                 ...((definition as ExerciseDefinition).linkedResourceIds || []),
-                ...((definition).linkedElementIds || []),
+                ...((definition as FormalizationItem).linkedElementIds || []),
             ];
-
+            
             if (definition.type === 'formalization_element' && definition.properties) {
                 childIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
             }
-            if (definition.points) {
-                childIds.push(...definition.points.filter(p => p.resourceId).map(p => p.resourceId!));
+            if ((definition as Resource).points) {
+                childIds.push(...(definition as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
             }
 
             const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId));
@@ -341,8 +349,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (currentNodeDef.type === 'formalization_element' && currentNodeDef.properties) {
             childIds.push(...Object.values(currentNodeDef.properties).filter(val => allDefinitions.has(val)));
         }
-        if (currentNodeDef.points) {
-            childIds.push(...currentNodeDef.points.filter(p => p.resourceId).map(p => p.resourceId!));
+        if ((currentNodeDef as Resource).points) {
+            childIds.push(...(currentNodeDef as Resource).points!.filter(p => p.resourceId).map(p => p.resourceId!));
         }
 
         const validChildIds = childIds.filter(id => allDefinitions.has(id));
@@ -1289,3 +1297,5 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     </>
   );
 }
+
+```
