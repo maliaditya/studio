@@ -782,62 +782,61 @@ function FormalizationPageContent() {
       }, []);
       
     const fullFormalizationData = useMemo(() => {
-        const allGlobalItems = {
+        const globalItems = {
             elements: new Map<string, FormalizationItem>(),
             operations: new Map<string, FormalizationItem>(),
             components: new Map<string, FormalizationItem>(),
         };
-    
+
         const allItemsMap = new Map<string, any>();
         resources.forEach(res => {
             if (res.formalization) {
-                res.formalization.elements?.forEach(el => allItemsMap.set(el.id, { ...el, type: 'element', resourceId: res.id }));
-                res.formalization.operations?.forEach(op => allItemsMap.set(op.id, { ...op, type: 'operation', resourceId: res.id }));
-                res.formalization.components?.forEach(c => allItemsMap.set(c.id, { ...c, type: 'component', resourceId: res.id }));
+                (res.formalization.elements || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'element', resourceId: res.id }));
+                (res.formalization.operations || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'operation', resourceId: res.id }));
+                (res.formalization.components || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'component', resourceId: res.id }));
             }
         });
 
-        const globalRootIds = Array.from(allItemsMap.values()).filter(item => item.isGlobal).map(item => item.id);
         const globalIdSet = new Set<string>();
-        const queue = [...globalRootIds];
-        
-        while(queue.length > 0) {
+        const queue: string[] = Array.from(allItemsMap.values()).filter(item => item.isGlobal).map(item => item.id);
+
+        while (queue.length > 0) {
             const currentId = queue.shift()!;
             if (globalIdSet.has(currentId)) continue;
             globalIdSet.add(currentId);
 
             const item = allItemsMap.get(currentId);
-            if (item) {
-                const children = [
-                    ...(item.linkedElementIds || []),
-                    ...(item.linkedComponentIds || []),
-                    ...(item.linkedOperationIds || []),
-                    ...(item.properties ? Object.values(item.properties) : [])
-                ].filter(id => allItemsMap.has(id));
-                
-                queue.push(...children);
-            }
+            if (!item) continue;
+            
+            const children = [
+                ...(item.linkedElementIds || []),
+                ...(item.linkedComponentIds || []),
+                ...(item.linkedOperationIds || []),
+                ...(item.properties ? Object.values(item.properties) : [])
+            ].filter(id => allItemsMap.has(id));
+
+            queue.push(...children);
         }
-        
+
         globalIdSet.forEach(id => {
             const item = allItemsMap.get(id);
-            if (item.type === 'element') allGlobalItems.elements.set(id, item);
-            else if (item.type === 'operation') allGlobalItems.operations.set(id, item);
-            else if (item.type === 'component') allGlobalItems.components.set(id, item);
+            if (item.type === 'element') globalItems.elements.set(id, item);
+            else if (item.type === 'operation') globalItems.operations.set(id, item);
+            else if (item.type === 'component') globalItems.components.set(id, item);
         });
 
-        const localData = isResource(selectedResource) ? selectedResource.formalization : { elements: [], operations: [], components: [] };
+        const localData = isResource(selectedResource) ? selectedResource.formalization : null;
         
         const combined = {
-            elements: new Map(allGlobalItems.elements),
-            operations: new Map(allGlobalItems.operations),
-            components: new Map(allGlobalItems.components),
+            elements: new Map(globalItems.elements),
+            operations: new Map(globalItems.operations),
+            components: new Map(globalItems.components),
         };
-    
+
         (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
         (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
         (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
-    
+
         return {
             elements: Array.from(combined.elements.values()),
             operations: Array.from(combined.operations.values()),
@@ -848,14 +847,17 @@ function FormalizationPageContent() {
     const itemsToDisplay = useMemo(() => {
         const localData = isResource(selectedResource) ? selectedResource.formalization : null;
         if (!localData && !resources.some(r => r.formalization)) return { elements: [], operations: [], components: [] };
-    
-        const globalItems = { elements: new Map(), operations: new Map(), components: new Map() };
-    
+        
+        const globalItems = {
+            elements: new Map<string, FormalizationItem>(),
+            operations: new Map<string, FormalizationItem>(),
+            components: new Map<string, FormalizationItem>()
+        };
         resources.forEach(res => {
             if (res.formalization) {
-                res.formalization.elements?.forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
-                res.formalization.operations?.forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
-                res.formalization.components?.forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
+                (res.formalization.elements || []).forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
+                (res.formalization.operations || []).forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
+                (res.formalization.components || []).forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
             }
         });
         
@@ -864,11 +866,11 @@ function FormalizationPageContent() {
             operations: new Map(globalItems.operations),
             components: new Map(globalItems.components),
         };
-
+        
         if (localData) {
-            localData.elements?.forEach(el => displayItems.elements.set(el.id, el));
-            localData.operations?.forEach(op => displayItems.operations.set(op.id, op));
-            localData.components?.forEach(c => displayItems.components.set(c.id, c));
+            (localData.elements || []).forEach(el => displayItems.elements.set(el.id, el));
+            (localData.operations || []).forEach(op => displayItems.operations.set(op.id, op));
+            (localData.components || []).forEach(c => displayItems.components.set(c.id, c));
         }
 
         return {
@@ -1013,8 +1015,8 @@ function FormalizationPageContent() {
         const data: FormalizationItem[] = (itemsToDisplay?.[type] || []);
         
         return (
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between p-4">
+            <Card className="flex flex-col h-full">
+                <CardHeader className="flex flex-row items-center justify-between p-4 flex-shrink-0">
                     <div>
                         <CardTitle className="capitalize">{title}</CardTitle>
                         <CardDescription className="text-xs">{description}</CardDescription>
@@ -1028,8 +1030,8 @@ function FormalizationPageContent() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                    <div className="h-96 overflow-y-auto">
+                <CardContent className="p-0 flex-grow min-h-0">
+                    <ScrollArea className="h-full">
                         <div className="space-y-2 p-4 pt-0">
                             {data.map(item => {
                                 const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
@@ -1108,7 +1110,7 @@ function FormalizationPageContent() {
                                 </Card>
                             )})}
                         </div>
-                    </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         );
@@ -1199,6 +1201,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
-
