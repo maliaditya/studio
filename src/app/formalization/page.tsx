@@ -147,7 +147,7 @@ type PropertyItem = { id: string; key: string; value: string };
 
 const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: { 
     item: FormalizationItem | null; 
-    type: 'elements' | 'operations' | 'patterns';
+    type: 'elements' | 'operations' | 'components';
     formalizationData?: FormalizationData;
     onClose: () => void; 
     onSave: (itemToSave: FormalizationItem) => void;
@@ -174,7 +174,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                 if (prop.key.trim()) acc[prop.key.trim()] = prop.value;
                 return acc;
             }, {} as Record<string, any>) : undefined,
-            linkedElementIds: (type === 'operations' || type === 'patterns') ? linkedElementIds : undefined,
+            linkedElementIds: (type === 'operations' || type === 'components') ? linkedElementIds : undefined,
         };
         
         onSave(updatedItem);
@@ -200,12 +200,17 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         const newValue = value === '--none--' ? '' : value;
         handlePropertyChange(propId, 'value', newValue);
     };
+    
+    const getModalTitle = () => {
+        if (type === 'components') return 'Edit Component';
+        return `Edit ${type.slice(0, -1)}`;
+    }
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent className="sm:max-w-xl">
                 <DialogHeader>
-                    <DialogTitle>Edit {type.slice(0, -1)}</DialogTitle>
+                    <DialogTitle>{getModalTitle()}</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                     <Textarea 
@@ -224,7 +229,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                         <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
                                         <Select onValueChange={(val) => handleSelectChange(prop.id, val)} defaultValue={prop.value}>
                                             <SelectTrigger>
-                                                <SelectValue placeholder="Value or Link Pattern..." />
+                                                <SelectValue placeholder="Value or Link Component..." />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <Input
@@ -234,7 +239,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                                   onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
                                                 />
                                                 <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                {(formalizationData?.patterns || []).map(p => (
+                                                {(formalizationData?.components || []).map(p => (
                                                   <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -246,7 +251,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {(type === 'operations' || type === 'patterns') && (
+                    {(type === 'operations' || type === 'components') && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -287,7 +292,7 @@ function FormalizationPageContent() {
     
     const [selectedResource, setSelectedResource] = useState<Resource | ExerciseDefinition | null>(null);
 
-    const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'patterns'} | null>(null);
+    const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'components'} | null>(null);
 
     const [playingAudio, setPlayingAudio] = useState(false);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -412,12 +417,12 @@ function FormalizationPageContent() {
       );
     };
 
-    const handleAddItem = (type: 'elements' | 'operations' | 'patterns') => {
+    const handleAddItem = (type: 'elements' | 'operations' | 'components') => {
         if (!selectedResource || !isResource(selectedResource)) return;
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
-        if (type === 'operations' || type === 'patterns') newItem.linkedElementIds = [];
+        if (type === 'operations' || type === 'components') newItem.linkedElementIds = [];
         
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         const updatedItems = [...(currentFormalization[type] || []), newItem];
         
         updateResourceFormalization(selectedResource.id, { ...currentFormalization, [type]: updatedItems });
@@ -428,7 +433,7 @@ function FormalizationPageContent() {
         if (!selectedResource || !isResource(selectedResource)) return;
         
         const type = editingItem!.type;
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         
         const updatedItems = (currentFormalization[type] || []).map(item =>
             item.id === itemToSave.id ? itemToSave : item
@@ -438,9 +443,9 @@ function FormalizationPageContent() {
         setEditingItem(null);
     };
 
-    const handleDeleteItem = (type: 'elements' | 'operations' | 'patterns', id: string) => {
+    const handleDeleteItem = (type: 'elements' | 'operations' | 'components', id: string) => {
         if (!selectedResource || !isResource(selectedResource)) return;
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], patterns: [] };
+        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
         const updatedItems = (currentFormalization[type] || []).filter(item => item.id !== id);
         
         let finalFormalization = { ...currentFormalization, [type]: updatedItems };
@@ -450,7 +455,7 @@ function FormalizationPageContent() {
                 ...op,
                 linkedElementIds: (op.linkedElementIds || []).filter(elId => elId !== id)
             }));
-             finalFormalization.patterns = (finalFormalization.patterns || []).map(p => ({
+             finalFormalization.components = (finalFormalization.components || []).map(p => ({
                 ...p,
                 linkedElementIds: (p.linkedElementIds || []).filter(elId => elId !== id)
             }));
@@ -597,13 +602,13 @@ function FormalizationPageContent() {
         );
     };
 
-    const renderFormalizationSection = (type: 'elements' | 'operations' | 'patterns', title: string, description: string) => {
+    const renderFormalizationSection = (type: 'elements' | 'operations' | 'components', title: string, description: string) => {
         const formalizationData = (isResource(selectedResource) && selectedResource.formalization) || undefined;
         const data = formalizationData?.[type] || [];
         
         const reverseElementLinks = useMemo(() => {
             if (!formalizationData) return new Map();
-            const map = new Map<string, {name: string, type: 'operation' | 'pattern'}[]>();
+            const map = new Map<string, {name: string, type: 'operation' | 'component'}[]>();
 
             (formalizationData.operations || []).forEach(op => {
                 (op.linkedElementIds || []).forEach(elId => {
@@ -612,10 +617,10 @@ function FormalizationPageContent() {
                 });
             });
 
-             (formalizationData.patterns || []).forEach(p => {
+             (formalizationData.components || []).forEach(p => {
                 (p.linkedElementIds || []).forEach(elId => {
                     if (!map.has(elId)) map.set(elId, []);
-                    map.get(elId)!.push({ name: p.text, type: 'pattern' });
+                    map.get(elId)!.push({ name: p.text, type: 'component' });
                 });
             });
             return map;
@@ -646,7 +651,7 @@ function FormalizationPageContent() {
                                         {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
                                             <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                 {Object.entries(item.properties).map(([key, value]) => {
-                                                    const pattern = formalizationData?.patterns?.find(p => p.id === value);
+                                                    const pattern = formalizationData?.components?.find(p => p.id === value);
                                                     return (
                                                         <div key={key} className="flex items-center gap-2">
                                                             <span className="font-medium text-foreground">{key}:</span>
@@ -660,7 +665,7 @@ function FormalizationPageContent() {
                                                 })}
                                             </div>
                                         )}
-                                        {(type === 'operations' || type === 'patterns') && linkedElements.length > 0 && (
+                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
                                             <div className="mt-2 pt-2 border-t">
                                                 <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
                                                 <div className="flex flex-wrap gap-1 mt-1">
@@ -732,7 +737,7 @@ function FormalizationPageContent() {
                     <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                         {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                         {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
-                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of elements & operations.')}
+                        {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
                     </div>
                 </div>
             </div>
@@ -756,6 +761,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
