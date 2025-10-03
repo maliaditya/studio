@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -780,101 +781,141 @@ function FormalizationPageContent() {
       }, []);
       
     const fullFormalizationData = useMemo(() => {
-        const allItemsMap = new Map<string, any>();
-        resources.forEach(res => {
-            if (res.formalization) {
-                (res.formalization.elements || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'element', resourceId: res.id }));
-                (res.formalization.operations || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'operation', resourceId: res.id }));
-                (res.formalization.components || []).forEach(item => allItemsMap.set(item.id, { ...item, type: 'component', resourceId: res.id }));
-            }
-        });
-
-        const globalItems = {
-            elements: new Map<string, FormalizationItem>(),
-            operations: new Map<string, FormalizationItem>(),
-            components: new Map<string, FormalizationItem>(),
-        };
-
-        const globalSeedIds = Array.from(allItemsMap.values())
-            .filter(item => item.isGlobal)
-            .map(item => item.id);
+        // 1. Get all resources and curiosities within the selected specialization
+        const spec = specializations.find(s => s.id === selectedFormalizationSpecId);
+        if (!spec) return { elements: [], operations: [], components: [] };
         
-        const queue: string[] = [...globalSeedIds];
-        const processed = new Set<string>();
+        const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+        
+        const curiositiesInSpec = upskillDefinitions.filter(def => microSkillNames.has(def.category));
+        const curiositiesInSpecIds = new Set(curiositiesInSpec.map(c => c.id));
+        
+        const resourcesInSpec: Resource[] = [];
+        const visitedResourceIds = new Set<string>();
+        const queue = [...curiositiesInSpec];
 
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            if (processed.has(currentId)) continue;
-            processed.add(currentId);
-
-            const item = allItemsMap.get(currentId);
-            if (!item) continue;
-            
-            if (item.type === 'element') globalItems.elements.set(item.id, item);
-            else if (item.type === 'operation') globalItems.operations.set(item.id, item);
-            else if (item.type === 'component') globalItems.components.set(item.id, item);
-
-            const children = [
-                ...(item.linkedElementIds || []),
-                ...(item.linkedComponentIds || []),
-                ...(item.linkedOperationIds || []),
-                ...(item.properties ? Object.values(item.properties) : [])
-            ].filter((id): id is string => typeof id === 'string' && allItemsMap.has(id));
-
-            queue.push(...children);
+        while(queue.length > 0) {
+            const current = queue.shift()!;
+            if (current.linkedResourceIds) {
+                current.linkedResourceIds.forEach(resId => {
+                    if (!visitedResourceIds.has(resId)) {
+                        const resource = resources.find(r => r.id === resId);
+                        if (resource) {
+                            resourcesInSpec.push(resource);
+                            visitedResourceIds.add(resId);
+                        }
+                    }
+                });
+            }
+            if (current.linkedUpskillIds) {
+                current.linkedUpskillIds.forEach(childId => {
+                    const childDef = upskillDefinitions.find(d => d.id === childId);
+                    if (childDef) queue.push(childDef);
+                });
+            }
         }
         
-        const localData = isResource(selectedResource) ? selectedResource.formalization : null;
+        // 2. From this set, find all global elements
+        const globalElements = resourcesInSpec
+            .flatMap(res => res.formalization?.elements || [])
+            .filter(el => el.isGlobal);
+
+        // 3. Get local data from the currently selected resource/curiosity
+        const localData = isResource(selectedResource) || selectedResource ? selectedResource.formalization : null;
         
-        const combined = {
-            elements: new Map(globalItems.elements),
-            operations: new Map(globalItems.operations),
-            components: new Map(globalItems.components),
-        };
+        // 4. Combine them, giving precedence to local if there are ID conflicts (though unlikely)
+        const combinedElementsMap = new Map<string, FormalizationItem>();
 
-        (localData?.elements || []).forEach(item => { if (!combined.elements.has(item.id)) combined.elements.set(item.id, item); });
-        (localData?.operations || []).forEach(item => { if (!combined.operations.has(item.id)) combined.operations.set(item.id, item); });
-        (localData?.components || []).forEach(item => { if (!combined.components.has(item.id)) combined.components.set(item.id, item); });
+        globalElements.forEach(item => combinedElementsMap.set(item.id, item));
+        (localData?.elements || []).forEach(item => combinedElementsMap.set(item.id, item));
         
-        return {
-            elements: Array.from(combined.elements.values()),
-            operations: Array.from(combined.operations.values()),
-            components: Array.from(combined.components.values()),
-        };
-    }, [selectedResource, resources]);
-
-    const itemsToDisplay = useMemo(() => {
-        // 1. Get all local items for the selected resource
-        const localItems = isResource(selectedResource) && selectedResource.formalization
-            ? {
-                elements: selectedResource.formalization.elements || [],
-                operations: selectedResource.formalization.operations || [],
-                components: selectedResource.formalization.components || [],
-            } : { elements: [], operations: [], components: [] };
-
-        // 2. Identify all items that are encapsulated (linked as properties) anywhere in the entire app
-        const allItemsMap = new Map<string, FormalizationItem>();
+        const allVisibleElements = Array.from(combinedElementsMap.values());
+        
+        // 5. Find all linked operations and components from the visible elements
+        const allLinkedOpIds = new Set(allVisibleElements.flatMap(el => el.linkedOperationIds || []));
+        const allLinkedComponentIdsAsProps = new Set(allVisibleElements.flatMap(el => Object.values(el.properties || {})));
+        
+        // 6. Get all operations and components from ALL resources to create a complete map
+        const allOpsMap = new Map<string, FormalizationItem>();
+        const allCompsMap = new Map<string, FormalizationItem>();
         resources.forEach(r => {
-            (r.formalization?.elements || []).forEach(el => allItemsMap.set(el.id, el));
-            (r.formalization?.operations || []).forEach(op => allItemsMap.set(op.id, op));
-            (r.formalization?.components || []).forEach(c => allItemsMap.set(c.id, c));
+            (r.formalization?.operations || []).forEach(op => allOpsMap.set(op.id, op));
+            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
         });
 
+        const visibleOperations = Array.from(allLinkedOpIds).map(id => allOpsMap.get(id)).filter((op): op is FormalizationItem => !!op);
+        
+        let visibleComponents = (localData?.components || []);
+
+        const recursivelyFindLinkedComponents = (componentId: string, visited: Set<string> = new Set()) => {
+            if (visited.has(componentId)) return [];
+            visited.add(componentId);
+
+            const component = allCompsMap.get(componentId);
+            if (!component) return [];
+
+            let linkedComps = [component];
+            (component.linkedComponentIds || []).forEach(childId => {
+                linkedComps = [...linkedComps, ...recursivelyFindLinkedComponents(childId, visited)];
+            });
+            return linkedComps;
+        };
+
+        (localData?.components || []).forEach(comp => {
+            (comp.linkedComponentIds || []).forEach(childId => {
+                visibleComponents = [...visibleComponents, ...recursivelyFindLinkedComponents(childId)];
+            });
+        });
+        
+        Array.from(allLinkedComponentIdsAsProps).forEach(compId => {
+            if (!visibleComponents.some(c => c.id === compId)) {
+                recursivelyFindLinkedComponents(compId).forEach(c => {
+                    if (!visibleComponents.some(vc => vc.id === c.id)) {
+                        visibleComponents.push(c);
+                    }
+                });
+            }
+        });
+        
+        return {
+            elements: allVisibleElements,
+            operations: visibleOperations,
+            components: [...new Map(visibleComponents.map(item => [item.id, item])).values()],
+        };
+
+    }, [selectedFormalizationSpecId, coreSkills, upskillDefinitions, resources, selectedResource]);
+
+
+    const itemsToDisplay = useMemo(() => {
+        const { elements, operations, components } = fullFormalizationData;
+
+        // Find all items that are encapsulated (linked as properties) anywhere
+        const allElementsMap = new Map<string, FormalizationItem>();
+        resources.forEach(r => {
+            (r.formalization?.elements || []).forEach(el => allElementsMap.set(el.id, el));
+        });
+        const allComponentsMap = new Map<string, FormalizationItem>();
+        resources.forEach(r => {
+            (r.formalization?.components || []).forEach(c => allComponentsMap.set(c.id, c));
+        });
+        const allOperationsMap = new Map<string, FormalizationItem>();
+        resources.forEach(r => {
+            (r.formalization?.operations || []).forEach(op => allOperationsMap.set(op.id, op));
+        });
+
+
         const encapsulatedComponentIds = new Set<string>();
-        for (const resource of resources) {
-            for (const el of resource.formalization?.elements || []) {
-                if (el.properties) {
-                    for (const value of Object.values(el.properties)) {
-                        const component = Array.from(allItemsMap.values()).find(item => item.id === value && item.type === 'component');
-                        if (component) {
-                            encapsulatedComponentIds.add(component.id);
-                        }
+        for (const el of allElementsMap.values()) {
+            if (el.properties) {
+                for (const value of Object.values(el.properties)) {
+                    if (allComponentsMap.has(value)) {
+                        encapsulatedComponentIds.add(value);
                     }
                 }
             }
         }
         
-        // 3. Recursively find all children of encapsulated components
+        // Recursively find all children of encapsulated components
         const allEncapsulatedIds = new Set<string>();
         const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
@@ -883,28 +924,30 @@ function FormalizationPageContent() {
             if (visited.has(currentId)) continue;
             visited.add(currentId);
             allEncapsulatedIds.add(currentId);
-            const item = allItemsMap.get(currentId);
-            if (!item) continue;
-            const children = [
-                ...(item.linkedElementIds || []),
-                ...(item.linkedComponentIds || []),
-                ...(item.linkedOperationIds || []),
-            ];
-            children.forEach(childId => queue.push(childId));
+
+            const component = allComponentsMap.get(currentId);
+            if (component) {
+                (component.linkedElementIds || []).forEach(childId => queue.push(childId));
+                (component.linkedComponentIds || []).forEach(childId => queue.push(childId));
+            }
+            
+            const element = allElementsMap.get(currentId);
+            if (element) {
+                (element.linkedOperationIds || []).forEach(childId => queue.push(childId));
+            }
         }
 
-        // 4. Start with local items, but filter out any that are part of an encapsulation tree (unless they are the local resource itself)
         const filterEncapsulated = <T extends FormalizationItem>(items: T[]): T[] => {
-            return items.filter(item => !allEncapsulatedIds.has(item.id) || item.resourceId === selectedResource?.id);
+            return items.filter(item => !allEncapsulatedIds.has(item.id));
         };
         
         let finalItems = {
-            elements: filterEncapsulated(localItems.elements),
-            operations: filterEncapsulated(localItems.operations),
-            components: filterEncapsulated(localItems.components),
+            elements: filterEncapsulated(elements),
+            operations: filterEncapsulated(operations),
+            components: filterEncapsulated(components),
         };
-
-        // 5. Apply the "hide linked" toggle
+        
+        // Then, apply the "hide linked" toggle
         const allLinkedIdsInView = new Set<string>();
         finalItems.elements.forEach(item => {
             (item.linkedOperationIds || []).forEach(id => allLinkedIdsInView.add(id));
@@ -916,19 +959,13 @@ function FormalizationPageContent() {
             (item.linkedElementIds || []).forEach(id => allLinkedIdsInView.add(id));
             (item.linkedComponentIds || []).forEach(id => allLinkedIdsInView.add(id));
         });
-
-        if (hideLinked.elements) {
-            finalItems.elements = finalItems.elements.filter(item => !allLinkedIdsInView.has(item.id));
-        }
-        if (hideLinked.operations) {
-            finalItems.operations = finalItems.operations.filter(item => !allLinkedIdsInView.has(item.id));
-        }
-        if (hideLinked.components) {
-            finalItems.components = finalItems.components.filter(item => !allLinkedIdsInView.has(item.id));
-        }
         
+        if (hideLinked.elements) finalItems.elements = finalItems.elements.filter(item => !allLinkedIdsInView.has(item.id));
+        if (hideLinked.operations) finalItems.operations = finalItems.operations.filter(item => !allLinkedIdsInView.has(item.id));
+        if (hideLinked.components) finalItems.components = finalItems.components.filter(item => !allLinkedIdsInView.has(item.id));
+
         return finalItems;
-    }, [selectedResource, resources, hideLinked]);
+    }, [fullFormalizationData, resources, hideLinked]);
     
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1171,7 +1208,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-[calc(100vh-4rem)] flex flex-col">
+            <div className="h-screen flex flex-col">
                 <header className="flex-shrink-0 p-4 border-b">
                     <div className="flex justify-between items-center">
                         <div>
@@ -1262,3 +1299,4 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
