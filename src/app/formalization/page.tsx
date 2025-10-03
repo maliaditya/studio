@@ -484,6 +484,7 @@ function FormalizationPageContent() {
 
     const [editingItem, setEditingItem] = useState<{item: FormalizationItem, type: 'elements' | 'operations' | 'components'} | null>(null);
     const audioWasPlayingBeforeModal = useRef(false);
+    const audioTimeBeforeModal = useRef(0);
 
     const [playingAudio, setPlayingAudio] = useState(false);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -520,10 +521,13 @@ function FormalizationPageContent() {
     const isResource = (item: any): item is Resource => item && 'folderId' in item;
 
     useEffect(() => {
-        if (editingItem && playingAudio) {
+        const audio = audioRef.current;
+        if (editingItem && playingAudio && audio) {
             audioWasPlayingBeforeModal.current = true;
+            audioTimeBeforeModal.current = audio.currentTime;
             setPlayingAudio(false);
-        } else if (!editingItem && audioWasPlayingBeforeModal.current) {
+        } else if (!editingItem && audioWasPlayingBeforeModal.current && audio) {
+            audio.currentTime = audioTimeBeforeModal.current;
             setPlayingAudio(true);
             audioWasPlayingBeforeModal.current = false;
         }
