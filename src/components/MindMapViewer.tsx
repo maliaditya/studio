@@ -90,14 +90,13 @@ interface MindMapNode extends Partial<ExerciseDefinition>, Partial<Release>, Par
   children: MindMapNode[];
   totalLoggedHours?: number;
   topic?: string;
-  type?: 'product' | 'service' | 'card' | 'link';
+  type?: 'product' | 'service' | 'card' | 'link' | 'formalization_element';
 }
 
 interface MindMapViewerProps {
     defaultView?: string | null;
     showControls?: boolean;
-    rootFolderId?: string | null;
-    rootFocusAreaId?: string | null;
+    rootId?: string | null;
 }
 
 const CARD_WIDTH = 192;
@@ -116,6 +115,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         allDeepWorkLogs, 
         brandingLogs,
         openGeneralPopup, 
+        patterns,
+        metaRules,
     } = useAuth();
     const transformWrapperRef = useRef<ReactZoomPanPinchRef>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -152,14 +153,26 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         }
     }, []);
 
-    const allDefinitions = useMemo(() => new Map(
-        [...deepWorkDefinitions, ...upskillDefinitions, ...resources].map(def => [def.id, def])
-    ), [deepWorkDefinitions, upskillDefinitions, resources]);
-
+    const allDefinitions = useMemo(() => {
+        const formalizationItems = [
+            ...patterns.map(p => ({ ...p, type: 'component' })),
+            ...metaRules.map(r => ({ ...r, type: 'meta-rule' })),
+        ];
+        return new Map(
+            [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...formalizationItems].map(def => [def.id, def])
+        );
+    }, [deepWorkDefinitions, upskillDefinitions, resources, patterns, metaRules]);
+    
     const parentMap = useMemo(() => {
         const map = new Map<string, string[]>();
         allDefinitions.forEach(def => {
-            const childIds = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || []), ...(def.linkedResourceIds || [])];
+            const childIds = [
+                ...(def.linkedDeepWorkIds || []), 
+                ...(def.linkedUpskillIds || []),
+                ...(def.linkedResourceIds || []),
+                ...((def as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+                ...((def as Pattern).linkedElementIds || []),
+            ];
             childIds.forEach(childId => {
                 if (!map.has(childId)) map.set(childId, []);
                 map.get(childId)!.push(def.id);
@@ -216,7 +229,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         nodes.forEach((pos, nodeId) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
-            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])]; // Exclude resources
+            const childIds = [
+                ...(definition.linkedDeepWorkIds || []), 
+                ...(definition.linkedUpskillIds || []),
+                ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+                ...((definition as Pattern).linkedElementIds || []),
+            ];
             childIds.forEach(childId => {
                 if (nodesOnCanvas.has(childId)) {
                     const edgeId1 = `${nodeId}-${childId}`;
@@ -245,25 +263,13 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, [nodes, edges, allDefinitions, parentMap]);
 
     useEffect(() => {
-        const linkedDeepWorkChildIds = new Set<string>((deepWorkDefinitions || []).flatMap(def => def.linkedDeepWorkIds || []));
-        let currentId = rootId;
-        let trueRootId = rootId;
-
-        while (linkedDeepWorkChildIds.has(currentId)) {
-            const parent = deepWorkDefinitions.find(def => (def.linkedDeepWorkIds || []).includes(currentId));
-            if (parent) {
-                currentId = parent.id;
-                trueRootId = parent.id;
-            } else { break; }
-        }
-        
         const container = containerRef.current;
         const centerX = container ? container.offsetWidth / 2 - (CARD_WIDTH / 2) : 500;
         const centerY = container ? container.offsetHeight / 2 - (CARD_HEIGHT / 2) : 500;
 
-        setNodes(new Map([[trueRootId, { x: centerX, y: centerY }]]));
+        setNodes(new Map([[rootId, { x: centerX, y: centerY }]]));
         setEdges(new Set());
-    }, [rootId, deepWorkDefinitions]);
+    }, [rootId]);
 
     const handleExpandAll = useCallback(() => {
         setIsAutoExpanding(true);
@@ -283,8 +289,13 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
             const definition = allDefinitions.get(nodeId);
             if (!definition) return;
     
-            // Expand children (excluding resources)
-            const childIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])];
+            // Expand children
+             const childIds = [
+                ...(definition.linkedDeepWorkIds || []), 
+                ...(definition.linkedUpskillIds || []),
+                ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+                ...((definition as Pattern).linkedElementIds || []),
+            ];
             const childrenToLoad = childIds.filter(childId => allDefinitions.has(childId) && !nodesOnCanvas.has(childId) && !newNodesMap.has(childId));
             
             if (childrenToLoad.length > 0) {
@@ -338,7 +349,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
 
-        const childIds = [...(currentNodeDef.linkedDeepWorkIds || []), ...(currentNodeDef.linkedUpskillIds || [])]; // Exclude resources
+        const childIds = [
+            ...(currentNodeDef.linkedDeepWorkIds || []), 
+            ...(currentNodeDef.linkedUpskillIds || []),
+            ...((currentNodeDef as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+            ...((currentNodeDef as Pattern).linkedElementIds || []),
+        ];
         const validChildIds = childIds.filter(id => allDefinitions.has(id));
 
         const nodesToUpdate = new Map<string, { x: number; y: number }>();
@@ -608,10 +624,16 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             })}
                         </svg>
                         {Array.from(nodes.entries()).map(([nodeId, pos]) => {
-                            const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource);
+                            const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource & Pattern & MetaRule);
                             if (!definition) return null;
                             
-                            const allChildIds = [...(definition.linkedDeepWorkIds || []), ...(definition.linkedUpskillIds || [])];
+                            const allChildIds = [
+                                ...(definition.linkedDeepWorkIds || []), 
+                                ...(definition.linkedUpskillIds || []),
+                                ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+                                ...((definition as Pattern).linkedElementIds || []),
+                            ];
+
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
                             const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
                             const canExpandChildren = hasUnloadedChild || hasUnlinkedChild;
@@ -636,13 +658,15 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 else nodeType = 'Standalone';
                             } else if (definition.type === 'card' || definition.type === 'link') {
                                 nodeType = 'Resource';
+                            } else if (definition.type === 'component' || definition.type === 'meta-rule') {
+                                nodeType = definition.type;
                             }
                             else { // Deep Work
                                 const isParent = (definition.linkedDeepWorkIds?.length ?? 0) > 0;
                                 const isChild = linkedDeepWorkChildIds.has(definition.id);
                                 if (isParent && !isChild) nodeType = 'Intention';
                                 else if (isParent && isChild) nodeType = 'Objective';
-                                else if (isParent && isChild) nodeType = 'Action';
+                                else if (!isParent && !isChild) nodeType = 'Action';
                                 else nodeType = 'Standalone';
                             }
                             
@@ -690,12 +714,15 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
             case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
             case 'Resource': return <Library className="h-4 w-4 text-indigo-500" />;
+            case 'component': return <Blocks className="h-4 w-4 text-teal-500" />;
+            case 'meta-rule': return <Workflow className="h-4 w-4 text-rose-500" />;
             default: return <Briefcase className="h-4 w-4" />;
         }
     };
 
     const isUpskillNode = upskillDefinitions.some((d: any) => d.id === definition.id);
     const isResourceNode = definition.type === 'card' || definition.type === 'link';
+    const isFormalizationNode = definition.type === 'component' || definition.type === 'meta-rule';
     const hasFooterActions = isRootNode || canExpandChildren || canRevealParents;
     
     const handleClick = (e: React.MouseEvent) => {
@@ -737,7 +764,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                                     {definition.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground capitalize">
-                                    {isResourceNode ? 'Resource' : (isUpskillNode ? 'Learning' : 'Deep Work')}
+                                    {isResourceNode ? 'Resource' : (isUpskillNode ? 'Learning' : isFormalizationNode ? nodeType : 'Deep Work')}
                                 </p>
                             </div>
                         </div>
@@ -797,7 +824,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
 
 
 // Main Component
-export function MindMapViewer({ defaultView, showControls = true, rootFolderId = null, rootFocusAreaId = null }: MindMapViewerProps) {
+export function MindMapViewer({ defaultView, showControls = true, rootId = null }: MindMapViewerProps) {
   const { toast, openIntentionPopup } = useAuth();
   const { 
       deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, scheduleTaskFromMindMap, addFeatureToRelease, setDeepWorkDefinitions, resources, resourceFolders,
@@ -903,19 +930,13 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
         return node;
     };
 
-    if (rootFolderId) {
-        const buildFolderTree = (parentId: string | null): MindMapNode[] => {
-            return resourceFolders.filter(f => f.parentId === parentId).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(folder => {
-                const childrenResources = resources.filter(r => r.folderId === folder.id).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
-                const childrenFolders = buildFolderTree(folder.id);
-                return getNode(folder, 'Folder', [...childrenFolders, ...childrenResources]);
-            });
-        };
-        const rootFolder = resourceFolders.find(f => f.id === rootFolderId);
-        if (!rootFolder) return null;
-        const childrenResources = resources.filter(r => r.folderId === rootFolderId).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(r => getNode(r, r.type || 'link', [], { name: r.name }));
-        const childrenFolders = buildFolderTree(rootFolderId);
-        return getNode(rootFolder, 'Folder', [...childrenFolders, ...childrenResources]);
+    if (rootId) {
+        const rootDef = deepWorkDefinitions.find(d => d.id === rootId) || upskillDefinitions.find(d => d.id === rootId) || resources.find(r => r.id === rootId);
+        if (!rootDef) return null;
+        if (rootDef && 'category' in rootDef) {
+            return buildDeepWorkTree(rootId) || buildUpskillTree(rootId);
+        }
+        return getNode(rootDef, rootDef.type || 'link');
     }
     
     if (!selectedTopic) return null;
@@ -980,7 +1001,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     const type = productizationPlans[selectedTopic] ? 'product' : 'service';
     return buildFullTopicTree(selectedTopic, plan, type);
 
-  }, [selectedTopic, rootFolderId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
+  }, [selectedTopic, rootId, deepWorkDefinitions, upskillDefinitions, productizationPlans, offerizationPlans, totalTimePerFocusArea, resources, resourceFolders]);
 
   const scheduledTaskInfo = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -1249,8 +1270,8 @@ export function MindMapViewer({ defaultView, showControls = true, rootFolderId =
     );
   };
 
-  if (rootFocusAreaId) {
-    return <InteractiveFocusAreaMap rootId={rootFocusAreaId} />;
+  if (rootId) {
+    return <InteractiveFocusAreaMap rootId={rootId} />;
   }
 
   return (
