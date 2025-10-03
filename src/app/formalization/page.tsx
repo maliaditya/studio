@@ -1114,5 +1114,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-```
