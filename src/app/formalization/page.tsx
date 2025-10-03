@@ -339,54 +339,56 @@ const ComponentDetailPopup = ({ componentId, formalizationData, onClose, onOpenS
 
     return (
         <Dialog open={!!componentId} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>Component: {component.text}</DialogTitle>
                 </DialogHeader>
-                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                    {linkedElements.map(el => (
-                        <Card key={el.id}>
-                            <CardHeader>
-                                <CardTitle className="text-base">Element: {el.text}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {el.properties && Object.keys(el.properties).length > 0 && (
-                                    <div className="text-xs text-muted-foreground space-y-1">
-                                        <p className="font-medium text-foreground">Properties:</p>
+                <div className="py-4 space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {linkedElements.map(el => (
+                            <Card key={el.id}>
+                                <CardHeader className="p-4">
+                                    <CardTitle className="text-base">Element: {el.text}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-4 pt-0 space-y-2">
+                                    {el.properties && Object.keys(el.properties).length > 0 && (
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p className="font-medium text-foreground">Properties:</p>
+                                            <ul className="list-disc list-inside">
+                                                {Object.entries(el.properties).map(([key, value]) => {
+                                                    const linkedComp = formalizationData?.components?.find(c => c.id === value);
+                                                    return (
+                                                      <li key={key}>
+                                                          <span className="font-semibold">{key}:</span>{' '}
+                                                          {linkedComp ? (
+                                                              <Badge
+                                                                  variant="secondary"
+                                                                  className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                                                  onClick={() => onOpenSubComponent(linkedComp.id)}
+                                                              >
+                                                                  {linkedComp.text}
+                                                              </Badge>
+                                                          ) : (
+                                                              value
+                                                          )}
+                                                      </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
+                                        <p className="font-medium text-foreground">Operations:</p>
                                         <ul className="list-disc list-inside">
-                                            {Object.entries(el.properties).map(([key, value]) => {
-                                                const linkedComp = formalizationData?.components?.find(c => c.id === value);
-                                                return (
-                                                  <li key={key}>
-                                                      <span className="font-semibold">{key}:</span>{' '}
-                                                      {linkedComp ? (
-                                                          <Badge
-                                                              variant="secondary"
-                                                              className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                              onClick={() => onOpenSubComponent(linkedComp.id)}
-                                                          >
-                                                              {linkedComp.text}
-                                                          </Badge>
-                                                      ) : (
-                                                          value
-                                                      )}
-                                                  </li>
-                                                );
-                                            })}
+                                            {getLinkedOperations(el.id).map(op => (
+                                                <li key={op.id}>{op.text}</li>
+                                            ))}
                                         </ul>
                                     </div>
-                                )}
-                                <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t">
-                                    <p className="font-medium text-foreground">Operations:</p>
-                                    <ul className="list-disc list-inside">
-                                        {getLinkedOperations(el.id).map(op => (
-                                            <li key={op.id}>{op.text}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                     {linkedElements.length === 0 && <p className="text-muted-foreground text-center">No elements linked to this component.</p>}
                 </div>
                  <DialogFooter>
@@ -1037,4 +1039,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
