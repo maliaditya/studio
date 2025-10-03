@@ -623,9 +623,14 @@ function FormalizationPageContent() {
 
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle className="capitalize">{title}</CardTitle>
-                    <CardDescription className="text-xs">{description}</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="capitalize">{title}</CardTitle>
+                        <CardDescription className="text-xs">{description}</CardDescription>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
+                        <PlusCircle className="h-4 w-4 text-green-500"/>
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-64">
@@ -680,7 +685,6 @@ function FormalizationPageContent() {
                             )})}
                         </div>
                     </ScrollArea>
-                    <Button size="sm" variant="outline" className="w-full mt-2" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}><PlusCircle className="mr-2 h-4 w-4" /> Add {type.slice(0, -1)}</Button>
                 </CardContent>
             </Card>
         );
@@ -728,7 +732,7 @@ function FormalizationPageContent() {
                     <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
                         {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                         {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
-                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of elements.')}
+                        {renderFormalizationSection('patterns', 'Patterns', 'Reusable templates of elements & operations.')}
                     </div>
                 </div>
             </div>
@@ -752,5 +756,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
