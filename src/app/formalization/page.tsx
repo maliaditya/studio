@@ -863,34 +863,25 @@ function FormalizationPageContent() {
             components: selectedResource.formalization.components || [],
         } : { elements: [], operations: [], components: [] };
     
-        const globalItems = {
-            elements: new Map<string, FormalizationItem>(),
-            operations: new Map<string, FormalizationItem>(),
-            components: new Map<string, FormalizationItem>()
-        };
-        resources.forEach(res => {
-            if (res.formalization) {
-                (res.formalization.elements || []).forEach(el => { if (el.isGlobal) globalItems.elements.set(el.id, el); });
-                (res.formalization.operations || []).forEach(op => { if (op.isGlobal) globalItems.operations.set(op.id, op); });
-                (res.formalization.components || []).forEach(c => { if (c.isGlobal) globalItems.components.set(c.id, c); });
-            }
-        });
-        
         const displayItems = {
             elements: new Map(localItems.elements.map(item => [item.id, item])),
             operations: new Map(localItems.operations.map(item => [item.id, item])),
             components: new Map(localItems.components.map(item => [item.id, item])),
         };
-        
-        globalItems.elements.forEach((item, id) => displayItems.elements.set(id, item));
-        globalItems.operations.forEach((item, id) => displayItems.operations.set(id, item));
-        globalItems.components.forEach((item, id) => displayItems.components.set(id, item));
-        
-        // --- This is the corrected encapsulation logic ---
+    
+        // Add global items if they are not already in the local set.
+        resources.forEach(res => {
+            if (res.formalization) {
+                (res.formalization.elements || []).forEach(el => { if (el.isGlobal && !displayItems.elements.has(el.id)) displayItems.elements.set(el.id, el); });
+                (res.formalization.operations || []).forEach(op => { if (op.isGlobal && !displayItems.operations.has(op.id)) displayItems.operations.set(op.id, op); });
+                (res.formalization.components || []).forEach(c => { if (c.isGlobal && !displayItems.components.has(c.id)) displayItems.components.set(c.id, c); });
+            }
+        });
+    
+        // Encapsulation Logic
         const encapsulatedIds = new Set<string>();
         const propertyLinkedComponentIds = new Set<string>();
-        
-        // 1. Find all components linked via properties from ANY element across ALL resources.
+    
         resources.forEach(res => {
             (res.formalization?.elements || []).forEach(element => {
                 if (element.properties) {
@@ -903,10 +894,8 @@ function FormalizationPageContent() {
                 }
             });
         });
-        
+    
         const queue: string[] = Array.from(propertyLinkedComponentIds);
-        
-        // 2. Traverse and find all children of these encapsulated components.
         const visited = new Set<string>();
         while (queue.length > 0) {
             const currentId = queue.shift()!;
@@ -922,44 +911,47 @@ function FormalizationPageContent() {
                 ...(item.linkedComponentIds || []),
                 ...(item.linkedOperationIds || []),
             ];
-    
-            children.forEach((childId: string) => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
+            children.forEach((childId: string) => queue.push(childId));
         }
-        // --- End of corrected logic ---
-
+        
         const localItemIds = new Set([
             ...localItems.elements.map(i => i.id),
             ...localItems.operations.map(i => i.id),
             ...localItems.components.map(i => i.id),
         ]);
         
-        const applyHideFilter = (items: Map<string, FormalizationItem>, type: 'elements' | 'operations' | 'components') => {
-            const allLinkedIds = new Set<string>();
-            if (hideLinked[type]) {
-                for (const item of displayItems.elements.values()) { (item.linkedOperationIds || []).forEach(id => allLinkedIds.add(id)); }
-                for (const item of displayItems.components.values()) { (item.linkedElementIds || []).forEach(id => allLinkedIds.add(id)); (item.linkedComponentIds || []).forEach(id => allLinkedIds.add(id)); }
-                for (const item of displayItems.elements.values()) { Object.values(item.properties || {}).forEach(id => allLinkedIds.add(id)); }
-            }
+        // Hide/Unhide Logic
+        const allLinkedIds = new Set<string>();
+        displayItems.elements.forEach(item => (item.linkedOperationIds || []).forEach(id => allLinkedIds.add(id)));
+        displayItems.components.forEach(item => {
+            (item.linkedElementIds || []).forEach(id => allLinkedIds.add(id));
+            (item.linkedComponentIds || []).forEach(id => allLinkedIds.add(id));
+        });
+        displayItems.elements.forEach(item => Object.values(item.properties || {}).forEach(id => allLinkedIds.add(id)));
 
+
+        const applyFilters = (items: Map<string, FormalizationItem>, type: 'elements' | 'operations' | 'components') => {
             return Array.from(items.values()).filter(item => {
-                if (encapsulatedIds.has(item.id)) {
-                    return localItemIds.has(item.id);
-                }
-                return hideLinked[type] ? !allLinkedIds.has(item.id) || localItemIds.has(item.id) : true;
+                // Never hide an item that belongs to the currently selected resource.
+                if (localItemIds.has(item.id)) return true;
+
+                // If it's an encapsulated item (part of a component property), hide it.
+                if (encapsulatedIds.has(item.id)) return false;
+
+                // If "hide linked" is on for this column, hide it if it's linked from another item.
+                if (hideLinked[type] && allLinkedIds.has(item.id)) return false;
+
+                // Otherwise, show it.
+                return true;
             });
         };
 
         return {
-            elements: applyHideFilter(displayItems.elements, 'elements'),
-            operations: applyHideFilter(displayItems.operations, 'operations'),
-            components: applyHideFilter(displayItems.components, 'components'),
+            elements: applyFilters(displayItems.elements, 'elements'),
+            operations: applyFilters(displayItems.operations, 'operations'),
+            components: applyFilters(displayItems.components, 'components'),
         };
     }, [selectedResource, resources, allDefinitionsMap, hideLinked]);
-
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1202,21 +1194,27 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 p-4">
+            <div className="h-screen flex flex-col gap-4 p-4">
+                <header className="flex-shrink-0">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-2xl font-bold">Formalization</h1>
+                        <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
+                            <SelectTrigger className="w-[300px]"><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                            <SelectContent>
+                                {specializations.map(spec => (
+                                    <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <p className="text-muted-foreground">Deconstruct knowledge into its fundamental building blocks.</p>
+                </header>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                            <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
-                                <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                                <SelectContent>
-                                    {specializations.map(spec => (
-                                        <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                             <ScrollArea className="flex-grow">
                                 <div className="space-y-1">
                                     {curiositiesForSpecialization.map(curiosity => (
@@ -1285,5 +1283,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
