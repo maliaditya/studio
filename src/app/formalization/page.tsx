@@ -159,7 +159,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
     useEffect(() => {
       if (item) {
         setText(item.text);
-        setProperties(item.properties ? Object.entries(item.properties).map(([key, value], i) => ({ id: `prop-${item.id}-${i}-${Math.random()}`, key, value })) : []);
+        setProperties(item.properties ? Object.entries(item.properties).map(([key, value]) => ({ id: `prop-${item.id}-${key}-${Math.random()}`, key, value: value || '' })) : []);
         setLinkedElementIds(item.linkedElementIds || []);
       }
     }, [item]);
@@ -196,6 +196,11 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
         setLinkedElementIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
+    const handleSelectChange = (propId: string, value: string) => {
+        const newValue = value === '--none--' ? '' : value;
+        handlePropertyChange(propId, 'value', newValue);
+    };
+
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
             <DialogContent className="sm:max-w-xl">
@@ -217,7 +222,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 {properties.map((prop) => (
                                     <div key={prop.id} className="flex items-center gap-2">
                                         <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                        <Select onValueChange={(val) => handlePropertyChange(prop.id, 'value', val)} defaultValue={prop.value}>
+                                        <Select onValueChange={(val) => handleSelectChange(prop.id, val)} defaultValue={prop.value}>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Value or Link Pattern..." />
                                             </SelectTrigger>
@@ -228,7 +233,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                                   defaultValue={prop.value}
                                                   onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
                                                 />
-                                                <SelectItem value="">-- Clear --</SelectItem>
+                                                <SelectItem value="--none--">-- Clear --</SelectItem>
                                                 {(formalizationData?.patterns || []).map(p => (
                                                   <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
                                                 ))}
@@ -517,7 +522,7 @@ function FormalizationPageContent() {
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} fill objectFit="contain" />
                         </div>
                     ) : null }
                     <CardHeader>
@@ -747,4 +752,5 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
