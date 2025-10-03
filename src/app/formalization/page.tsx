@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -862,96 +862,62 @@ function FormalizationPageContent() {
             operations: selectedResource.formalization.operations || [],
             components: selectedResource.formalization.components || [],
         } : { elements: [], operations: [], components: [] };
-    
-        const displayItems = {
-            elements: new Map(localItems.elements.map(item => [item.id, item])),
-            operations: new Map(localItems.operations.map(item => [item.id, item])),
-            components: new Map(localItems.components.map(item => [item.id, item])),
-        };
-    
-        // Add global items if they are not already in the local set.
-        resources.forEach(res => {
-            if (res.formalization) {
-                (res.formalization.elements || []).forEach(el => { if (el.isGlobal && !displayItems.elements.has(el.id)) displayItems.elements.set(el.id, el); });
-                (res.formalization.operations || []).forEach(op => { if (op.isGlobal && !displayItems.operations.has(op.id)) displayItems.operations.set(op.id, op); });
-                (res.formalization.components || []).forEach(c => { if (c.isGlobal && !displayItems.components.has(c.id)) displayItems.components.set(c.id, c); });
+
+        const allItemsFromAllResources = resources.flatMap(r => [
+            ...(r.formalization?.elements || []),
+            ...(r.formalization?.operations || []),
+            ...(r.formalization?.components || []),
+        ]);
+
+        const allLinkedIds = new Set<string>();
+        allItemsFromAllResources.forEach(item => {
+            (item.linkedOperationIds || []).forEach(id => allLinkedIds.add(id));
+            (item.linkedElementIds || []).forEach(id => allLinkedIds.add(id));
+            (item.linkedComponentIds || []).forEach(id => allLinkedIds.add(id));
+            if (item.properties) {
+                Object.values(item.properties).forEach(id => allLinkedIds.add(id));
             }
         });
-    
-        // Encapsulation Logic
-        const encapsulatedIds = new Set<string>();
-        const propertyLinkedComponentIds = new Set<string>();
-    
-        resources.forEach(res => {
-            (res.formalization?.elements || []).forEach(element => {
-                if (element.properties) {
-                    Object.values(element.properties).forEach(value => {
-                        const itemDef = allDefinitionsMap.get(value);
-                        if (itemDef && itemDef._type === 'component') {
-                            propertyLinkedComponentIds.add(value);
-                        }
-                    });
-                }
-            });
+        
+        const encapsulatedComponentIds = new Set<string>();
+        fullFormalizationData.elements.forEach(element => {
+            if (element.properties) {
+                Object.values(element.properties).forEach(value => {
+                    if (fullFormalizationData.components.some(c => c.id === value)) {
+                        encapsulatedComponentIds.add(value);
+                    }
+                });
+            }
         });
-    
-        const queue: string[] = Array.from(propertyLinkedComponentIds);
+
+        const encapsulatedChildIds = new Set<string>();
+        const queue = [...encapsulatedComponentIds];
         const visited = new Set<string>();
-        while (queue.length > 0) {
+        while(queue.length > 0) {
             const currentId = queue.shift()!;
             if (visited.has(currentId)) continue;
             visited.add(currentId);
-            encapsulatedIds.add(currentId);
-    
+            encapsulatedChildIds.add(currentId);
             const item = allDefinitionsMap.get(currentId);
             if (!item) continue;
-    
-            const children = [
-                ...(item.linkedElementIds || []),
-                ...(item.linkedComponentIds || []),
-                ...(item.linkedOperationIds || []),
-            ];
-            children.forEach((childId: string) => queue.push(childId));
+            const children = [...(item.linkedElementIds || []), ...(item.linkedComponentIds || []), ...(item.linkedOperationIds || [])];
+            children.forEach(childId => queue.push(childId));
         }
-        
-        const localItemIds = new Set([
-            ...localItems.elements.map(i => i.id),
-            ...localItems.operations.map(i => i.id),
-            ...localItems.components.map(i => i.id),
-        ]);
-        
-        // Hide/Unhide Logic
-        const allLinkedIds = new Set<string>();
-        displayItems.elements.forEach(item => (item.linkedOperationIds || []).forEach(id => allLinkedIds.add(id)));
-        displayItems.components.forEach(item => {
-            (item.linkedElementIds || []).forEach(id => allLinkedIds.add(id));
-            (item.linkedComponentIds || []).forEach(id => allLinkedIds.add(id));
-        });
-        displayItems.elements.forEach(item => Object.values(item.properties || {}).forEach(id => allLinkedIds.add(id)));
 
-
-        const applyFilters = (items: Map<string, FormalizationItem>, type: 'elements' | 'operations' | 'components') => {
-            return Array.from(items.values()).filter(item => {
-                // Never hide an item that belongs to the currently selected resource.
-                if (localItemIds.has(item.id)) return true;
-
-                // If it's an encapsulated item (part of a component property), hide it.
-                if (encapsulatedIds.has(item.id)) return false;
-
-                // If "hide linked" is on for this column, hide it if it's linked from another item.
+        const filterItems = (items: FormalizationItem[], type: 'elements' | 'operations' | 'components') => {
+            return items.filter(item => {
+                if (encapsulatedChildIds.has(item.id)) return false;
                 if (hideLinked[type] && allLinkedIds.has(item.id)) return false;
-
-                // Otherwise, show it.
                 return true;
             });
         };
-
+        
         return {
-            elements: applyFilters(displayItems.elements, 'elements'),
-            operations: applyFilters(displayItems.operations, 'operations'),
-            components: applyFilters(displayItems.components, 'components'),
+            elements: filterItems(localItems.elements, 'elements'),
+            operations: filterItems(localItems.operations, 'operations'),
+            components: filterItems(localItems.components, 'components'),
         };
-    }, [selectedResource, resources, allDefinitionsMap, hideLinked]);
+    }, [selectedResource, resources, hideLinked, fullFormalizationData, allDefinitionsMap]);
 
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1097,7 +1063,7 @@ function FormalizationPageContent() {
                         </div>
                         <div className="flex items-center">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHideLinked(prev => ({...prev, [type]: !prev[type]}))}>
-                            <EyeOff className={cn("h-4 w-4", !hideLinked[type] && "text-primary")} />
+                                {hideLinked[type] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4 text-primary" />}
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
                                 <PlusCircle className="h-4 w-4 text-green-500"/>
@@ -1194,7 +1160,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="h-screen flex flex-col gap-4 p-4">
+            <div className="h-[calc(100vh-8rem)] flex flex-col gap-4 p-4">
                 <header className="flex-shrink-0">
                     <div className="flex justify-between items-center">
                         <h1 className="text-2xl font-bold">Formalization</h1>
@@ -1232,11 +1198,11 @@ function FormalizationPageContent() {
                         </CardContent>
                     </Card>
 
-                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 h-full min-h-0">
                             {renderSelectedResource()}
                         </div>
-                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
                             {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                             {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
                             {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
@@ -1283,6 +1249,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
 
 
 
