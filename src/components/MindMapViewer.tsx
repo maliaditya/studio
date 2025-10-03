@@ -22,7 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DndContext, useDraggable, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 import { Progress } from './ui/progress';
-import { IntentionDetailPopup } from './IntentionDetailModal';
+import { IntentionDetailPopup } from './IntentionDetailPopup';
 
 // Component-specific icons
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -154,25 +154,22 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     }, []);
 
     const allDefinitions = useMemo(() => {
-      const formalizationItems: any[] = [];
       const { elements = [], operations = [], components = [] } = resources.reduce((acc, resource) => {
         if (resource.formalization) {
           if (resource.formalization.elements) {
-            acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element', category: 'Formalization', name: e.text })));
+            acc.elements.push(...resource.formalization.elements.map(e => ({ ...e, type: 'formalization_element' as const, category: 'Formalization', name: e.text })));
           }
           if (resource.formalization.operations) {
-            acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation', category: 'Formalization', name: o.text })));
+            acc.operations.push(...resource.formalization.operations.map(o => ({ ...o, type: 'operation' as const, category: 'Formalization', name: o.text })));
           }
           if (resource.formalization.components) {
-            acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component', category: 'Formalization', name: c.text })));
+            acc.components.push(...resource.formalization.components.map(c => ({ ...c, type: 'component' as const, category: 'Formalization', name: c.text })));
           }
         }
         return acc;
       }, { elements: [] as any[], operations: [] as any[], components: [] as any[] });
-
-      formalizationItems.push(...elements, ...operations, ...components);
       
-      const allItems = [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...patterns, ...metaRules, ...formalizationItems];
+      const allItems: (ExerciseDefinition | Resource | Pattern | MetaRule | FormalizationItem)[] = [...deepWorkDefinitions, ...upskillDefinitions, ...resources, ...patterns, ...metaRules, ...elements, ...operations, ...components];
       return new Map(allItems.map(def => [def.id, def]));
     }, [deepWorkDefinitions, upskillDefinitions, resources, patterns, metaRules]);
     
@@ -614,7 +611,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             })}
                         </svg>
                         {Array.from(nodes.entries()).map(([nodeId, pos]) => {
-                            const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource & Pattern & MetaRule);
+                            const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource & Pattern & MetaRule & FormalizationItem);
                             if (!definition) return null;
                             
                             const allChildIds = [
@@ -622,7 +619,12 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                                 ...((definition as ExerciseDefinition).linkedUpskillIds || []),
                                 ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
                                 ...((definition as Pattern).linkedElementIds || []),
+                                ...((definition as FormalizationItem).linkedElementIds || []),
                             ];
+
+                            if (definition.type === 'formalization_element' && definition.properties) {
+                                allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                            }
 
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
                             const hasUnlinkedChild = allChildIds.some(childId => allDefinitions.has(childId) && nodes.has(childId) && !Array.from(edges).some(edgeId => edgeId === `${nodeId}-${childId}` || edgeId === `${childId}-${nodeId}`));
@@ -669,14 +671,16 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
     const showProgress = estimatedHours > 0;
     
     let nodeType = definition.type || 'unknown';
-    let isFormalizationNode = false;
     let nodeCategory: string = (definition as ExerciseDefinition).category;
     
     if (definition.type === 'formalization_element' || definition.type === 'component' || definition.type === 'operation' || definition.type === 'property' || definition.type === 'meta-rule') {
-        isFormalizationNode = true;
         nodeCategory = 'Formalization';
         if (definition.type === 'formalization_element') nodeType = 'Element';
+        else nodeType = definition.type.charAt(0).toUpperCase() + definition.type.slice(1);
+    } else if (definition.category === 'Content Bundle') {
+        nodeType = 'Content Bundle';
     }
+
 
     const getIcon = () => {
         switch (nodeType) {
@@ -687,11 +691,12 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
             case 'Standalone': return <Focus className="h-4 w-4 text-purple-500" />;
             case 'card': case 'link': case 'Resource': return <Library className="h-4 w-4 text-indigo-500" />;
-            case 'component': return <Blocks className="h-4 w-4 text-teal-500" />;
-            case 'operation': return <Workflow className="h-4 w-4 text-pink-500"/>;
-            case 'property': return <GitBranch className="h-4 w-4 text-gray-500"/>;
+            case 'Component': return <Blocks className="h-4 w-4 text-teal-500" />;
+            case 'Operation': return <Workflow className="h-4 w-4 text-pink-500"/>;
+            case 'Property': return <GitBranch className="h-4 w-4 text-gray-500"/>;
             case 'Element': return <Database className="h-4 w-4 text-cyan-500"/>;
-            case 'meta-rule': return <Workflow className="h-4 w-4 text-rose-500" />;
+            case 'Meta-rule': return <Workflow className="h-4 w-4 text-rose-500" />;
+            case 'Content Bundle': return <Share2 className="h-4 w-4 text-fuchsia-500" />;
             default: return <Briefcase className="h-4 w-4" />;
         }
     };
@@ -1114,7 +1119,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
             const isChild = linkedUpskillChildIds.has(node.id);
             if (isParent && !isChild) return <Flashlight className="h-4 w-4 text-amber-500" />; // Curiosity
             if (isParent && isChild) return <Flag className="h-4 w-4 text-green-500" />; // Objective
-            if (!isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
+            if (isParent && isChild) return <Frame className="h-4 w-4 text-blue-500" />; // Visualization
             return <Focus className="h-4 w-4 text-purple-500" />; // Standalone
         }
         if (node.category === 'Release') return <Calendar className="h-4 w-4" />;
@@ -1297,5 +1302,3 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     </>
   );
 }
-
-```
