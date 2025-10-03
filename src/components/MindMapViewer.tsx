@@ -258,7 +258,6 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
     useEffect(() => {
         if (!isAutoExpanding) return;
     
-        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         let madeChanges = false;
         const newNodesMap = new Map<string, { x: number; y: number }>();
         const newEdgesSet = new Set<string>();
@@ -291,8 +290,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 childrenToLoad.forEach((childId, index) => {
                     if (!newNodesMap.has(childId)) {
-                        const x = isElementMindMap ? pos.x + (index * (CARD_WIDTH + 20)) - ((childrenToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : pos.x + HORIZONTAL_SPACING;
-                        const y = isElementMindMap ? pos.y + (CARD_HEIGHT + VERTICAL_SPACING) : pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((childrenToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                        const x = pos.x + (index * (CARD_WIDTH + 20)) - ((childrenToLoad.length - 1) * (CARD_WIDTH + 20) / 2);
+                        const y = pos.y + (CARD_HEIGHT + VERTICAL_SPACING);
                         newNodesMap.set(childId, { x, y });
                     }
                     newEdgesSet.add(`${nodeId}-${childId}`);
@@ -307,8 +306,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                 madeChanges = true;
                 parentsToLoad.forEach((parentId, index) => {
                      if (!newNodesMap.has(parentId)) {
-                        const x = isElementMindMap ? pos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : pos.x - HORIZONTAL_SPACING;
-                        const y = isElementMindMap ? pos.y - (CARD_HEIGHT + VERTICAL_SPACING) : pos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                        const x = pos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2);
+                        const y = pos.y - (CARD_HEIGHT + VERTICAL_SPACING);
                         newNodesMap.set(parentId, { x, y });
                     }
                     newEdgesSet.add(`${parentId}-${nodeId}`);
@@ -329,10 +328,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         } else {
             setIsAutoExpanding(false);
         }
-    }, [isAutoExpanding, nodes, allDefinitions, parentMap, runCollisionDetection, rootId]);
+    }, [isAutoExpanding, nodes, allDefinitions, parentMap, runCollisionDetection]);
 
     const handleExpandChildren = useCallback((nodeId: string) => {
-        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         const currentNodeDef = allDefinitions.get(nodeId) as (Resource & Pattern & FormalizationItem);
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodeDef || !currentNodePos) return;
@@ -357,8 +355,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         validChildIds.forEach((childId, index) => {
             if (!nodes.has(childId)) {
-                const x = isElementMindMap ? currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((validChildIds.length - 1) * (CARD_WIDTH + 20) / 2) : currentNodePos.x + HORIZONTAL_SPACING;
-                const y = isElementMindMap ? currentNodePos.y + (CARD_HEIGHT + VERTICAL_SPACING) : currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((validChildIds.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                const x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((validChildIds.length - 1) * (CARD_WIDTH + 20) / 2);
+                const y = currentNodePos.y + (CARD_HEIGHT + VERTICAL_SPACING);
                 nodesToUpdate.set(childId, { x, y });
             }
             const edgeId1 = `${nodeId}-${childId}`;
@@ -376,10 +374,9 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, runCollisionDetection, rootId]);
+    }, [nodes, edges, allDefinitions, runCollisionDetection]);
   
     const handleRevealParents = useCallback((nodeId: string) => {
-        const isElementMindMap = allDefinitions.get(rootId)?.category === 'Formalization';
         const currentNodePos = nodes.get(nodeId);
         if (!currentNodePos) return;
 
@@ -391,8 +388,8 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
 
         parentsToLoad.forEach((parentId, index) => {
             if (!nodes.has(parentId)) {
-                 const x = isElementMindMap ? currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2) : currentNodePos.x - HORIZONTAL_SPACING;
-                 const y = isElementMindMap ? currentNodePos.y - (CARD_HEIGHT + VERTICAL_SPACING) : currentNodePos.y + (index * (CARD_HEIGHT + VERTICAL_SPACING)) - ((parentsToLoad.length - 1) * (CARD_HEIGHT + VERTICAL_SPACING) / 2);
+                 const x = currentNodePos.x + (index * (CARD_WIDTH + 20)) - ((parentsToLoad.length - 1) * (CARD_WIDTH + 20) / 2);
+                 const y = currentNodePos.y - (CARD_HEIGHT + VERTICAL_SPACING);
                  nodesToUpdate.set(parentId, { x, y });
             }
             const edgeId1 = `${parentId}-${nodeId}`;
@@ -410,7 +407,7 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
         if (edgesToUpdate.size > 0) {
             setEdges(prev => new Set([...prev, ...edgesToUpdate]));
         }
-    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection, rootId]);
+    }, [nodes, edges, allDefinitions, parentMap, runCollisionDetection]);
     
     const handleDragEnd = (event: DragEndEvent) => {
         setIsDragging(false);
@@ -631,15 +628,18 @@ const InteractiveFocusAreaMap = ({ rootId }: { rootId: string }) => {
                             const definition = allDefinitions.get(nodeId) as (ExerciseDefinition & Resource & Pattern & MetaRule & FormalizationItem);
                             if (!definition) return null;
                             
-                            let allChildIds: string[] = [
-                                ...((definition as ExerciseDefinition).linkedDeepWorkIds || []), 
-                                ...((definition as ExerciseDefinition).linkedUpskillIds || []),
-                                ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
-                                ...((definition as FormalizationItem).linkedElementIds || []),
-                            ];
+                            let allChildIds: string[] = [];
+                            if (definition) {
+                                allChildIds = [
+                                    ...((definition as ExerciseDefinition).linkedDeepWorkIds || []),
+                                    ...((definition as ExerciseDefinition).linkedUpskillIds || []),
+                                    ...((definition as Resource).points || []).filter(p => p.resourceId).map(p => p.resourceId!),
+                                    ...((definition as FormalizationItem).linkedElementIds || []),
+                                ];
 
-                            if (definition.type === 'formalization_element' && definition.properties) {
-                                allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                                if (definition.type === 'formalization_element' && definition.properties) {
+                                    allChildIds.push(...Object.values(definition.properties).filter(val => allDefinitions.has(val)));
+                                }
                             }
 
                             const hasUnloadedChild = allChildIds.some(childId => allDefinitions.has(childId) && !nodes.has(childId));
@@ -689,12 +689,15 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
     let nodeType = definition.type || 'unknown';
     let nodeCategory: string = (definition as ExerciseDefinition).category;
     
-    if (definition.type === 'formalization_element' || definition.type === 'component' || definition.type === 'operation' || definition.type === 'property' || definition.type === 'meta-rule') {
-        nodeCategory = 'Formalization';
+    if (definition.category === 'Formalization') {
         if (definition.type === 'formalization_element') nodeType = 'Element';
-        else nodeType = definition.type.charAt(0).toUpperCase() + definition.type.slice(1);
+        else if (definition.type === 'component') nodeType = 'Component';
+        else if (definition.type === 'operation') nodeType = 'Operation';
+        else if (definition.type === 'property') nodeType = 'Property';
     } else if (definition.category === 'Content Bundle') {
         nodeType = 'Content Bundle';
+    } else if (definition.type === 'meta-rule') {
+        nodeType = 'Meta-Rule';
     }
 
 
@@ -711,7 +714,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
             case 'Operation': return <Workflow className="h-4 w-4 text-pink-500"/>;
             case 'Property': return <GitBranch className="h-4 w-4 text-gray-500"/>;
             case 'Element': return <Database className="h-4 w-4 text-cyan-500"/>;
-            case 'Meta-rule': return <Workflow className="h-4 w-4 text-rose-500" />;
+            case 'Meta-Rule': return <Workflow className="h-4 w-4 text-rose-500" />;
             case 'Content Bundle': return <Share2 className="h-4 w-4 text-fuchsia-500" />;
             default: return <Briefcase className="h-4 w-4" />;
         }
@@ -745,7 +748,7 @@ const PositionedNode = ({ nodeId, pos, definition, onExpandChildren, onRevealPar
                                     {definition.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground capitalize">
-                                    {nodeCategory}
+                                    {nodeType}
                                 </p>
                             </div>
                         </div>
@@ -900,7 +903,10 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     };
 
     if (rootId) {
-        return {id: 'root-wrapper', name: 'Root', category: 'System', children: [buildDeepWorkTree(rootId) || buildUpskillTree(rootId)].filter((n): n is MindMapNode => !!n)}
+        const rootNode = buildDeepWorkTree(rootId) || buildUpskillTree(rootId);
+        if (rootNode) {
+            return {id: 'root-wrapper', name: 'Root', category: 'System', children: [rootNode]}
+        }
     }
     
     if (!selectedTopic) return null;
@@ -1172,7 +1178,7 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     const nodeClass = cn(
         "p-2 rounded-md shadow-md transition-all duration-300 relative border-l-4",
         isHighlighted ? 'bg-primary/10' : 'bg-card',
-        nodeStatus.isLogged ? "bg-green-100 dark:bg-transparent border-green-500 dark:border-green-400" :
+        nodeStatus.isLogged ? "bg-green-100 dark:bg-green-900/30 border-green-500 dark:border-green-400" :
         nodeStatus.isScheduled ? "dark:bg-transparent border-yellow-500 dark:border-yellow-400" :
         nodeStatus.isPending ? "dark:bg-transparent border-orange-400 dark:border-orange-500" :
         nodeStatus.isPastLogged ? "border-green-400" :
@@ -1318,5 +1324,3 @@ export function MindMapViewer({ defaultView, showControls = true, rootId = null 
     </>
   );
 }
-
-    
