@@ -235,7 +235,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                 {properties.map((prop) => (
                                     <div key={prop.id} className="flex items-center gap-2">
                                         <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                        <Select onValueChange={(val) => handleSelectChange(prop.id, val)} defaultValue={prop.value}>
+                                        <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Value or Link Component..." />
                                             </SelectTrigger>
@@ -247,7 +247,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                                                   onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
                                                 />
                                                 <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                {(formalizationData?.components || []).map(p => (
+                                                {formalizationData?.components?.map(p => (
                                                   <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -816,5 +816,7 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+
+    
 
     
