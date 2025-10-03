@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -260,22 +260,7 @@ const ItemEditorModal = ({ item, type, formalizationData, onClose, onSave }: {
                             <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                         </div>
                     )}
-                    {type === 'operations' && (
-                        <div className="space-y-2">
-                            <Label>Link Elements</Label>
-                            <ScrollArea className="h-40 border rounded-md p-2">
-                                <div className="space-y-1">
-                                    {(formalizationData?.elements || []).map(el => (
-                                        <div key={el.id} className="flex items-center space-x-2">
-                                            <Checkbox id={`el-${el.id}`} checked={linkedElementIds.includes(el.id)} onCheckedChange={() => handleLinkToggle(el.id)} />
-                                            <Label htmlFor={`el-${el.id}`} className="font-normal">{el.text}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </div>
-                    )}
-                    {type === 'components' && (
+                    {(type === 'operations' || type === 'components') && (
                         <div className="space-y-2">
                             <Label>Link Elements</Label>
                             <ScrollArea className="h-40 border rounded-md p-2">
@@ -671,69 +656,63 @@ function FormalizationPageContent() {
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <div className="space-y-2">
-                        {data.map(item => {
-                            const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                            const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []) : [];
-                            
-                            return (
-                            <Card key={item.id} className="group relative">
-                                <CardContent className="p-3 text-sm">
-                                    <p className="font-semibold">{item.text}</p>
-                                    {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
-                                        <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
-                                            {Object.entries(item.properties).map(([key, value]) => {
-                                                const component = formalizationData?.components?.find(p => p.id === value);
-                                                return (
-                                                    <div key={key} className="flex items-center gap-2">
-                                                        <span className="font-medium text-foreground">{key}:</span>
-                                                        {component ? (
-                                                            <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
-                                                        ) : (
-                                                            String(value)
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                    {type === 'operations' && linkedElements.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t">
-                                            <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                    <ScrollArea className="h-64">
+                        <div className="space-y-2 pr-2">
+                            {data.map(item => {
+                                const linkedElements = (item.linkedElementIds || []).map(id => formalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                const usedIn = type === 'elements' ? (reverseElementLinks.get(item.id) || []).map(link => link.name) : [];
+                                
+                                return (
+                                <Card key={item.id} className="group relative">
+                                    <CardContent className="p-3 text-sm">
+                                        <p className="font-semibold">{item.text}</p>
+                                        {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
+                                            <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
+                                                {Object.entries(item.properties).map(([key, value]) => {
+                                                    const component = formalizationData?.components?.find(p => p.id === value);
+                                                    return (
+                                                        <div key={key} className="flex items-center gap-2">
+                                                            <span className="font-medium text-foreground">{key}:</span>
+                                                            {component ? (
+                                                                <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary">{component.text}</Badge>
+                                                            ) : (
+                                                                String(value)
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                        </div>
-                                    )}
-                                    {type === 'components' && linkedElements.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t">
-                                            <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                        )}
+                                        {(type === 'operations' || type === 'components') && linkedElements.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                    {type === 'elements' && usedIn.length > 0 && (
-                                        <div className="mt-2 pt-2 border-t">
-                                            <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
-                                             <div className="flex flex-wrap gap-1 mt-1">
-                                                {usedIn.map((use, i) => <Badge key={i} variant={use.type === 'operation' ? 'outline' : 'default'}>{use.name}</Badge>)}
+                                        )}
+                                        {type === 'elements' && usedIn.length > 0 && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <h5 className="font-medium text-xs text-muted-foreground">Used for:</h5>
+                                                 <div className="flex flex-wrap gap-1 mt-1">
+                                                    {usedIn.map((p, i) => <Badge key={i} variant="default">{p}</Badge>)}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                                <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {type === 'elements' && (
-                                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
-                                        <GitMerge className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            </Card>
-                        )})}
-                    </div>
+                                        )}
+                                    </CardContent>
+                                    <div className="absolute top-1 right-1 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {type === 'elements' && (
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openMindMapForElement(item.id)}>
+                                            <GitMerge className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingItem({ item, type })}><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteItem(type, item.id)}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                </Card>
+                            )})}
+                        </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         );
@@ -813,10 +792,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
-
