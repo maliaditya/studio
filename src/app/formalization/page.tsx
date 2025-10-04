@@ -529,6 +529,7 @@ function FormalizationPageContent() {
         globalVolume,
         selectedFormalizationSpecId,
         setSelectedFormalizationSpecId,
+        offerizationPlans,
     } = useAuth();
     const { toast } = useToast();
     
@@ -550,8 +551,39 @@ function FormalizationPageContent() {
     const [hideLinked, setHideLinked] = useState<Record<'elements' | 'operations' | 'components', boolean>>({ elements: true, operations: true, components: true });
 
     const specializations = useMemo(() => {
-        return coreSkills.filter(skill => skill.type === 'Specialization');
-    }, [coreSkills]);
+        return coreSkills.filter(skill => skill.type === 'Specialization' && offerizationPlans && offerizationPlans[skill.id]);
+    }, [coreSkills, offerizationPlans]);
+
+    const getSpecResources = useCallback((specId: string | null): Resource[] => {
+        if (!specId) return [];
+        const spec = specializations.find(s => s.id === specId);
+        if (!spec) return [];
+        
+        const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+        const curiositiesInSpec = upskillDefinitions.filter(def => microSkillNames.has(def.category));
+        
+        const resourcesInSpec: Resource[] = [];
+        const visitedResourceIds = new Set<string>();
+        const queue = [...curiositiesInSpec];
+
+        while (queue.length > 0) {
+            const current = queue.shift()!;
+            (current.linkedResourceIds || []).forEach(resId => {
+                if (!visitedResourceIds.has(resId)) {
+                    const resource = resources.find(r => r.id === resId);
+                    if (resource) {
+                        resourcesInSpec.push(resource);
+                        visitedResourceIds.add(resId);
+                    }
+                }
+            });
+            (current.linkedUpskillIds || []).forEach(childId => {
+                const childDef = upskillDefinitions.find(d => d.id === childId);
+                if (childDef) queue.push(childDef);
+            });
+        }
+        return resourcesInSpec;
+    }, [specializations, upskillDefinitions, resources]);
 
     const curiositiesForSpecialization = useMemo(() => {
         if (!selectedFormalizationSpecId) return [];
@@ -770,37 +802,6 @@ function FormalizationPageContent() {
         }
     };
     
-    const getSpecResources = useCallback((specId: string | null): Resource[] => {
-        if (!specId) return [];
-        const spec = specializations.find(s => s.id === specId);
-        if (!spec) return [];
-        
-        const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
-        const curiositiesInSpec = upskillDefinitions.filter(def => microSkillNames.has(def.category));
-        
-        const resourcesInSpec: Resource[] = [];
-        const visitedResourceIds = new Set<string>();
-        const queue = [...curiositiesInSpec];
-
-        while (queue.length > 0) {
-            const current = queue.shift()!;
-            (current.linkedResourceIds || []).forEach(resId => {
-                if (!visitedResourceIds.has(resId)) {
-                    const resource = resources.find(r => r.id === resId);
-                    if (resource) {
-                        resourcesInSpec.push(resource);
-                        visitedResourceIds.add(resId);
-                    }
-                }
-            });
-            (current.linkedUpskillIds || []).forEach(childId => {
-                const childDef = upskillDefinitions.find(d => d.id === childId);
-                if (childDef) queue.push(childDef);
-            });
-        }
-        return resourcesInSpec;
-    }, [specializations, upskillDefinitions, resources]);
-
     const allComponentsForSpec = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
         return specResources.flatMap(r => r.formalization?.components || []);
@@ -908,13 +909,15 @@ function FormalizationPageContent() {
     }, [selectedFormalizationSpecId, getSpecResources, resources]);
 
     const { itemsToDisplay, encapsulatedIds } = useMemo(() => {
-        const encapsulatedComponentIds = new Set<string>();
         const allElements = fullFormalizationData.elements;
-    
+        const allComponents = fullFormalizationData.components;
+        const allOperations = fullFormalizationData.operations;
+
+        const encapsulatedComponentIds = new Set<string>();
         allElements.forEach(el => {
             if (el.properties) {
                 Object.values(el.properties).forEach(value => {
-                    if (fullFormalizationData.components.some(c => c.id === value)) {
+                    if (allComponents.some(c => c.id === value)) {
                         encapsulatedComponentIds.add(value);
                     }
                 });
@@ -928,7 +931,7 @@ function FormalizationPageContent() {
     
         while (queue.length > 0) {
             const currentComponentId = queue.shift()!;
-            const component = fullFormalizationData.components.find(c => c.id === currentComponentId);
+            const component = allComponents.find(c => c.id === currentComponentId);
             if (component) {
                 (component.linkedElementIds || []).forEach(elId => encapsulatedElementIds.add(elId));
                 (component.linkedComponentIds || []).forEach(cId => {
@@ -942,7 +945,7 @@ function FormalizationPageContent() {
         }
     
         encapsulatedElementIds.forEach(elId => {
-            const element = fullFormalizationData.elements.find(e => e.id === elId);
+            const element = allElements.find(e => e.id === elId);
             if (element && element.linkedOperationIds) {
                 element.linkedOperationIds.forEach(opId => encapsulatedOperationIds.add(opId));
             }
@@ -952,9 +955,9 @@ function FormalizationPageContent() {
 
         return {
             itemsToDisplay: {
-                elements: hideLinked.elements ? fullFormalizationData.elements.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.elements,
-                operations: hideLinked.operations ? fullFormalizationData.operations.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.operations,
-                components: hideLinked.components ? fullFormalizationData.components.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.components,
+                elements: hideLinked.elements ? allElements.filter(item => !allEncapsulatedIds.has(item.id)) : allElements,
+                operations: hideLinked.operations ? allOperations.filter(item => !allEncapsulatedIds.has(item.id)) : allOperations,
+                components: hideLinked.components ? allComponents.filter(item => !allEncapsulatedIds.has(item.id)) : allComponents,
             },
             encapsulatedIds: allEncapsulatedIds,
         };
@@ -1373,5 +1376,6 @@ export default function FormalizationPage() {
 
 
     
+
 
 
