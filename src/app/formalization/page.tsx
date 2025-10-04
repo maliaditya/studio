@@ -360,10 +360,12 @@ interface ComponentPopupState {
     y: number;
 }
 
-const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, onClose, onOpenSubComponent }: { 
+const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, allComponentsForSpec, allElementsForSpec, onClose, onOpenSubComponent }: { 
     popupState: ComponentPopupState;
     formalizationData?: FormalizationData;
     globalContext?: FormalizationData;
+    allComponentsForSpec: FormalizationItem[];
+    allElementsForSpec: FormalizationItem[];
     onClose: (id: string) => void;
     onOpenSubComponent: (id: string, event: React.MouseEvent) => void;
 }) => {
@@ -371,20 +373,6 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, on
       id: `component-popup-${popupState.id}`,
     });
     
-    const allComponents = useMemo(() => {
-        const map = new Map<string, FormalizationItem>();
-        (formalizationData?.components || []).forEach(c => map.set(c.id, c));
-        (globalContext?.components || []).forEach(c => map.set(c.id, c));
-        return Array.from(map.values());
-    }, [formalizationData, globalContext]);
-
-    const allElements = useMemo(() => {
-        const map = new Map<string, FormalizationItem>();
-        (formalizationData?.elements || []).forEach(c => map.set(c.id, c));
-        (globalContext?.elements || []).forEach(c => map.set(c.id, c));
-        return Array.from(map.values());
-    }, [formalizationData, globalContext]);
-
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
@@ -395,8 +383,8 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, on
     };
     
     const component = useMemo(() => {
-        return allComponents.find(c => c.id === popupState.id);
-    }, [popupState.id, allComponents]);
+        return allComponentsForSpec.find(c => c.id === popupState.id);
+    }, [popupState.id, allComponentsForSpec]);
 
     const getLinkedOperations = (element: FormalizationItem) => {
         if (!formalizationData?.operations || !element.linkedOperationIds) return [];
@@ -405,13 +393,13 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, on
 
     const linkedComponents = useMemo(() => {
         if (!component || !component.linkedComponentIds) return [];
-        return allComponents.filter(c => component.linkedComponentIds?.includes(c.id));
-    }, [component, allComponents]);
+        return allComponentsForSpec.filter(c => component.linkedComponentIds?.includes(c.id));
+    }, [component, allComponentsForSpec]);
 
     const linkedElements = useMemo(() => {
         if (!component || !component.linkedElementIds) return [];
-        return allElements.filter(el => component.linkedElementIds?.includes(el.id));
-    }, [component, allElements]);
+        return allElementsForSpec.filter(el => component.linkedElementIds?.includes(el.id));
+    }, [component, allElementsForSpec]);
     
     if (!component) return null;
 
@@ -436,7 +424,7 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, on
                             <h4 className="text-sm font-semibold">Linked Components</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {linkedComponents.map(subComponent => {
-                                const subComponentElements = allElements.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
+                                const subComponentElements = allElementsForSpec.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
                                 return (
                                     <Card key={subComponent.id} className="cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
                                     <CardHeader className="p-4 pb-2">
@@ -478,7 +466,7 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, on
                                                         <p className="font-medium text-foreground">Properties:</p>
                                                         <ul className="list-disc list-inside">
                                                             {Object.entries(el.properties).map(([key, value]) => {
-                                                                const linkedComp = allComponents.find(c => c.id === value);
+                                                                const linkedComp = allComponentsForSpec.find(c => c.id === value);
                                                                 return (
                                                                 <li key={key}>
                                                                     <span className="font-semibold">{key}:</span>{' '}
@@ -782,42 +770,6 @@ function FormalizationPageContent() {
         }
     };
     
-    const openComponentHierarchyFromElement = (element: FormalizationItem) => {
-        if (!element.properties) return;
-        let xOffset = 0;
-
-        const openRecursive = (componentId: string, level = 0, parentX = window.innerWidth / 2, parentY = window.innerHeight / 2) => {
-            const component = allComponentsForSpec.find(c => c.id === componentId);
-            if (!component) return;
-
-            const posX = parentX + 200 * level + xOffset;
-            const posY = parentY + 50 * level;
-            
-            // This needs to be adapted to use the global openGeneralPopup
-            // For now, let's just log it. A proper implementation would need to manage popup states.
-            console.log(`Opening popup for ${component.text} at ${posX}, ${posY}`);
-
-
-            const linkedElements = allElementsForSpec.filter(el => component.linkedElementIds?.includes(el.id));
-            linkedElements.forEach(el => {
-                if (el.properties) {
-                    Object.values(el.properties).forEach(propValue => {
-                        const isComponentLink = allComponentsForSpec.some(c => c.id === propValue);
-                        if (isComponentLink) {
-                            openRecursive(propValue, level + 1, posX, posY);
-                        }
-                    });
-                }
-            });
-            xOffset += 450; // shift next top-level component
-        };
-
-        const topLevelComponents = Object.values(element.properties).filter(val => allComponentsForSpec.some(c => c.id === val));
-        topLevelComponents.forEach(componentId => {
-            openRecursive(componentId);
-        });
-    };
-
     const getSpecResources = useCallback((specId: string | null): Resource[] => {
         if (!specId) return [];
         const spec = specializations.find(s => s.id === specId);
@@ -858,84 +810,64 @@ function FormalizationPageContent() {
         const specResources = getSpecResources(selectedFormalizationSpecId);
         return specResources.flatMap(r => r.formalization?.elements || []);
     }, [selectedFormalizationSpecId, getSpecResources]);
+
+    const openComponentHierarchyFromElement = (element: FormalizationItem) => {
+        if (!element.properties) return;
+        let xOffset = 0;
+
+        const openRecursive = (componentId: string, level = 0, parentX = window.innerWidth / 2, parentY = window.innerHeight / 2) => {
+            const component = allComponentsForSpec.find(c => c.id === componentId);
+            if (!component) return;
+
+            const posX = parentX + 200 * level + xOffset;
+            const posY = parentY + 50 * level;
+            
+            openGeneralPopup(componentId, { clientX: posX, clientY: posY } as React.MouseEvent);
+
+            const linkedElements = allElementsForSpec.filter(el => component.linkedElementIds?.includes(el.id));
+            linkedElements.forEach(el => {
+                if (el.properties) {
+                    Object.values(el.properties).forEach(propValue => {
+                        const isComponentLink = allComponentsForSpec.some(c => c.id === propValue);
+                        if (isComponentLink) {
+                            openRecursive(propValue, level + 1, posX, posY);
+                        }
+                    });
+                }
+            });
+            xOffset += 450;
+        };
+
+        const topLevelComponents = Object.values(element.properties).filter(val => allComponentsForSpec.some(c => c.id === val));
+        topLevelComponents.forEach(componentId => {
+            openRecursive(componentId);
+        });
+    };
       
     const fullFormalizationData = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
         
-        // Find all global elements within the specialization
-        const globalElements = specResources
-            .flatMap(res => res.formalization?.elements || [])
-            .filter(el => el.isGlobal);
-
-        // If a resource is selected, use its local data, otherwise start with empty arrays
         const localData = (isResource(selectedResource) && selectedResource?.formalization)
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
         
-        // Combine local elements with global elements, ensuring no duplicates
-        const combinedElementsMap = new Map<string, FormalizationItem>();
-        globalElements.forEach(item => combinedElementsMap.set(item.id, item));
-        (localData.elements || []).forEach(item => combinedElementsMap.set(item.id, item));
-        
-        const allVisibleElements = Array.from(combinedElementsMap.values());
-        
-        // Find all operations from the specialization
-        const allOpsMap = new Map<string, FormalizationItem>();
-        specResources.forEach(r => {
-            (r.formalization?.operations || []).forEach(op => allOpsMap.set(op.id, op));
-        });
-
-        // Operations to show: local ones + any linked from the combined elements
-        const visibleOperationsSet = new Set<FormalizationItem>(localData.operations || []);
-        const allLinkedOpIds = new Set(allVisibleElements.flatMap(el => el.linkedOperationIds || []));
-        allLinkedOpIds.forEach(id => {
-            const op = allOpsMap.get(id);
-            if (op) {
-                visibleOperationsSet.add(op);
+        const allSpecFormalization = specResources.reduce((acc, res) => {
+            if (res.formalization) {
+                acc.elements.push(...res.formalization.elements);
+                acc.operations.push(...res.formalization.operations);
+                acc.components.push(...res.formalization.components);
             }
-        });
-        
-        // Find all components from the specialization
-        const allCompsMap = new Map<string, FormalizationItem>();
-        specResources.forEach(r => {
-            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
-        });
-        
-        // Recursively find all components linked as properties or sub-components
-        const visibleComponentsSet = new Set<FormalizationItem>(localData.components || []);
-        const queue = [...(localData.components || [])];
-        const visited = new Set<string>(queue.map(c => c.id));
-        
-        allVisibleElements.forEach(el => {
-            if (el.properties) {
-                Object.values(el.properties).forEach(propValue => {
-                    const comp = allCompsMap.get(propValue);
-                    if (comp && !visited.has(comp.id)) {
-                        queue.push(comp);
-                        visited.add(comp.id);
-                    }
-                });
-            }
-        });
+            return acc;
+        }, { elements: [] as FormalizationItem[], operations: [] as FormalizationItem[], components: [] as FormalizationItem[] });
 
-        while(queue.length > 0) {
-            const current = queue.shift()!;
-            visibleComponentsSet.add(current);
-            (current.linkedComponentIds || []).forEach(childId => {
-                const childComp = allCompsMap.get(childId);
-                if(childComp && !visited.has(childId)) {
-                    queue.push(childComp);
-                    visited.add(childId);
-                }
-            });
-        }
-
+        const uniqueItems = (items: FormalizationItem[]) => Array.from(new Map(items.map(item => [item.id, item])).values());
+        
         return {
-            elements: allVisibleElements,
-            operations: Array.from(visibleOperationsSet),
-            components: Array.from(visibleComponentsSet),
+            elements: uniqueItems(allSpecFormalization.elements),
+            operations: uniqueItems(allSpecFormalization.operations),
+            components: uniqueItems(allSpecFormalization.components),
         };
-    }, [selectedFormalizationSpecId, selectedResource, getSpecResources, resources]);
+    }, [selectedFormalizationSpecId, getSpecResources, selectedResource]);
 
 
     const globalContextData = useMemo(() => {
@@ -975,35 +907,56 @@ function FormalizationPageContent() {
         };
     }, [selectedFormalizationSpecId, getSpecResources, resources]);
 
-    const itemsToDisplay = useMemo(() => {
-        if (!hideLinked.elements && !hideLinked.operations && !hideLinked.components) {
-            return fullFormalizationData;
-        }
-
-        const allLinkedElementIds = new Set<string>();
-        const allLinkedComponentIds = new Set<string>();
-        const allLinkedOperationIds = new Set<string>();
-
-        fullFormalizationData.components.forEach(comp => {
-            (comp.linkedElementIds || []).forEach(id => allLinkedElementIds.add(id));
-            (comp.linkedComponentIds || []).forEach(id => allLinkedComponentIds.add(id));
-        });
-
-        fullFormalizationData.elements.forEach(el => {
-            (el.linkedOperationIds || []).forEach(id => allLinkedOperationIds.add(id));
-             if (el.properties) {
-                Object.values(el.properties).forEach(propValue => {
-                    if (fullFormalizationData.components.some(c => c.id === propValue)) {
-                        allLinkedComponentIds.add(propValue);
+    const { itemsToDisplay, encapsulatedIds } = useMemo(() => {
+        const encapsulatedComponentIds = new Set<string>();
+        const allElements = fullFormalizationData.elements;
+    
+        allElements.forEach(el => {
+            if (el.properties) {
+                Object.values(el.properties).forEach(value => {
+                    if (fullFormalizationData.components.some(c => c.id === value)) {
+                        encapsulatedComponentIds.add(value);
                     }
                 });
             }
         });
+    
+        const encapsulatedElementIds = new Set<string>();
+        const encapsulatedOperationIds = new Set<string>();
+        const queue = Array.from(encapsulatedComponentIds);
+        const visited = new Set<string>(queue);
+    
+        while (queue.length > 0) {
+            const currentComponentId = queue.shift()!;
+            const component = fullFormalizationData.components.find(c => c.id === currentComponentId);
+            if (component) {
+                (component.linkedElementIds || []).forEach(elId => encapsulatedElementIds.add(elId));
+                (component.linkedComponentIds || []).forEach(cId => {
+                    if (!visited.has(cId)) {
+                        queue.push(cId);
+                        visited.add(cId);
+                        encapsulatedComponentIds.add(cId);
+                    }
+                });
+            }
+        }
+    
+        encapsulatedElementIds.forEach(elId => {
+            const element = fullFormalizationData.elements.find(e => e.id === elId);
+            if (element && element.linkedOperationIds) {
+                element.linkedOperationIds.forEach(opId => encapsulatedOperationIds.add(opId));
+            }
+        });
+        
+        const allEncapsulatedIds = new Set([...encapsulatedComponentIds, ...encapsulatedElementIds, ...encapsulatedOperationIds]);
 
         return {
-            elements: hideLinked.elements ? fullFormalizationData.elements.filter(item => !allLinkedElementIds.has(item.id)) : fullFormalizationData.elements,
-            operations: hideLinked.operations ? fullFormalizationData.operations.filter(item => !allLinkedOperationIds.has(item.id)) : fullFormalizationData.operations,
-            components: hideLinked.components ? fullFormalizationData.components.filter(item => !allLinkedComponentIds.has(item.id)) : fullFormalizationData.components,
+            itemsToDisplay: {
+                elements: hideLinked.elements ? fullFormalizationData.elements.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.elements,
+                operations: hideLinked.operations ? fullFormalizationData.operations.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.operations,
+                components: hideLinked.components ? fullFormalizationData.components.filter(item => !allEncapsulatedIds.has(item.id)) : fullFormalizationData.components,
+            },
+            encapsulatedIds: allEncapsulatedIds,
         };
     }, [fullFormalizationData, hideLinked]);
     
@@ -1385,6 +1338,8 @@ function FormalizationPageContent() {
                     popupState={popupState}
                     formalizationData={fullFormalizationData}
                     globalContext={globalContextData}
+                    allComponentsForSpec={allComponentsForSpec}
+                    allElementsForSpec={allElementsForSpec}
                     onClose={closeComponentPopup}
                     onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
                 />
@@ -1418,4 +1373,5 @@ export default function FormalizationPage() {
 
 
     
+
 
