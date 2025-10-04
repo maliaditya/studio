@@ -1313,11 +1313,11 @@ function FormalizationPageContent() {
                         </CardContent>
                     </Card>
 
-                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-4">
+                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="lg:col-span-1 h-full min-h-0">
                             {renderSelectedResource()}
                         </div>
-                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
                             {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                             {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
                             {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
@@ -1376,6 +1376,7 @@ export default function FormalizationPage() {
 
 
     
+
 
 
 
