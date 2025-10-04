@@ -818,61 +818,6 @@ function FormalizationPageContent() {
         });
     };
 
-    const allComponentsForSpec = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources.flatMap(r => r.formalization?.components || []);
-    }, [selectedFormalizationSpecId, resources]);
-
-    const allElementsForSpec = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources.flatMap(r => r.formalization?.elements || []);
-    }, [selectedFormalizationSpecId, resources]);
-
-
-    const openComponentPopup = useCallback((componentId: string, event: React.MouseEvent) => {
-        setComponentPopups(prev => {
-            const newPopups = new Map(prev);
-            const parentRect = (event.target as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
-            
-            const newPopup: ComponentPopupState = {
-                id: componentId,
-                x: parentRect ? parentRect.right + 10 : event.clientX,
-                y: parentRect ? parentRect.top : event.clientY,
-            };
-            newPopups.set(componentId, newPopup);
-            return newPopups;
-        });
-    }, []);
-
-    const closeComponentPopup = useCallback((componentId: string) => {
-        setComponentPopups(prev => {
-            const newPopups = new Map(prev);
-            newPopups.delete(componentId);
-            return newPopups;
-        });
-    }, []);
-
-    const handleDragEnd = useCallback((event: DragEndEvent) => {
-        const { active, delta } = event;
-        const activeId = active.id as string;
-    
-        if (activeId.startsWith('component-popup-')) {
-          const componentId = activeId.replace('component-popup-', '');
-          setComponentPopups(prev => {
-            const newPopups = new Map(prev);
-            const popup = newPopups.get(componentId);
-            if (popup) {
-              newPopups.set(componentId, {
-                ...popup,
-                x: popup.x + delta.x,
-                y: popup.y + delta.y,
-              });
-            }
-            return newPopups;
-          });
-        }
-      }, []);
-      
     const getSpecResources = useCallback((specId: string | null): Resource[] => {
         if (!specId) return [];
         const spec = specializations.find(s => s.id === specId);
@@ -903,6 +848,16 @@ function FormalizationPageContent() {
         }
         return resourcesInSpec;
     }, [specializations, upskillDefinitions, resources]);
+
+    const allComponentsForSpec = useMemo(() => {
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        return specResources.flatMap(r => r.formalization?.components || []);
+    }, [selectedFormalizationSpecId, getSpecResources]);
+
+    const allElementsForSpec = useMemo(() => {
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        return specResources.flatMap(r => r.formalization?.elements || []);
+    }, [selectedFormalizationSpecId, getSpecResources]);
       
     const fullFormalizationData = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
@@ -1299,6 +1254,50 @@ function FormalizationPageContent() {
         );
     };
 
+    const openComponentPopup = useCallback((componentId: string, event: React.MouseEvent) => {
+        setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            const parentRect = (event.target as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
+            
+            const newPopup: ComponentPopupState = {
+                id: componentId,
+                x: parentRect ? parentRect.right + 10 : event.clientX,
+                y: parentRect ? parentRect.top : event.clientY,
+            };
+            newPopups.set(componentId, newPopup);
+            return newPopups;
+        });
+    }, []);
+
+    const closeComponentPopup = useCallback((componentId: string) => {
+        setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            newPopups.delete(componentId);
+            return newPopups;
+        });
+    }, []);
+
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, delta } = event;
+        const activeId = active.id as string;
+    
+        if (activeId.startsWith('component-popup-')) {
+          const componentId = activeId.replace('component-popup-', '');
+          setComponentPopups(prev => {
+            const newPopups = new Map(prev);
+            const popup = newPopups.get(componentId);
+            if (popup) {
+              newPopups.set(componentId, {
+                ...popup,
+                x: popup.x + delta.x,
+                y: popup.y + delta.y,
+              });
+            }
+            return newPopups;
+          });
+        }
+      }, []);
+
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
@@ -1419,3 +1418,4 @@ export default function FormalizationPage() {
 
 
     
+
