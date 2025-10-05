@@ -8,9 +8,56 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 
 // A simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+
+function DraggableNode({ node, selected, startNodeDrag, onReleaseConnect, onStartConnect }: { node: any; selected: boolean; startNodeDrag: (e: React.PointerEvent, nodeId: string) => void; onReleaseConnect: (e: React.PointerEvent, nodeId: string) => void; onStartConnect: (e: React.PointerEvent, fromId: string) => void; }) {
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: node.id,
+    });
+
+    const style = transform ? {
+        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    } : undefined;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={{ ...style, left: node.x, top: node.y, width: node.w, height: "auto" }}
+            className="absolute cursor-default"
+            onPointerUp={(e) => onReleaseConnect(e, node.id)}
+        >
+            <div {...attributes} {...listeners}>
+              <Card className={cn("shadow-lg border-2", selected ? "border-primary" : "border-border")}>
+                <CardHeader className="p-2 flex flex-row items-center justify-between cursor-grab active:cursor-grabbing">
+                  <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
+                  <div className="flex items-center">
+                     <div
+                      className="w-3 h-3 rounded-full bg-background border cursor-pointer"
+                      onPointerDown={(e) => onStartConnect(e, node.id)}
+                      title="Drag to connect"
+                     />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  {node.properties && Object.keys(node.properties).length > 0 && (
+                    <ul className="text-xs space-y-1">
+                      {Object.entries(node.properties).map(([key, value]) => (
+                        <li key={key} className="flex justify-between">
+                          <span className="text-muted-foreground">{key}:</span>
+                          <span className="font-medium truncate">{value as string}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+        </div>
+    );
+}
 
 export function MindMapViewer() {
   const { 
@@ -129,29 +176,13 @@ export function MindMapViewer() {
     lastPointerRef.current = null;
   };
 
-  // Node Dragging handlers
-  const startNodeDrag = (e: React.PointerEvent, nodeId: string) => {
-    e.stopPropagation();
-    lastPointerRef.current = { x: e.clientX, y: e.clientY };
-    const onMove = (ev: PointerEvent) => {
-      ev.preventDefault();
-      if (!lastPointerRef.current) return;
-      const dx = (ev.clientX - lastPointerRef.current.x) / transform.k;
-      const dy = (ev.clientY - lastPointerRef.current.y) / transform.k;
-      lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
-      const node = nodesWithLayout.find(n => n.id === nodeId);
-      if (node) {
-        updateNodePosition(nodeId, node.x + dx, node.y + dy);
-      }
-    };
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      lastPointerRef.current = null;
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    setSelected(nodeId);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, delta } = event;
+    const nodeId = active.id as string;
+    const node = nodesWithLayout.find(n => n.id === nodeId);
+    if (node) {
+        updateNodePosition(nodeId, node.x + delta.x / transform.k, node.y + delta.y / transform.k);
+    }
   };
 
   // Connection handlers
@@ -181,6 +212,7 @@ export function MindMapViewer() {
   };
 
   return (
+    <DndContext onDragEnd={handleDragEnd}>
     <div className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
       <div
         ref={containerRef}
@@ -225,38 +257,14 @@ export function MindMapViewer() {
             })()}
           </svg>
           {nodesWithLayout.map((node) => (
-            <div
-              key={node.id}
-              className="absolute cursor-default"
-              style={{ left: node.x, top: node.y, width: node.w, height: "auto" }}
-              onPointerDown={(e) => startNodeDrag(e, node.id)}
-              onPointerUp={(e) => onReleaseConnect(e, node.id)}
-            >
-              <Card className={cn("shadow-lg border-2", selected === node.id ? "border-primary" : "border-border")}>
-                <CardHeader className="p-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
-                  <div className="flex items-center">
-                     <div
-                      className="w-3 h-3 rounded-full bg-background border cursor-pointer"
-                      onPointerDown={(e) => onStartConnect(e, node.id)}
-                      title="Drag to connect"
-                     />
-                  </div>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  {node.properties && Object.keys(node.properties).length > 0 && (
-                    <ul className="text-xs space-y-1">
-                      {Object.entries(node.properties).map(([key, value]) => (
-                        <li key={key} className="flex justify-between">
-                          <span className="text-muted-foreground">{key}:</span>
-                          <span className="font-medium truncate">{value}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+             <DraggableNode 
+                key={node.id} 
+                node={node} 
+                selected={selected === node.id} 
+                startNodeDrag={()=>{}} 
+                onReleaseConnect={onReleaseConnect} 
+                onStartConnect={onStartConnect}
+             />
           ))}
         </div>
       </div>
@@ -266,5 +274,6 @@ export function MindMapViewer() {
         <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
       </div>
     </div>
+    </DndContext>
   );
 }
