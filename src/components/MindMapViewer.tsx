@@ -212,7 +212,18 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
   // Connection handlers
   const onStartConnect = (e: React.PointerEvent, fromId: string, fromSide: Side) => {
     e.stopPropagation();
-    setConnecting({ fromId, fromSide, x: e.clientX, y: e.clientY });
+
+    const existingEdge = edges.find(edge => edge.source === fromId && edge.fromSide === fromSide);
+
+    if (existingEdge) {
+      setCanvasLayout(prev => ({
+        ...prev,
+        edges: prev.edges.filter(e => e.id !== existingEdge.id),
+      }));
+      setConnecting(null);
+    } else {
+      setConnecting({ fromId, fromSide, x: e.clientX, y: e.clientY });
+    }
   };
   const onMoveConnect = (e: React.PointerEvent) => {
     if (connecting) {
@@ -289,11 +300,16 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
               if (!fromNode) return null;
               const p1 = getNodeEdgePoint(fromNode, connecting.fromSide);
               const { x: toX, y: toY } = screenToWorld(connecting.x, connecting.y);
-              const dx = toX - p1.x;
-              const cx1 = p1.x + dx * 0.4;
-              const cx2 = toX - dx * 0.4;
+
+              const CUBIC_OFFSET = 80;
+              let cp1 = { ...p1 };
+              if (connecting.fromSide === 'left') cp1.x -= CUBIC_OFFSET;
+              if (connecting.fromSide === 'right') cp1.x += CUBIC_OFFSET;
+              if (connecting.fromSide === 'top') cp1.y -= CUBIC_OFFSET;
+              if (connecting.fromSide === 'bottom') cp1.y += CUBIC_OFFSET;
+
               return (
-                  <path d={`M ${p1.x} ${p1.y} C ${cx1} ${p1.y} ${cx2} ${toY} ${toX} ${toY}`} stroke="hsl(var(--primary))" strokeWidth={1.8} fill="none" />
+                  <path d={`M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${toX} ${toY} ${toX} ${toY}`} stroke="hsl(var(--primary))" strokeWidth={1.8} fill="none" />
               );
             })()}
           </svg>
