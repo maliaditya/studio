@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -505,8 +506,8 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                         <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
                         )}
                     </CardContent>
-                </div>
-            </Card>
+                </Card>
+            </div>
         </div>
     );
 };
@@ -910,9 +911,10 @@ function FormalizationPageContent() {
             : { elements: [], operations: [], components: [] };
     
         const linkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
+        const linkedElIds = new Set(fullFormalizationData.components.flatMap(el => el.linkedElementIds || []));
 
         const items = {
-            elements: [...localData.elements, ...globalContextData.elements],
+            elements: [...localData.elements, ...globalContextData.elements].filter(el => !linkedElIds.has(el.id)),
             operations: fullFormalizationData.operations.filter(op => !linkedOpIds.has(op.id)),
             components: [...localData.components, ...globalContextData.components],
         };
@@ -1213,63 +1215,67 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="grid h-full grid-cols-5 gap-4">
-                <div className="col-span-1 h-full min-h-0 overflow-y-auto">
-                    <Card className="flex flex-col h-full">
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
-                                <div className="flex">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
-                                        <ChevronsUp className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
-                                        <ChevronsDown className="h-4 w-4" />
-                                    </Button>
+            <div className="h-[calc(100vh-4rem-1px)] p-4 flex flex-col">
+                <div className="flex-grow grid grid-cols-5 gap-4 min-h-0">
+                    <div className="col-span-1 h-full min-h-0">
+                        <Card className="flex flex-col h-full">
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                                    <div className="flex">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
+                                            <ChevronsUp className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
+                                            <ChevronsDown className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                            <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
-                                <SelectTrigger className="w-full"><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                                <SelectContent>
-                                    {specializations.map(spec => (
-                                        <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </CardHeader>
-                        <CardContent className="flex-grow min-h-0 flex flex-col gap-4 overflow-y-auto">
-                            <div className="space-y-1">
-                                {curiositiesForSpecialization.map(curiosity => (
-                                    <CuriosityNode 
-                                        key={curiosity.id}
-                                        item={curiosity}
-                                        onSelect={setSelectedResource}
-                                        selectedId={selectedResource?.id || null}
-                                        allUpskillDefinitions={upskillDefinitions}
-                                        allResources={resources}
-                                        collapsedIds={collapsedCuriosities}
-                                        onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
-                                            const newSet = new Set(prev);
-                                            if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                                            return newSet;
-                                        })}
-                                    />
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                <div className="col-span-1 h-full min-h-0 overflow-y-auto">
-                    {renderSelectedResource()}
-                </div>
-                <div className="col-span-1 h-full min-h-0 overflow-y-auto">
-                    {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
-                </div>
-                <div className="col-span-1 h-full min-h-0 overflow-y-auto">
-                    {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
-                </div>
-                <div className="col-span-1 h-full min-h-0 overflow-y-auto">
-                    {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
+                                <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
+                                    <SelectTrigger className="w-full"><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {specializations.map(spec => (
+                                            <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </CardHeader>
+                            <CardContent className="flex-grow min-h-0">
+                                <ScrollArea className="h-full">
+                                    <div className="space-y-1">
+                                        {curiositiesForSpecialization.map(curiosity => (
+                                            <CuriosityNode 
+                                                key={curiosity.id}
+                                                item={curiosity}
+                                                onSelect={setSelectedResource}
+                                                selectedId={selectedResource?.id || null}
+                                                allUpskillDefinitions={upskillDefinitions}
+                                                allResources={resources}
+                                                collapsedIds={collapsedCuriosities}
+                                                onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
+                                                    const newSet = new Set(prev);
+                                                    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                                                    return newSet;
+                                                })}
+                                            />
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="col-span-1 h-full min-h-0">
+                        {renderSelectedResource()}
+                    </div>
+                    <div className="col-span-1 h-full min-h-0">
+                        {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
+                    </div>
+                    <div className="col-span-1 h-full min-h-0">
+                        {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
+                    </div>
+                    <div className="col-span-1 h-full min-h-0">
+                        {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
+                    </div>
                 </div>
             </div>
             {editingItem && (
@@ -1310,10 +1316,11 @@ function FormalizationPageContent() {
 export default function FormalizationPage() {
     return (
         <AuthGuard>
-            <div className="h-[calc(100vh-4rem-1px)] p-4">
-                <FormalizationPageContent />
-            </div>
+            <FormalizationPageContent />
         </AuthGuard>
     );
 }
 
+
+
+    
