@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -582,7 +583,7 @@ function FormalizationPageContent() {
 
         while (queue.length > 0) {
             const current = queue.shift()!;
-            (current.linkedResourceIds || [])).forEach(resId => {
+            (current.linkedResourceIds || []).forEach(resId => {
                 if (!visitedResourceIds.has(resId)) {
                     const resource = resources.find(r => r.id === resId);
                     if (resource) {
@@ -591,7 +592,7 @@ function FormalizationPageContent() {
                     }
                 }
             });
-            (current.linkedUpskillIds || [])).forEach(childId => {
+            (current.linkedUpskillIds || []).forEach(childId => {
                 const childDef = upskillDefinitions.find(d => d.id === childId);
                 if (childDef) queue.push(childDef);
             });
@@ -1064,9 +1065,9 @@ function FormalizationPageContent() {
                         <ScrollArea className="h-full">
                             <div className="space-y-2 p-4 pt-0">
                                 {data.map(item => {
-                                    const linkedOperations = (item.linkedOperationIds || [])).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
-                                    const linkedElements = (item.linkedElementIds || [])).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                    const linkedComponents = (item.linkedComponentIds || [])).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
+                                    const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
+                                    const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                    const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
                                     
                                     return (
                                     <Card key={item.id} className="group relative">
