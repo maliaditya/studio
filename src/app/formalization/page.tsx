@@ -359,13 +359,14 @@ interface ComponentPopupState {
     y: number;
 }
 
-const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsForSpec, allOpsForSpec, onClose, onOpenSubComponent }: { 
+const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsForSpec, allOpsForSpec, onClose, onOpenSubComponent, onEditItem }: { 
     popupState: ComponentPopupState;
     allComponentsForSpec: FormalizationItem[];
     allElementsForSpec: FormalizationItem[];
     allOpsForSpec: FormalizationItem[];
     onClose: (id: string) => void;
     onOpenSubComponent: (id: string, event: React.MouseEvent) => void;
+    onEditItem: (item: FormalizationItem, type: 'components' | 'elements' | 'operations') => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
       id: `component-popup-${popupState.id}`,
@@ -410,9 +411,14 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                             <Blocks className="h-5 w-5 text-primary" />
                             {component.text}
                         </CardTitle>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(component!.id); }}>
-                            <X className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onEditItem(component, 'components'); }}>
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={(e) => { e.stopPropagation(); onClose(component!.id); }}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
@@ -424,22 +430,27 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                               {linkedComponents.map(subComponent => {
                                 const subComponentElements = allElementsForSpec.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
                                 return (
-                                    <Card key={subComponent.id} className="cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
-                                    <CardHeader className="p-4 pb-2">
-                                        <CardTitle className="text-base flex items-center gap-2">
-                                            <Blocks className="h-4 w-4 text-primary" />
-                                            {subComponent.text}
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-2">
-                                        {subComponentElements.length > 0 ? (
-                                            <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                                {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-xs text-muted-foreground">No elements linked.</p>
-                                        )}
-                                    </CardContent>
+                                    <Card key={subComponent.id} className="relative group/subcomponent cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
+                                        <div className="absolute top-1 right-1 opacity-0 group-hover/subcomponent:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditItem(subComponent, 'components'); }}>
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <CardHeader className="p-4 pb-2">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <Blocks className="h-4 w-4 text-primary" />
+                                                {subComponent.text}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-4 pt-2">
+                                            {subComponentElements.length > 0 ? (
+                                                <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                                    {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
+                                                </ul>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">No elements linked.</p>
+                                            )}
+                                        </CardContent>
                                     </Card>
                                 );
                               })}
@@ -451,7 +462,12 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                                 <h4 className="text-sm font-semibold">Linked Elements</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {linkedElements.map(el => (
-                                        <Card key={el.id}>
+                                        <Card key={el.id} className="relative group/element">
+                                            <div className="absolute top-1 right-1 opacity-0 group-hover/element:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditItem(el, 'elements'); }}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                             <CardHeader className="p-4">
                                                 <CardTitle className="text-base flex items-center gap-2">
                                                 <Database className="h-4 w-4 text-primary" />
@@ -1272,6 +1288,7 @@ function FormalizationPageContent() {
                     allOpsForSpec={allOpsForSpec}
                     onClose={closeComponentPopup}
                     onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
+                    onEditItem={setEditingItem}
                 />
             ))}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
@@ -1295,6 +1312,8 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+    
+
     
 
     
