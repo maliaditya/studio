@@ -216,6 +216,7 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
     };
     
     const getModalTitle = () => {
+        if (!type) return 'Edit Item';
         if (type === 'components') return 'Edit Component';
         return `Edit ${type.slice(0, -1)}`;
     }
@@ -895,26 +896,19 @@ function FormalizationPageContent() {
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
-        const allLinkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
-        const allLinkedElIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
-    
         const localAndGlobalElements = [
             ...(localData.elements || []),
             ...globalElements,
         ];
-
-        const finalElements = Array.from(new Map(localAndGlobalElements.map(item => [item.id, item])).values())
-            .filter(el => !allLinkedElIds.has(el.id));
-            
-        const finalOperations = (localData.operations || []).filter(op => !allLinkedOpIds.has(op.id));
-        const finalComponents = localData.components || [];
-
+    
+        const finalElements = Array.from(new Map(localAndGlobalElements.map(item => [item.id, item])).values());
+        
         return {
             elements: finalElements,
-            operations: finalOperations,
-            components: finalComponents,
+            operations: localData.operations || [],
+            components: localData.components || [],
         };
-    }, [selectedResource, globalElements, fullFormalizationData]);
+    }, [selectedResource, globalElements]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1312,6 +1306,8 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
+    
+
     
 
     
