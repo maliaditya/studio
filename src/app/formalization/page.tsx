@@ -579,10 +579,14 @@ function FormalizationPageContent() {
         
         const resourcesInSpec: Resource[] = [];
         const visitedResourceIds = new Set<string>();
-        const queue = [...curiositiesInSpec];
+        const queue: ExerciseDefinition[] = [...curiositiesInSpec];
+        const visitedDefs = new Set<string>();
 
         while (queue.length > 0) {
             const current = queue.shift()!;
+            if (visitedDefs.has(current.id)) continue;
+            visitedDefs.add(current.id);
+
             (current.linkedResourceIds || []).forEach(resId => {
                 if (!visitedResourceIds.has(resId)) {
                     const resource = resources.find(r => r.id === resId);
@@ -897,9 +901,13 @@ function FormalizationPageContent() {
         const linkedOperationIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
         const linkedElementIdsInComponents = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
         const linkedComponentIdsInProperties = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
-    
+        
+        const localElements = localData.elements || [];
+        const globalElementIds = new Set(globalElements.map(el => el.id));
+        const combinedElements = [...localElements, ...globalElements.filter(ge => !localElements.some(le => le.id === ge.id))];
+
         return {
-            elements: [...(localData.elements || []), ...globalElements].filter(el => !linkedElementIdsInComponents.has(el.id)),
+            elements: combinedElements.filter(el => !linkedElementIdsInComponents.has(el.id)),
             operations: (localData.operations || []).filter(op => !linkedOperationIds.has(op.id)),
             components: (localData.components || []).filter(c => !linkedComponentIdsInProperties.has(c.id)),
         };
@@ -1312,3 +1320,4 @@ export default function FormalizationPage() {
 
 
     
+
