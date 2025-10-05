@@ -1183,7 +1183,7 @@ function MyPlatePageContent() {
                   ) : (
                       <Card>
                           <CardHeader className="flex flex-row items-center justify-between">
-                              <CardTitle className="flex items-center gap-2"><PieChart /> Daily Time Allocation</CardTitle>
+                              <CardTitle className="flex items-center gap-2"><PieChartIcon /> Daily Time Allocation</CardTitle>
                                <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
                                   <Expand className="h-4 w-4" />
                                   <span className="sr-only">Open Time Allocation in Modal</span>
@@ -1310,7 +1310,7 @@ function MyPlatePageContent() {
       </Dialog>
 
       <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-          <DialogContent className="max-w-7xl h-[90vh] p-0">
+          <DialogContent className="max-w-full w-screen h-screen p-0 flex flex-col">
               <DialogHeader className="p-4 border-b">
                   <DialogTitle>Strategic Mind Map</DialogTitle>
               </DialogHeader>

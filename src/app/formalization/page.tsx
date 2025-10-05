@@ -985,7 +985,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                         </div>
                     ) : imageEmbedUrl ? (
                          <div className="aspect-video w-full bg-black relative rounded-t-lg">
-                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" />
+                            <Image src={imageEmbedUrl} alt={selectedResource.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
                         </div>
                     ) : null }
                     <CardHeader>
@@ -1298,7 +1298,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                 />
             ))}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-              <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+              <DialogContent className="max-w-full w-screen h-screen p-0 flex flex-col">
                 <DialogHeader className="p-4 border-b">
                   <DialogTitle>Mind Map</DialogTitle>
                 </DialogHeader>
@@ -1329,5 +1329,6 @@ export default function FormalizationPage() {
 
 
     
+
 
 
