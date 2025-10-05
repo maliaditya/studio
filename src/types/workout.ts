@@ -425,6 +425,8 @@ export interface CanvasNode {
   id: string; // This will be the definitionId
   x: number;
   y: number;
+  width?: number; // Optional
+  height?: number; // Optional
 }
 
 export interface CanvasEdge {
