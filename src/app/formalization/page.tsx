@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem, PopupState } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye, ChevronsDown, ChevronsUp } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye, ChevronsDown, ChevronsUp, Workflow } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -849,7 +849,6 @@ function FormalizationPageContent() {
     const fullFormalizationData = useMemo(() => {
       const specResources = getSpecResources(selectedFormalizationSpecId);
   
-      // All items defined within the current specialization
       const allSpecFormalization = specResources.reduce((acc, res) => {
         if (res.formalization) {
           acc.elements.push(...res.formalization.elements);
@@ -871,12 +870,10 @@ function FormalizationPageContent() {
     const globalContextData = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
 
-        // Global elements are those explicitly marked as global from ANY resource in the spec
         const globalElements = specResources
             .flatMap(res => res.formalization?.elements || [])
             .filter(el => el.isGlobal);
 
-        // Global components are those reachable from global elements
         const allCompsMap = new Map<string, FormalizationItem>();
         specResources.forEach(r => {
             (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
@@ -903,7 +900,7 @@ function FormalizationPageContent() {
         return {
             elements: globalElements,
             components: Array.from(globalComponentsSet),
-            operations: [], // Operations are not considered global in this context
+            operations: [],
         };
     }, [selectedFormalizationSpecId, getSpecResources]);
 
@@ -912,19 +909,19 @@ function FormalizationPageContent() {
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
+        const linkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
+
         const items = {
             elements: [...localData.elements, ...globalContextData.elements],
-            operations: [...localData.operations],
+            operations: fullFormalizationData.operations.filter(op => !linkedOpIds.has(op.id)),
             components: [...localData.components, ...globalContextData.components],
         };
     
-        // Deduplicate
         items.elements = Array.from(new Map(items.elements.map(item => [item.id, item])).values());
-        items.operations = Array.from(new Map(items.operations.map(item => [item.id, item])).values());
         items.components = Array.from(new Map(items.components.map(item => [item.id, item])).values());
     
         return items;
-    }, [selectedResource, globalContextData]);
+    }, [selectedResource, globalContextData, fullFormalizationData]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1216,7 +1213,7 @@ function FormalizationPageContent() {
     return (
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-            <div className="grid h-[calc(100vh-6rem)] grid-cols-5 gap-4 p-4">
+            <div className="grid h-full grid-cols-5 gap-4">
                 <div className="col-span-1 h-full min-h-0 overflow-y-auto">
                     <Card className="flex flex-col h-full">
                         <CardHeader>
@@ -1313,7 +1310,10 @@ function FormalizationPageContent() {
 export default function FormalizationPage() {
     return (
         <AuthGuard>
-            <FormalizationPageContent />
+            <div className="h-[calc(100vh-4rem-1px)] p-4">
+                <FormalizationPageContent />
+            </div>
         </AuthGuard>
     );
 }
+
