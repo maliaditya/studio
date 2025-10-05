@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -506,8 +505,9 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                         <p className="text-muted-foreground text-center">No elements or components linked to this component.</p>
                         )}
                     </CardContent>
-                </Card>
-            </div>
+                </div>
+            </Card>
+        </div>
     );
 };
 
@@ -1319,7 +1319,6 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
+    
 
     
