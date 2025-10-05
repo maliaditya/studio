@@ -360,12 +360,11 @@ interface ComponentPopupState {
     y: number;
 }
 
-const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, allComponentsForSpec, allElementsForSpec, onClose, onOpenSubComponent }: { 
+const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsForSpec, allOpsForSpec, onClose, onOpenSubComponent }: { 
     popupState: ComponentPopupState;
-    formalizationData?: FormalizationData;
-    globalContext?: FormalizationData;
     allComponentsForSpec: FormalizationItem[];
     allElementsForSpec: FormalizationItem[];
+    allOpsForSpec: FormalizationItem[];
     onClose: (id: string) => void;
     onOpenSubComponent: (id: string, event: React.MouseEvent) => void;
 }) => {
@@ -387,8 +386,8 @@ const ComponentDetailPopup = ({ popupState, formalizationData, globalContext, al
     }, [popupState.id, allComponentsForSpec]);
 
     const getLinkedOperations = (element: FormalizationItem) => {
-        if (!formalizationData?.operations || !element.linkedOperationIds) return [];
-        return formalizationData.operations.filter(op => element.linkedOperationIds?.includes(op.id));
+        if (!allOpsForSpec || !element.linkedOperationIds) return [];
+        return allOpsForSpec.filter(op => element.linkedOperationIds?.includes(op.id));
     };
 
     const linkedComponents = useMemo(() => {
@@ -793,7 +792,6 @@ function FormalizationPageContent() {
         });
         setResources(allResourcesToUpdate);
 
-        // Open popups if element is now global
         if (isNowGlobal) {
             const element = allResourcesToUpdate.flatMap(r => r.formalization?.elements || []).find(el => el.id === elementId);
             if (element) {
@@ -810,6 +808,11 @@ function FormalizationPageContent() {
     const allElementsForSpec = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
         return specResources.flatMap(r => r.formalization?.elements || []);
+    }, [selectedFormalizationSpecId, getSpecResources]);
+
+    const allOpsForSpec = useMemo(() => {
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        return specResources.flatMap(r => r.formalization?.operations || []);
     }, [selectedFormalizationSpecId, getSpecResources]);
 
     const openComponentHierarchyFromElement = (element: FormalizationItem) => {
@@ -846,43 +849,41 @@ function FormalizationPageContent() {
     };
       
     const fullFormalizationData = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        
-        const localData = (isResource(selectedResource) && selectedResource?.formalization)
-            ? selectedResource.formalization
-            : { elements: [], operations: [], components: [] };
-        
-        const allSpecFormalization = specResources.reduce((acc, res) => {
-            if (res.formalization) {
-                acc.elements.push(...res.formalization.elements);
-                acc.operations.push(...res.formalization.operations);
-                acc.components.push(...res.formalization.components);
-            }
-            return acc;
-        }, { elements: [] as FormalizationItem[], operations: [] as FormalizationItem[], components: [] as FormalizationItem[] });
-
-        const uniqueItems = (items: FormalizationItem[]) => Array.from(new Map(items.map(item => [item.id, item])).values());
-        
-        return {
-            elements: uniqueItems(allSpecFormalization.elements),
-            operations: uniqueItems(allSpecFormalization.operations),
-            components: uniqueItems(allSpecFormalization.components),
-        };
-    }, [selectedFormalizationSpecId, getSpecResources, selectedResource]);
-
+      const specResources = getSpecResources(selectedFormalizationSpecId);
+  
+      // All items defined within the current specialization
+      const allSpecFormalization = specResources.reduce((acc, res) => {
+        if (res.formalization) {
+          acc.elements.push(...res.formalization.elements);
+          acc.operations.push(...res.formalization.operations);
+          acc.components.push(...res.formalization.components);
+        }
+        return acc;
+      }, { elements: [] as FormalizationItem[], operations: [] as FormalizationItem[], components: [] as FormalizationItem[] });
+      
+      const uniqueItems = (items: FormalizationItem[]) => Array.from(new Map(items.map(item => [item.id, item])).values());
+  
+      return {
+        elements: uniqueItems(allSpecFormalization.elements),
+        operations: uniqueItems(allSpecFormalization.operations),
+        components: uniqueItems(allSpecFormalization.components),
+      };
+    }, [selectedFormalizationSpecId, getSpecResources]);
 
     const globalContextData = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
-        
+
+        // Global elements are those explicitly marked as global from ANY resource in the spec
         const globalElements = specResources
             .flatMap(res => res.formalization?.elements || [])
             .filter(el => el.isGlobal);
-        
+
+        // Global components are those reachable from global elements
         const allCompsMap = new Map<string, FormalizationItem>();
         specResources.forEach(r => {
             (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
         });
-
+        
         const globalComponentsSet = new Set<FormalizationItem>();
         const queue = globalElements.flatMap(el => Object.values(el.properties || {})).filter(id => allCompsMap.has(id));
         const visited = new Set<string>(queue);
@@ -906,63 +907,75 @@ function FormalizationPageContent() {
             components: Array.from(globalComponentsSet),
             operations: [], // Operations are not considered global in this context
         };
-    }, [selectedFormalizationSpecId, getSpecResources, resources]);
+    }, [selectedFormalizationSpecId, getSpecResources]);
 
     const { itemsToDisplay, encapsulatedIds } = useMemo(() => {
-        const allElements = fullFormalizationData.elements;
-        const allComponents = fullFormalizationData.components;
-        const allOperations = fullFormalizationData.operations;
-
-        const encapsulatedComponentIds = new Set<string>();
-        allElements.forEach(el => {
-            if (el.properties) {
-                Object.values(el.properties).forEach(value => {
-                    if (allComponents.some(c => c.id === value)) {
-                        encapsulatedComponentIds.add(value);
-                    }
-                });
-            }
-        });
-    
-        const encapsulatedElementIds = new Set<string>();
-        const encapsulatedOperationIds = new Set<string>();
-        const queue = Array.from(encapsulatedComponentIds);
-        const visited = new Set<string>(queue);
-    
-        while (queue.length > 0) {
-            const currentComponentId = queue.shift()!;
-            const component = allComponents.find(c => c.id === currentComponentId);
-            if (component) {
-                (component.linkedElementIds || []).forEach(elId => encapsulatedElementIds.add(elId));
-                (component.linkedComponentIds || []).forEach(cId => {
-                    if (!visited.has(cId)) {
-                        queue.push(cId);
-                        visited.add(cId);
-                        encapsulatedComponentIds.add(cId);
-                    }
-                });
-            }
-        }
-    
-        encapsulatedElementIds.forEach(elId => {
-            const element = allElements.find(e => e.id === elId);
-            if (element && element.linkedOperationIds) {
-                element.linkedOperationIds.forEach(opId => encapsulatedOperationIds.add(opId));
-            }
-        });
+        const localData = (isResource(selectedResource) && selectedResource?.formalization)
+            ? selectedResource.formalization
+            : { elements: [], operations: [], components: [] };
         
-        const allEncapsulatedIds = new Set([...encapsulatedComponentIds, ...encapsulatedElementIds, ...encapsulatedOperationIds]);
+        const allLocalIds = new Set([
+            ...localData.elements.map(e => e.id),
+            ...localData.operations.map(o => o.id),
+            ...localData.components.map(c => c.id),
+        ]);
 
+        const getLinkedNonGlobalIds = (startItems: FormalizationItem[]): Set<string> => {
+            const linkedIds = new Set<string>();
+            const queue = [...startItems];
+            const visited = new Set<string>(queue.map(i => i.id));
+    
+            while (queue.length > 0) {
+                const current = queue.shift()!;
+                const allChildIds = [
+                    ...(current.linkedElementIds || []),
+                    ...(current.linkedComponentIds || []),
+                    ...(current.linkedOperationIds || []),
+                    ...(Object.values(current.properties || {})),
+                ];
+    
+                allChildIds.forEach(childId => {
+                    if (!visited.has(childId)) {
+                        visited.add(childId);
+                        const childItem = fullFormalizationData.elements.find(i => i.id === childId) ||
+                                          fullFormalizationData.components.find(i => i.id === childId) ||
+                                          fullFormalizationData.operations.find(i => i.id === childId);
+                        
+                        if (childItem && !childItem.isGlobal) {
+                            linkedIds.add(childId);
+                            queue.push(childItem);
+                        }
+                    }
+                });
+            }
+            return linkedIds;
+        };
+
+        const visibleItems = [
+            ...localData.elements,
+            ...localData.operations,
+            ...localData.components,
+            ...globalContextData.elements,
+            ...globalContextData.components,
+        ];
+        
+        const linkedNonGlobalIds = getLinkedNonGlobalIds(visibleItems);
+        const allVisibleIds = new Set([...visibleItems.map(i => i.id), ...linkedNonGlobalIds]);
+
+        const allItems = [...fullFormalizationData.elements, ...fullFormalizationData.operations, ...fullFormalizationData.components];
+        const finalVisibleItems = allItems.filter(item => allVisibleIds.has(item.id));
+        
         return {
             itemsToDisplay: {
-                elements: hideLinked.elements ? allElements.filter(item => !allEncapsulatedIds.has(item.id)) : allElements,
-                operations: hideLinked.operations ? allOperations.filter(item => !allEncapsulatedIds.has(item.id)) : allOperations,
-                components: hideLinked.components ? allComponents.filter(item => !allEncapsulatedIds.has(item.id)) : allComponents,
+                elements: finalVisibleItems.filter(item => fullFormalizationData.elements.some(e => e.id === item.id)),
+                operations: finalVisibleItems.filter(item => fullFormalizationData.operations.some(o => o.id === item.id)),
+                components: finalVisibleItems.filter(item => fullFormalizationData.components.some(c => c.id === item.id)),
             },
-            encapsulatedIds: allEncapsulatedIds,
+            encapsulatedIds: new Set<string>(), // Simplified for now, can be improved if needed
         };
-    }, [fullFormalizationData, hideLinked]);
-    
+    }, [selectedResource, fullFormalizationData, globalContextData]);
+
+
     const handleToggleCollapseAll = () => {
         const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
         if (collapsedCuriosities.size === allIds.size) {
@@ -1274,7 +1287,7 @@ function FormalizationPageContent() {
                         </Select>
                     </div>
                 </header>
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 flex-grow min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
                             <div className="flex justify-between items-center">
@@ -1313,7 +1326,7 @@ function FormalizationPageContent() {
                         </CardContent>
                     </Card>
 
-                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-3 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
                         <div className="lg:col-span-1 h-full min-h-0">
                             {renderSelectedResource()}
                         </div>
@@ -1339,10 +1352,9 @@ function FormalizationPageContent() {
                 <ComponentDetailPopup
                     key={popupState.id}
                     popupState={popupState}
-                    formalizationData={fullFormalizationData}
-                    globalContext={globalContextData}
                     allComponentsForSpec={allComponentsForSpec}
                     allElementsForSpec={allElementsForSpec}
+                    allOpsForSpec={allOpsForSpec}
                     onClose={closeComponentPopup}
                     onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
                 />
@@ -1376,6 +1388,7 @@ export default function FormalizationPage() {
 
 
     
+
 
 
 
