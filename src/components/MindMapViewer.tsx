@@ -48,7 +48,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: {
             className="absolute"
         >
             <div {...attributes} {...listeners}>
-              <Card className={cn("shadow-lg border-2 relative", selected ? "border-primary" : "border-border")}>
+              <Card className={cn("shadow-lg border-2 relative group", selected ? "border-primary" : "border-border")}>
                 <CardHeader className="p-2 flex flex-row items-center justify-between cursor-grab active:cursor-grabbing">
                   <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
                 </CardHeader>
@@ -71,7 +71,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: {
                         onPointerDown={(e) => onStartConnect(e, node.id, side)}
                         onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
                         className={cn(
-                            "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20",
+                            "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity",
                             getSideClass(side)
                         )}
                         title={`Connect from ${side}`}
@@ -105,6 +105,11 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
+    if (rootId) {
+      // This is not the global element view, so we don't render anything for now.
+      // This part can be built out to show other mind map types.
+      return [];
+    }
     return globalElements.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
       return {
@@ -115,7 +120,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         h: layout?.height || 100, // Approximate height for edge calculation
       };
     });
-  }, [globalElements, canvasLayout.nodes]);
+  }, [globalElements, canvasLayout.nodes, rootId]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
