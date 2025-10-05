@@ -10,10 +10,10 @@ import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 
-// A simple unique ID generator
+// Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, startNodeDrag, onReleaseConnect, onStartConnect }: { node: any; selected: boolean; startNodeDrag: (e: React.PointerEvent, nodeId: string) => void; onReleaseConnect: (e: React.PointerEvent, nodeId: string) => void; onStartConnect: (e: React.PointerEvent, fromId: string) => void; }) {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { node: any; selected: boolean; onReleaseConnect: (e: React.PointerEvent, nodeId: string) => void; onStartConnect: (e: React.PointerEvent, fromId: string) => void; }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
@@ -261,7 +261,6 @@ export function MindMapViewer() {
                 key={node.id} 
                 node={node} 
                 selected={selected === node.id} 
-                startNodeDrag={()=>{}} 
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
              />
