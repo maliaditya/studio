@@ -45,7 +45,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: {
         <div
             ref={setNodeRef}
             style={{ ...style, left: node.x, top: node.y, width: node.w, height: "auto" }}
-            className="absolute cursor-default"
+            className="absolute"
         >
             <div {...attributes} {...listeners}>
               <Card className={cn("shadow-lg border-2 relative", selected ? "border-primary" : "border-border")}>
@@ -112,7 +112,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
         w: layout?.width || 250,
-        h: layout?.height || 'auto',
+        h: layout?.height || 100, // Approximate height for edge calculation
       };
     });
   }, [globalElements, canvasLayout.nodes]);
@@ -127,7 +127,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
             newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
             return { ...prev, nodes: newNodes };
         } else {
-            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY }] };
+            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 250, height: 100 }] };
         }
     });
   }, [setCanvasLayout]);
@@ -230,12 +230,13 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
   const screenToWorld = (x: number, y: number) => ({ x: (x - transform.x) / transform.k, y: (y - transform.y) / transform.k });
   
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
+    const nodeHeight = node.h || 100; // Use a default if height isn't set yet
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y };
-        case 'bottom': return { x: node.x + node.w / 2, y: node.y + node.h };
-        case 'left': return { x: node.x, y: node.y + node.h / 2 };
-        case 'right': return { x: node.x + node.w, y: node.y + node.h / 2 };
-        default: return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight };
+        case 'left': return { x: node.x, y: node.y + nodeHeight / 2 };
+        case 'right': return { x: node.x + node.w, y: node.y + nodeHeight / 2 };
+        default: return { x: node.x + node.w / 2, y: node.y + nodeHeight / 2 };
     }
   };
 
@@ -263,13 +264,23 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
 
               const p1 = getNodeEdgePoint(fromNode, edge.fromSide);
               const p2 = getNodeEdgePoint(toNode, edge.toSide);
-              const dx = p2.x - p1.x;
-              const cx1 = p1.x + dx * 0.4;
-              const cx2 = p2.x - dx * 0.4;
+              
+              const CUBIC_OFFSET = 80;
+              let cp1 = { ...p1 }, cp2 = { ...p2 };
+
+              if (edge.fromSide === 'left') cp1.x -= CUBIC_OFFSET;
+              if (edge.fromSide === 'right') cp1.x += CUBIC_OFFSET;
+              if (edge.fromSide === 'top') cp1.y -= CUBIC_OFFSET;
+              if (edge.fromSide === 'bottom') cp1.y += CUBIC_OFFSET;
+
+              if (edge.toSide === 'left') cp2.x -= CUBIC_OFFSET;
+              if (edge.toSide === 'right') cp2.x += CUBIC_OFFSET;
+              if (edge.toSide === 'top') cp2.y -= CUBIC_OFFSET;
+              if (edge.toSide === 'bottom') cp2.y += CUBIC_OFFSET;
 
               return (
                 <g key={edge.id}>
-                  <path d={`M ${p1.x} ${p1.y} C ${cx1} ${p1.y} ${cx2} ${p2.y} ${p2.x} ${p2.y}`} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} fill="none" />
+                  <path d={`M ${p1.x} ${p1.y} C ${cp1.x} ${cp1.y} ${cp2.x} ${cp2.y} ${p2.x} ${p2.y}`} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} fill="none" />
                 </g>
               );
             })}
