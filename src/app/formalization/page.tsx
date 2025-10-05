@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -909,7 +907,7 @@ function FormalizationPageContent() {
         };
     }, [selectedFormalizationSpecId, getSpecResources]);
 
-    const { itemsToDisplay, encapsulatedIds } = useMemo(() => {
+    const itemsToDisplay = useMemo(() => {
         const localData = (isResource(selectedResource) && selectedResource?.formalization)
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
@@ -959,6 +957,7 @@ function FormalizationPageContent() {
             ...localData.operations,
             ...localData.components,
             ...globalContextData.elements,
+            ...globalContextData.components
         ];
         
         const allVisibleItems = getVisibleLinkedItems(baseVisibleItems);
@@ -968,28 +967,19 @@ function FormalizationPageContent() {
             operations: allVisibleItems.filter(item => fullFormalizationData.operations.some(o => o.id === item.id)),
             components: allVisibleItems.filter(item => fullFormalizationData.components.some(c => c.id === item.id)),
         };
-
-        const encapsulated = new Set<string>();
-        Object.values(finalItems).flat().forEach(item => {
-            if (!localItemIds.elements.has(item.id) && !localItemIds.operations.has(item.id) && !localItemIds.components.has(item.id) && !item.isGlobal) {
-                encapsulated.add(item.id);
-            }
-        });
-
+    
         const filterByType = (items: FormalizationItem[], type: 'elements' | 'operations' | 'components') => {
             if (hideLinked[type]) {
-                return items.filter(item => localItemIds[type].has(item.id) || item.isGlobal);
+                const visibleIdsFromTraversal = new Set(allVisibleItems.map(i => i.id));
+                return items.filter(item => localItemIds[type].has(item.id) || item.isGlobal || visibleIdsFromTraversal.has(item.id));
             }
             return items;
         };
-
+    
         return {
-            itemsToDisplay: {
-                elements: filterByType(finalItems.elements, 'elements'),
-                operations: filterByType(finalItems.operations, 'operations'),
-                components: filterByType(finalItems.components, 'components'),
-            },
-            encapsulatedIds: encapsulated,
+            elements: filterByType(finalItems.elements, 'elements'),
+            operations: filterByType(finalItems.operations, 'operations'),
+            components: filterByType(finalItems.components, 'components'),
         };
     }, [selectedResource, fullFormalizationData, globalContextData, hideLinked]);
 
@@ -1306,7 +1296,7 @@ function FormalizationPageContent() {
                     </div>
                 </header>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 flex-grow min-h-0">
-                    <div className="lg:col-span-1 h-full min-h-0 flex flex-col">
+                    <div className="lg:col-span-1 h-full min-h-0 flex flex-col overflow-y-auto">
                         <Card className="flex flex-col flex-grow">
                             <CardHeader>
                                 <div className="flex justify-between items-center">
@@ -1321,38 +1311,40 @@ function FormalizationPageContent() {
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                                <ScrollArea className="flex-grow">
-                                    <div className="space-y-1">
-                                        {curiositiesForSpecialization.map(curiosity => (
-                                            <CuriosityNode 
-                                                key={curiosity.id}
-                                                item={curiosity}
-                                                onSelect={setSelectedResource}
-                                                selectedId={selectedResource?.id || null}
-                                                allUpskillDefinitions={upskillDefinitions}
-                                                allResources={resources}
-                                                collapsedIds={collapsedCuriosities}
-                                                onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
-                                                    const newSet = new Set(prev);
-                                                    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                                                    return newSet;
-                                                })}
-                                            />
-                                        ))}
-                                    </div>
-                                </ScrollArea>
+                            <CardContent className="flex-grow min-h-0 flex flex-col gap-4 overflow-y-auto">
+                                <div className="space-y-1">
+                                    {curiositiesForSpecialization.map(curiosity => (
+                                        <CuriosityNode 
+                                            key={curiosity.id}
+                                            item={curiosity}
+                                            onSelect={setSelectedResource}
+                                            selectedId={selectedResource?.id || null}
+                                            allUpskillDefinitions={upskillDefinitions}
+                                            allResources={resources}
+                                            collapsedIds={collapsedCuriosities}
+                                            onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
+                                                const newSet = new Set(prev);
+                                                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                                                return newSet;
+                                            })}
+                                        />
+                                    ))}
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
 
                     <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-4">
-                        <div className="lg:col-span-1 h-full min-h-0">
+                        <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto">
                             {renderSelectedResource()}
                         </div>
-                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+                        <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto">
                             {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
+                        </div>
+                        <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto">
                             {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
+                        </div>
+                        <div className="lg:col-span-1 h-full min-h-0 overflow-y-auto">
                             {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
                         </div>
                     </div>
@@ -1400,22 +1392,3 @@ export default function FormalizationPage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
-
-    
-
-
-
-
-
-
-
-    
-
-    
-
