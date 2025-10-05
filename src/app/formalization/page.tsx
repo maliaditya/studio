@@ -229,7 +229,7 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
-            <DialogContent className="sm:max-w-4xl">
+            <DialogContent className="sm:max-w-4xl z-[130]">
                 <DialogHeader>
                     <DialogTitle>{getModalTitle()}</DialogTitle>
                 </DialogHeader>
@@ -582,7 +582,7 @@ function FormalizationPageContent() {
 
         while (queue.length > 0) {
             const current = queue.shift()!;
-            (current.linkedResourceIds || []).forEach(resId => {
+            (current.linkedResourceIds || [])).forEach(resId => {
                 if (!visitedResourceIds.has(resId)) {
                     const resource = resources.find(r => r.id === resId);
                     if (resource) {
@@ -591,7 +591,7 @@ function FormalizationPageContent() {
                     }
                 }
             });
-            (current.linkedUpskillIds || []).forEach(childId => {
+            (current.linkedUpskillIds || [])).forEach(childId => {
                 const childDef = upskillDefinitions.find(d => d.id === childId);
                 if (childDef) queue.push(childDef);
             });
@@ -730,7 +730,7 @@ function FormalizationPageContent() {
     };
     
     const handleUpdateItem = (itemToSave: FormalizationItem) => {
-        if (!selectedResource || !isResource(selectedResource)) return;
+        if (!selectedResource || !isResource(selectedResource) || !editingItem) return;
         
         const type = editingItem!.type;
         const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
@@ -883,25 +883,26 @@ function FormalizationPageContent() {
         components: uniqueItems(allSpecFormalization.components),
       };
     }, [selectedFormalizationSpecId, getSpecResources]);
-
+    
+    const globalElements = useMemo(() => {
+        return fullFormalizationData.elements.filter(el => el.isGlobal);
+    }, [fullFormalizationData]);
+    
     const itemsToDisplay = useMemo(() => {
         const localData = (isResource(selectedResource) && selectedResource?.formalization)
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
-        const globalElements = fullFormalizationData.elements.filter(el => el.isGlobal);
-    
-        // IDs of items that are already linked and should be hidden from main lists
         const linkedOperationIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
-        const linkedInComponentElementIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
-        const linkedInPropertiesComponentIds = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
+        const linkedElementIdsInComponents = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
+        const linkedComponentIdsInProperties = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
     
         return {
-            elements: [...(localData.elements || []), ...globalElements].filter(el => !linkedInComponentElementIds.has(el.id)),
+            elements: [...(localData.elements || []), ...globalElements].filter(el => !linkedElementIdsInComponents.has(el.id)),
             operations: (localData.operations || []).filter(op => !linkedOperationIds.has(op.id)),
-            components: (localData.components || []).filter(c => !linkedInPropertiesComponentIds.has(c.id)),
+            components: (localData.components || []).filter(c => !linkedComponentIdsInProperties.has(c.id)),
         };
-    }, [selectedResource, fullFormalizationData]);
+    }, [selectedResource, fullFormalizationData, globalElements]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1063,9 +1064,9 @@ function FormalizationPageContent() {
                         <ScrollArea className="h-full">
                             <div className="space-y-2 p-4 pt-0">
                                 {data.map(item => {
-                                    const linkedOperations = (item.linkedOperationIds || []).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
-                                    const linkedElements = (item.linkedElementIds || []).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
-                                    const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
+                                    const linkedOperations = (item.linkedOperationIds || [])).map(id => fullFormalizationData?.operations?.find(op => op.id === id)?.text).filter(Boolean);
+                                    const linkedElements = (item.linkedElementIds || [])).map(id => fullFormalizationData?.elements?.find(el => el.id === id)?.text).filter(Boolean);
+                                    const linkedComponents = (item.linkedComponentIds || [])).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
                                     
                                     return (
                                     <Card key={item.id} className="group relative">
@@ -1261,7 +1262,7 @@ function FormalizationPageContent() {
                     item={editingItem.item}
                     type={editingItem.type}
                     formalizationData={fullFormalizationData}
-                    globalContext={{ elements: itemsToDisplay.elements.filter(el => el.isGlobal), operations: [], components: fullFormalizationData.components }}
+                    globalContext={{ elements: globalElements, operations: [], components: fullFormalizationData.components }}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                 />
@@ -1307,3 +1308,6 @@ export default function FormalizationPage() {
 
     
 
+
+
+    
