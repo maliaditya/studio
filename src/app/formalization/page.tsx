@@ -913,17 +913,17 @@ function FormalizationPageContent() {
         const localData = (isResource(selectedResource) && selectedResource?.formalization)
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
-        
-        const allLocalIds = new Set([
-            ...localData.elements.map(e => e.id),
-            ...localData.operations.map(o => o.id),
-            ...localData.components.map(c => c.id),
-        ]);
-
-        const getLinkedNonGlobalIds = (startItems: FormalizationItem[]): Set<string> => {
-            const linkedIds = new Set<string>();
+    
+        const localItemIds = {
+            elements: new Set(localData.elements.map(e => e.id)),
+            operations: new Set(localData.operations.map(o => o.id)),
+            components: new Set(localData.components.map(c => c.id)),
+        };
+    
+        const getVisibleLinkedItems = (startItems: FormalizationItem[]): FormalizationItem[] => {
+            const visible = new Set<string>(startItems.map(i => i.id));
             const queue = [...startItems];
-            const visited = new Set<string>(queue.map(i => i.id));
+            const visited = new Set<string>(startItems.map(i => i.id));
     
             while (queue.length > 0) {
                 const current = queue.shift()!;
@@ -940,40 +940,58 @@ function FormalizationPageContent() {
                         const childItem = fullFormalizationData.elements.find(i => i.id === childId) ||
                                           fullFormalizationData.components.find(i => i.id === childId) ||
                                           fullFormalizationData.operations.find(i => i.id === childId);
-                        
-                        if (childItem && !childItem.isGlobal) {
-                            linkedIds.add(childId);
+                        if (childItem) {
+                            visible.add(childId);
                             queue.push(childItem);
                         }
                     }
                 });
             }
-            return linkedIds;
+            return [
+                ...fullFormalizationData.elements,
+                ...fullFormalizationData.operations,
+                ...fullFormalizationData.components,
+            ].filter(item => visible.has(item.id));
         };
-
-        const visibleItems = [
+    
+        const baseVisibleItems = [
             ...localData.elements,
             ...localData.operations,
             ...localData.components,
             ...globalContextData.elements,
-            ...globalContextData.components,
         ];
         
-        const linkedNonGlobalIds = getLinkedNonGlobalIds(visibleItems);
-        const allVisibleIds = new Set([...visibleItems.map(i => i.id), ...linkedNonGlobalIds]);
-
-        const allItems = [...fullFormalizationData.elements, ...fullFormalizationData.operations, ...fullFormalizationData.components];
-        const finalVisibleItems = allItems.filter(item => allVisibleIds.has(item.id));
+        const allVisibleItems = getVisibleLinkedItems(baseVisibleItems);
         
+        const finalItems = {
+            elements: allVisibleItems.filter(item => fullFormalizationData.elements.some(e => e.id === item.id)),
+            operations: allVisibleItems.filter(item => fullFormalizationData.operations.some(o => o.id === item.id)),
+            components: allVisibleItems.filter(item => fullFormalizationData.components.some(c => c.id === item.id)),
+        };
+
+        const encapsulated = new Set<string>();
+        Object.values(finalItems).flat().forEach(item => {
+            if (!localItemIds.elements.has(item.id) && !localItemIds.operations.has(item.id) && !localItemIds.components.has(item.id) && !item.isGlobal) {
+                encapsulated.add(item.id);
+            }
+        });
+
+        const filterByType = (items: FormalizationItem[], type: 'elements' | 'operations' | 'components') => {
+            if (hideLinked[type]) {
+                return items.filter(item => localItemIds[type].has(item.id) || item.isGlobal);
+            }
+            return items;
+        };
+
         return {
             itemsToDisplay: {
-                elements: finalVisibleItems.filter(item => fullFormalizationData.elements.some(e => e.id === item.id)),
-                operations: finalVisibleItems.filter(item => fullFormalizationData.operations.some(o => o.id === item.id)),
-                components: finalVisibleItems.filter(item => fullFormalizationData.components.some(c => c.id === item.id)),
+                elements: filterByType(finalItems.elements, 'elements'),
+                operations: filterByType(finalItems.operations, 'operations'),
+                components: filterByType(finalItems.components, 'components'),
             },
-            encapsulatedIds: new Set<string>(), // Simplified for now, can be improved if needed
+            encapsulatedIds: encapsulated,
         };
-    }, [selectedResource, fullFormalizationData, globalContextData]);
+    }, [selectedResource, fullFormalizationData, globalContextData, hideLinked]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1287,7 +1305,7 @@ function FormalizationPageContent() {
                         </Select>
                     </div>
                 </header>
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4 flex-grow min-h-0">
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 flex-grow min-h-0">
                     <Card className="lg:col-span-1 flex flex-col min-h-0">
                         <CardHeader>
                             <div className="flex justify-between items-center">
@@ -1326,11 +1344,11 @@ function FormalizationPageContent() {
                         </CardContent>
                     </Card>
 
-                    <div className="lg:col-span-3 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 h-full min-h-0">
                             {renderSelectedResource()}
                         </div>
-                        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
+                        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4 min-h-0">
                             {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                             {renderFormalizationSection('operations', 'Operations', 'How elements interact; inputs and outputs.')}
                             {renderFormalizationSection('components', 'Components', 'Reusable templates of elements.')}
@@ -1393,3 +1411,6 @@ export default function FormalizationPage() {
 
 
 
+
+
+    
