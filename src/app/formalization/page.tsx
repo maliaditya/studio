@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -1332,3 +1331,6 @@ export default function FormalizationPage() {
 
 
 
+
+
+    
