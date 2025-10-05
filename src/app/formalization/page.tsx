@@ -1306,43 +1306,45 @@ function FormalizationPageContent() {
                     </div>
                 </header>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 flex-grow min-h-0">
-                    <Card className="lg:col-span-1 flex flex-col min-h-0">
-                        <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
-                                <div className="flex">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
-                                        <ChevronsUp className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
-                                        <ChevronsDown className="h-4 w-4" />
-                                    </Button>
+                    <div className="lg:col-span-1 h-full min-h-0 flex flex-col">
+                        <Card className="flex flex-col flex-grow">
+                            <CardHeader>
+                                <div className="flex justify-between items-center">
+                                    <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
+                                    <div className="flex">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
+                                            <ChevronsUp className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
+                                            <ChevronsDown className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
-                            <ScrollArea className="flex-grow">
-                                <div className="space-y-1">
-                                    {curiositiesForSpecialization.map(curiosity => (
-                                        <CuriosityNode 
-                                            key={curiosity.id}
-                                            item={curiosity}
-                                            onSelect={setSelectedResource}
-                                            selectedId={selectedResource?.id || null}
-                                            allUpskillDefinitions={upskillDefinitions}
-                                            allResources={resources}
-                                            collapsedIds={collapsedCuriosities}
-                                            onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
-                                                const newSet = new Set(prev);
-                                                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                                                return newSet;
-                                            })}
-                                        />
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
+                            </CardHeader>
+                            <CardContent className="flex-grow min-h-0 flex flex-col gap-4">
+                                <ScrollArea className="flex-grow">
+                                    <div className="space-y-1">
+                                        {curiositiesForSpecialization.map(curiosity => (
+                                            <CuriosityNode 
+                                                key={curiosity.id}
+                                                item={curiosity}
+                                                onSelect={setSelectedResource}
+                                                selectedId={selectedResource?.id || null}
+                                                allUpskillDefinitions={upskillDefinitions}
+                                                allResources={resources}
+                                                collapsedIds={collapsedCuriosities}
+                                                onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
+                                                    const newSet = new Set(prev);
+                                                    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                                                    return newSet;
+                                                })}
+                                            />
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </div>
 
                     <div className="lg:col-span-4 flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-4 gap-4">
                         <div className="lg:col-span-1 h-full min-h-0">
@@ -1416,3 +1418,4 @@ export default function FormalizationPage() {
     
 
     
+
