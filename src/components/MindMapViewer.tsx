@@ -1,131 +1,126 @@
 
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import type { CanvasNode, CanvasEdge } from "@/types/workout";
+import type { CanvasNode, CanvasEdge, FormalizationItem } from "@/types/workout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
-// Obsidian-like Canvas Component for Next.js (single-file)
-// - Tailwind CSS classes used for styling (no imports required)
-// - Features: Pan & zoom, drag nodes, create/delete nodes, connect nodes with edges,
-//   inline edit node title/content, localStorage persistence (export/import), minimap
-// - Drop this component into a Next.js page (e.g., pages/canvas.jsx) or as a component
-
-// Simple unique id generator
+// A simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function useLocalStorage(key: string, initial: any) {
-  const [state, setState] = useState(() => {
-    try {
-      const raw = typeof window !== "undefined" && window.localStorage.getItem(key);
-      return raw ? JSON.parse(raw) : initial;
-    } catch (e) {
-      return initial;
-    }
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(key, JSON.stringify(state));
-    } catch (e) {}
-  }, [key, state]);
-  return [state, setState];
-}
-
 export function MindMapViewer() {
-  // Canvas transform state
+  const { 
+    resources, 
+    canvasLayout, setCanvasLayout, 
+    addGlobalElement, updateGlobalElement, deleteGlobalElement
+  } = useAuth();
+  
+  const globalElements = useMemo(() => {
+    return resources
+      .flatMap(r => r.formalization?.elements || [])
+      .filter(el => el.isGlobal);
+  }, [resources]);
+  
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
-  const [nodes, setNodes] = useLocalStorage("obs_canvas_nodes", {
-    list: {
-      // example starter node
-      [id()]: { id: id(), x: 100, y: 80, w: 240, h: 120, title: "Welcome", content: "Double-click to edit", color: "bg-indigo-50" },
-    },
-    edges: {},
-  });
   const [selected, setSelected] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState<{fromId: string, x: number, y: number} | null>(null);
+  const [connecting, setConnecting] = useState<{ fromId: string; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const viewportRef = useRef<HTMLDivElement>(null);
-  const lastPointerRef = useRef<{x: number, y: number} | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Helpers to update nodes & edges immutably
-  const updateNode = useCallback((nodeId: string, patch: any) => {
-    setNodes((prev: any) => ({ ...prev, list: { ...prev.list, [nodeId]: { ...prev.list[nodeId], ...patch } } }));
-  }, [setNodes]);
+  // Combine elements with their layout info
+  const nodesWithLayout = useMemo(() => {
+    return globalElements.map(element => {
+      const layout = canvasLayout.nodes.find(n => n.id === element.id);
+      return {
+        ...element,
+        x: layout?.x || Math.random() * 800,
+        y: layout?.y || Math.random() * 600,
+        w: layout?.width || 250,
+        h: layout?.height || 150,
+      };
+    });
+  }, [globalElements, canvasLayout.nodes]);
+  
+  const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
-  const addNode = (x: number, y: number) => {
-    const nid = id();
-    setNodes((prev: any) => ({
-      ...prev,
-      list: {
-        ...prev.list,
-        [nid]: { id: nid, x, y, w: 240, h: 120, title: "New Node", content: "", color: "bg-white" },
-      },
-    }));
-    setSelected(nid);
+  const updateNodePosition = useCallback((nodeId: string, newX: number, newY: number) => {
+    setCanvasLayout(prev => {
+        const existingNodeIndex = prev.nodes.findIndex(n => n.id === nodeId);
+        if (existingNodeIndex > -1) {
+            const newNodes = [...prev.nodes];
+            newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
+            return { ...prev, nodes: newNodes };
+        } else {
+            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY }] };
+        }
+    });
+  }, [setCanvasLayout]);
+
+  const handleAddNode = () => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    const center = screenToWorld(rect.width / 2, rect.height / 2);
+    const newNode = addGlobalElement("New Element", center.x, center.y);
+    if(newNode) {
+      setSelected(newNode.id);
+    }
   };
 
-  const removeNode = (nodeId: string) => {
-    setNodes((prev: any) => {
-      const newList = { ...prev.list };
-      delete newList[nodeId];
-      const newEdges = { ...prev.edges };
-      Object.keys(newEdges).forEach((eId) => {
-        if (newEdges[eId].from === nodeId || newEdges[eId].to === nodeId) delete newEdges[eId];
-      });
-      return { list: newList, edges: newEdges };
-    });
+  const handleRemoveNode = (nodeId: string) => {
+    deleteGlobalElement(nodeId);
+    setCanvasLayout(prev => ({
+      ...prev,
+      nodes: prev.nodes.filter(n => n.id !== nodeId),
+      edges: prev.edges.filter(e => e.source !== nodeId && e.target !== nodeId),
+    }));
     if (selected === nodeId) setSelected(null);
   };
 
   const addEdge = (from: string, to: string) => {
     if (from === to) return;
     const eid = id("e");
-    setNodes((prev: any) => ({ ...prev, edges: { ...prev.edges, [eid]: { id: eid, from, to } } }));
+    setCanvasLayout(prev => ({
+        ...prev,
+        edges: [...prev.edges, { id: eid, source: from, target: to, label: 'relates' }],
+    }));
   };
 
-  // background pointer handlers (pan & zoom)
+  // Panning and Zooming handlers
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const onWheel = (e: WheelEvent) => {
-      // zoom on wheel - ctrl/alt for zoom-only, otherwise normal scroll
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = -e.deltaY;
-        const scaleFactor = delta > 0 ? 1.08 : 0.92;
-        const rect = container.getBoundingClientRect();
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
-        const { x, y, k } = transform;
-        const newK = Math.max(0.2, Math.min(3, k * scaleFactor));
-        // zoom around cursor
-        const nx = cx - ((cx - x) / k) * newK;
-        const ny = cy - ((cy - y) / k) * newK;
-        setTransform({ x: nx, y: ny, k: newK });
-      }
+      e.preventDefault();
+      const scaleFactor = e.deltaY > 0 ? 0.92 : 1.08;
+      const rect = container.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const { x, y, k } = transform;
+      const newK = Math.max(0.1, Math.min(2, k * scaleFactor));
+      const nx = cx - ((cx - x) / k) * newK;
+      const ny = cy - ((cy - y) / k) * newK;
+      setTransform({ x: nx, y: ny, k: newK });
     };
 
     container.addEventListener("wheel", onWheel, { passive: false });
     return () => container.removeEventListener("wheel", onWheel);
   }, [transform]);
-
-  // pointerdown for panning background
+  
   const onPointerDownBackground = (e: React.PointerEvent) => {
-    if (e.button !== 0) return; // left only
-    // only start pan if background clicked (not node)
     if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains("canvas-bg")) return;
     setIsPanning(true);
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
     containerRef.current?.setPointerCapture?.(e.pointerId);
   };
   const onPointerMoveBackground = (e: React.PointerEvent) => {
-    if (!isPanning) return;
-    const last = lastPointerRef.current;
-    if (!last) return;
-    const dx = e.clientX - last.x;
-    const dy = e.clientY - last.y;
+    if (!isPanning || !lastPointerRef.current) return;
+    const dx = e.clientX - lastPointerRef.current.x;
+    const dy = e.clientY - lastPointerRef.current.y;
     setTransform((t) => ({ ...t, x: t.x + dx, y: t.y + dy }));
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
   };
@@ -134,25 +129,20 @@ export function MindMapViewer() {
     lastPointerRef.current = null;
   };
 
-  // Node drag
+  // Node Dragging handlers
   const startNodeDrag = (e: React.PointerEvent, nodeId: string) => {
     e.stopPropagation();
-    const p = { x: e.clientX, y: e.clientY };
-    lastPointerRef.current = p;
+    lastPointerRef.current = { x: e.clientX, y: e.clientY };
     const onMove = (ev: PointerEvent) => {
       ev.preventDefault();
-      const lp = lastPointerRef.current;
-      if (!lp) return;
-      const dx = (ev.clientX - lp.x) / transform.k;
-      const dy = (ev.clientY - lp.y) / transform.k;
+      if (!lastPointerRef.current) return;
+      const dx = (ev.clientX - lastPointerRef.current.x) / transform.k;
+      const dy = (ev.clientY - lastPointerRef.current.y) / transform.k;
       lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
-      updateNode(nodeId, {}); // placeholder to keep reference
-      setNodes((prev: any) => {
-        const n = { ...prev.list[nodeId] };
-        n.x += dx;
-        n.y += dy;
-        return { ...prev, list: { ...prev.list, [nodeId]: n } };
-      });
+      const node = nodesWithLayout.find(n => n.id === nodeId);
+      if (node) {
+        updateNodePosition(nodeId, node.x + dx, node.y + dy);
+      }
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove);
@@ -164,262 +154,117 @@ export function MindMapViewer() {
     setSelected(nodeId);
   };
 
-  // Connect by dragging from handle
+  // Connection handlers
   const onStartConnect = (e: React.PointerEvent, fromId: string) => {
     e.stopPropagation();
     setConnecting({ fromId, x: e.clientX, y: e.clientY });
   };
   const onMoveConnect = (e: React.PointerEvent) => {
-    if (!connecting) return;
-    setConnecting((c) => c && { ...c, x: e.clientX, y: e.clientY });
+    if (connecting) {
+      setConnecting((c) => c && { ...c, x: e.clientX, y: e.clientY });
+    }
   };
   const onReleaseConnect = (e: React.PointerEvent, targetId: string) => {
-    if (!connecting) return;
-    if (targetId && connecting.fromId !== targetId) addEdge(connecting.fromId, targetId);
-    setConnecting(null);
-  };
-
-  // keyboard shortcuts
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Delete" && selected) {
-        removeNode(selected);
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d" && selected) {
-        // duplicate
-        const orig = nodes.list[selected];
-        if (!orig) return;
-        const nid = id();
-        setNodes((prev: any) => ({
-          ...prev,
-          list: { ...prev.list, [nid]: { ...orig, id: nid, x: orig.x + 30, y: orig.y + 30 } },
-        }));
-        setSelected(nid);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [selected, nodes, setNodes]);
-
-  // Export / Import
-  const exportJSON = () => {
-    const data = JSON.stringify(nodes, null, 2);
-    const blob = new Blob([data], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "canvas.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-  const importJSON = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target!.result as string);
-        setNodes(parsed);
-      } catch (e) {
-        alert("Invalid JSON");
-      }
-    };
-    reader.readAsText(file);
+    if (connecting) {
+      if (targetId && connecting.fromId !== targetId) addEdge(connecting.fromId, targetId);
+      setConnecting(null);
+    }
   };
 
   // Render helpers
-  const worldToScreen = (x: number, y: number) => ({ x: x * transform.k + transform.x, y: y * transform.k + transform.y });
   const screenToWorld = (x: number, y: number) => ({ x: (x - transform.x) / transform.k, y: (y - transform.y) / transform.k });
 
+  const getEdgePoints = (fromNode: any, toNode: any) => {
+    const fromCenter = { x: fromNode.x + fromNode.w / 2, y: fromNode.y + fromNode.h / 2 };
+    const toCenter = { x: toNode.x + toNode.w / 2, y: toNode.y + toNode.h / 2 };
+    return { fromCenter, toCenter };
+  };
+
   return (
-    <div className="flex h-full w-full bg-gray-50">
-      {/* Sidebar */}
-      <aside className="w-64 p-3 border-r bg-white flex-shrink-0">
-        <h2 className="text-lg font-semibold mb-2">Canvas Controls</h2>
-        <div className="space-y-2">
-          <button
-            className="w-full p-2 rounded shadow-sm border hover:bg-gray-50"
-            onClick={() => {
-              // add node near center
-              const rect = containerRef.current!.getBoundingClientRect();
-              const center = screenToWorld(rect.width / 2, rect.height / 2);
-              addNode(center.x - 120, center.y - 60);
-            }}
-          >
-            + Add node
-          </button>
-          <label className="block">
-            <span className="text-sm text-gray-600">Import JSON</span>
-            <input
-              type="file"
-              accept="application/json"
-              className="mt-1 block w-full text-sm"
-              onChange={(e) => e.target.files?.[0] && importJSON(e.target.files[0])}
-            />
-          </label>
-          <button className="w-full p-2 rounded shadow-sm border" onClick={exportJSON}>
-            Export JSON
-          </button>
-          <div className="pt-2">
-            <div className="text-xs text-gray-500">Shortcuts:</div>
-            <div className="text-sm mt-1">Delete — remove node</div>
-            <div className="text-sm">Ctrl/Cmd + D — duplicate</div>
-            <div className="text-sm">Ctrl/Cmd + MouseWheel — zoom</div>
-          </div>
-          <div className="mt-4">
-            <div className="text-sm font-medium">Selected</div>
-            {selected ? (
-              <div className="mt-2 p-2 rounded border bg-white">
-                <div className="text-sm font-semibold">{nodes.list[selected]?.title}</div>
-                <div className="text-xs text-gray-500">ID: {selected}</div>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    className="px-2 py-1 text-sm border rounded"
-                    onClick={() => {
-                      const n = nodes.list[selected];
-                      setNodes((prev: any) => ({ ...prev, list: { ...prev.list, [selected]: { ...n, x: n.x + 20, y: n.y + 20 } } }));
-                    }}
-                  >
-                    Nudge
-                  </button>
-                  <button className="px-2 py-1 text-sm border rounded" onClick={() => removeNode(selected)}>
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-2 text-sm text-gray-500">No node selected</div>
-            )}
-          </div>
-        </div>
-      </aside>
-
-      {/* Main canvas area */}
-      <div className="relative flex-1 overflow-hidden">
+    <div className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
+      <div
+        ref={containerRef}
+        className="canvas-bg absolute inset-0 touch-none"
+        onPointerDown={onPointerDownBackground}
+        onPointerMove={(e) => { onPointerMoveBackground(e); onMoveConnect(e); }}
+        onPointerUp={onPointerUpBackground}
+        style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+      >
         <div
-          ref={containerRef}
-          className="canvas-bg absolute inset-0 touch-none"
-          onPointerDown={onPointerDownBackground}
-          onPointerMove={(e) => {
-            onPointerMoveBackground(e);
-            onMoveConnect(e);
-          }}
-          onPointerUp={onPointerUpBackground}
-          style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '40px 40px, 40px 40px' }}
+          className="absolute left-0 top-0"
+          style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: "0 0" }}
         >
-          {/* viewport that will be transformed for pan/zoom */}
-          <div
-            ref={viewportRef}
-            className="absolute left-0 top-0"
-            style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.k})`, transformOrigin: "0 0", width: "100%", height: "100%" }}
-          >
-            {/* SVG edges layer */}
-            <svg width="2000" height="2000" className="pointer-events-none absolute left-0 top-0">
-              {/* existing edges */}
-              {Object.values(nodes.edges || {}).map((edge: any) => {
-                const a = nodes.list[edge.from];
-                const b = nodes.list[edge.to];
-                if (!a || !b) return null;
-                const ax = a.x + a.w / 2;
-                const ay = a.y + a.h / 2;
-                const bx = b.x + b.w / 2;
-                const by = b.y + b.h / 2;
-                const dx = Math.abs(bx - ax);
-                const mx = (ax + bx) / 2;
-                const my = (ay + by) / 2;
-                // simple bezier control
-                const cx1 = ax + Math.sign(bx - ax) * Math.max(60, dx * 0.3);
-                const cy1 = ay;
-                const cx2 = bx - Math.sign(bx - ax) * Math.max(60, dx * 0.3);
-                const cy2 = by;
-                return (
-                  <g key={edge.id}>
-                    <path d={`M ${ax} ${ay} C ${cx1} ${cy1} ${cx2} ${cy2} ${bx} ${by}`} stroke="#111827" strokeWidth={1.5} fill="none" opacity={0.8} />
-                    <circle cx={bx} cy={by} r={6} fill="#111827" stroke="#fff" strokeWidth={1} />
-                  </g>
-                );
-              })}
+          <svg width="4000" height="4000" className="pointer-events-none absolute left-0 top-0">
+            {edges.map((edge) => {
+              const fromNode = nodesWithLayout.find(n => n.id === edge.source);
+              const toNode = nodesWithLayout.find(n => n.id === edge.target);
+              if (!fromNode || !toNode) return null;
 
-              {/* dragging connection line */}
-              {connecting && (() => {
-                const from = nodes.list[connecting.fromId];
-                if (!from) return null;
-                const fx = from.x + from.w / 2;
-                const fy = from.y + from.h / 2;
-                // convert pointer to world
-                const rect = containerRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
-                const world = screenToWorld(connecting.x - rect.left, connecting.y - rect.top);
-                const tx = world.x;
-                const ty = world.y;
-                const dx = Math.abs(tx - fx);
-                const cx1 = fx + Math.sign(tx - fx) * Math.max(60, dx * 0.3);
-                const cx2 = tx - Math.sign(tx - fx) * Math.max(60, dx * 0.3);
-                return (
-                  <path key="connTemp" d={`M ${fx} ${fy} C ${cx1} ${fy} ${cx2} ${ty} ${tx} ${ty}`} stroke="#ef4444" strokeWidth={1.8} fill="none" opacity={0.9} />
-                );
-              })()}
-            </svg>
+              const { fromCenter, toCenter } = getEdgePoints(fromNode, toNode);
+              const dx = toCenter.x - fromCenter.x;
+              const cx1 = fromCenter.x + dx * 0.3;
+              const cx2 = toCenter.x - dx * 0.3;
 
-            {/* nodes */}
-            {Object.values(nodes.list).map((n: any) => (
-              <div
-                key={n.id}
-                className={`absolute shadow rounded border ${n.color} cursor-default select-none`}
-                style={{ left: n.x, top: n.y, width: n.w, height: n.h, transformOrigin: "0 0" }}
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  setSelected(n.id);
-                }}
-                onPointerDown={(e) => startNodeDrag(e, n.id)}
-                onPointerUp={(e) => onReleaseConnect(e, n.id)}
-              >
-                <div className={`flex items-center justify-between px-3 py-2 border-b ${selected === n.id ? "ring-2 ring-indigo-300" : ""}`}>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-indigo-400" />
-                    <div className="font-semibold text-sm">{n.title}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full bg-white border cursor-pointer flex items-center justify-center"
-                      onPointerDown={(e) => onStartConnect(e, n.id)}
-                      title="Drag to connect"
-                    >
-                      ↔
-                    </div>
-                    <div className="text-xs text-gray-500">{n.id ? n.id.slice(-4) : ''}</div>
-                  </div>
-                </div>
-                <div className="p-3 h-full overflow-auto">
-                  <textarea
-                    value={n.content}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setNodes((prev: any) => ({ ...prev, list: { ...prev.list, [n.id]: { ...n, content: val } } }));
-                    }}
-                    className="w-full h-full resize-none bg-transparent outline-none text-sm"
-                    placeholder="Write notes..."
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* minimap (simple) */}
-        <div className="absolute right-4 bottom-4 w-48 h-36 bg-white/90 rounded shadow p-2 border">
-          <div className="text-xs font-medium text-gray-600">Mini-map</div>
-          <div className="relative mt-2 bg-gray-100 h-full overflow-hidden">
-            <div className="absolute inset-1 border rounded" />
-            {Object.values(nodes.list).map((n: any) => {
-              const miniX = (n.x / 2000) * 100;
-              const miniY = (n.y / 2000) * 100;
-              const miniW = (n.w / 2000) * 100;
-              const miniH = (n.h / 2000) * 100;
-              return <div key={n.id} className="absolute bg-indigo-300/60" style={{ left: `${miniX}%`, top: `${miniY}%`, width: `${miniW}%`, height: `${miniH}%`, borderRadius: 4 }} />;
+              return (
+                <g key={edge.id}>
+                  <path d={`M ${fromCenter.x} ${fromCenter.y} C ${cx1} ${fromCenter.y} ${cx2} ${toCenter.y} ${toCenter.x} ${toCenter.y}`} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} fill="none" />
+                </g>
+              );
             })}
-          </div>
+            {connecting && (() => {
+              const fromNode = nodesWithLayout.find(n => n.id === connecting.fromId);
+              if (!fromNode) return null;
+              const { x: fromX, y: fromY } = getEdgePoints(fromNode, { x:0, y:0, w:0, h:0 }).fromCenter;
+              const { x: toX, y: toY } = screenToWorld(connecting.x, connecting.y);
+              const dx = toX - fromX;
+              const cx1 = fromX + dx * 0.3;
+              const cx2 = toX - dx * 0.3;
+              return (
+                  <path d={`M ${fromX} ${fromY} C ${cx1} ${fromY} ${cx2} ${toY} ${toX} ${toY}`} stroke="hsl(var(--primary))" strokeWidth={1.8} fill="none" />
+              );
+            })()}
+          </svg>
+          {nodesWithLayout.map((node) => (
+            <div
+              key={node.id}
+              className="absolute cursor-default"
+              style={{ left: node.x, top: node.y, width: node.w, height: "auto" }}
+              onPointerDown={(e) => startNodeDrag(e, node.id)}
+              onPointerUp={(e) => onReleaseConnect(e, node.id)}
+            >
+              <Card className={cn("shadow-lg border-2", selected === node.id ? "border-primary" : "border-border")}>
+                <CardHeader className="p-2 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
+                  <div className="flex items-center">
+                     <div
+                      className="w-3 h-3 rounded-full bg-background border cursor-pointer"
+                      onPointerDown={(e) => onStartConnect(e, node.id)}
+                      title="Drag to connect"
+                     />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                  {node.properties && Object.keys(node.properties).length > 0 && (
+                    <ul className="text-xs space-y-1">
+                      {Object.entries(node.properties).map(([key, value]) => (
+                        <li key={key} className="flex justify-between">
+                          <span className="text-muted-foreground">{key}:</span>
+                          <span className="font-medium truncate">{value}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ))}
         </div>
+      </div>
+      <div className="absolute top-4 left-4 z-10 flex gap-2">
+        <Button size="icon" onClick={handleAddNode}><Plus /></Button>
+        <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
+        <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
       </div>
     </div>
   );
 }
-
-    
