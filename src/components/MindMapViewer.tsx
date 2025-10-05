@@ -106,9 +106,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
 
   const nodesWithLayout = useMemo(() => {
     if (rootId) {
-      // This is not the global element view, so we don't render anything for now.
-      // This part can be built out to show other mind map types.
-      return [];
+        return [];
     }
     return globalElements.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
@@ -259,14 +257,14 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-    <div className="relative h-full w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
+    <div className="relative h-full w-full overflow-hidden bg-gray-900">
       <div
         ref={containerRef}
         className="canvas-bg absolute inset-0 touch-none"
         onPointerDown={onPointerDownBackground}
         onPointerMove={(e) => { onPointerMoveBackground(e); onMoveConnect(e); }}
         onPointerUp={onPointerUpBackground}
-        style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+        style={{ backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
       >
         <div
           className="absolute left-0 top-0"
