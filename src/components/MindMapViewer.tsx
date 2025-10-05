@@ -213,54 +213,7 @@ const InteractiveCanvas = ({ rootId }: { rootId: string }) => {
 
 // Main Component
 export function MindMapViewer({ defaultView, showControls = true, rootId = null }: MindMapViewerProps) {
-  if (rootId === "global_elements") {
-    return <InteractiveCanvas rootId={rootId} />;
-  }
-  
-  // This is a basic placeholder for the original mind map functionality.
-  // We'll need to build this out to fully restore the previous views.
-  const OriginalMindMapComponent = () => {
-    const { 
-        deepWorkDefinitions,
-        upskillDefinitions,
-        resources,
-        projects,
-        offerizationPlans,
-        productizationPlans,
-    } = useAuth();
-    
-    const [view, setView] = useState(defaultView || 'Offerization');
-
-    return (
-        <div className="p-4">
-            <h3 className="font-semibold text-lg">Original Mind Map (Restored)</h3>
-            <p className="text-sm text-muted-foreground">
-                This view shows the hierarchical structure of your skills, projects, and plans.
-            </p>
-            <div className="mt-4">
-                <Select value={view} onValueChange={setView}>
-                    <SelectTrigger className="w-[200px]">
-                        <SelectValue placeholder="Select a view..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="Strategic Overview">Strategic Overview</SelectItem>
-                        {/* Add other view options here */}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className="mt-4 border p-4 rounded-md bg-muted/20 min-h-[400px]">
-                {/* 
-                  Here you would implement the D3 or other library logic 
-                  to render the actual nodes and links based on the selected `view`
-                  and the data from the AuthContext.
-                */}
-                <p className="text-center text-muted-foreground">
-                    Rendering for '{view}' view would appear here.
-                </p>
-            </div>
-        </div>
-    );
-  };
-  
-  return <OriginalMindMapComponent />;
+    // For now, always render the interactive canvas, regardless of the rootId.
+    // This addresses the user's request to replace the placeholder.
+    return <InteractiveCanvas rootId={rootId || 'global_elements'} />;
 }
