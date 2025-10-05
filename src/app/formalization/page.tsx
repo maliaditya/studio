@@ -529,13 +529,11 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
     );
 };
 
-function formatTime(seconds: number): string {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-};
+interface FormalizationPageContentProps {
+    // Add any props if necessary, for now it uses context
+}
 
-function FormalizationPageContent() {
+const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => {
     const { 
         resources, 
         setResources, 
@@ -898,18 +896,22 @@ function FormalizationPageContent() {
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
-        const linkedOperationIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
-        const linkedElementIdsInComponents = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
-        const linkedComponentIdsInProperties = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
-        
-        const localElements = localData.elements || [];
+        const allLinkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
+        const allLinkedElementIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
+        const allLinkedComponentIdsInProps = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
+        const allLinkedComponentIdsInComps = new Set(fullFormalizationData.components.flatMap(c => c.linkedComponentIds || []));
+
         const globalElementIds = new Set(globalElements.map(el => el.id));
-        const combinedElements = [...localElements, ...globalElements.filter(ge => !localElements.some(le => le.id === ge.id))];
+        const localElementIds = new Set((localData.elements || []).map(el => el.id));
+        const combinedElements = [
+            ...(localData.elements || []),
+            ...globalElements.filter(ge => !localElementIds.has(ge.id))
+        ];
 
         return {
-            elements: combinedElements.filter(el => !linkedElementIdsInComponents.has(el.id)),
-            operations: (localData.operations || []).filter(op => !linkedOperationIds.has(op.id)),
-            components: (localData.components || []).filter(c => !linkedComponentIdsInProperties.has(c.id)),
+            elements: combinedElements.filter(el => !allLinkedElementIds.has(el.id)),
+            operations: (localData.operations || []).filter(op => !allLinkedOpIds.has(op.id)),
+            components: (localData.components || []).filter(c => !allLinkedComponentIdsInProps.has(c.id) && !allLinkedComponentIdsInComps.has(c.id)),
         };
     }, [selectedResource, fullFormalizationData, globalElements]);
 
@@ -1065,9 +1067,16 @@ function FormalizationPageContent() {
                             <CardTitle className="capitalize">{title}</CardTitle>
                             <CardDescription className="text-xs">{description}</CardDescription>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
-                            <PlusCircle className="h-4 w-4 text-green-500"/>
-                        </Button>
+                        <div className="flex items-center">
+                            {type === 'elements' && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMindMapModalOpen(true)}>
+                                    <GitMerge className="h-4 w-4 text-purple-500" />
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
+                                <PlusCircle className="h-4 w-4 text-green-500"/>
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0 flex-grow min-h-0">
                         <ScrollArea className="h-full">
@@ -1320,4 +1329,5 @@ export default function FormalizationPage() {
 
 
     
+
 

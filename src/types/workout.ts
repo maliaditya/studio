@@ -431,6 +431,7 @@ export interface CanvasEdge {
   id: string;
   source: string; // definitionId of source node
   target: string; // definitionId of target node
+  label?: string;
 }
 
 export interface CanvasLayout {
