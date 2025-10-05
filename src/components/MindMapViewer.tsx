@@ -13,7 +13,15 @@ import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { node: any; selected: boolean; onReleaseConnect: (e: React.PointerEvent, nodeId: string) => void; onStartConnect: (e: React.PointerEvent, fromId: string) => void; }) {
+type Side = 'top' | 'right' | 'bottom' | 'left';
+
+
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { 
+    node: any; 
+    selected: boolean; 
+    onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
+    onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void; 
+}) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
@@ -21,25 +29,28 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { n
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
     } : undefined;
+    
+    const sides: Side[] = ['top', 'right', 'bottom', 'left'];
+
+    const getSideClass = (side: Side) => {
+        switch (side) {
+            case 'top': return 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2';
+            case 'bottom': return 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2';
+            case 'left': return 'left-0 top-1/2 -translate-y-1/2 -translate-x-1/2';
+            case 'right': return 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2';
+        }
+    };
 
     return (
         <div
             ref={setNodeRef}
             style={{ ...style, left: node.x, top: node.y, width: node.w, height: "auto" }}
             className="absolute cursor-default"
-            onPointerUp={(e) => onReleaseConnect(e, node.id)}
         >
             <div {...attributes} {...listeners}>
-              <Card className={cn("shadow-lg border-2", selected ? "border-primary" : "border-border")}>
+              <Card className={cn("shadow-lg border-2 relative", selected ? "border-primary" : "border-border")}>
                 <CardHeader className="p-2 flex flex-row items-center justify-between cursor-grab active:cursor-grabbing">
                   <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
-                  <div className="flex items-center">
-                     <div
-                      className="w-3 h-3 rounded-full bg-background border cursor-pointer"
-                      onPointerDown={(e) => onStartConnect(e, node.id)}
-                      title="Drag to connect"
-                     />
-                  </div>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
                   {node.properties && Object.keys(node.properties).length > 0 && (
@@ -53,17 +64,31 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { n
                     </ul>
                   )}
                 </CardContent>
+                {/* Connection points */}
+                {sides.map(side => (
+                    <div
+                        key={side}
+                        onPointerDown={(e) => onStartConnect(e, node.id, side)}
+                        onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
+                        className={cn(
+                            "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20",
+                            getSideClass(side)
+                        )}
+                        title={`Connect from ${side}`}
+                    />
+                ))}
               </Card>
             </div>
         </div>
     );
 }
 
-export function MindMapViewer() {
+export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, rootId?: string | null }) {
   const { 
     resources, 
     canvasLayout, setCanvasLayout, 
-    addGlobalElement, updateGlobalElement, deleteGlobalElement
+    addGlobalElement, updateGlobalElement, deleteGlobalElement,
+    deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes,
   } = useAuth();
   
   const globalElements = useMemo(() => {
@@ -74,12 +99,11 @@ export function MindMapViewer() {
   
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [selected, setSelected] = useState<string | null>(null);
-  const [connecting, setConnecting] = useState<{ fromId: string; x: number; y: number } | null>(null);
+  const [connecting, setConnecting] = useState<{ fromId: string; fromSide: Side; x: number; y: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPanning, setIsPanning] = useState(false);
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Combine elements with their layout info
   const nodesWithLayout = useMemo(() => {
     return globalElements.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
@@ -88,7 +112,7 @@ export function MindMapViewer() {
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
         w: layout?.width || 250,
-        h: layout?.height || 150,
+        h: layout?.height || 'auto',
       };
     });
   }, [globalElements, canvasLayout.nodes]);
@@ -127,12 +151,12 @@ export function MindMapViewer() {
     if (selected === nodeId) setSelected(null);
   };
 
-  const addEdge = (from: string, to: string) => {
+  const addEdge = (from: string, fromSide: Side, to: string, toSide: Side) => {
     if (from === to) return;
     const eid = id("e");
     setCanvasLayout(prev => ({
         ...prev,
-        edges: [...prev.edges, { id: eid, source: from, target: to, label: 'relates' }],
+        edges: [...prev.edges, { id: eid, source: from, fromSide, target: to, toSide, label: 'relates' }],
     }));
   };
 
@@ -186,30 +210,35 @@ export function MindMapViewer() {
   };
 
   // Connection handlers
-  const onStartConnect = (e: React.PointerEvent, fromId: string) => {
+  const onStartConnect = (e: React.PointerEvent, fromId: string, fromSide: Side) => {
     e.stopPropagation();
-    setConnecting({ fromId, x: e.clientX, y: e.clientY });
+    setConnecting({ fromId, fromSide, x: e.clientX, y: e.clientY });
   };
   const onMoveConnect = (e: React.PointerEvent) => {
     if (connecting) {
       setConnecting((c) => c && { ...c, x: e.clientX, y: e.clientY });
     }
   };
-  const onReleaseConnect = (e: React.PointerEvent, targetId: string) => {
+  const onReleaseConnect = (e: React.PointerEvent, targetId: string, toSide: Side) => {
     if (connecting) {
-      if (targetId && connecting.fromId !== targetId) addEdge(connecting.fromId, targetId);
+      if (targetId && connecting.fromId !== targetId) addEdge(connecting.fromId, connecting.fromSide, targetId, toSide);
       setConnecting(null);
     }
   };
 
   // Render helpers
   const screenToWorld = (x: number, y: number) => ({ x: (x - transform.x) / transform.k, y: (y - transform.y) / transform.k });
-
-  const getEdgePoints = (fromNode: any, toNode: any) => {
-    const fromCenter = { x: fromNode.x + fromNode.w / 2, y: fromNode.y + fromNode.h / 2 };
-    const toCenter = { x: toNode.x + toNode.w / 2, y: toNode.y + toNode.h / 2 };
-    return { fromCenter, toCenter };
+  
+  const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
+    switch(side) {
+        case 'top': return { x: node.x + node.w / 2, y: node.y };
+        case 'bottom': return { x: node.x + node.w / 2, y: node.y + node.h };
+        case 'left': return { x: node.x, y: node.y + node.h / 2 };
+        case 'right': return { x: node.x + node.w, y: node.y + node.h / 2 };
+        default: return { x: node.x + node.w / 2, y: node.y + node.h / 2 };
+    }
   };
+
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
@@ -232,27 +261,28 @@ export function MindMapViewer() {
               const toNode = nodesWithLayout.find(n => n.id === edge.target);
               if (!fromNode || !toNode) return null;
 
-              const { fromCenter, toCenter } = getEdgePoints(fromNode, toNode);
-              const dx = toCenter.x - fromCenter.x;
-              const cx1 = fromCenter.x + dx * 0.3;
-              const cx2 = toCenter.x - dx * 0.3;
+              const p1 = getNodeEdgePoint(fromNode, edge.fromSide);
+              const p2 = getNodeEdgePoint(toNode, edge.toSide);
+              const dx = p2.x - p1.x;
+              const cx1 = p1.x + dx * 0.4;
+              const cx2 = p2.x - dx * 0.4;
 
               return (
                 <g key={edge.id}>
-                  <path d={`M ${fromCenter.x} ${fromCenter.y} C ${cx1} ${fromCenter.y} ${cx2} ${toCenter.y} ${toCenter.x} ${toCenter.y}`} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} fill="none" />
+                  <path d={`M ${p1.x} ${p1.y} C ${cx1} ${p1.y} ${cx2} ${p2.y} ${p2.x} ${p2.y}`} stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} fill="none" />
                 </g>
               );
             })}
             {connecting && (() => {
               const fromNode = nodesWithLayout.find(n => n.id === connecting.fromId);
               if (!fromNode) return null;
-              const { x: fromX, y: fromY } = getEdgePoints(fromNode, { x:0, y:0, w:0, h:0 }).fromCenter;
+              const p1 = getNodeEdgePoint(fromNode, connecting.fromSide);
               const { x: toX, y: toY } = screenToWorld(connecting.x, connecting.y);
-              const dx = toX - fromX;
-              const cx1 = fromX + dx * 0.3;
-              const cx2 = toX - dx * 0.3;
+              const dx = toX - p1.x;
+              const cx1 = p1.x + dx * 0.4;
+              const cx2 = toX - dx * 0.4;
               return (
-                  <path d={`M ${fromX} ${fromY} C ${cx1} ${fromY} ${cx2} ${toY} ${toX} ${toY}`} stroke="hsl(var(--primary))" strokeWidth={1.8} fill="none" />
+                  <path d={`M ${p1.x} ${p1.y} C ${cx1} ${p1.y} ${cx2} ${toY} ${toX} ${toY}`} stroke="hsl(var(--primary))" strokeWidth={1.8} fill="none" />
               );
             })()}
           </svg>

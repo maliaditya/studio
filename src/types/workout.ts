@@ -420,6 +420,8 @@ export interface PopupState {
   z?: number;
 }
 
+export type Side = 'top' | 'right' | 'bottom' | 'left';
+
 // Canvas Types
 export interface CanvasNode {
   id: string; // This will be the definitionId
@@ -434,6 +436,8 @@ export interface CanvasEdge {
   source: string; // definitionId of source node
   target: string; // definitionId of target node
   label?: string;
+  fromSide: Side;
+  toSide: Side;
 }
 
 export interface CanvasLayout {
