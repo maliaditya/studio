@@ -867,41 +867,11 @@ function FormalizationPageContent() {
       };
     }, [selectedFormalizationSpecId, getSpecResources]);
 
-    const globalContextData = useMemo(() => {
+    const globalElements = useMemo(() => {
         const specResources = getSpecResources(selectedFormalizationSpecId);
-
-        const globalElements = specResources
+        return specResources
             .flatMap(res => res.formalization?.elements || [])
             .filter(el => el.isGlobal);
-
-        const allCompsMap = new Map<string, FormalizationItem>();
-        specResources.forEach(r => {
-            (r.formalization?.components || []).forEach(c => allCompsMap.set(c.id, c));
-        });
-        
-        const globalComponentsSet = new Set<FormalizationItem>();
-        const queue = globalElements.flatMap(el => Object.values(el.properties || {})).filter(id => allCompsMap.has(id));
-        const visited = new Set<string>(queue);
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
-            const component = allCompsMap.get(currentId);
-            if (component) {
-                globalComponentsSet.add(component);
-                (component.linkedComponentIds || []).forEach(childId => {
-                    if (!visited.has(childId)) {
-                        queue.push(childId);
-                        visited.add(childId);
-                    }
-                });
-            }
-        }
-        
-        return {
-            elements: globalElements,
-            components: Array.from(globalComponentsSet),
-            operations: [],
-        };
     }, [selectedFormalizationSpecId, getSpecResources]);
 
     const itemsToDisplay = useMemo(() => {
@@ -909,20 +879,26 @@ function FormalizationPageContent() {
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
-        const linkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
-        const linkedElIds = new Set(fullFormalizationData.components.flatMap(el => el.linkedElementIds || []));
+        const allLinkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
+        const allLinkedElIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
+    
+        const localAndGlobalElements = [
+            ...(localData.elements || []),
+            ...globalElements,
+        ];
 
-        const items = {
-            elements: [...localData.elements, ...globalContextData.elements].filter(el => !linkedElIds.has(el.id)),
-            operations: fullFormalizationData.operations.filter(op => !linkedOpIds.has(op.id)),
-            components: [...localData.components, ...globalContextData.components],
+        const finalElements = Array.from(new Map(localAndGlobalElements.map(item => [item.id, item])).values())
+            .filter(el => !allLinkedElIds.has(el.id));
+            
+        const finalOperations = (localData.operations || []).filter(op => !allLinkedOpIds.has(op.id));
+        const finalComponents = localData.components || [];
+
+        return {
+            elements: finalElements,
+            operations: finalOperations,
+            components: finalComponents,
         };
-    
-        items.elements = Array.from(new Map(items.elements.map(item => [item.id, item])).values());
-        items.components = Array.from(new Map(items.components.map(item => [item.id, item])).values());
-    
-        return items;
-    }, [selectedResource, globalContextData, fullFormalizationData]);
+    }, [selectedResource, globalElements, fullFormalizationData]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1282,7 +1258,7 @@ function FormalizationPageContent() {
                     item={editingItem.item}
                     type={editingItem.type}
                     formalizationData={fullFormalizationData}
-                    globalContext={globalContextData}
+                    globalContext={globalElements}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                 />
