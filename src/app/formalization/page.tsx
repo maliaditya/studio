@@ -508,7 +508,6 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                     </CardContent>
                 </Card>
             </div>
-        </div>
     );
 };
 
