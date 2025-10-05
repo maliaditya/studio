@@ -2,6 +2,8 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CanvasNode, CanvasEdge } from "@/types/workout";
 
 // Obsidian-like Canvas Component for Next.js (single-file)
 // - Tailwind CSS classes used for styling (no imports required)
@@ -144,7 +146,7 @@ export function MindMapViewer() {
       const dx = (ev.clientX - lp.x) / transform.k;
       const dy = (ev.clientY - lp.y) / transform.k;
       lastPointerRef.current = { x: ev.clientX, y: ev.clientY };
-      updateNode(nodeId, (prev: any) => {}); // placeholder to keep reference
+      updateNode(nodeId, {}); // placeholder to keep reference
       setNodes((prev: any) => {
         const n = { ...prev.list[nodeId] };
         n.x += dx;
@@ -382,7 +384,7 @@ export function MindMapViewer() {
                     >
                       ↔
                     </div>
-                    <div className="text-xs text-gray-500">{n.id.slice(-4)}</div>
+                    <div className="text-xs text-gray-500">{n.id ? n.id.slice(-4) : ''}</div>
                   </div>
                 </div>
                 <div className="p-3 h-full overflow-auto">
@@ -419,3 +421,5 @@ export function MindMapViewer() {
     </div>
   );
 }
+
+    
