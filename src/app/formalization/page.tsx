@@ -884,31 +884,24 @@ function FormalizationPageContent() {
       };
     }, [selectedFormalizationSpecId, getSpecResources]);
 
-    const globalElements = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources
-            .flatMap(res => res.formalization?.elements || [])
-            .filter(el => el.isGlobal);
-    }, [selectedFormalizationSpecId, getSpecResources]);
-
     const itemsToDisplay = useMemo(() => {
         const localData = (isResource(selectedResource) && selectedResource?.formalization)
             ? selectedResource.formalization
             : { elements: [], operations: [], components: [] };
     
-        const localAndGlobalElements = [
-            ...(localData.elements || []),
-            ...globalElements,
-        ];
+        const globalElements = fullFormalizationData.elements.filter(el => el.isGlobal);
     
-        const finalElements = Array.from(new Map(localAndGlobalElements.map(item => [item.id, item])).values());
-        
+        // IDs of items that are already linked and should be hidden from main lists
+        const linkedOperationIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
+        const linkedInComponentElementIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
+        const linkedInPropertiesComponentIds = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
+    
         return {
-            elements: finalElements,
-            operations: localData.operations || [],
-            components: localData.components || [],
+            elements: [...(localData.elements || []), ...globalElements].filter(el => !linkedInComponentElementIds.has(el.id)),
+            operations: (localData.operations || []).filter(op => !linkedOperationIds.has(op.id)),
+            components: (localData.components || []).filter(c => !linkedInPropertiesComponentIds.has(c.id)),
         };
-    }, [selectedResource, globalElements]);
+    }, [selectedResource, fullFormalizationData]);
 
 
     const handleToggleCollapseAll = () => {
@@ -1268,7 +1261,7 @@ function FormalizationPageContent() {
                     item={editingItem.item}
                     type={editingItem.type}
                     formalizationData={fullFormalizationData}
-                    globalContext={globalElements}
+                    globalContext={{ elements: itemsToDisplay.elements.filter(el => el.isGlobal), operations: [], components: fullFormalizationData.components }}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                 />
@@ -1282,7 +1275,7 @@ function FormalizationPageContent() {
                     allOpsForSpec={allOpsForSpec}
                     onClose={closeComponentPopup}
                     onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
-                    onEditItem={setEditingItem}
+                    onEditItem={(item, type) => setEditingItem({ item, type })}
                 />
             ))}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
@@ -1313,3 +1306,4 @@ export default function FormalizationPage() {
     
 
     
+
