@@ -64,27 +64,16 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                             <li key={key} className="flex flex-col gap-1 items-start">
                                 <span className="text-muted-foreground font-medium text-xs">{key}:</span>
                                 {linkedComponent ? (
-                                    <Card
-                                        className="w-full bg-muted/50 cursor-pointer hover:ring-1 hover:ring-primary"
-                                        onClick={(e) => onOpenPopup(e, linkedComponent.id)}
+                                    <Badge
+                                        variant="secondary"
+                                        className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onOpenPopup(e, linkedComponent.id);
+                                        }}
                                     >
-                                        <CardHeader className="p-2">
-                                            <CardTitle className="text-xs font-semibold">{linkedComponent.text}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-2 pt-0">
-                                            {(linkedComponent.linkedElementIds && linkedComponent.linkedElementIds.length > 0) && (
-                                                <div className="mt-1">
-                                                    <p className="font-semibold text-xs text-muted-foreground">Elements:</p>
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {(linkedComponent.linkedElementIds || []).map(elId => {
-                                                            const el = globalElements.find(e => e.id === elId);
-                                                            return el ? <Badge key={elId} variant="outline">{el.text}</Badge> : null;
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
+                                        {linkedComponent.text}
+                                    </Badge>
                                 ) : (
                                     <span className="font-medium text-right truncate text-foreground self-end">{value as string}</span>
                                 )}
@@ -200,7 +189,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         h: layout?.height || 150,
       };
     });
-  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec]);
+  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec, setCanvasLayout]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
