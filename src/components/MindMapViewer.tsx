@@ -175,9 +175,9 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     });
   }, [setCanvasLayout]);
 
-  const handleAddNode = () => {
+  const handleAddNode = (x?: number, y?: number) => {
     const rect = containerRef.current!.getBoundingClientRect();
-    const center = screenToWorld(rect.width / 2, rect.height / 2);
+    const center = screenToWorld(x ?? rect.width / 2, y ?? rect.height / 2);
     const newNode = addGlobalElement("New Element", center.x, center.y);
     if(newNode) {
       setSelected(newNode.id);
@@ -226,6 +226,12 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   }, [transform]);
   
   const onPointerDownBackground = (e: React.PointerEvent) => {
+    if (e.button === 2) { // Right-click
+        e.preventDefault();
+        const { x, y } = screenToWorld(e.clientX, e.clientY);
+        handleAddNode(x, y);
+        return;
+    }
     if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains("canvas-bg")) return;
     setIsPanning(true);
     lastPointerRef.current = { x: e.clientX, y: e.clientY };
@@ -281,7 +287,13 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
 
   // Render helpers
-  const screenToWorld = (x: number, y: number) => ({ x: (x - transform.x) / transform.k, y: (y - transform.y) / transform.k });
+  const screenToWorld = (x: number, y: number) => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return {
+        x: (x - rect.left - transform.x) / transform.k,
+        y: (y - rect.top - transform.y) / transform.k,
+    };
+  };
   
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
     const nodeHeight = node.h || 150; // Use a default if height isn't set yet
@@ -371,8 +383,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       </div>
       {showControls && (
         <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <Button size="icon" onClick={handleAddNode}><Plus /></Button>
-            <Button size="icon" onClick={handleAddNewResourceCard}>New Card</Button>
+            <Button size="icon" onClick={() => handleAddNode()}><Plus /></Button>
+            <Button size="icon" onClick={() => handleAddNewResourceCard(null, { x: 0, y: 0 })}>New Card</Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
         </div>
