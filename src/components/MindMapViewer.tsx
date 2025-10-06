@@ -142,9 +142,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    if (rootId || !globalElements) {
-        return [];
-    }
+    if (rootId) return []; // Don't render global elements if a root is specified for hierarchy view
+    
     return globalElements.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
       return {
@@ -247,8 +246,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
 
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
-    const nodeHeight = node.h || 150;
-    const handleSize = 8;
+    const nodeElement = document.querySelector(`[data-node-id='${node.id}']`);
+    const nodeHeight = nodeElement ? nodeElement.clientHeight : (node.h || 150);
   
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y };
@@ -271,10 +270,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       }));
       setConnecting(null);
     } else {
-      const fromNode = nodesWithLayout.find(n => n.id === fromId);
-      if (!fromNode) return;
-      const startPoint = getNodeEdgePoint(fromNode, fromSide);
-      setConnecting({ fromId, fromSide, x: startPoint.x, y: startPoint.y });
+      const { x, y } = screenToWorld(e.clientX, e.clientY);
+      setConnecting({ fromId, fromSide, x, y });
     }
   };
   const onMoveConnect = (e: React.PointerEvent) => {
@@ -363,15 +360,16 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             })()}
           </svg>
           {nodesWithLayout.map((node) => (
-             <DraggableNode 
-                key={node.id} 
-                node={node} 
-                selected={selected === node.id} 
-                onReleaseConnect={onReleaseConnect} 
-                onStartConnect={onStartConnect}
-                onOpenPopup={(e, componentId) => openComponentPopup(componentId, e)}
-                globalElements={globalElements}
-             />
+             <div key={node.id} data-node-id={node.id}>
+                <DraggableNode 
+                    node={node} 
+                    selected={selected === node.id} 
+                    onReleaseConnect={onReleaseConnect} 
+                    onStartConnect={onStartConnect}
+                    onOpenPopup={(e, componentId) => openComponentPopup(componentId, e)}
+                    globalElements={globalElements}
+                />
+            </div>
           ))}
         </div>
       </div>
