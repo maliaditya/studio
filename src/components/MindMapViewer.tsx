@@ -369,4 +369,3 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
     </DndContext>
   );
 }
-

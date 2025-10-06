@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -273,6 +273,10 @@ interface AuthContextType {
   // Canvas
   canvasLayout: CanvasLayout;
   setCanvasLayout: React.Dispatch<React.SetStateAction<CanvasLayout>>;
+  allComponentsForSpec: FormalizationItem[];
+  addGlobalElement: (text: string, x: number, y: number) => FormalizationItem | undefined;
+  updateGlobalElement: (elementId: string, updates: Partial<FormalizationItem>) => void;
+  deleteGlobalElement: (elementId: string) => void;
 
   // Mindset
   mindsetCards: MindsetCard[];
@@ -3053,6 +3057,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [playbackRequest, openGeneralPopup]);
 
+  const allComponentsForSpec = useMemo(() => {
+    if (!selectedFormalizationSpecId) return [];
+    
+    const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
+    if (!spec) return [];
+
+    const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+
+    return resources.flatMap(res => 
+        (res.formalization?.components || []).filter(comp => {
+            const elIds = comp.linkedElementIds || [];
+            return (res.formalization?.elements || []).some(el => {
+                if (elIds.includes(el.id)) {
+                    // This is a rough check. A more robust way might be needed if elements can belong to multiple micro-skills.
+                    // Assuming an element's parent resource gives us context.
+                    const parentResource = resources.find(r => r.formalization?.elements.some(e => e.id === el.id));
+                    const parentUpskillTask = upskillDefinitions.find(u => u.linkedResourceIds?.includes(parentResource?.id || ''));
+                    if (parentUpskillTask) {
+                        return microSkillNames.has(parentUpskillTask.category);
+                    }
+                }
+                return false;
+            });
+        })
+    );
+  }, [selectedFormalizationSpecId, resources, coreSkills, upskillDefinitions]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -3115,7 +3146,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     swapWorkoutForDay,
-    canvasLayout, setCanvasLayout,
+    canvasLayout, setCanvasLayout, allComponentsForSpec,
+    addGlobalElement: () => undefined, updateGlobalElement: () => {}, deleteGlobalElement: () => {}, // Placeholder functions
     mindsetCards, setMindsetCards,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
@@ -3334,6 +3366,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
