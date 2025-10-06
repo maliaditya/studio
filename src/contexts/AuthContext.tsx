@@ -235,7 +235,7 @@ interface AuthContextType {
   openPillarPopup: (pillarName: string, event?: React.MouseEvent) => void;
   closePillarPopup: () => void;
   handlePillarPopupDragEnd: (event: DragEndEvent) => void;
-
+  
   // Habit Detail Popup
   habitDetailPopup: HabitDetailPopupState | null;
   openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
@@ -1948,7 +1948,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
         const popupWidth = hasMarkdown ? 1280 : 768;
         
-        let x, y, level, parentId;
+        let x, y, level, parentId, z;
 
         if (parentPopupState && parentRect) {
             level = parentPopupState.level + 1;
@@ -1960,6 +1960,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 x = parentRect.x - popupWidth - 20;
             }
             y = parentRect.y;
+            z = (parentPopupState.z || 80) + 1;
         } else {
             level = 0;
             parentId = undefined;
@@ -1967,10 +1968,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const screenHeight = window.innerHeight;
             x = event ? event.clientX : (screenWidth - popupWidth) / 2;
             y = event ? event.clientY : (screenHeight - 400) / 2;
+            z = 80;
         }
         
         newPopups.set(resourceId, { 
-            resourceId, level, x, y, parentId, width: popupWidth, z: 80 + level
+            resourceId, level, x, y, parentId, width: popupWidth, z
         });
         return newPopups;
     });
