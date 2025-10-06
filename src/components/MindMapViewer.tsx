@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
@@ -124,9 +125,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     allComponentsForSpec,
     openComponentPopup,
     selectedFormalizationSpecId,
-    resourceFolders,
-    setResourceFolders,
-    setResources,
     handleAddNewResourceCard,
   } = useAuth();
   
@@ -175,15 +173,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     });
   }, [setCanvasLayout]);
 
-  const handleAddNode = (x?: number, y?: number) => {
-    const rect = containerRef.current!.getBoundingClientRect();
-    const center = screenToWorld(x ?? rect.width / 2, y ?? rect.height / 2);
-    const newNode = addGlobalElement("New Element", center.x, center.y);
-    if(newNode) {
-      setSelected(newNode.id);
-    }
-  };
-
   const handleRemoveNode = (nodeId: string) => {
     deleteGlobalElement(nodeId);
     setCanvasLayout(prev => ({
@@ -226,10 +215,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   }, [transform]);
   
   const onPointerDownBackground = (e: React.PointerEvent) => {
-    if (e.button === 2) { // Right-click
+    if (e.button === 2) {
         e.preventDefault();
         const { x, y } = screenToWorld(e.clientX, e.clientY);
-        handleAddNode(x, y);
+        handleAddNewResourceCard(null, {x, y});
         return;
     }
     if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains("canvas-bg")) return;
@@ -383,7 +372,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       </div>
       {showControls && (
         <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <Button size="icon" onClick={() => handleAddNode()}><Plus /></Button>
+            <Button size="icon" onClick={() => addGlobalElement("New Element", 0, 0)}><Plus /></Button>
             <Button size="icon" onClick={() => handleAddNewResourceCard(null, { x: 0, y: 0 })}>New Card</Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>

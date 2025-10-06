@@ -273,10 +273,12 @@ interface AuthContextType {
   // Canvas
   canvasLayout: CanvasLayout;
   setCanvasLayout: React.Dispatch<React.SetStateAction<CanvasLayout>>;
+  globalElements: FormalizationItem[];
   allComponentsForSpec: FormalizationItem[];
   addGlobalElement: (text: string, x: number, y: number) => FormalizationItem | undefined;
   updateGlobalElement: (elementId: string, updates: Partial<FormalizationItem>) => void;
   deleteGlobalElement: (elementId: string) => void;
+  handleAddNewResourceCard: (folderId: string | null, position: { x: number; y: number; }) => Resource | undefined;
 
   // Mindset
   mindsetCards: MindsetCard[];
@@ -2678,6 +2680,127 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [coreSkills]);
 
   const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
+  
+  const addGlobalElement = useCallback((text: string, x: number, y: number): FormalizationItem | undefined => {
+    if (!selectedFormalizationSpecId) {
+      toast({
+        title: "No Specialization Selected",
+        description: "Please select a specialization in the Formalization page before adding elements.",
+        variant: "destructive",
+      });
+      return undefined;
+    }
+    
+    const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
+    if (!spec) return undefined;
+    
+    const elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === spec.id);
+    let elementsFolderId = elementsFolder?.id;
+
+    if (!elementsFolderId) {
+        const newFolder: ResourceFolder = { id: `folder_elements_${spec.id}`, name: 'Elements', parentId: spec.id, icon: 'Database' };
+        setResourceFolders(prev => [...prev, newFolder]);
+        elementsFolderId = newFolder.id;
+    }
+    
+    const newElement: FormalizationItem = { id: id("el"), text: text.trim(), isGlobal: true };
+    const newResource: Resource = {
+        id: id("res"),
+        name: newElement.text,
+        folderId: elementsFolderId,
+        type: 'card',
+        createdAt: new Date().toISOString(),
+        formalization: { elements: [newElement], operations: [], components: [] }
+    };
+
+    setResources(prev => [...prev, newResource]);
+    setCanvasLayout(prev => ({
+        ...prev,
+        nodes: [...prev.nodes, { id: newElement.id, x: x, y: y, width: 384, height: 150 }]
+    }));
+    
+    return newElement;
+  }, [selectedFormalizationSpecId, coreSkills, resourceFolders, setResourceFolders, setResources, setCanvasLayout, toast]);
+
+  const updateGlobalElement = useCallback((elementId: string, updates: Partial<FormalizationItem>) => {
+    setResources(prev => prev.map(res => {
+        if (res.formalization?.elements.some(el => el.id === elementId)) {
+            return {
+                ...res,
+                formalization: {
+                    ...res.formalization,
+                    elements: res.formalization.elements.map(el => el.id === elementId ? { ...el, ...updates } : el)
+                }
+            };
+        }
+        return res;
+    }));
+  }, [setResources]);
+  
+  const deleteGlobalElement = useCallback((elementId: string) => {
+    setResources(prev => prev.map(res => {
+        if (res.formalization?.elements.some(el => el.id === elementId)) {
+            return {
+                ...res,
+                formalization: {
+                    ...res.formalization,
+                    elements: res.formalization.elements.filter(el => el.id !== elementId)
+                }
+            };
+        }
+        return res;
+    }));
+  }, [setResources]);
+  
+  const handleAddNewResourceCard = useCallback((folderId: string | null, position: { x: number; y: number; }) => {
+    let targetFolderId = folderId;
+
+    if (!targetFolderId) {
+      if (selectedFormalizationSpecId) {
+        const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
+        if (spec) {
+          const elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === spec.id);
+          targetFolderId = elementsFolder?.id || null;
+
+          if (!elementsFolder) {
+            const newFolder: ResourceFolder = { id: `folder_elements_${spec.id}`, name: 'Elements', parentId: spec.id, icon: 'Database' };
+            setResourceFolders(prev => [...prev, newFolder]);
+            targetFolderId = newFolder.id;
+          }
+        }
+      }
+    }
+    
+    if (!targetFolderId) {
+        toast({ title: 'Error', description: 'Cannot create card without a folder context.', variant: 'destructive'});
+        return;
+    }
+
+    const newResource: Resource = {
+      id: id("res"),
+      name: "New Card",
+      folderId: targetFolderId,
+      type: 'card',
+      createdAt: new Date().toISOString(),
+    };
+    
+    setResources(prev => [...prev, newResource]);
+    
+    const newNode: CanvasNode = {
+      id: newResource.id,
+      x: position.x,
+      y: position.y,
+      width: 384,
+      height: 150,
+    };
+    
+    setCanvasLayout(prev => ({
+        ...prev,
+        nodes: [...prev.nodes, newNode]
+    }));
+    
+    return newResource;
+  }, [selectedFormalizationSpecId, coreSkills, resourceFolders, setResourceFolders, setResources, setCanvasLayout, toast]);
 
   const addPillarCard = () => {
     const newCard: PillarCardData = {
@@ -3057,6 +3180,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [playbackRequest, openGeneralPopup]);
 
+  const globalElements = useMemo(() => {
+    return resources
+      .flatMap(r => r.formalization?.elements || [])
+      .filter(el => el.isGlobal);
+  }, [resources]);
+
   const allComponentsForSpec = useMemo(() => {
     if (!selectedFormalizationSpecId) return [];
     
@@ -3146,8 +3275,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logWorkoutSet, updateWorkoutSet, deleteWorkoutSet, removeExerciseFromWorkout,
     swapWorkoutExercise,
     swapWorkoutForDay,
-    canvasLayout, setCanvasLayout, allComponentsForSpec,
-    addGlobalElement: () => undefined, updateGlobalElement: () => {}, deleteGlobalElement: () => {}, // Placeholder functions
+    canvasLayout, setCanvasLayout, globalElements, allComponentsForSpec,
+    addGlobalElement, updateGlobalElement, deleteGlobalElement, handleAddNewResourceCard,
     mindsetCards, setMindsetCards,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
@@ -3355,19 +3484,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
-
-
-
-
-
-
-
-
-
-
-    
-
-
-
-
-
