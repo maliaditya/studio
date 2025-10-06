@@ -49,6 +49,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globa
             ref={setNodeRef}
             style={{ ...style, left: node.x, top: node.y, width: node.w, height: "auto" }}
             className="absolute"
+            data-node-id={node.id}
         >
             <div {...attributes} {...listeners}>
               <Card className={cn("shadow-lg border-2 relative group", selected ? "border-primary" : "border-border")}>
@@ -69,7 +70,11 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globa
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    openComponentPopup(linkedComponent.id, e as any);
+                                                    if (typeof openComponentPopup === 'function') {
+                                                        openComponentPopup(linkedComponent.id, e as any);
+                                                    } else {
+                                                        console.warn('openComponentPopup not a function (or not provided).', { openComponentPopup, linkedComponentId: linkedComponent.id });
+                                                    }
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -409,16 +414,15 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             })()}
           </svg>
           {nodesWithLayout.map((node) => (
-             <div key={node.id} data-node-id={node.id}>
-                <DraggableNode 
-                    node={node} 
-                    selected={selected === node.id} 
-                    onReleaseConnect={onReleaseConnect} 
-                    onStartConnect={onStartConnect}
-                    globalElements={globalElements}
-                    openComponentPopup={openComponentPopup}
-                />
-            </div>
+            <DraggableNode 
+                key={node.id} 
+                node={node} 
+                selected={selected === node.id} 
+                onReleaseConnect={onReleaseConnect} 
+                onStartConnect={onStartConnect}
+                globalElements={globalElements}
+                openComponentPopup={openComponentPopup}
+            />
           ))}
         </div>
       </div>
