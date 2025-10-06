@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
@@ -250,7 +249,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   // Connection handlers
   const onStartConnect = (e: React.PointerEvent, fromId: string, fromSide: Side) => {
     e.stopPropagation();
-
     const existingEdge = edges.find(edge => edge.source === fromId && edge.fromSide === fromSide);
 
     if (existingEdge) {
@@ -260,12 +258,14 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       }));
       setConnecting(null);
     } else {
-      setConnecting({ fromId, fromSide, x: e.clientX, y: e.clientY });
+      const { x, y } = screenToWorld(e.clientX, e.clientY);
+      setConnecting({ fromId, fromSide, x, y });
     }
   };
   const onMoveConnect = (e: React.PointerEvent) => {
     if (connecting) {
-      setConnecting((c) => c && { ...c, x: e.clientX, y: e.clientY });
+      const { x, y } = screenToWorld(e.clientX, e.clientY);
+      setConnecting((c) => c && { ...c, x, y });
     }
   };
   const onReleaseConnect = (e: React.PointerEvent, targetId: string, toSide: Side) => {
@@ -277,7 +277,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
   // Render helpers
   const screenToWorld = (x: number, y: number) => {
-    const rect = containerRef.current!.getBoundingClientRect();
+    if (!containerRef.current) return {x: 0, y: 0};
+    const rect = containerRef.current.getBoundingClientRect();
     return {
         x: (x - rect.left - transform.x) / transform.k,
         y: (y - rect.top - transform.y) / transform.k,
@@ -286,7 +287,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
     const nodeHeight = node.h || 150;
-    const handleSize = 6; // Half the size of the handle (12px / 2)
+    const handleSize = 0; // The line should go to the center of the handle
   
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y - handleSize };
@@ -342,10 +343,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
               );
             })}
             {connecting && (() => {
-              const fromNode = nodesWithLayout.find(n => n.id === connecting.fromId);
-              if (!fromNode) return null;
-              const p1 = getNodeEdgePoint(fromNode, connecting.fromSide);
-              const { x: toX, y: toY } = screenToWorld(connecting.x, connecting.y);
+              const p1Node = nodesWithLayout.find(n => n.id === connecting.fromId);
+              if (!p1Node) return null;
+              const p1 = getNodeEdgePoint(p1Node, connecting.fromSide);
+              const { x: toX, y: toY } = connecting;
 
               const CUBIC_OFFSET = 80;
               let cp1 = { ...p1 };
@@ -375,7 +376,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       {showControls && (
         <>
           <div className="absolute top-4 left-4 z-10 flex gap-2">
-            <Button size="icon" onClick={() => addGlobalElement("New Element", 0, 0)}><Plus /></Button>
+            <Button size="icon" onClick={() => {
+                const {x, y} = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+                addGlobalElement("New Element", x, y);
+            }}><Plus /></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
           </div>
