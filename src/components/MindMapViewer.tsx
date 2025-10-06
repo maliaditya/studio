@@ -16,13 +16,14 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap, openComponentPopup }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
     allComponentsMap: Map<string, FormalizationItem>;
+    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -69,7 +70,11 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    addNodeForComponent(linkedComponent.id, node.id);
+                                                    if (typeof openComponentPopup === 'function') {
+                                                        openComponentPopup(linkedComponent.id, e as any);
+                                                    } else {
+                                                        console.warn('openComponentPopup not a function');
+                                                    }
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -116,17 +121,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     resources, 
     canvasLayout, setCanvasLayout, 
     addGlobalElement, updateGlobalElement, deleteGlobalElement,
-    allComponentsForSpec,
-    selectedFormalizationSpecId,
-    handleAddNewResourceCard,
+    openPillarPopup: openComponentPopup,
   } = useAuth();
-  
-  const globalElements = useMemo(() => {
-    if (!resources) return [];
-    return resources
-      .flatMap(r => r.formalization?.elements || [])
-      .filter(el => el.isGlobal);
-  }, [resources]);
   
   const allComponentsMap = useMemo(() => {
       const map = new Map<string, FormalizationItem>();
@@ -136,6 +132,14 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       });
       return map;
   }, [resources]);
+
+  const globalElements = useMemo(() => {
+    if (!resources) return [];
+    return resources
+      .flatMap(r => r.formalization?.elements || [])
+      .filter(el => el.isGlobal);
+  }, [resources]);
+  
 
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [selected, setSelected] = useState<string | null>(null);
@@ -163,7 +167,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
             if (element.properties) {
                 Object.values(element.properties).forEach((value, index) => {
-                    const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                    const linkedComponent = Array.from(allComponentsMap.values()).find(c => c.id === value);
                     if (linkedComponent && linkedComponent.linkedElementIds) {
                         linkedComponent.linkedElementIds.forEach((childElementId, childIndex) => {
                             buildHierarchy(childElementId, x + 450, y + (index * 200) + (childIndex * 150));
@@ -190,7 +194,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         h: layout?.height || 150,
       };
     });
-  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec]);
+  }, [globalElements, canvasLayout.nodes, rootId, allComponentsMap]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
@@ -233,7 +237,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     setCanvasLayout(prevLayout => {
         const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId);
         if (!sourceNode) return prevLayout;
-
+        
         const currentNodesMap = new Map(prevLayout.nodes.map(n => [n.id, n]));
         const newNodesToAdd: CanvasNode[] = [];
         const newEdgesToAdd: CanvasEdge[] = [];
@@ -293,7 +297,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     if (e.button === 2) {
         e.preventDefault();
         const { x, y } = screenToWorld(e.clientX, e.clientY);
-        handleAddNewResourceCard(null, {x, y});
+        addGlobalElement("New Element", x, y);
         return;
     }
     if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains("canvas-bg")) return;
@@ -449,6 +453,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
                 allComponentsMap={allComponentsMap}
+                openComponentPopup={openComponentPopup}
             />
           ))}
         </div>
@@ -462,12 +467,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             }}><Plus /></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
-          </div>
-          <div className="absolute top-4 right-4 z-10">
-            <Button onClick={() => {
-                const {x, y} = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
-                handleAddNewResourceCard(null, { x, y });
-            }}>New Card</Button>
           </div>
         </>
       )}
