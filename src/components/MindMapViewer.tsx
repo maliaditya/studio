@@ -16,18 +16,17 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpenPopup, globalElements }: { 
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements }: { 
     node: any; 
     selected: boolean; 
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
-    onOpenPopup: (componentId: string, e: React.MouseEvent) => void;
     globalElements: FormalizationItem[];
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
-    const { allComponentsForSpec } = useAuth();
+    const { allComponentsForSpec, openComponentPopup } = useAuth();
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -70,7 +69,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                                 className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    onOpenPopup(linkedComponent.id, e as any);
+                                                    openComponentPopup(linkedComponent.id, e as any);
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -134,7 +133,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    let nodesToDisplay = rootId ? [] : globalElements;
+    let nodesToDisplay = globalElements;
     if (rootId) {
         const hierarchyNodes = new Map<string, any>();
         const hierarchyEdges: CanvasEdge[] = [];
@@ -407,7 +406,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                     selected={selected === node.id} 
                     onReleaseConnect={onReleaseConnect} 
                     onStartConnect={onStartConnect}
-                    onOpenPopup={openComponentPopup}
                     globalElements={globalElements}
                 />
             </div>
