@@ -58,7 +58,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                   {node.properties && Object.keys(node.properties).length > 0 && (
                     <ul className="text-xs space-y-1.5">
                       {Object.entries(node.properties).map(([key, value]) => {
-                        const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                        const linkedComponent = (allComponentsForSpec || []).find(c => c.id === value);
                         return (
                             <li key={key} className="flex justify-between items-center gap-2">
                                 <TooltipProvider>
