@@ -52,40 +52,42 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
         >
             <div {...attributes} {...listeners}>
               <Card className={cn("shadow-lg border-2 relative group", selected ? "border-primary" : "border-border")}>
-                <CardHeader className="p-2 flex flex-row items-center justify-between cursor-grab active:cursor-grabbing">
-                  <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 pt-0">
-                  {node.properties && Object.keys(node.properties).length > 0 && (
-                    <ul className="text-xs space-y-2">
-                      {Object.entries(node.properties).map(([key, value]) => {
-                        const linkedComponent = allComponentsForSpec.find(c => c.id === value);
-                        return (
-                            <li key={key} className="flex items-center justify-between gap-2">
-                                <span className="text-muted-foreground font-medium text-xs truncate">{key}:</span>
-                                {linkedComponent ? (
-                                    <Badge
-                                        variant="secondary"
-                                        className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
-                                        onPointerDown={(e) => {
-                                            e.stopPropagation();
-                                            onOpenPopup(e as any, linkedComponent.id);
-                                        }}
-                                        title={linkedComponent.text}
-                                    >
-                                        {linkedComponent.text}
-                                    </Badge>
-                                ) : (
-                                    <span className="font-medium text-right truncate text-foreground" title={value as string}>{value as string}</span>
-                                )}
-                            </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </CardContent>
+                <div className="relative z-10 bg-card rounded-lg">
+                    <CardHeader className="p-2 flex flex-row items-center justify-between cursor-grab active:cursor-grabbing">
+                        <CardTitle className="text-sm font-semibold truncate">{node.text}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 pt-0">
+                        {node.properties && Object.keys(node.properties).length > 0 && (
+                            <ul className="text-xs space-y-2">
+                            {Object.entries(node.properties).map(([key, value]) => {
+                                const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                                return (
+                                    <li key={key} className="flex items-center justify-between gap-2">
+                                        <span className="text-muted-foreground font-medium text-xs truncate">{key}:</span>
+                                        {linkedComponent ? (
+                                            <Badge
+                                                variant="secondary"
+                                                className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
+                                                onPointerDown={(e) => {
+                                                    e.stopPropagation();
+                                                    onOpenPopup(e as any, linkedComponent.id);
+                                                }}
+                                                title={linkedComponent.text}
+                                            >
+                                                {linkedComponent.text}
+                                            </Badge>
+                                        ) : (
+                                            <span className="font-medium text-right truncate text-foreground" title={value as string}>{value as string}</span>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                            </ul>
+                        )}
+                    </CardContent>
+                </div>
                 {/* Connection points */}
-                <div className="absolute inset-0 pointer-events-none group-hover:pointer-events-auto">
+                <div className="absolute inset-0 pointer-events-none group-hover:pointer-events-auto z-0">
                     {sides.map(side => (
                         <div
                             key={side}
@@ -132,7 +134,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    let nodesToDisplay = globalElements;
+    let nodesToDisplay = rootId ? [] : globalElements;
     if (rootId) {
         const hierarchyNodes = new Map<string, any>();
         const hierarchyEdges: CanvasEdge[] = [];
@@ -283,14 +285,19 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
     const nodeElement = document.querySelector(`[data-node-id='${node.id}']`);
-    const nodeHeight = nodeElement?.firstElementChild?.clientHeight || (node.h || 150);
+    const nodeHeight = nodeElement?.firstElementChild?.clientHeight || (node.h || 'auto');
+
+    let height = 150; // Default height
+    if (nodeHeight !== 'auto' && nodeHeight > 0) {
+        height = nodeHeight;
+    }
   
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y };
-        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight };
-        case 'left': return { x: node.x, y: node.y + nodeHeight / 2 };
-        case 'right': return { x: node.x + node.w, y: node.y + nodeHeight / 2 };
-        default: return { x: node.x + node.w / 2, y: node.y + nodeHeight / 2 };
+        case 'bottom': return { x: node.x + node.w / 2, y: node.y + height };
+        case 'left': return { x: node.x, y: node.y + height / 2 };
+        case 'right': return { x: node.x + node.w, y: node.y + height / 2 };
+        default: return { x: node.x + node.w / 2, y: node.y + height / 2 };
     }
   };
   
