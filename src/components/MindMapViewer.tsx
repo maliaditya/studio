@@ -102,7 +102,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                             onPointerDown={(e) => onStartConnect(e, node.id, side)}
                             onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
                             className={cn(
-                                "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto",
+                                "absolute w-4 h-4 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto",
                                 getSideClass(side)
                             )}
                             title={`Connect from ${side}`}
@@ -246,6 +246,19 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     }
   };
 
+  const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
+    const nodeHeight = node.h || 150;
+    const handleSize = 8;
+  
+    switch(side) {
+        case 'top': return { x: node.x + node.w / 2, y: node.y };
+        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight };
+        case 'left': return { x: node.x, y: node.y + nodeHeight / 2 };
+        case 'right': return { x: node.x + node.w, y: node.y + nodeHeight / 2 };
+        default: return { x: node.x + node.w / 2, y: node.y + nodeHeight / 2 };
+    }
+  };
+  
   // Connection handlers
   const onStartConnect = (e: React.PointerEvent, fromId: string, fromSide: Side) => {
     e.stopPropagation();
@@ -258,8 +271,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       }));
       setConnecting(null);
     } else {
-      const { x, y } = screenToWorld(e.clientX, e.clientY);
-      setConnecting({ fromId, fromSide, x, y });
+      const fromNode = nodesWithLayout.find(n => n.id === fromId);
+      if (!fromNode) return;
+      const startPoint = getNodeEdgePoint(fromNode, fromSide);
+      setConnecting({ fromId, fromSide, x: startPoint.x, y: startPoint.y });
     }
   };
   const onMoveConnect = (e: React.PointerEvent) => {
@@ -283,19 +298,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         x: (x - rect.left - transform.x) / transform.k,
         y: (y - rect.top - transform.y) / transform.k,
     };
-  };
-  
-  const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
-    const nodeHeight = node.h || 150;
-    const handleSize = 0; // The line should go to the center of the handle
-  
-    switch(side) {
-        case 'top': return { x: node.x + node.w / 2, y: node.y - handleSize };
-        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight + handleSize };
-        case 'left': return { x: node.x - handleSize, y: node.y + nodeHeight / 2 };
-        case 'right': return { x: node.x + node.w + handleSize, y: node.y + nodeHeight / 2 };
-        default: return { x: node.x + node.w / 2, y: node.y + nodeHeight / 2 };
-    }
   };
 
 
