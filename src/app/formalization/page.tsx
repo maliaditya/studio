@@ -918,7 +918,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
     const handleToggleCollapseAll = () => {
         const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
         if (collapsedCuriosities.size === allIds.size) {
-            setCollapsedCuriosities(new Set();
+            setCollapsedCuriosities(new Set());
         } else {
             setCollapsedCuriosities(allIds);
         }
