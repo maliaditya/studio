@@ -142,8 +142,54 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    if (rootId) return []; // Don't render global elements if a root is specified for hierarchy view
-    
+    if (rootId) {
+        const hierarchyNodes = new Map<string, any>();
+        const hierarchyEdges: CanvasEdge[] = [];
+        const visited = new Set<string>();
+
+        const buildHierarchy = (elementId: string, x: number, y: number, level: number) => {
+            if (visited.has(elementId)) return;
+            visited.add(elementId);
+
+            const element = globalElements.find(e => e.id === elementId);
+            if (!element) return;
+            
+            const layout = canvasLayout.nodes.find(n => n.id === element.id);
+
+            hierarchyNodes.set(elementId, {
+                ...element,
+                x: layout?.x ?? x,
+                y: layout?.y ?? y,
+                w: layout?.width || 384,
+                h: layout?.height || 'auto'
+            });
+
+            if (element.properties) {
+                Object.values(element.properties).forEach((value, index) => {
+                    const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                    if (linkedComponent && linkedComponent.linkedElementIds) {
+                        linkedComponent.linkedElementIds.forEach((childElementId, childIndex) => {
+                            hierarchyEdges.push({
+                                id: id('e'),
+                                source: elementId,
+                                fromSide: 'right',
+                                target: childElementId,
+                                toSide: 'left'
+                            });
+                            buildHierarchy(childElementId, x + 450, y + (index * 200) + (childIndex * 150), level + 1);
+                        });
+                    }
+                });
+            }
+        };
+
+        buildHierarchy(rootId, 50, 400, 0);
+
+        setCanvasLayout(prev => ({...prev, edges: hierarchyEdges}));
+
+        return Array.from(hierarchyNodes.values());
+    }
+
     return globalElements.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
       return {
@@ -154,7 +200,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         h: layout?.height || 150,
       };
     });
-  }, [globalElements, canvasLayout.nodes, rootId]);
+  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
@@ -247,7 +293,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
     const nodeElement = document.querySelector(`[data-node-id='${node.id}']`);
-    const nodeHeight = nodeElement ? nodeElement.clientHeight : (node.h || 150);
+    const nodeHeight = nodeElement?.firstElementChild?.clientHeight || (node.h || 150);
   
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y };
@@ -366,7 +412,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                     selected={selected === node.id} 
                     onReleaseConnect={onReleaseConnect} 
                     onStartConnect={onStartConnect}
-                    onOpenPopup={(e, componentId) => openComponentPopup(componentId, e)}
+                    onOpenPopup={openComponentPopup}
                     globalElements={globalElements}
                 />
             </div>
