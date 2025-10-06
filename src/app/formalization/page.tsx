@@ -262,25 +262,23 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Value or Link Component..." />
                                                     </SelectTrigger>
-                                                    <Select.Portal>
-                                                        <SelectContent position="popper">
-                                                            <Input
-                                                                className="m-2 w-[calc(100%-1rem)]"
-                                                                placeholder="Type a value..."
-                                                                defaultValue={prop.value}
-                                                                onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
-                                                            />
-                                                            <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                            <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
-                                                            {availableComponents.map(p => (
-                                                                <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                            ))}
-                                                            {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
-                                                            {(globalContext?.components || []).map(p => (
-                                                                <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select.Portal>
+                                                    <SelectContent position="popper">
+                                                        <Input
+                                                            className="m-2 w-[calc(100%-1rem)]"
+                                                            placeholder="Type a value..."
+                                                            defaultValue={prop.value}
+                                                            onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                        />
+                                                        <SelectItem value="--none--">-- Clear --</SelectItem>
+                                                        <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                                                        {availableComponents.map(p => (
+                                                            <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                        ))}
+                                                        {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                                                        {(globalContext?.components || []).map(p => (
+                                                            <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
                                                 </Select>
                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                           </div>
@@ -1397,6 +1395,9 @@ export default function FormalizationPage() {
 
 
     
+
+    
+
 
     
 
