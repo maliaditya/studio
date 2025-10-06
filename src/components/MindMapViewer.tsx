@@ -73,12 +73,25 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                         {linkedComponent.properties && Object.keys(linkedComponent.properties).length > 0 && (
                                             <CardContent className="p-2 pt-0">
                                                 <ul className="text-xs space-y-1">
-                                                    {Object.entries(linkedComponent.properties).map(([compKey, compValue]) => (
-                                                        <li key={compKey} className="flex justify-between items-center gap-1">
-                                                            <span className="text-muted-foreground truncate">{compKey}:</span>
-                                                            <span className="font-medium truncate">{compValue as string}</span>
-                                                        </li>
-                                                    ))}
+                                                    {Object.entries(linkedComponent.properties).map(([compKey, compValue]) => {
+                                                        const deeperLinkedComponent = allComponentsForSpec.find(c => c.id === compValue);
+                                                        return (
+                                                            <li key={compKey} className="flex justify-between items-center gap-1">
+                                                                <span className="text-muted-foreground truncate">{compKey}:</span>
+                                                                {deeperLinkedComponent ? (
+                                                                    <Badge
+                                                                        variant="secondary"
+                                                                        className="cursor-pointer hover:ring-1 hover:ring-primary font-normal"
+                                                                        onClick={(e) => { e.stopPropagation(); onOpenPopup(e, deeperLinkedComponent.id); }}
+                                                                    >
+                                                                        {deeperLinkedComponent.text}
+                                                                    </Badge>
+                                                                ) : (
+                                                                    <span className="font-medium truncate">{compValue as string}</span>
+                                                                )}
+                                                            </li>
+                                                        );
+                                                    })}
                                                 </ul>
                                             </CardContent>
                                         )}
@@ -146,7 +159,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         ...element,
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
-        w: layout?.width || 320, // Increased default width
+        w: layout?.width || 384, // Increased default width
         h: layout?.height || 150, // Approximate height for edge calculation
       };
     });
@@ -162,7 +175,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
             newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
             return { ...prev, nodes: newNodes };
         } else {
-            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 320, height: 150 }] };
+            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 384, height: 150 }] };
         }
     });
   }, [setCanvasLayout]);
