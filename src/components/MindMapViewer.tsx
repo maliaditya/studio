@@ -10,8 +10,6 @@ import { Plus, Maximize, Minus, Download, Upload, Database } from 'lucide-react'
 import { cn } from "@/lib/utils";
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { Badge } from "./ui/badge";
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/tooltip";
-
 
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -36,7 +34,6 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
       });
       return map;
     }, [resources]);
-
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -153,42 +150,20 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    let nodesToDisplay: FormalizationItem[] = [];
-
-    if (rootId) {
-        const hierarchyNodes = new Map<string, any>();
-        const visited = new Set<string>();
-
-        const buildHierarchy = (elementId: string, x: number, y: number) => {
-            if (visited.has(elementId)) return;
-            visited.add(elementId);
-
-            const element = globalElements.find(e => e.id === elementId);
-            if (!element) return;
-            
-            const layout = canvasLayout.nodes.find(n => n.id === element.id);
-            hierarchyNodes.set(elementId, { ...element, x: layout?.x ?? x, y: layout?.y ?? y, w: 384, h: 'auto' });
-
-            if (element.properties) {
-                Object.values(element.properties).forEach((value, index) => {
-                    const linkedComponent = Array.from(allComponentsMap.values()).find(c => c.id === value);
-                    if (linkedComponent && linkedComponent.linkedElementIds) {
-                        linkedComponent.linkedElementIds.forEach((childElementId, childIndex) => {
-                            buildHierarchy(childElementId, x + 450, y + (index * 200) + (childIndex * 150));
-                        });
-                    }
-                });
+    const allElementsOnCanvas = new Map<string, FormalizationItem>();
+    globalElements.forEach(el => allElementsOnCanvas.set(el.id, el));
+    
+    // Add elements from layout that might not be in the initial global list
+    canvasLayout.nodes.forEach(node => {
+        if (!allElementsOnCanvas.has(node.id)) {
+            const foundElement = resources.flatMap(r => r.formalization?.elements || []).find(el => el.id === node.id);
+            if (foundElement) {
+                allElementsOnCanvas.set(node.id, foundElement);
             }
-        };
-        buildHierarchy(rootId, 50, 400);
-        nodesToDisplay = Array.from(hierarchyNodes.values());
-    } else {
-        nodesToDisplay = globalElements;
-    }
+        }
+    });
 
-    if (!nodesToDisplay) return [];
-
-    return nodesToDisplay.map(element => {
+    return Array.from(allElementsOnCanvas.values()).map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
       return {
         ...element,
@@ -198,7 +173,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         h: layout?.height || 150,
       };
     });
-  }, [globalElements, canvasLayout.nodes, rootId, allComponentsMap]);
+  }, [globalElements, canvasLayout.nodes, resources]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
@@ -215,48 +190,35 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     });
   }, [setCanvasLayout]);
 
-  const handleRemoveNode = (nodeId: string) => {
-    deleteGlobalElement(nodeId);
-    setCanvasLayout(prev => ({
-      ...prev,
-      nodes: prev.nodes.filter(n => n.id !== nodeId),
-      edges: prev.edges.filter(e => e.source !== nodeId && e.target !== nodeId),
-    }));
-    if (selected === nodeId) setSelected(null);
-  };
-
-  const addEdge = (from: string, fromSide: Side, to: string, toSide: Side) => {
-    if (from === to) return;
-    const eid = id("e");
-    setCanvasLayout(prev => ({
-        ...prev,
-        edges: [...prev.edges, { id: eid, source: from, fromSide, target: to, toSide, label: 'relates' }],
-    }));
-  };
-  
   const addNodeForComponent = useCallback((componentId: string, sourceNodeId: string) => {
     const component = allComponentsMap.get(componentId);
     if (!component || !component.linkedElementIds) return;
-  
+
     setCanvasLayout(prevLayout => {
         const sourceNodeLayout = prevLayout.nodes.find(n => n.id === sourceNodeId);
         if (!sourceNodeLayout) return prevLayout;
-  
+
         const currentNodesMap = new Map(prevLayout.nodes.map(n => [n.id, n]));
-        const newNodesToAdd: CanvasNode[] = [];
-        const newEdgesToAdd: CanvasEdge[] = [];
         
         let yOffset = 0;
         const Y_SPACING = 180;
-  
+        const newNodeX = sourceNodeLayout.x + (sourceNodeLayout.width || 300) + 100;
+
+        const nodesToAdd: CanvasNode[] = [];
+        const edgesToAdd: CanvasEdge[] = [];
+
         component.linkedElementIds!.forEach(elementId => {
             if (!currentNodesMap.has(elementId)) {
-                const newNodeX = sourceNodeLayout.x + (sourceNodeLayout.width || 300) + 100;
-                const newNodeY = sourceNodeLayout.y + yOffset;
-                newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
+                nodesToAdd.push({
+                    id: elementId,
+                    x: newNodeX,
+                    y: sourceNodeLayout.y + yOffset,
+                    width: 300,
+                    height: 150
+                });
                 yOffset += Y_SPACING;
             }
-            newEdgesToAdd.push({
+            edgesToAdd.push({
                 id: id('e'),
                 source: sourceNodeId,
                 fromSide: 'right',
@@ -265,20 +227,17 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 label: 'contains'
             });
         });
-  
-        if (newNodesToAdd.length === 0 && newEdgesToAdd.length === 0) {
-            if (newEdgesToAdd.length > 0) {
-                return { ...prevLayout, edges: [...prevLayout.edges, ...newEdgesToAdd] };
-            }
-            return prevLayout;
-        }
-  
+        
+        // No change if all nodes already exist
+        if (nodesToAdd.length === 0) return prevLayout;
+
         return {
-            nodes: [...prevLayout.nodes, ...newNodesToAdd],
-            edges: [...prevLayout.edges, ...newEdgesToAdd],
+            nodes: [...prevLayout.nodes, ...nodesToAdd],
+            edges: [...prevLayout.edges, ...edgesToAdd],
         };
     });
 }, [allComponentsMap, setCanvasLayout]);
+
 
   // Panning and Zooming handlers
   useEffect(() => {
@@ -376,7 +335,13 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
   const onReleaseConnect = (e: React.PointerEvent, targetId: string, toSide: Side) => {
     if (connecting) {
-      if (targetId && connecting.fromId !== targetId) addEdge(connecting.fromId, connecting.fromSide, targetId, toSide);
+      if (targetId && connecting.fromId !== targetId) {
+         const eid = id("e");
+         setCanvasLayout(prev => ({
+             ...prev,
+             edges: [...prev.edges, { id: eid, source: connecting.fromId, fromSide: connecting.fromSide, target: targetId, toSide, label: 'relates' }],
+         }));
+      }
       setConnecting(null);
     }
   };
