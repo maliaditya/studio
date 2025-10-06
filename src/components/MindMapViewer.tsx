@@ -61,21 +61,22 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                       {Object.entries(node.properties).map(([key, value]) => {
                         const linkedComponent = allComponentsForSpec.find(c => c.id === value);
                         return (
-                            <li key={key} className="flex flex-col gap-1 items-start">
-                                <span className="text-muted-foreground font-medium text-xs">{key}:</span>
+                            <li key={key} className="flex items-center justify-between gap-2">
+                                <span className="text-muted-foreground font-medium text-xs truncate">{key}:</span>
                                 {linkedComponent ? (
                                     <Badge
                                         variant="secondary"
-                                        className="cursor-pointer hover:ring-1 hover:ring-primary"
+                                        className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onOpenPopup(e, linkedComponent.id);
                                         }}
+                                        title={linkedComponent.text}
                                     >
                                         {linkedComponent.text}
                                     </Badge>
                                 ) : (
-                                    <span className="font-medium text-right truncate text-foreground self-end">{value as string}</span>
+                                    <span className="font-medium text-right truncate text-foreground" title={value as string}>{value as string}</span>
                                 )}
                             </li>
                         );
@@ -131,6 +132,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
+    let nodesToDisplay = globalElements;
     if (rootId) {
         const hierarchyNodes = new Map<string, any>();
         const hierarchyEdges: CanvasEdge[] = [];
@@ -173,19 +175,25 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         };
 
         buildHierarchy(rootId, 50, 400, 0);
+        
+        // This is a side-effect in useMemo, which is not ideal, but for now it's here.
+        // A better solution would use a useEffect that depends on the calculated hierarchy.
+        if(hierarchyEdges.length > 0) {
+            setCanvasLayout(prev => ({...prev, edges: [...prev.edges, ...hierarchyEdges]}));
+        }
 
-        setCanvasLayout(prev => ({...prev, edges: hierarchyEdges}));
-
-        return Array.from(hierarchyNodes.values());
+        nodesToDisplay = Array.from(hierarchyNodes.values());
     }
 
-    return globalElements.map(element => {
+    if (!nodesToDisplay) return [];
+
+    return nodesToDisplay.map(element => {
       const layout = canvasLayout.nodes.find(n => n.id === element.id);
       return {
         ...element,
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
-        w: layout?.width || 384,
+        w: layout?.width || 300,
         h: layout?.height || 150,
       };
     });
@@ -201,7 +209,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
             return { ...prev, nodes: newNodes };
         } else {
-            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 384, height: 150 }] };
+            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 300, height: 150 }] };
         }
     });
   }, [setCanvasLayout]);
