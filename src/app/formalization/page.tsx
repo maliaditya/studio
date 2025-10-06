@@ -62,6 +62,12 @@ const isImageUrl = (url: string | undefined): boolean => {
     }
 };
 
+const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+};
+
 const CuriosityNode = ({
     item,
     level = 0,
@@ -916,10 +922,24 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
 
 
     const handleToggleCollapseAll = () => {
-        const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
-        if (collapsedCuriosities.size === allIds.size) {
+        const allIds = new Set(curiositiesForSpecialization.flatMap(c => {
+          const allChildren: string[] = [c.id];
+          const getChildren = (item: ExerciseDefinition) => {
+            (item.linkedUpskillIds || []).forEach(childId => {
+              const child = upskillDefinitions.find(d => d.id === childId);
+              if (child) {
+                allChildren.push(childId);
+                getChildren(child);
+              }
+            });
+          };
+          getChildren(c);
+          return allChildren;
+        }));
+        
+        if (collapsedCuriosities.size >= allIds.size) { // If all are collapsed, expand all
             setCollapsedCuriosities(new Set());
-        } else {
+        } else { // Otherwise, collapse all
             setCollapsedCuriosities(allIds);
         }
     };
