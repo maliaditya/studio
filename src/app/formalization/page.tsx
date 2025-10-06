@@ -1270,7 +1270,11 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                 collapsedIds={collapsedCuriosities}
                                                 onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
                                                     const newSet = new Set(prev);
-                                                    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                                                    if (newSet.has(id)) {
+                                                        newSet.delete(id);
+                                                    } else {
+                                                        newSet.add(id);
+                                                    }
                                                     return newSet;
                                                 })}
                                             />
