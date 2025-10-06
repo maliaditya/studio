@@ -96,7 +96,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globa
                         <div
                             key={side}
                             onPointerDown={(e) => onStartConnect(e, node.id, side)}
-                            onPointerUp={(e) => onReleaseConnect(e, node.id, toSide)}
+                            onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
                             className={cn(
                                 "absolute w-4 h-4 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto",
                                 getSideClass(side)
