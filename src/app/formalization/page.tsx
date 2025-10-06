@@ -255,34 +255,48 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                               <div className="space-y-3">
                                   <Label>Properties</Label>
                                   <div className="space-y-2">
-                                      {properties.map((prop) => (
+                                      {properties.map((prop) => {
+                                        const [popoverOpen, setPopoverOpen] = useState(false);
+                                        const linkedComponent = [...availableComponents, ...(globalContext?.components || [])].find(c => c.id === prop.value);
+                                        const displayValue = linkedComponent ? linkedComponent.text : prop.value;
+                                        return (
                                           <div key={prop.id} className="flex items-center gap-2">
                                               <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                               <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Value or Link Component..." />
-                                                    </SelectTrigger>
-                                                    <SelectContent position="popper">
+                                               <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-start font-normal truncate">
+                                                            {displayValue || <span className="text-muted-foreground">Set Value...</span>}
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" side="bottom" align="start">
                                                         <Input
                                                             className="m-2 w-[calc(100%-1rem)]"
                                                             placeholder="Type a value..."
                                                             defaultValue={prop.value}
-                                                            onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                            onBlur={(e) => {
+                                                                handlePropertyChange(prop.id, 'value', e.currentTarget.value);
+                                                                setPopoverOpen(false);
+                                                            }}
                                                         />
-                                                        <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                        <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
-                                                        {availableComponents.map(p => (
-                                                            <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                        ))}
-                                                        {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
-                                                        {(globalContext?.components || []).map(p => (
-                                                            <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                        <ScrollArea className="max-h-48">
+                                                            <div className="p-1">
+                                                                <Button variant="ghost" className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', ''); setPopoverOpen(false); }}>-- Clear --</Button>
+                                                                <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                                                                {availableComponents.map(p => (
+                                                                    <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
+                                                                ))}
+                                                                {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                                                                {(globalContext?.components || []).map(p => (
+                                                                    <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
+                                                                ))}
+                                                            </div>
+                                                        </ScrollArea>
+                                                    </PopoverContent>
+                                                </Popover>
                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                           </div>
-                                      ))}
+                                        )
+                                      })}
                                   </div>
                                   <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                               </div>
@@ -1140,7 +1154,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                     {Object.entries(item.properties).map(([key, value]) => {
                                                         const linkedComp = fullFormalizationData?.components?.find(c => c.id === value);
                                                         return (
-                                                            <div key={key} className="flex items-center justify-between gap-2">
+                                                            <div key={key} className="flex items-center justify-between gap-2 group/prop">
                                                                 <span className="font-medium text-foreground">{key}:</span>
                                                                 {linkedComp ? (
                                                                     <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary" onClick={(e) => openComponentPopup(linkedComp.id, e)}>
@@ -1151,7 +1165,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                                 ) : (
                                                                     <Popover>
                                                                         <PopoverTrigger asChild>
-                                                                            <Button variant="ghost" size="icon" className="h-6 w-6"><PlusCircle className="h-4 w-4" /></Button>
+                                                                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/prop:opacity-100"><PlusCircle className="h-4 w-4" /></Button>
                                                                         </PopoverTrigger>
                                                                         <PopoverContent className="w-56 p-0">
                                                                             <Select onValueChange={(val) => handleUpdateElementProperty(item.id, key, val)}>
@@ -1276,7 +1290,17 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
                                     <div className="flex">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.map(c => c.id)))}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.flatMap(c => {
+                                          const allChildren: string[] = [c.id];
+                                          const getChildren = (item: ExerciseDefinition) => {
+                                            (item.linkedUpskillIds || []).forEach(childId => {
+                                              const child = upskillDefinitions.find(d => d.id === childId);
+                                              if (child) { allChildren.push(childId); getChildren(child); }
+                                            });
+                                          };
+                                          getChildren(c);
+                                          return allChildren;
+                                        })))}>
                                             <ChevronsUp className="h-4 w-4" />
                                         </Button>
                                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
