@@ -72,7 +72,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                             <CardTitle className="text-xs font-semibold">{linkedComponent.text}</CardTitle>
                                         </CardHeader>
                                         <CardContent className="p-2 pt-0">
-                                            {linkedComponent.linkedElementIds && linkedComponent.linkedElementIds.length > 0 && (
+                                            {(linkedComponent.linkedElementIds && linkedComponent.linkedElementIds.length > 0) && (
                                                 <div className="mt-1">
                                                     <p className="font-semibold text-xs text-muted-foreground">Elements:</p>
                                                     <div className="flex flex-wrap gap-1 mt-1">
@@ -127,9 +127,11 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     resourceFolders,
     setResourceFolders,
     setResources,
+    handleAddNewResourceCard,
   } = useAuth();
   
   const globalElements = useMemo(() => {
+    if (!resources) return [];
     return resources
       .flatMap(r => r.formalization?.elements || [])
       .filter(el => el.isGlobal);
@@ -143,7 +145,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    if (rootId) {
+    if (rootId || !globalElements) {
         return [];
     }
     return globalElements.map(element => {
@@ -172,34 +174,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         }
     });
   }, [setCanvasLayout]);
-  
-  const handleAddNewResourceCard = () => {
-    if (!selectedFormalizationSpecId) return;
-
-    // Find or create 'Elements' folder under the current specialization
-    const specFolder = resourceFolders.find(f => f.name === selectedFormalizationSpecId && !f.parentId);
-    if (!specFolder) return;
-
-    let elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === specFolder.id);
-    if (!elementsFolder) {
-        elementsFolder = { id: `folder_elements_${specFolder.id}`, name: 'Elements', parentId: specFolder.id, icon: 'Folder' };
-        setResourceFolders(prev => [...prev, elementsFolder!]);
-    }
-
-    // Create the new resource card
-    const newCard: Resource = {
-        id: `res_card_${Date.now()}`,
-        name: "New Element Card",
-        folderId: elementsFolder.id,
-        type: 'card',
-        createdAt: new Date().toISOString(),
-        points: []
-    };
-    setResources(prev => [...prev, newCard]);
-
-    // Create a new global element linked to this resource card
-    addGlobalElement(`New Element ${nodesWithLayout.length + 1}`, 100, 100);
-  };
 
   const handleAddNode = () => {
     const rect = containerRef.current!.getBoundingClientRect();
