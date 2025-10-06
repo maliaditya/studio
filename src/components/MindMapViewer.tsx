@@ -16,13 +16,13 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, openComponentPopup }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, addNodeForComponent }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     globalElements: FormalizationItem[];
-    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
+    addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -70,11 +70,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globa
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    if (typeof openComponentPopup === 'function') {
-                                                        openComponentPopup(linkedComponent.id, e as any);
-                                                    } else {
-                                                        console.warn('openComponentPopup not a function (or not provided).', { openComponentPopup, linkedComponentId: linkedComponent.id });
-                                                    }
+                                                    addNodeForComponent(linkedComponent.id, node.id);
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -122,7 +118,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     canvasLayout, setCanvasLayout, 
     addGlobalElement, updateGlobalElement, deleteGlobalElement,
     allComponentsForSpec,
-    openComponentPopup,
     selectedFormalizationSpecId,
     handleAddNewResourceCard,
   } = useAuth();
@@ -238,6 +233,31 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         ...prev,
         edges: [...prev.edges, { id: eid, source: from, fromSide, target: to, toSide, label: 'relates' }],
     }));
+  };
+  
+  const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
+    const component = allComponentsForSpec.find(c => c.id === componentId);
+    if (!component) return;
+
+    const sourceNode = nodesWithLayout.find(n => n.id === sourceNodeId);
+    const sourceNodePosition = sourceNode ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w } : { x: 50, y: 50, w: 300 };
+
+    (component.linkedElementIds || []).forEach((elementId, index) => {
+        const element = globalElements.find(el => el.id === elementId);
+        if (!element) return;
+
+        const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
+        const newNodeY = sourceNodePosition.y + (index * 180);
+
+        setCanvasLayout(prev => {
+            const nodeExists = prev.nodes.some(n => n.id === element.id);
+            if (!nodeExists) {
+                const newNode: CanvasNode = { id: element.id, x: newNodeX, y: newNodeY, width: 300, height: 150 };
+                return { ...prev, nodes: [...prev.nodes, newNode] };
+            }
+            return prev;
+        });
+    });
   };
 
   // Panning and Zooming handlers
@@ -421,7 +441,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 globalElements={globalElements}
-                openComponentPopup={openComponentPopup}
+                addNodeForComponent={addNodeForComponent}
             />
           ))}
         </div>
