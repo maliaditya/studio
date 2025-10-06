@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -12,7 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, startOfToday } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -399,7 +398,7 @@ interface AuthContextType {
   recalculateAndFixTaskTypes: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 // Helper hook to get the previous value of a state or prop
 const usePrevious = <T,>(value: T) => {
@@ -409,6 +408,8 @@ const usePrevious = <T,>(value: T) => {
   });
   return ref.current;
 };
+
+const id = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
@@ -511,7 +512,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Resource Popups (Original system, kept for resources page)
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
   const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   
   // Intention Popups
   const [intentionPopups, setIntentionPopups] = useState<Map<string, PopupState>>(new Map());
@@ -2833,7 +2834,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const activeProjectIds = useMemo(() => {
     const activeIds = new Set<string>();
-    const today = startOfDay(new Date());
+    const today = startOfToday();
 
     (projects || []).forEach(project => {
         if (productizationPlans && productizationPlans[project.name]) {
@@ -2861,7 +2862,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newSchedule = { ...prev };
         for (const dateKey in newSchedule) {
             for (const slotName in newSchedule[dateKey]) {
-                const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                const activities = newSchedule[dateKey][slotName as SlotName] as Activity[] | undefined;
                 if (Array.isArray(activities)) {
                     const activityIndex = activities.findIndex(a => a.id === activityId);
                     if (activityIndex > -1) {
@@ -2883,7 +2884,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const newSchedule = { ...prev };
           for (const dateKey in newSchedule) {
               for (const slotName in newSchedule[dateKey]) {
-                  const activities = newSchedule[dateKey][slotName] as Activity[] | undefined;
+                  const activities = newSchedule[dateKey][slotName as SlotName] as Activity[] | undefined;
                   if (Array.isArray(activities)) {
                       const activityIndex = activities.findIndex(a => a.id === activityId);
                       if (activityIndex > -1) {
@@ -3119,6 +3120,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const globalElements = useMemo(() => {
+    if (!resources) return [];
+    return resources
+      .flatMap(r => r.formalization?.elements || [])
+      .filter(el => el.isGlobal);
+  }, [resources]);
+
+  const allComponentsForSpec = useMemo(() => {
+    if (!selectedFormalizationSpecId) return [];
+    const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
+    if (!spec) return [];
+    
+    const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+
+    return resources
+      .filter(r => {
+        const def = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.linkedResourceIds?.includes(r.id));
+        return def && microSkillNames.has(def.category);
+      })
+      .flatMap(r => r.formalization?.components || []);
+  }, [selectedFormalizationSpecId, coreSkills, resources, deepWorkDefinitions, upskillDefinitions]);
+
+
   useEffect(() => {
     if (isLoadingState || !currentUser) return;
   
@@ -3179,39 +3203,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       openGeneralPopup(playbackRequest.resourceId, null); 
     }
   }, [playbackRequest, openGeneralPopup]);
-
-  const globalElements = useMemo(() => {
-    return resources
-      .flatMap(r => r.formalization?.elements || [])
-      .filter(el => el.isGlobal);
-  }, [resources]);
-
-  const allComponentsForSpec = useMemo(() => {
-    if (!selectedFormalizationSpecId) return [];
-    
-    const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
-    if (!spec) return [];
-
-    const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
-
-    return resources.flatMap(res => 
-        (res.formalization?.components || []).filter(comp => {
-            const elIds = comp.linkedElementIds || [];
-            return (res.formalization?.elements || []).some(el => {
-                if (elIds.includes(el.id)) {
-                    // This is a rough check. A more robust way might be needed if elements can belong to multiple micro-skills.
-                    // Assuming an element's parent resource gives us context.
-                    const parentResource = resources.find(r => r.formalization?.elements.some(e => e.id === el.id));
-                    const parentUpskillTask = upskillDefinitions.find(u => u.linkedResourceIds?.includes(parentResource?.id || ''));
-                    if (parentUpskillTask) {
-                        return microSkillNames.has(parentUpskillTask.category);
-                    }
-                }
-                return false;
-            });
-        })
-    );
-  }, [selectedFormalizationSpecId, resources, coreSkills, upskillDefinitions]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -3484,3 +3475,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Snacks & Supplements",
 }
+    
+
+    
