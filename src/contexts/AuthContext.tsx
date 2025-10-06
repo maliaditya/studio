@@ -1961,13 +1961,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             y = parentRect.y;
             z = (parentPopupState.z || 80) + 1;
-        } else {
+        } else if (event) { // Check if event is not null
             level = 0;
             parentId = undefined;
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-            x = event ? event.clientX : (screenWidth - popupWidth) / 2;
-            y = event ? event.clientY : (screenHeight - 400) / 2;
+            x = event.clientX;
+            y = event.clientY;
+            z = 80;
+        } else { // Fallback if no event (e.g., from search)
+            level = 0;
+            parentId = undefined;
+            x = (window.innerWidth - popupWidth) / 2;
+            y = (window.innerHeight - 600) / 2; // Assume a default height
             z = 80;
         }
         
@@ -3480,3 +3486,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+

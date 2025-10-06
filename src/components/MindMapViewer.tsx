@@ -67,9 +67,9 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                     <Badge
                                         variant="secondary"
                                         className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
-                                        onClick={(e) => {
+                                        onPointerDown={(e) => {
                                             e.stopPropagation();
-                                            onOpenPopup(e, linkedComponent.id);
+                                            onOpenPopup(e as any, linkedComponent.id);
                                         }}
                                         title={linkedComponent.text}
                                     >
@@ -175,13 +175,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         };
 
         buildHierarchy(rootId, 50, 400, 0);
-        
-        // This is a side-effect in useMemo, which is not ideal, but for now it's here.
-        // A better solution would use a useEffect that depends on the calculated hierarchy.
-        if(hierarchyEdges.length > 0) {
-            setCanvasLayout(prev => ({...prev, edges: [...prev.edges, ...hierarchyEdges]}));
-        }
-
         nodesToDisplay = Array.from(hierarchyNodes.values());
     }
 
@@ -197,7 +190,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         h: layout?.height || 150,
       };
     });
-  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec, setCanvasLayout]);
+  }, [globalElements, canvasLayout.nodes, rootId, allComponentsForSpec]);
   
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
