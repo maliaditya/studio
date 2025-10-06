@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
@@ -27,6 +28,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { useDraggable, DndContext, type DragEndEvent } from '@dnd-kit/core';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -256,28 +258,30 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                                       {properties.map((prop) => (
                                           <div key={prop.id} className="flex items-center gap-2">
                                               <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                              <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
-                                                  <SelectTrigger>
-                                                      <SelectValue placeholder="Value or Link Component..." />
-                                                  </SelectTrigger>
-                                                  <SelectContent position="popper">
-                                                      <Input
-                                                        className="m-2 w-[calc(100%-1rem)]"
-                                                        placeholder="Type a value..."
-                                                        defaultValue={prop.value}
-                                                        onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
-                                                      />
-                                                      <SelectItem value="--none--">-- Clear --</SelectItem>
-                                                      <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
-                                                      {availableComponents.map(p => (
-                                                        <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                      ))}
-                                                      {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
-                                                      {(globalContext?.components || []).map(p => (
-                                                        <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
-                                                      ))}
-                                                  </SelectContent>
-                                              </Select>
+                                               <Select onValueChange={(val) => handleSelectChange(prop.id, val)} value={prop.value || ''}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Value or Link Component..." />
+                                                    </SelectTrigger>
+                                                    <Select.Portal>
+                                                        <SelectContent position="popper">
+                                                            <Input
+                                                                className="m-2 w-[calc(100%-1rem)]"
+                                                                placeholder="Type a value..."
+                                                                defaultValue={prop.value}
+                                                                onBlur={(e) => handlePropertyChange(prop.id, 'value', e.currentTarget.value)}
+                                                            />
+                                                            <SelectItem value="--none--">-- Clear --</SelectItem>
+                                                            <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                                                            {availableComponents.map(p => (
+                                                                <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                            ))}
+                                                            {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                                                            {(globalContext?.components || []).map(p => (
+                                                                <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select.Portal>
+                                                </Select>
                                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                           </div>
                                       ))}
@@ -943,6 +947,27 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
             setCollapsedCuriosities(allIds);
         }
     };
+
+    const handleUpdateElementProperty = (elementId: string, propertyKey: string, propertyValue: string) => {
+        if (!selectedResource || !isResource(selectedResource)) return;
+
+        const updatedFormalization = {
+            ...(selectedResource.formalization || { elements: [], operations: [], components: [] }),
+            elements: (selectedResource.formalization?.elements || []).map(el => {
+                if (el.id === elementId) {
+                    return {
+                        ...el,
+                        properties: {
+                            ...(el.properties || {}),
+                            [propertyKey]: propertyValue,
+                        },
+                    };
+                }
+                return el;
+            }),
+        };
+        updateResourceFormalization(selectedResource.id, updatedFormalization);
+    };
     
     const renderSelectedResource = () => {
         if (!selectedResource) {
@@ -1112,23 +1137,37 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                 <button className="font-semibold text-left w-full" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)}>{item.text}</button>
                                                 {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
                                             </div>
-                                            {type === 'elements' && item.properties && Object.keys(item.properties).length > 0 && (
+                                            {type === 'elements' && item.properties && (
                                                 <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                     {Object.entries(item.properties).map(([key, value]) => {
-                                                        const component = fullFormalizationData?.components?.find(p => p.id === value);
+                                                        const linkedComp = fullFormalizationData?.components?.find(c => c.id === value);
                                                         return (
-                                                            <div key={key} className="flex items-center gap-2">
+                                                            <div key={key} className="flex items-center justify-between gap-2">
                                                                 <span className="font-medium text-foreground">{key}:</span>
-                                                                {component ? (
-                                                                    <Badge
-                                                                    variant="secondary"
-                                                                    className="cursor-pointer hover:ring-1 hover:ring-primary"
-                                                                    onClick={(e) => openComponentPopup(component.id, e)}
-                                                                    >
-                                                                    {component.text}
+                                                                {linkedComp ? (
+                                                                    <Badge variant="secondary" className="cursor-pointer hover:ring-1 hover:ring-primary" onClick={(e) => openComponentPopup(linkedComp.id, e)}>
+                                                                        {linkedComp.text}
                                                                     </Badge>
+                                                                ) : value ? (
+                                                                    <span className="font-medium text-right truncate text-foreground">{value}</span>
                                                                 ) : (
-                                                                    String(value)
+                                                                    <Popover>
+                                                                        <PopoverTrigger asChild>
+                                                                            <Button variant="ghost" size="icon" className="h-6 w-6"><PlusCircle className="h-4 w-4" /></Button>
+                                                                        </PopoverTrigger>
+                                                                        <PopoverContent className="w-56 p-0">
+                                                                            <Select onValueChange={(val) => handleUpdateElementProperty(item.id, key, val)}>
+                                                                                <SelectTrigger className="border-0 focus:ring-0">
+                                                                                    <SelectValue placeholder="Link a component..." />
+                                                                                </SelectTrigger>
+                                                                                <SelectContent>
+                                                                                    {fullFormalizationData.components.map(p => (
+                                                                                        <SelectItem key={p.id} value={p.id}>{p.text}</SelectItem>
+                                                                                    ))}
+                                                                                </SelectContent>
+                                                                            </Select>
+                                                                        </PopoverContent>
+                                                                    </Popover>
                                                                 )}
                                                             </div>
                                                         );
