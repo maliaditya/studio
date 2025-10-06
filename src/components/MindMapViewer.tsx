@@ -16,17 +16,18 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements }: { 
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, openComponentPopup }: { 
     node: any; 
     selected: boolean; 
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     globalElements: FormalizationItem[];
+    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
-    const { allComponentsForSpec, openComponentPopup } = useAuth();
+    const { allComponentsForSpec } = useAuth();
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -64,17 +65,21 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globa
                                     <li key={key} className="flex items-center justify-between gap-2">
                                         <span className="text-muted-foreground font-medium text-xs truncate">{key}:</span>
                                         {linkedComponent ? (
-                                            <Badge
-                                                variant="secondary"
-                                                className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
+                                            <div
+                                                className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
                                                     openComponentPopup(linkedComponent.id, e as any);
                                                 }}
                                                 title={linkedComponent.text}
                                             >
-                                                {linkedComponent.text}
-                                            </Badge>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
+                                                >
+                                                    {linkedComponent.text}
+                                                </Badge>
+                                            </div>
                                         ) : (
                                             <span className="font-medium text-right truncate text-foreground" title={value as string}>{value as string}</span>
                                         )}
@@ -407,6 +412,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                     onReleaseConnect={onReleaseConnect} 
                     onStartConnect={onStartConnect}
                     globalElements={globalElements}
+                    openComponentPopup={openComponentPopup}
                 />
             </div>
           ))}
