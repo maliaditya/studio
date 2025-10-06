@@ -3,28 +3,30 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import type { CanvasNode, CanvasEdge, FormalizationItem } from "@/types/workout";
+import type { CanvasNode, CanvasEdge, FormalizationItem, Side } from "@/types/workout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { Badge } from "./ui/badge";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/tooltip";
+
 
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-type Side = 'top' | 'right' | 'bottom' | 'left';
-
-
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: { 
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpenPopup }: { 
     node: any; 
     selected: boolean; 
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
-    onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void; 
+    onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
+    onOpenPopup: (e: React.MouseEvent, componentId: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
+    const { allComponentsForSpec } = useAuth();
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -54,13 +56,41 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect }: {
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
                   {node.properties && Object.keys(node.properties).length > 0 && (
-                    <ul className="text-xs space-y-1">
-                      {Object.entries(node.properties).map(([key, value]) => (
-                        <li key={key} className="flex justify-between">
-                          <span className="text-muted-foreground">{key}:</span>
-                          <span className="font-medium truncate">{value as string}</span>
-                        </li>
-                      ))}
+                    <ul className="text-xs space-y-1.5">
+                      {Object.entries(node.properties).map(([key, value]) => {
+                        const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                        return (
+                            <li key={key} className="flex justify-between items-center gap-2">
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="text-muted-foreground truncate">{key}:</span>
+                                        </TooltipTrigger>
+                                        <TooltipContent><p>{key}</p></TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                                {linkedComponent ? (
+                                    <Badge
+                                        variant="secondary"
+                                        className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
+                                        onClick={(e) => onOpenPopup(e, linkedComponent.id)}
+                                        title={linkedComponent.text}
+                                    >
+                                        {linkedComponent.text}
+                                    </Badge>
+                                ) : (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <span className="font-medium text-right truncate">{value as string}</span>
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>{value as string}</p></TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                            </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </CardContent>
@@ -89,6 +119,8 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
     canvasLayout, setCanvasLayout, 
     addGlobalElement, updateGlobalElement, deleteGlobalElement,
     deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes,
+    allComponentsForSpec,
+    openComponentPopup,
   } = useAuth();
   
   const globalElements = useMemo(() => {
@@ -264,7 +296,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         onPointerDown={onPointerDownBackground}
         onPointerMove={(e) => { onPointerMoveBackground(e); onMoveConnect(e); }}
         onPointerUp={onPointerUpBackground}
-        style={{ backgroundImage: 'linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+        style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)', backgroundSize: '40px 40px' }}
       >
         <div
           className="absolute left-0 top-0"
@@ -323,6 +355,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
                 selected={selected === node.id} 
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
+                onOpenPopup={(e, componentId) => openComponentPopup(componentId, e)}
              />
           ))}
         </div>
@@ -336,3 +369,4 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
     </DndContext>
   );
 }
+
