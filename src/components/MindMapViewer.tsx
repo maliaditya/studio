@@ -116,7 +116,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     resources, 
     canvasLayout, setCanvasLayout, 
     addGlobalElement, updateGlobalElement, deleteGlobalElement,
-    deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes,
     allComponentsForSpec,
     openComponentPopup,
     selectedFormalizationSpecId,
@@ -138,7 +137,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    let nodesToDisplay = globalElements;
+    let nodesToDisplay: FormalizationItem[] = [];
+
     if (rootId) {
         const hierarchyNodes = new Map<string, any>();
         const hierarchyEdges: CanvasEdge[] = [];
@@ -182,7 +182,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
         buildHierarchy(rootId, 50, 400, 0);
         nodesToDisplay = Array.from(hierarchyNodes.values());
-    } else if (!rootId) {
+    } else {
         nodesToDisplay = globalElements;
     }
 
