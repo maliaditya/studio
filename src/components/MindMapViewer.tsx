@@ -182,7 +182,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
         buildHierarchy(rootId, 50, 400, 0);
         nodesToDisplay = Array.from(hierarchyNodes.values());
-    } else {
+    } else if (globalElements) {
         nodesToDisplay = globalElements;
     }
 
@@ -294,7 +294,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     const nodeElement = document.querySelector(`[data-node-id='${node.id}']`);
     let height = 150; // Default height
     if (nodeElement?.firstElementChild) {
-        height = nodeElement.firstElementChild.clientHeight;
+        const cs = getComputedStyle(nodeElement.firstElementChild);
+        height = parseFloat(cs.height);
     }
   
     switch(side) {
