@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { CanvasNode, CanvasEdge, FormalizationItem, Side, Resource } from "@/types/workout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
+import { Plus, Maximize, Minus, Download, Upload, Database } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { Badge } from "./ui/badge";
@@ -235,35 +235,48 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
   
   const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
-    const component = allComponentsForSpec.find(c => c.id === componentId);
-    if (!component) return;
+      const component = allComponentsForSpec.find(c => c.id === componentId);
+      if (!component) return;
   
-    const sourceNode = nodesWithLayout.find(n => n.id === sourceNodeId);
-    const sourceNodePosition = sourceNode
-      ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w }
-      : { x: 50, y: 50, w: 300 };
+      const sourceNode = nodesWithLayout.find(n => n.id === sourceNodeId);
+      const sourceNodePosition = sourceNode
+          ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w }
+          : { x: 50, y: 50, w: 300 };
   
-    const newNodes: CanvasNode[] = [];
-    (component.linkedElementIds || []).forEach((elementId, index) => {
-      const element = globalElements.find(el => el.id === elementId);
-      if (!element) return;
+      const newNodesToAdd: CanvasNode[] = [];
+      const newEdgesToAdd: CanvasEdge[] = [];
   
-      const nodeExists = nodesWithLayout.some(n => n.id === elementId) ||
-                         canvasLayout.nodes.some(n => n.id === elementId);
+      (component.linkedElementIds || []).forEach((elementId, index) => {
+          const element = globalElements.find(el => el.id === elementId);
+          if (!element) return;
   
-      if (!nodeExists) {
-        const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
-        const newNodeY = sourceNodePosition.y + (index * 180);
-        newNodes.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
-      }
-    });
+          const nodeExists = nodesWithLayout.some(n => n.id === elementId);
   
-    if (newNodes.length > 0) {
-        setCanvasLayout(prev => ({
-            ...prev,
-            nodes: [...prev.nodes, ...newNodes],
-        }));
-    }
+          if (!nodeExists) {
+              const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
+              const newNodeY = sourceNodePosition.y + (index * 200);
+              newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
+          }
+          
+          newEdgesToAdd.push({
+              id: id('e'),
+              source: sourceNodeId,
+              fromSide: 'right',
+              target: elementId,
+              toSide: 'left',
+              label: 'contains'
+          });
+      });
+  
+      setCanvasLayout(prev => {
+          const existingNodeIds = new Set(prev.nodes.map(n => n.id));
+          const finalNewNodes = newNodesToAdd.filter(n => !existingNodeIds.has(n.id));
+          
+          return {
+              nodes: [...prev.nodes, ...finalNewNodes],
+              edges: [...prev.edges, ...newEdgesToAdd],
+          };
+      });
   };
 
   // Panning and Zooming handlers
