@@ -16,14 +16,14 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap, openComponentPopup }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap, openGeneralPopup }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
     allComponentsMap: Map<string, FormalizationItem>;
-    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
+    openGeneralPopup: (componentId: string, event: React.MouseEvent) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -70,10 +70,10 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    if (typeof openComponentPopup === 'function') {
-                                                        openComponentPopup(linkedComponent.id, e as any);
+                                                    if (typeof openGeneralPopup === 'function') {
+                                                        openGeneralPopup(linkedComponent.id, e as any);
                                                     } else {
-                                                        console.warn('openComponentPopup not a function');
+                                                        console.warn('openGeneralPopup not a function (or not provided).', { openGeneralPopup, linkedComponentId: linkedComponent.id });
                                                     }
                                                 }}
                                                 title={linkedComponent.text}
@@ -121,7 +121,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     resources, 
     canvasLayout, setCanvasLayout, 
     addGlobalElement, updateGlobalElement, deleteGlobalElement,
-    openPillarPopup: openComponentPopup,
+    openGeneralPopup,
   } = useAuth();
   
   const allComponentsMap = useMemo(() => {
@@ -235,21 +235,19 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     if (!component || !component.linkedElementIds) return;
 
     setCanvasLayout(prevLayout => {
-        const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId);
-        if (!sourceNode) return prevLayout;
-        
+        const sourceNodeLayout = prevLayout.nodes.find(n => n.id === sourceNodeId);
+        if (!sourceNodeLayout) return prevLayout;
+
         const currentNodesMap = new Map(prevLayout.nodes.map(n => [n.id, n]));
         const newNodesToAdd: CanvasNode[] = [];
         const newEdgesToAdd: CanvasEdge[] = [];
 
         component.linkedElementIds!.forEach((elementId, index) => {
             if (!currentNodesMap.has(elementId)) {
-                // Stagger new nodes vertically
-                const newNodeX = sourceNode.x + (sourceNode.width || 300) + 100;
-                const newNodeY = sourceNode.y + (index * 180);
+                const newNodeX = sourceNodeLayout.x + (sourceNodeLayout.width || 300) + 100;
+                const newNodeY = sourceNodeLayout.y + (index * 180);
                 newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
             }
-            // Always add the edge
             newEdgesToAdd.push({
                 id: id('e'),
                 source: sourceNodeId,
@@ -261,7 +259,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         });
 
         if (newNodesToAdd.length === 0 && newEdgesToAdd.length === 0) {
-            return prevLayout; // No changes needed
+            return prevLayout;
         }
 
         return {
@@ -269,7 +267,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             edges: [...prevLayout.edges, ...newEdgesToAdd],
         };
     });
-  }, [allComponentsMap, setCanvasLayout]);
+}, [allComponentsMap, setCanvasLayout]);
 
   // Panning and Zooming handlers
   useEffect(() => {
@@ -453,7 +451,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
                 allComponentsMap={allComponentsMap}
-                openComponentPopup={openComponentPopup}
+                openGeneralPopup={openGeneralPopup}
             />
           ))}
         </div>
@@ -474,3 +472,5 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     </DndContext>
   );
 }
+
+    
