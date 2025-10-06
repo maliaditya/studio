@@ -16,10 +16,10 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, openComponentPopup }: { 
-    node: any; 
-    selected: boolean; 
-    onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, openComponentPopup }: {
+    node: any;
+    selected: boolean;
+    onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     globalElements: FormalizationItem[];
     openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
@@ -182,7 +182,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
         buildHierarchy(rootId, 50, 400, 0);
         nodesToDisplay = Array.from(hierarchyNodes.values());
+    } else if (!rootId) {
+        nodesToDisplay = globalElements;
     }
+
 
     if (!nodesToDisplay) return [];
 
