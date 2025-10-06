@@ -142,7 +142,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    // Only render nodes that are explicitly in the canvasLayout.nodes array.
+    // Render only nodes that are explicitly in the canvasLayout.nodes array.
     return canvasLayout.nodes
       .map(layoutNode => {
         const element = allElementsMap.get(layoutNode.id);
@@ -174,52 +174,63 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
   const addNodeForComponent = useCallback((componentId: string, sourceNodeId: string) => {
     setCanvasLayout(prevLayout => {
-        const component = allComponentsMap.get(componentId);
-        if (!component?.linkedElementIds) return prevLayout;
-
-        const sourceNodeLayout = prevLayout.nodes.find(n => n.id === sourceNodeId);
+      const component = allComponentsMap.get(componentId);
+      if (!component?.linkedElementIds) return prevLayout;
+  
+      const childElementIds = new Set(component.linkedElementIds);
+      const nodesOnCanvas = new Map(prevLayout.nodes.map(n => [n.id, n]));
+      
+      const alreadyOnCanvas = component.linkedElementIds.every(id => nodesOnCanvas.has(id));
+  
+      if (alreadyOnCanvas) {
+        // Collapse: Remove child nodes and their edges
+        const newNodes = prevLayout.nodes.filter(n => !childElementIds.has(n.id));
+        const newEdges = prevLayout.edges.filter(e => e.source !== sourceNodeId || !childElementIds.has(e.target));
+        return { ...prevLayout, nodes: newNodes, edges: newEdges };
+      } else {
+        // Expand: Add child nodes and edges
+        const sourceNodeLayout = nodesOnCanvas.get(sourceNodeId);
         if (!sourceNodeLayout) return prevLayout;
-
-        const currentNodesOnCanvas = new Map(prevLayout.nodes.map(n => [n.id, n]));
-        
+  
+        const nodesToAdd: CanvasNode[] = [];
+        const edgesToAdd: CanvasEdge[] = [];
         let yOffset = 0;
         const Y_SPACING = 180;
         const newNodeX = sourceNodeLayout.x + (sourceNodeLayout.width || 300) + 100;
-
-        const nodesToAdd: CanvasNode[] = [];
-        const edgesToAdd: CanvasEdge[] = [];
-
+  
         component.linkedElementIds.forEach(elementId => {
-            if (!currentNodesOnCanvas.has(elementId)) {
-                nodesToAdd.push({
-                    id: elementId,
-                    x: newNodeX,
-                    y: sourceNodeLayout.y + yOffset,
-                    width: 300,
-                    height: 150
-                });
-                yOffset += Y_SPACING;
-            }
-            
-            const edgeExists = prevLayout.edges.some(e => e.source === sourceNodeId && e.target === elementId);
-            if (!edgeExists) {
-                edgesToAdd.push({
-                    id: id('e'),
-                    source: sourceNodeId,
-                    fromSide: 'right',
-                    target: elementId,
-                    toSide: 'left',
-                    label: 'contains'
-                });
-            }
+          if (!nodesOnCanvas.has(elementId)) {
+            nodesToAdd.push({
+              id: elementId,
+              x: newNodeX,
+              y: sourceNodeLayout.y + yOffset,
+              width: 300,
+              height: 150
+            });
+            yOffset += Y_SPACING;
+          }
+          
+          const edgeExists = prevLayout.edges.some(e => e.source === sourceNodeId && e.target === elementId);
+          if (!edgeExists) {
+            edgesToAdd.push({
+              id: id('e'),
+              source: sourceNodeId,
+              fromSide: 'right',
+              target: elementId,
+              toSide: 'left',
+              label: 'contains'
+            });
+          }
         });
-
+        
         if (nodesToAdd.length === 0 && edgesToAdd.length === 0) return prevLayout;
 
         return {
-            nodes: [...prevLayout.nodes, ...nodesToAdd],
-            edges: [...prevLayout.edges, ...edgesToAdd],
+          ...prevLayout,
+          nodes: [...prevLayout.nodes, ...nodesToAdd],
+          edges: [...prevLayout.edges, ...edgesToAdd],
         };
+      }
     });
   }, [allComponentsMap, setCanvasLayout]);
 
@@ -432,5 +443,3 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     </DndContext>
   );
 }
-
-    
