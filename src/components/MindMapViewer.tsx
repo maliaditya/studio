@@ -21,7 +21,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
     selected: boolean; 
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
-    onOpenPopup: (e: React.MouseEvent, componentId: string) => void;
+    onOpenPopup: (componentId: string, e: React.MouseEvent) => void;
     globalElements: FormalizationItem[];
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -70,7 +70,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                                 className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    onOpenPopup(e as any, linkedComponent.id);
+                                                    onOpenPopup(linkedComponent.id, e as any);
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -285,11 +285,9 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
     const nodeElement = document.querySelector(`[data-node-id='${node.id}']`);
-    const nodeHeight = nodeElement?.firstElementChild?.clientHeight || (node.h || 'auto');
-
     let height = 150; // Default height
-    if (nodeHeight !== 'auto' && nodeHeight > 0) {
-        height = nodeHeight;
+    if (nodeElement?.firstElementChild) {
+        height = nodeElement.firstElementChild.clientHeight;
     }
   
     switch(side) {
