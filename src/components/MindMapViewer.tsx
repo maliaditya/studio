@@ -56,37 +56,35 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
                   {node.properties && Object.keys(node.properties).length > 0 && (
-                    <ul className="text-xs space-y-1.5">
+                    <ul className="text-xs space-y-2">
                       {Object.entries(node.properties).map(([key, value]) => {
-                        const linkedComponent = (allComponentsForSpec || []).find(c => c.id === value);
+                        const linkedComponent = allComponentsForSpec.find(c => c.id === value);
                         return (
-                            <li key={key} className="flex justify-between items-center gap-2">
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="text-muted-foreground truncate">{key}:</span>
-                                        </TooltipTrigger>
-                                        <TooltipContent><p>{key}</p></TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                            <li key={key} className="flex flex-col gap-1 items-start">
+                                <span className="text-muted-foreground font-medium text-xs">{key}:</span>
                                 {linkedComponent ? (
-                                    <Badge
-                                        variant="secondary"
-                                        className="cursor-pointer hover:ring-1 hover:ring-primary truncate"
+                                    <Card
+                                        className="w-full bg-muted/50 cursor-pointer hover:ring-1 hover:ring-primary"
                                         onClick={(e) => onOpenPopup(e, linkedComponent.id)}
-                                        title={linkedComponent.text}
                                     >
-                                        {linkedComponent.text}
-                                    </Badge>
+                                        <CardHeader className="p-2">
+                                            <CardTitle className="text-xs font-semibold">{linkedComponent.text}</CardTitle>
+                                        </CardHeader>
+                                        {linkedComponent.properties && Object.keys(linkedComponent.properties).length > 0 && (
+                                            <CardContent className="p-2 pt-0">
+                                                <ul className="text-xs space-y-1">
+                                                    {Object.entries(linkedComponent.properties).map(([compKey, compValue]) => (
+                                                        <li key={compKey} className="flex justify-between items-center gap-1">
+                                                            <span className="text-muted-foreground truncate">{compKey}:</span>
+                                                            <span className="font-medium truncate">{compValue as string}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </CardContent>
+                                        )}
+                                    </Card>
                                 ) : (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <span className="font-medium text-right truncate">{value as string}</span>
-                                            </TooltipTrigger>
-                                            <TooltipContent><p>{value as string}</p></TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
+                                    <span className="font-medium text-right truncate text-foreground self-end">{value as string}</span>
                                 )}
                             </li>
                         );
@@ -95,18 +93,20 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                   )}
                 </CardContent>
                 {/* Connection points */}
-                {sides.map(side => (
-                    <div
-                        key={side}
-                        onPointerDown={(e) => onStartConnect(e, node.id, side)}
-                        onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
-                        className={cn(
-                            "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity",
-                            getSideClass(side)
-                        )}
-                        title={`Connect from ${side}`}
-                    />
-                ))}
+                <div className="absolute inset-0 pointer-events-none group-hover:pointer-events-auto">
+                    {sides.map(side => (
+                        <div
+                            key={side}
+                            onPointerDown={(e) => onStartConnect(e, node.id, side)}
+                            onPointerUp={(e) => onReleaseConnect(e, node.id, side)}
+                            className={cn(
+                                "absolute w-3 h-3 rounded-full bg-background border-2 border-primary/50 cursor-pointer hover:bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto",
+                                getSideClass(side)
+                            )}
+                            title={`Connect from ${side}`}
+                        />
+                    ))}
+                </div>
               </Card>
             </div>
         </div>
@@ -146,8 +146,8 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         ...element,
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
-        w: layout?.width || 250,
-        h: layout?.height || 100, // Approximate height for edge calculation
+        w: layout?.width || 320, // Increased default width
+        h: layout?.height || 150, // Approximate height for edge calculation
       };
     });
   }, [globalElements, canvasLayout.nodes, rootId]);
@@ -162,7 +162,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
             newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
             return { ...prev, nodes: newNodes };
         } else {
-            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 250, height: 100 }] };
+            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 320, height: 150 }] };
         }
     });
   }, [setCanvasLayout]);
@@ -276,7 +276,7 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
   const screenToWorld = (x: number, y: number) => ({ x: (x - transform.x) / transform.k, y: (y - transform.y) / transform.k });
   
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
-    const nodeHeight = node.h || 100; // Use a default if height isn't set yet
+    const nodeHeight = node.h || 150; // Use a default if height isn't set yet
     switch(side) {
         case 'top': return { x: node.x + node.w / 2, y: node.y };
         case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight };
