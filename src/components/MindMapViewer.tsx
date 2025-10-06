@@ -16,12 +16,11 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, globalElements, addNodeForComponent }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
-    globalElements: FormalizationItem[];
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -238,26 +237,33 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
     const component = allComponentsForSpec.find(c => c.id === componentId);
     if (!component) return;
-
+  
     const sourceNode = nodesWithLayout.find(n => n.id === sourceNodeId);
-    const sourceNodePosition = sourceNode ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w } : { x: 50, y: 50, w: 300 };
-
+    const sourceNodePosition = sourceNode
+      ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w }
+      : { x: 50, y: 50, w: 300 };
+  
+    const newNodes: CanvasNode[] = [];
     (component.linkedElementIds || []).forEach((elementId, index) => {
-        const element = globalElements.find(el => el.id === elementId);
-        if (!element) return;
-
+      const element = globalElements.find(el => el.id === elementId);
+      if (!element) return;
+  
+      const nodeExists = nodesWithLayout.some(n => n.id === elementId) ||
+                         canvasLayout.nodes.some(n => n.id === elementId);
+  
+      if (!nodeExists) {
         const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
         const newNodeY = sourceNodePosition.y + (index * 180);
-
-        setCanvasLayout(prev => {
-            const nodeExists = prev.nodes.some(n => n.id === element.id);
-            if (!nodeExists) {
-                const newNode: CanvasNode = { id: element.id, x: newNodeX, y: newNodeY, width: 300, height: 150 };
-                return { ...prev, nodes: [...prev.nodes, newNode] };
-            }
-            return prev;
-        });
+        newNodes.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
+      }
     });
+  
+    if (newNodes.length > 0) {
+        setCanvasLayout(prev => ({
+            ...prev,
+            nodes: [...prev.nodes, ...newNodes],
+        }));
+    }
   };
 
   // Panning and Zooming handlers
@@ -440,7 +446,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 selected={selected === node.id} 
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
-                globalElements={globalElements}
                 addNodeForComponent={addNodeForComponent}
             />
           ))}
