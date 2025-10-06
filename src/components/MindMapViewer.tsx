@@ -16,17 +16,17 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
+    allComponentsMap: Map<string, FormalizationItem>;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
-    const { allComponentsForSpec } = useAuth();
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -60,7 +60,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
                         {node.properties && Object.keys(node.properties).length > 0 && (
                             <ul className="text-xs space-y-2">
                             {Object.entries(node.properties).map(([key, value]) => {
-                                const linkedComponent = allComponentsForSpec.find(c => c.id === value);
+                                const linkedComponent = allComponentsMap.get(value as string);
                                 return (
                                     <li key={key} className="flex items-center justify-between gap-2">
                                         <span className="text-muted-foreground font-medium text-xs truncate">{key}:</span>
@@ -128,6 +128,15 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
       .filter(el => el.isGlobal);
   }, [resources]);
   
+  const allComponentsMap = useMemo(() => {
+      const map = new Map<string, FormalizationItem>();
+      if (!resources) return map;
+      resources.forEach(r => {
+          (r.formalization?.components || []).forEach(c => map.set(c.id, c));
+      });
+      return map;
+  }, [resources]);
+
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [selected, setSelected] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<{ fromId: string; fromSide: Side; x: number; y: number } | null>(null);
@@ -217,24 +226,26 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     }));
   };
   
-  const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
-    const component = allComponentsForSpec.find(c => c.id === componentId);
+  const addNodeForComponent = useCallback((componentId: string, sourceNodeId: string) => {
+    const component = allComponentsMap.get(componentId);
     if (!component || !component.linkedElementIds) return;
-  
+
     setCanvasLayout(prevLayout => {
         const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId);
         if (!sourceNode) return prevLayout;
-  
-        const existingNodeIds = new Set(prevLayout.nodes.map(n => n.id));
+
+        const currentNodesMap = new Map(prevLayout.nodes.map(n => [n.id, n]));
         const newNodesToAdd: CanvasNode[] = [];
         const newEdgesToAdd: CanvasEdge[] = [];
-  
+
         component.linkedElementIds!.forEach((elementId, index) => {
-            if (!existingNodeIds.has(elementId)) {
+            if (!currentNodesMap.has(elementId)) {
+                // Stagger new nodes vertically
                 const newNodeX = sourceNode.x + (sourceNode.width || 300) + 100;
                 const newNodeY = sourceNode.y + (index * 180);
                 newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
             }
+            // Always add the edge
             newEdgesToAdd.push({
                 id: id('e'),
                 source: sourceNodeId,
@@ -246,15 +257,15 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         });
 
         if (newNodesToAdd.length === 0 && newEdgesToAdd.length === 0) {
-            return prevLayout;
+            return prevLayout; // No changes needed
         }
-  
+
         return {
             nodes: [...prevLayout.nodes, ...newNodesToAdd],
             edges: [...prevLayout.edges, ...newEdgesToAdd],
         };
     });
-};
+  }, [allComponentsMap, setCanvasLayout]);
 
   // Panning and Zooming handlers
   useEffect(() => {
@@ -437,6 +448,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
+                allComponentsMap={allComponentsMap}
             />
           ))}
         </div>
