@@ -14,26 +14,17 @@ import { Badge } from "./ui/badge";
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, allComponentsMap }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
+    allComponentsMap: Map<string, FormalizationItem>;
 }) {
-    const { resources } = useAuth();
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
     });
-    
-    const allComponentsMap = useMemo(() => {
-      const map = new Map<string, FormalizationItem>();
-      if (!resources) return map;
-      resources.forEach(r => {
-          (r.formalization?.components || []).forEach(c => map.set(c.id, c));
-      });
-      return map;
-    }, [resources]);
 
     const style = transform ? {
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
@@ -122,26 +113,27 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const { 
     resources, 
     canvasLayout, setCanvasLayout, 
-    addGlobalElement, updateGlobalElement, deleteGlobalElement,
+    addGlobalElement,
   } = useAuth();
   
   const allComponentsMap = useMemo(() => {
-      const map = new Map<string, FormalizationItem>();
-      if (!resources) return map;
-      resources.forEach(r => {
-          (r.formalization?.components || []).forEach(c => map.set(c.id, c));
-      });
-      return map;
+    const map = new Map<string, FormalizationItem>();
+    if (!resources) return map;
+    resources.forEach(r => {
+        (r.formalization?.components || []).forEach(c => map.set(c.id, c));
+    });
+    return map;
   }, [resources]);
 
-  const globalElements = useMemo(() => {
-    if (!resources) return [];
-    return resources
-      .flatMap(r => r.formalization?.elements || [])
-      .filter(el => el.isGlobal);
+  const allElementsMap = useMemo(() => {
+    const map = new Map<string, FormalizationItem>();
+    if (!resources) return map;
+    resources.forEach(r => {
+        (r.formalization?.elements || []).forEach(el => map.set(el.id, el));
+    });
+    return map;
   }, [resources]);
   
-
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [selected, setSelected] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<{ fromId: string; fromSide: Side; x: number; y: number } | null>(null);
@@ -150,31 +142,22 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const nodesWithLayout = useMemo(() => {
-    const allElementsOnCanvas = new Map<string, FormalizationItem>();
-    globalElements.forEach(el => allElementsOnCanvas.set(el.id, el));
-    
-    // Add elements from layout that might not be in the initial global list
-    canvasLayout.nodes.forEach(node => {
-        if (!allElementsOnCanvas.has(node.id)) {
-            const foundElement = resources.flatMap(r => r.formalization?.elements || []).find(el => el.id === node.id);
-            if (foundElement) {
-                allElementsOnCanvas.set(node.id, foundElement);
-            }
-        }
-    });
+    // Only render nodes that are explicitly in the canvasLayout.nodes array.
+    return canvasLayout.nodes
+      .map(layoutNode => {
+        const element = allElementsMap.get(layoutNode.id);
+        if (!element) return null;
+        return {
+          ...element,
+          x: layoutNode.x,
+          y: layoutNode.y,
+          w: layoutNode.width || 300,
+          h: layoutNode.height || 150,
+        };
+      })
+      .filter((node): node is NonNullable<typeof node> => node !== null);
+  }, [canvasLayout.nodes, allElementsMap]);
 
-    return Array.from(allElementsOnCanvas.values()).map(element => {
-      const layout = canvasLayout.nodes.find(n => n.id === element.id);
-      return {
-        ...element,
-        x: layout?.x || Math.random() * 800,
-        y: layout?.y || Math.random() * 600,
-        w: layout?.width || 300,
-        h: layout?.height || 150,
-      };
-    });
-  }, [globalElements, canvasLayout.nodes, resources]);
-  
   const edges = useMemo(() => canvasLayout.edges || [], [canvasLayout.edges]);
 
   const updateNodePosition = useCallback((nodeId: string, newX: number, newY: number) => {
@@ -184,21 +167,20 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             const newNodes = [...prev.nodes];
             newNodes[existingNodeIndex] = { ...newNodes[existingNodeIndex], x: newX, y: newY };
             return { ...prev, nodes: newNodes };
-        } else {
-            return { ...prev, nodes: [...prev.nodes, { id: nodeId, x: newX, y: newY, width: 300, height: 150 }] };
         }
+        return prev;
     });
   }, [setCanvasLayout]);
 
   const addNodeForComponent = useCallback((componentId: string, sourceNodeId: string) => {
-    const component = allComponentsMap.get(componentId);
-    if (!component || !component.linkedElementIds) return;
-
     setCanvasLayout(prevLayout => {
+        const component = allComponentsMap.get(componentId);
+        if (!component?.linkedElementIds) return prevLayout;
+
         const sourceNodeLayout = prevLayout.nodes.find(n => n.id === sourceNodeId);
         if (!sourceNodeLayout) return prevLayout;
 
-        const currentNodesMap = new Map(prevLayout.nodes.map(n => [n.id, n]));
+        const currentNodesOnCanvas = new Map(prevLayout.nodes.map(n => [n.id, n]));
         
         let yOffset = 0;
         const Y_SPACING = 180;
@@ -207,8 +189,8 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         const nodesToAdd: CanvasNode[] = [];
         const edgesToAdd: CanvasEdge[] = [];
 
-        component.linkedElementIds!.forEach(elementId => {
-            if (!currentNodesMap.has(elementId)) {
+        component.linkedElementIds.forEach(elementId => {
+            if (!currentNodesOnCanvas.has(elementId)) {
                 nodesToAdd.push({
                     id: elementId,
                     x: newNodeX,
@@ -218,25 +200,28 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 });
                 yOffset += Y_SPACING;
             }
-            edgesToAdd.push({
-                id: id('e'),
-                source: sourceNodeId,
-                fromSide: 'right',
-                target: elementId,
-                toSide: 'left',
-                label: 'contains'
-            });
+            
+            const edgeExists = prevLayout.edges.some(e => e.source === sourceNodeId && e.target === elementId);
+            if (!edgeExists) {
+                edgesToAdd.push({
+                    id: id('e'),
+                    source: sourceNodeId,
+                    fromSide: 'right',
+                    target: elementId,
+                    toSide: 'left',
+                    label: 'contains'
+                });
+            }
         });
-        
-        // No change if all nodes already exist
-        if (nodesToAdd.length === 0) return prevLayout;
+
+        if (nodesToAdd.length === 0 && edgesToAdd.length === 0) return prevLayout;
 
         return {
             nodes: [...prevLayout.nodes, ...nodesToAdd],
             edges: [...prevLayout.edges, ...edgesToAdd],
         };
     });
-}, [allComponentsMap, setCanvasLayout]);
+  }, [allComponentsMap, setCanvasLayout]);
 
 
   // Panning and Zooming handlers
@@ -426,6 +411,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
+                allComponentsMap={allComponentsMap}
             />
           ))}
         </div>
@@ -446,3 +432,5 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     </DndContext>
   );
 }
+
+    
