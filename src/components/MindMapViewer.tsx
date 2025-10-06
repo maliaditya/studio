@@ -371,12 +371,16 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
         </div>
       </div>
       {showControls && (
-        <div className="absolute top-4 left-4 z-10 flex gap-2">
+        <>
+          <div className="absolute top-4 left-4 z-10 flex gap-2">
             <Button size="icon" onClick={() => addGlobalElement("New Element", 0, 0)}><Plus /></Button>
-            <Button size="icon" onClick={() => handleAddNewResourceCard(null, { x: 0, y: 0 })}>New Card</Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
-        </div>
+          </div>
+          <div className="absolute top-4 right-4 z-10">
+            <Button onClick={() => handleAddNewResourceCard(null, { x: 0, y: 0 })}>New Card</Button>
+          </div>
+        </>
       )}
     </div>
     </DndContext>
