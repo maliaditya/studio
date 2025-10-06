@@ -285,12 +285,14 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
   
   const getNodeEdgePoint = (node: any, side: Side): { x: number; y: number } => {
-    const nodeHeight = node.h || 150; // Use a default if height isn't set yet
+    const nodeHeight = node.h || 150;
+    const handleSize = 6; // Half the size of the handle (12px / 2)
+  
     switch(side) {
-        case 'top': return { x: node.x + node.w / 2, y: node.y };
-        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight };
-        case 'left': return { x: node.x, y: node.y + nodeHeight / 2 };
-        case 'right': return { x: node.x + node.w, y: node.y + nodeHeight / 2 };
+        case 'top': return { x: node.x + node.w / 2, y: node.y - handleSize };
+        case 'bottom': return { x: node.x + node.w / 2, y: node.y + nodeHeight + handleSize };
+        case 'left': return { x: node.x - handleSize, y: node.y + nodeHeight / 2 };
+        case 'right': return { x: node.x + node.w + handleSize, y: node.y + nodeHeight / 2 };
         default: return { x: node.x + node.w / 2, y: node.y + nodeHeight / 2 };
     }
   };
@@ -378,7 +380,10 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
           </div>
           <div className="absolute top-4 right-4 z-10">
-            <Button onClick={() => handleAddNewResourceCard(null, { x: 0, y: 0 })}>New Card</Button>
+            <Button onClick={() => {
+                const {x, y} = screenToWorld(window.innerWidth / 2, window.innerHeight / 2);
+                handleAddNewResourceCard(null, { x, y });
+            }}>New Card</Button>
           </div>
         </>
       )}
