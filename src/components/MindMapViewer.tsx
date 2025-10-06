@@ -16,13 +16,12 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, openComponentPopup }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
-    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -70,11 +69,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    if (typeof openComponentPopup === 'function') {
-                                                      addNodeForComponent(linkedComponent.id, node.id);
-                                                    } else {
-                                                      console.warn('openComponentPopup not a function (or not provided).', { openComponentPopup, linkedComponentId: linkedComponent.id });
-                                                    }
+                                                    addNodeForComponent(linkedComponent.id, node.id);
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -124,7 +119,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     allComponentsForSpec,
     selectedFormalizationSpecId,
     handleAddNewResourceCard,
-    openComponentPopup,
   } = useAuth();
   
   const globalElements = useMemo(() => {
@@ -146,10 +140,9 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
 
     if (rootId) {
         const hierarchyNodes = new Map<string, any>();
-        const hierarchyEdges: CanvasEdge[] = [];
         const visited = new Set<string>();
 
-        const buildHierarchy = (elementId: string, x: number, y: number, level: number) => {
+        const buildHierarchy = (elementId: string, x: number, y: number) => {
             if (visited.has(elementId)) return;
             visited.add(elementId);
 
@@ -157,40 +150,24 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
             if (!element) return;
             
             const layout = canvasLayout.nodes.find(n => n.id === element.id);
-
-            hierarchyNodes.set(elementId, {
-                ...element,
-                x: layout?.x ?? x,
-                y: layout?.y ?? y,
-                w: layout?.width || 384,
-                h: layout?.height || 'auto'
-            });
+            hierarchyNodes.set(elementId, { ...element, x: layout?.x ?? x, y: layout?.y ?? y, w: 384, h: 'auto' });
 
             if (element.properties) {
                 Object.values(element.properties).forEach((value, index) => {
                     const linkedComponent = allComponentsForSpec.find(c => c.id === value);
                     if (linkedComponent && linkedComponent.linkedElementIds) {
                         linkedComponent.linkedElementIds.forEach((childElementId, childIndex) => {
-                            hierarchyEdges.push({
-                                id: id('e'),
-                                source: elementId,
-                                fromSide: 'right',
-                                target: childElementId,
-                                toSide: 'left'
-                            });
-                            buildHierarchy(childElementId, x + 450, y + (index * 200) + (childIndex * 150), level + 1);
+                            buildHierarchy(childElementId, x + 450, y + (index * 200) + (childIndex * 150));
                         });
                     }
                 });
             }
         };
-
-        buildHierarchy(rootId, 50, 400, 0);
+        buildHierarchy(rootId, 50, 400);
         nodesToDisplay = Array.from(hierarchyNodes.values());
-    } else if (globalElements) {
+    } else {
         nodesToDisplay = globalElements;
     }
-
 
     if (!nodesToDisplay) return [];
 
@@ -241,42 +218,43 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   };
   
   const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
-      const component = allComponentsForSpec.find(c => c.id === componentId);
-      if (!component || !component.linkedElementIds) return;
+    const component = allComponentsForSpec.find(c => c.id === componentId);
+    if (!component || !component.linkedElementIds) return;
   
-      setCanvasLayout(prevLayout => {
-          const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId) || nodesWithLayout.find(n => n.id === sourceNodeId);
-          if (!sourceNode) return prevLayout;
+    setCanvasLayout(prevLayout => {
+        const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId);
+        if (!sourceNode) return prevLayout;
   
-          const sourceNodePosition = { x: sourceNode.x, y: sourceNode.y, w: sourceNode.width || 300 };
-          const existingNodeIds = new Set(prevLayout.nodes.map(n => n.id));
-          
-          const newNodesToAdd: CanvasNode[] = [];
-          const newEdgesToAdd: CanvasEdge[] = [];
+        const existingNodeIds = new Set(prevLayout.nodes.map(n => n.id));
+        const newNodesToAdd: CanvasNode[] = [];
+        const newEdgesToAdd: CanvasEdge[] = [];
   
-          component.linkedElementIds!.forEach((elementId, index) => {
-              if (!existingNodeIds.has(elementId)) {
-                  const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
-                  const newNodeY = sourceNodePosition.y + (index * 200); // Stagger vertically
-                  newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
-              }
-              
-              newEdgesToAdd.push({
-                  id: id('e'),
-                  source: sourceNodeId,
-                  fromSide: 'right',
-                  target: elementId,
-                  toSide: 'left',
-                  label: 'contains'
-              });
-          });
+        component.linkedElementIds!.forEach((elementId, index) => {
+            if (!existingNodeIds.has(elementId)) {
+                const newNodeX = sourceNode.x + (sourceNode.width || 300) + 100;
+                const newNodeY = sourceNode.y + (index * 180);
+                newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
+            }
+            newEdgesToAdd.push({
+                id: id('e'),
+                source: sourceNodeId,
+                fromSide: 'right',
+                target: elementId,
+                toSide: 'left',
+                label: 'contains'
+            });
+        });
+
+        if (newNodesToAdd.length === 0 && newEdgesToAdd.length === 0) {
+            return prevLayout;
+        }
   
-          return {
-              nodes: [...prevLayout.nodes, ...newNodesToAdd],
-              edges: [...prevLayout.edges, ...newEdgesToAdd],
-          };
-      });
-  };
+        return {
+            nodes: [...prevLayout.nodes, ...newNodesToAdd],
+            edges: [...prevLayout.edges, ...newEdgesToAdd],
+        };
+    });
+};
 
   // Panning and Zooming handlers
   useEffect(() => {
@@ -459,7 +437,6 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
-                openComponentPopup={openComponentPopup}
             />
           ))}
         </div>
