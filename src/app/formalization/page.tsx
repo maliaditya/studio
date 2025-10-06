@@ -154,6 +154,56 @@ const CuriosityNode = ({
 
 type PropertyItem = { id: string; key: string; value: string };
 
+const PropertyItemRow = ({ prop, handlePropertyChange, handleDeleteProperty, availableComponents, globalContext }: {
+    prop: PropertyItem;
+    handlePropertyChange: (id: string, field: 'key' | 'value', newValue: string) => void;
+    handleDeleteProperty: (id: string) => void;
+    availableComponents: FormalizationItem[];
+    globalContext?: FormalizationData;
+}) => {
+    const [popoverOpen, setPopoverOpen] = useState(false);
+    const linkedComponent = [...availableComponents, ...(globalContext?.components || [])].find(c => c.id === prop.value);
+    const displayValue = linkedComponent ? linkedComponent.text : prop.value;
+
+    return (
+        <div key={prop.id} className="flex items-center gap-2">
+            <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name" />
+            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal truncate">
+                        {displayValue || <span className="text-muted-foreground">Set Value...</span>}
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" side="bottom" align="start">
+                    <Input
+                        className="m-2 w-[calc(100%-1rem)]"
+                        placeholder="Type a value..."
+                        defaultValue={prop.value}
+                        onBlur={(e) => {
+                            handlePropertyChange(prop.id, 'value', e.currentTarget.value);
+                            setPopoverOpen(false);
+                        }}
+                    />
+                    <ScrollArea className="max-h-48">
+                        <div className="p-1">
+                            <Button variant="ghost" className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', ''); setPopoverOpen(false); }}>-- Clear --</Button>
+                            <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
+                            {availableComponents.map(p => (
+                                <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
+                            ))}
+                            {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
+                            {(globalContext?.components || []).map(p => (
+                                <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </PopoverContent>
+            </Popover>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+        </div>
+    );
+};
+
 const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave }: { 
     item: FormalizationItem | null; 
     type: 'elements' | 'operations' | 'components';
@@ -217,11 +267,6 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
             setLinkedOperationIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
         }
     };
-
-    const handleSelectChange = (propId: string, value: string) => {
-        const newValue = value === '--none--' ? '' : value;
-        handlePropertyChange(propId, 'value', newValue);
-    };
     
     const getModalTitle = () => {
         if (!type) return 'Edit Item';
@@ -255,48 +300,16 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                               <div className="space-y-3">
                                   <Label>Properties</Label>
                                   <div className="space-y-2">
-                                      {properties.map((prop) => {
-                                        const [popoverOpen, setPopoverOpen] = useState(false);
-                                        const linkedComponent = [...availableComponents, ...(globalContext?.components || [])].find(c => c.id === prop.value);
-                                        const displayValue = linkedComponent ? linkedComponent.text : prop.value;
-                                        return (
-                                          <div key={prop.id} className="flex items-center gap-2">
-                                              <Input value={prop.key} onChange={(e) => handlePropertyChange(prop.id, 'key', e.target.value)} placeholder="Property Name"/>
-                                               <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" className="w-full justify-start font-normal truncate">
-                                                            {displayValue || <span className="text-muted-foreground">Set Value...</span>}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" side="bottom" align="start">
-                                                        <Input
-                                                            className="m-2 w-[calc(100%-1rem)]"
-                                                            placeholder="Type a value..."
-                                                            defaultValue={prop.value}
-                                                            onBlur={(e) => {
-                                                                handlePropertyChange(prop.id, 'value', e.currentTarget.value);
-                                                                setPopoverOpen(false);
-                                                            }}
-                                                        />
-                                                        <ScrollArea className="max-h-48">
-                                                            <div className="p-1">
-                                                                <Button variant="ghost" className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', ''); setPopoverOpen(false); }}>-- Clear --</Button>
-                                                                <Label className="px-2 py-1.5 text-xs font-semibold">Local Components</Label>
-                                                                {availableComponents.map(p => (
-                                                                    <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
-                                                                ))}
-                                                                {(globalContext?.components || []).length > 0 && <Label className="px-2 py-1.5 text-xs font-semibold">Global Components</Label>}
-                                                                {(globalContext?.components || []).map(p => (
-                                                                    <Button variant="ghost" key={p.id} className="w-full justify-start h-8" onClick={() => { handlePropertyChange(prop.id, 'value', p.id); setPopoverOpen(false); }}>{p.text}</Button>
-                                                                ))}
-                                                            </div>
-                                                        </ScrollArea>
-                                                    </PopoverContent>
-                                                </Popover>
-                                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDeleteProperty(prop.id)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                          </div>
-                                        )
-                                      })}
+                                      {properties.map((prop) => (
+                                         <PropertyItemRow
+                                            key={prop.id}
+                                            prop={prop}
+                                            handlePropertyChange={handlePropertyChange}
+                                            handleDeleteProperty={handleDeleteProperty}
+                                            availableComponents={availableComponents}
+                                            globalContext={globalContext}
+                                          />
+                                      ))}
                                   </div>
                                   <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
                               </div>
@@ -1290,20 +1303,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                 <div className="flex justify-between items-center">
                                     <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
                                     <div className="flex">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set(curiositiesForSpecialization.flatMap(c => {
-                                          const allChildren: string[] = [c.id];
-                                          const getChildren = (item: ExerciseDefinition) => {
-                                            (item.linkedUpskillIds || []).forEach(childId => {
-                                              const child = upskillDefinitions.find(d => d.id === childId);
-                                              if (child) { allChildren.push(childId); getChildren(child); }
-                                            });
-                                          };
-                                          getChildren(c);
-                                          return allChildren;
-                                        })))}>
-                                            <ChevronsUp className="h-4 w-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsedCuriosities(new Set())}>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleCollapseAll}>
                                             <ChevronsDown className="h-4 w-4" />
                                         </Button>
                                     </div>
@@ -1427,3 +1427,4 @@ export default function FormalizationPage() {
 
 
     
+
