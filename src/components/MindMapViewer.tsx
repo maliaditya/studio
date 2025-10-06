@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import type { CanvasNode, CanvasEdge, FormalizationItem, Side } from "@/types/workout";
+import type { CanvasNode, CanvasEdge, FormalizationItem, Side, Resource } from "@/types/workout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Maximize, Minus, Download, Upload } from 'lucide-react';
@@ -16,12 +16,13 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpenPopup }: { 
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpenPopup, globalElements }: { 
     node: any; 
     selected: boolean; 
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void; 
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     onOpenPopup: (e: React.MouseEvent, componentId: string) => void;
+    globalElements: FormalizationItem[];
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -70,31 +71,19 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
                                         <CardHeader className="p-2">
                                             <CardTitle className="text-xs font-semibold">{linkedComponent.text}</CardTitle>
                                         </CardHeader>
-                                        {linkedComponent.properties && Object.keys(linkedComponent.properties).length > 0 && (
-                                            <CardContent className="p-2 pt-0">
-                                                <ul className="text-xs space-y-1">
-                                                    {Object.entries(linkedComponent.properties).map(([compKey, compValue]) => {
-                                                        const deeperLinkedComponent = allComponentsForSpec.find(c => c.id === compValue);
-                                                        return (
-                                                            <li key={compKey} className="flex justify-between items-center gap-1">
-                                                                <span className="text-muted-foreground truncate">{compKey}:</span>
-                                                                {deeperLinkedComponent ? (
-                                                                    <Badge
-                                                                        variant="secondary"
-                                                                        className="cursor-pointer hover:ring-1 hover:ring-primary font-normal"
-                                                                        onClick={(e) => { e.stopPropagation(); onOpenPopup(e, deeperLinkedComponent.id); }}
-                                                                    >
-                                                                        {deeperLinkedComponent.text}
-                                                                    </Badge>
-                                                                ) : (
-                                                                    <span className="font-medium truncate">{compValue as string}</span>
-                                                                )}
-                                                            </li>
-                                                        );
-                                                    })}
-                                                </ul>
-                                            </CardContent>
-                                        )}
+                                        <CardContent className="p-2 pt-0">
+                                            {linkedComponent.linkedElementIds && linkedComponent.linkedElementIds.length > 0 && (
+                                                <div className="mt-1">
+                                                    <p className="font-semibold text-xs text-muted-foreground">Elements:</p>
+                                                    <div className="flex flex-wrap gap-1 mt-1">
+                                                        {(linkedComponent.linkedElementIds || []).map(elId => {
+                                                            const el = globalElements.find(e => e.id === elId);
+                                                            return el ? <Badge key={elId} variant="outline">{el.text}</Badge> : null;
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
                                     </Card>
                                 ) : (
                                     <span className="font-medium text-right truncate text-foreground self-end">{value as string}</span>
@@ -126,7 +115,7 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, onOpe
     );
 }
 
-export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, rootId?: string | null }) {
+export function MindMapViewer({ defaultView, rootId, showControls = true }: { defaultView?: string, rootId?: string | null, showControls?: boolean }) {
   const { 
     resources, 
     canvasLayout, setCanvasLayout, 
@@ -134,6 +123,10 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
     deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes,
     allComponentsForSpec,
     openComponentPopup,
+    selectedFormalizationSpecId,
+    resourceFolders,
+    setResourceFolders,
+    setResources,
   } = useAuth();
   
   const globalElements = useMemo(() => {
@@ -159,8 +152,8 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         ...element,
         x: layout?.x || Math.random() * 800,
         y: layout?.y || Math.random() * 600,
-        w: layout?.width || 384, // Increased default width
-        h: layout?.height || 150, // Approximate height for edge calculation
+        w: layout?.width || 384,
+        h: layout?.height || 150,
       };
     });
   }, [globalElements, canvasLayout.nodes, rootId]);
@@ -179,6 +172,34 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
         }
     });
   }, [setCanvasLayout]);
+  
+  const handleAddNewResourceCard = () => {
+    if (!selectedFormalizationSpecId) return;
+
+    // Find or create 'Elements' folder under the current specialization
+    const specFolder = resourceFolders.find(f => f.name === selectedFormalizationSpecId && !f.parentId);
+    if (!specFolder) return;
+
+    let elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === specFolder.id);
+    if (!elementsFolder) {
+        elementsFolder = { id: `folder_elements_${specFolder.id}`, name: 'Elements', parentId: specFolder.id, icon: 'Folder' };
+        setResourceFolders(prev => [...prev, elementsFolder!]);
+    }
+
+    // Create the new resource card
+    const newCard: Resource = {
+        id: `res_card_${Date.now()}`,
+        name: "New Element Card",
+        folderId: elementsFolder.id,
+        type: 'card',
+        createdAt: new Date().toISOString(),
+        points: []
+    };
+    setResources(prev => [...prev, newCard]);
+
+    // Create a new global element linked to this resource card
+    addGlobalElement(`New Element ${nodesWithLayout.length + 1}`, 100, 100);
+  };
 
   const handleAddNode = () => {
     const rect = containerRef.current!.getBoundingClientRect();
@@ -369,15 +390,19 @@ export function MindMapViewer({ defaultView, rootId }: { defaultView?: string, r
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 onOpenPopup={(e, componentId) => openComponentPopup(componentId, e)}
+                globalElements={globalElements}
              />
           ))}
         </div>
       </div>
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
-        <Button size="icon" onClick={handleAddNode}><Plus /></Button>
-        <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
-        <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
-      </div>
+      {showControls && (
+        <div className="absolute top-4 left-4 z-10 flex gap-2">
+            <Button size="icon" onClick={handleAddNode}><Plus /></Button>
+            <Button size="icon" onClick={handleAddNewResourceCard}>New Card</Button>
+            <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 1.1 }))}><Maximize className="h-4 w-4"/></Button>
+            <Button size="icon" onClick={() => setTransform(t => ({ ...t, k: t.k * 0.9 }))}><Minus className="h-4 w-4"/></Button>
+        </div>
+      )}
     </div>
     </DndContext>
   );
