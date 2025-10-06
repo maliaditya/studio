@@ -254,7 +254,7 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                                                   <SelectTrigger>
                                                       <SelectValue placeholder="Value or Link Component..." />
                                                   </SelectTrigger>
-                                                  <SelectContent>
+                                                  <SelectContent position="popper">
                                                       <Input
                                                         className="m-2 w-[calc(100%-1rem)]"
                                                         placeholder="Type a value..."
@@ -918,7 +918,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
     const handleToggleCollapseAll = () => {
         const allIds = new Set(curiositiesForSpecialization.map(c => c.id));
         if (collapsedCuriosities.size === allIds.size) {
-            setCollapsedCuriosities(new Set());
+            setCollapsedCuriosities(new Set();
         } else {
             setCollapsedCuriosities(allIds);
         }
@@ -1332,5 +1332,7 @@ export default function FormalizationPage() {
 
 
 
+
+    
 
     
