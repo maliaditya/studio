@@ -16,12 +16,13 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/t
 // Simple unique ID generator
 const id = (prefix = "n") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 
-function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent }: {
+function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNodeForComponent, openComponentPopup }: {
     node: any;
     selected: boolean;
     onReleaseConnect: (e: React.PointerEvent, nodeId: string, side: Side) => void;
     onStartConnect: (e: React.PointerEvent, fromId: string, fromSide: Side) => void;
     addNodeForComponent: (componentId: string, sourceNodeId: string) => void;
+    openComponentPopup: (componentId: string, event: React.MouseEvent) => void;
 }) {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: node.id,
@@ -69,7 +70,11 @@ function DraggableNode({ node, selected, onReleaseConnect, onStartConnect, addNo
                                                 className="truncate"
                                                 onPointerDown={(e) => {
                                                     e.stopPropagation();
-                                                    addNodeForComponent(linkedComponent.id, node.id);
+                                                    if (typeof openComponentPopup === 'function') {
+                                                      addNodeForComponent(linkedComponent.id, node.id);
+                                                    } else {
+                                                      console.warn('openComponentPopup not a function (or not provided).', { openComponentPopup, linkedComponentId: linkedComponent.id });
+                                                    }
                                                 }}
                                                 title={linkedComponent.text}
                                             >
@@ -119,6 +124,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
     allComponentsForSpec,
     selectedFormalizationSpecId,
     handleAddNewResourceCard,
+    openComponentPopup,
   } = useAuth();
   
   const globalElements = useMemo(() => {
@@ -236,45 +242,38 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
   
   const addNodeForComponent = (componentId: string, sourceNodeId: string) => {
       const component = allComponentsForSpec.find(c => c.id === componentId);
-      if (!component) return;
+      if (!component || !component.linkedElementIds) return;
   
-      const sourceNode = nodesWithLayout.find(n => n.id === sourceNodeId);
-      const sourceNodePosition = sourceNode
-          ? { x: sourceNode.x, y: sourceNode.y, w: sourceNode.w }
-          : { x: 50, y: 50, w: 300 };
+      setCanvasLayout(prevLayout => {
+          const sourceNode = prevLayout.nodes.find(n => n.id === sourceNodeId) || nodesWithLayout.find(n => n.id === sourceNodeId);
+          if (!sourceNode) return prevLayout;
   
-      const newNodesToAdd: CanvasNode[] = [];
-      const newEdgesToAdd: CanvasEdge[] = [];
-  
-      (component.linkedElementIds || []).forEach((elementId, index) => {
-          const element = globalElements.find(el => el.id === elementId);
-          if (!element) return;
-  
-          const nodeExists = nodesWithLayout.some(n => n.id === elementId);
-  
-          if (!nodeExists) {
-              const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
-              const newNodeY = sourceNodePosition.y + (index * 200);
-              newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
-          }
+          const sourceNodePosition = { x: sourceNode.x, y: sourceNode.y, w: sourceNode.width || 300 };
+          const existingNodeIds = new Set(prevLayout.nodes.map(n => n.id));
           
-          newEdgesToAdd.push({
-              id: id('e'),
-              source: sourceNodeId,
-              fromSide: 'right',
-              target: elementId,
-              toSide: 'left',
-              label: 'contains'
+          const newNodesToAdd: CanvasNode[] = [];
+          const newEdgesToAdd: CanvasEdge[] = [];
+  
+          component.linkedElementIds!.forEach((elementId, index) => {
+              if (!existingNodeIds.has(elementId)) {
+                  const newNodeX = sourceNodePosition.x + sourceNodePosition.w + 100;
+                  const newNodeY = sourceNodePosition.y + (index * 200); // Stagger vertically
+                  newNodesToAdd.push({ id: elementId, x: newNodeX, y: newNodeY, width: 300, height: 150 });
+              }
+              
+              newEdgesToAdd.push({
+                  id: id('e'),
+                  source: sourceNodeId,
+                  fromSide: 'right',
+                  target: elementId,
+                  toSide: 'left',
+                  label: 'contains'
+              });
           });
-      });
   
-      setCanvasLayout(prev => {
-          const existingNodeIds = new Set(prev.nodes.map(n => n.id));
-          const finalNewNodes = newNodesToAdd.filter(n => !existingNodeIds.has(n.id));
-          
           return {
-              nodes: [...prev.nodes, ...finalNewNodes],
-              edges: [...prev.edges, ...newEdgesToAdd],
+              nodes: [...prevLayout.nodes, ...newNodesToAdd],
+              edges: [...prevLayout.edges, ...newEdgesToAdd],
           };
       });
   };
@@ -460,6 +459,7 @@ export function MindMapViewer({ defaultView, rootId, showControls = true }: { de
                 onReleaseConnect={onReleaseConnect} 
                 onStartConnect={onStartConnect}
                 addNodeForComponent={addNodeForComponent}
+                openComponentPopup={openComponentPopup}
             />
           ))}
         </div>
