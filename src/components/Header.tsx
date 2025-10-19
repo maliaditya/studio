@@ -20,6 +20,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -164,138 +165,91 @@ function NavigationMenu() {
   const navLinks = [
     { href: '/my-plate', label: 'Dashboard' },
     { href: '/timetable', label: 'Timetable' },
-    { href: '/skill', label: 'Skill' },
-    { href: '/deep-work', label: 'Deep Work' },
     { href: '/resources', label: 'Resources' },
-    { href: '/formalization', label: 'Formalization' },
+    { href: '/skill', label: 'Skill Tree' },
+    { href: '/strategic-planning', label: 'Strategy' },
+    { href: '/code-of-conduct', label: 'Code of Conduct' },
   ];
 
-  const dropdownLinks = [
-    { href: '/workout-tracker', label: 'Workout' },
-    { href: '/strategic-planning', label: 'Planning' },
-    { href: '/path', label: 'Path' },
-    { href: '/portfolio', label: 'Portfolio' },
-    { href: '/purpose', label: 'Purpose' },
-    { href: '/patterns', label: 'Patterns' },
-    { href: '/mind-programming', label: 'Mind Programming' },
-    { href: '/personal-branding', label: 'Branding' },
-    { href: '/charts', label: 'Charts' },
-    { href: '/timesheet', label: 'Timesheet' },
-  ];
-  
   if (!isClient) {
-    return null; // Don't render on the server
+    return <div className="flex items-center gap-4 h-8 w-96 bg-muted rounded-md animate-pulse" />;
   }
 
   return (
-    <nav className="hidden md:flex items-center gap-4">
-      {navLinks.map(link => (
-        <Link
+    <nav className="hidden md:flex items-center gap-2">
+      {navLinks.map((link) => (
+        <Button
           key={link.href}
-          href={link.href}
-          className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            activePath === link.href ? "text-primary" : "text-muted-foreground"
-          )}
+          asChild
+          variant={activePath === link.href ? 'default' : 'ghost'}
+          size="sm"
         >
-          {link.label}
-        </Link>
+          <Link href={link.href}>{link.label}</Link>
+        </Button>
       ))}
-      <DropdownMenu>
+       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="text-sm font-medium text-muted-foreground hover:text-primary focus:text-primary data-[state=open]:text-primary gap-1">
-            Strategy
-            <ChevronDown className="h-4 w-4" />
+          <Button variant="ghost" size="sm" className="flex items-center gap-1">
+            More <ChevronDown className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {dropdownLinks.map(link => (
-            <DropdownMenuItem key={link.href} asChild>
-              <Link href={link.href}>{link.label}</Link>
-            </DropdownMenuItem>
-          ))}
+        <DropdownMenuContent align="start">
+          <DropdownMenuItem asChild><Link href="/workout-tracker">Workout Tracker</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/mind-programming">Mind Programming</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/upskill">Upskill</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/deep-work">Deep Work</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/personal-branding">Branding</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/lead-generation">Lead Gen</Link></DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem asChild><Link href="/formalization">Formalization</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/patterns">Patterns</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/purpose">Purpose</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/path">Path</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/charts">Charts</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/timesheet">Timesheet</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </nav>
   );
 }
 
-
 export function Header() {
-  const { 
-    currentUser, 
-    loading, 
-    isDemoTokenModalOpen, 
-    setIsDemoTokenModalOpen, 
-    pushDemoDataWithToken,
-  } = useAuth();
-  const router = useRouter();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  
+
   return (
-    <>
-      <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center">
-            <Link href="/" className="flex items-center gap-2 text-xl font-bold text-primary">
-              <BrainCircuit className="h-8 w-8" />
-              <span>Dock</span>
-            </Link>
-          </div>
-          
-          <div className="flex-grow flex items-center justify-center gap-4">
-            {currentUser && <NavigationMenu />}
-            {currentUser && (
-              <>
-                <Button variant="outline" className="gap-2 text-muted-foreground" onClick={() => setIsSearchOpen(true)}>
-                  <Search className="h-4 w-4" />
-                  Search Notes...
-                  <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                    <span className="text-xs">⌘</span>K
-                  </kbd>
-                </Button>
-              </>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-4">
-            {currentUser && <SaveStatusWidget />}
-            <Button
-              onClick={() => setIsSupportModalOpen(true)}
-              variant="secondary"
-              size="sm"
-            >
-              <Heart className="mr-2 h-4 w-4 text-destructive" />
-              Support
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-14 items-center">
+        <Link href="/" className="flex items-center gap-2 mr-6">
+          <BrainCircuit className="h-6 w-6 text-primary" />
+          <span className="font-bold hidden sm:inline-block">Dock</span>
+        </Link>
+
+        {currentUser && <NavigationMenu />}
+
+        <div className="flex flex-1 items-center justify-end gap-2">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSearchOpen(true)}>
+                <Search className="h-4 w-4" />
+                <span className="sr-only">Search</span>
             </Button>
             
-            {loading ? (
-               <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>
-            ) : currentUser ? (
-              <div>
-                <UserProfile onSettingsClick={() => setIsSettingsModalOpen(true)} />
-              </div>
-            ) : (
-              <Button onClick={() => router.push('/login')} variant="outline">
-                Login
-              </Button>
-            )}
-          </div>
+            <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
+
+            <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => setIsSupportModalOpen(true)}>
+                <Heart className="mr-2 h-4 w-4 text-red-500" />
+                Support
+            </Button>
+          
+            {currentUser && <SaveStatusWidget />}
+
+            <UserProfile onSettingsClick={() => setIsSettingsModalOpen(true)} />
         </div>
-      </header>
-      <SupportModal 
-        isOpen={isSupportModalOpen} 
-        onOpenChange={setIsSupportModalOpen} 
-      />
-      <DemoTokenModal
-        isOpen={isDemoTokenModalOpen}
-        onOpenChange={setIsDemoTokenModalOpen}
-        onSubmit={pushDemoDataWithToken}
-      />
+      </div>
+      <SupportModal isOpen={isSupportModalOpen} onOpenChange={setIsSupportModalOpen} />
+      <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
-      <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
-    </>
+    </header>
   );
 }
