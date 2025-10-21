@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button as ButtonShadCN } from './ui/button';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
 import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
@@ -20,12 +19,13 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -544,7 +544,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -598,27 +598,10 @@ export function Header() {
         
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const todaysSchedule = schedule[todayKey] || {};
-        
-        const routineTaskIdentifiers = new Set((settings.routines || []).map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
-        const reviewTaskDefIds = new Set(repetitionSkills.map(rt => {
-            const intentions = deepWorkDefinitions.filter(def => def.category === rt.name);
-            const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
-            return mainIntention?.id;
-        }).filter(Boolean));
-
-        const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
-            if (!act || act.completed) return false;
-            const isRoutine = routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
-            const isReview = act.taskIds?.some(tid => {
-                const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === tid);
-                return taskLog && reviewTaskDefIds.has(taskLog.definitionId);
-            });
-            return !isRoutine && !isReview;
-        }).length;
+        const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => act && !act.completed).length;
 
         return repetitionSkillsCount + learningGoalsCount + routineCount + scheduledTaskCount;
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, allUpskillLogs, allDeepWorkLogs]);
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule]);
 
 
   return (
