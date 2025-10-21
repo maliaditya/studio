@@ -376,9 +376,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 </DialogHeader>
                  <Tabs defaultValue="daily" className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="daily"><ListChecks className="mr-1 h-4 w-4" />Daily Goals</TabsTrigger>
-                        <TabsTrigger value="review"><Repeat className="mr-1 h-4 w-4" />Review</TabsTrigger>
-                        <TabsTrigger value="routine"><CalendarIcon className="mr-1 h-4 w-4" />Routine</TabsTrigger>
+                        <TabsTrigger value="daily">
+                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.length}</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="review">
+                            Review <Badge variant="secondary" className="ml-2">{repetitionSkillsWithDates.length}</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="routine">
+                            Routine <Badge variant="secondary" className="ml-2">{routineTasks.length}</Badge>
+                        </TabsTrigger>
                     </TabsList>
                     <TabsContent value="daily" className="mt-4">
                        <ScrollArea className="h-80">
@@ -443,11 +449,34 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
+
+  const upcomingTaskCount = useMemo(() => {
+    const today = startOfToday();
+    const repetitionSkills = coreSkills.flatMap(cs => 
+        cs.skillAreas.flatMap(sa => 
+            sa.microSkills.filter(ms => ms.isReadyForRepetition)
+        )
+    );
+    const repetitionCount = repetitionSkills.length;
+    
+    const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
+        if (plan.learningPlan) {
+            const activeAudio = (plan.learningPlan.audioVideoResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today));
+            const activeBooks = (plan.learningPlan.bookWebpageResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today));
+            return count + activeAudio.length + activeBooks.length;
+        }
+        return count;
+    }, 0);
+    
+    const routineCount = (settings.routines || []).length;
+    
+    return repetitionCount + learningGoalsCount + routineCount;
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines]);
 
   return (
     <>
@@ -468,10 +497,15 @@ export function Header() {
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
-              <Button variant="ghost" size="icon" className="h-8 w-8 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600" onClick={() => setIsUpcomingTasksModalOpen(true)}>
-                  <Info className="h-4 w-4" />
-                  <span className="sr-only">Upcoming Tasks</span>
-              </Button>
+              <div className="relative">
+                <Button variant="ghost" size="icon" className="h-8 w-8 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600" onClick={() => setIsUpcomingTasksModalOpen(true)}>
+                    <Info className="h-4 w-4" />
+                    <span className="sr-only">Upcoming Tasks</span>
+                </Button>
+                {upcomingTaskCount > 0 && (
+                  <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
+                )}
+              </div>
 
               <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => setIsSupportModalOpen(true)}>
                   <Heart className="mr-2 h-4 w-4 text-red-500" />
@@ -491,5 +525,3 @@ export function Header() {
     </>
   );
 }
-
-    
