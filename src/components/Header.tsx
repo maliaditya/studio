@@ -14,7 +14,7 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, AudioAnnotation, ResourcePoint, MicroSkill, Activity } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
@@ -28,6 +28,8 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
+import { getExercisesForDay } from '@/lib/workoutUtils';
+
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
   const { resources, openGeneralPopup, setPlaybackRequest } = useAuth();
@@ -229,6 +231,13 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         currentSlot, 
         offerizationPlans,
         settings,
+        dailyReviewLogs,
+        handleToggleDailyGoalCompletion,
+        workoutMode,
+        workoutPlans,
+        exerciseDefinitions,
+        allWorkoutLogs,
+        workoutPlanRotation,
     } = useAuth();
     const { toast } = useToast();
 
@@ -294,7 +303,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     };
     
     const dailyLearningGoals = useMemo(() => {
-        const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string }[] = [];
+        const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string, resourceId: string }[] = [];
         const today = startOfToday();
         
         const plannedSpecializations = Object.entries(offerizationPlans || {})
@@ -337,7 +346,8 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                         specName: spec.name,
                         resourceName: res.name,
                         dailyTarget: dailyTarget.join(' & '),
-                        progress: `${completed.items}/${res.totalItems} items & ${completed.hours.toFixed(1)}/${res.totalHours}h`
+                        progress: `${completed.items}/${res.totalItems} items & ${completed.hours.toFixed(1)}/${res.totalHours}h`,
+                        resourceId: res.id,
                     });
                 }
             });
@@ -349,7 +359,8 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                         specName: spec.name,
                         resourceName: res.name,
                         dailyTarget: `${targetPages} pgs/day`,
-                        progress: `${completed.pages}/${res.totalPages} pages`
+                        progress: `${completed.pages}/${res.totalPages} pages`,
+                        resourceId: res.id,
                     });
                 }
             });
@@ -359,8 +370,20 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [offerizationPlans, coreSkills]);
     
     const routineTasks = useMemo(() => {
-        return settings.routines || [];
-    }, [settings.routines]);
+      return (settings.routines || []).map(task => {
+        if (task.type === 'workout') {
+          const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+          return { ...task, details: description };
+        }
+        return task;
+      });
+    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
+
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysCompletions = useMemo(() => {
+        const log = dailyReviewLogs.find(log => log.date === todayKey);
+        return new Set(log?.completedResourceIds || []);
+    }, [dailyReviewLogs, todayKey]);
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -391,11 +414,21 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                             <ul className="space-y-3 pr-4">
                                 {dailyLearningGoals.map((goal, index) => (
                                     <li key={index} className="p-3 rounded-md border bg-muted/30">
-                                        <p className="font-semibold text-sm">{goal.resourceName}</p>
-                                        <p className="text-xs text-muted-foreground">{goal.specName}</p>
-                                        <div className="flex justify-between items-center mt-1 pt-1 border-t">
-                                            <Badge variant="secondary">{goal.progress}</Badge>
-                                            <Badge variant="default">{goal.dailyTarget}</Badge>
+                                        <div className="flex items-start">
+                                            <Checkbox
+                                                id={`goal-check-${goal.resourceId}`}
+                                                checked={todaysCompletions.has(goal.resourceId)}
+                                                onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
+                                                className="mr-2 mt-0.5"
+                                            />
+                                            <div className="flex-grow">
+                                                <p className="font-semibold text-sm">{goal.resourceName}</p>
+                                                <p className="text-xs text-muted-foreground">{goal.specName}</p>
+                                                <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                                    <Badge variant="secondary">{goal.progress}</Badge>
+                                                    <Badge variant="default">{goal.dailyTarget}</Badge>
+                                                </div>
+                                            </div>
                                         </div>
                                     </li>
                                 ))}
