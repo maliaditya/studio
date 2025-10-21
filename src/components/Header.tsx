@@ -236,23 +236,27 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         exerciseDefinitions,
         allWorkoutLogs,
         workoutPlanRotation,
-        allUpskillLogs,
-        allDeepWorkLogs,
         dailyReviewLogs,
         handleToggleDailyGoalCompletion,
+        allUpskillLogs,
+        allDeepWorkLogs,
     } = useAuth();
     const { toast } = useToast();
 
     const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
 
-    const repetitionSkillsWithDates = useMemo(() => {
+    const { todaysReviewTasks, pendingReviewTasks } = useMemo(() => {
         const repetitionSkills = coreSkills.flatMap(cs => 
             cs.skillAreas.flatMap(sa => 
                 sa.microSkills.filter(ms => ms.isReadyForRepetition)
             )
         );
 
-        return repetitionSkills.map(skill => {
+        const today = startOfToday();
+        const todaysTasks: any[] = [];
+        const pendingTasks: any[] = [];
+
+        repetitionSkills.forEach(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
             const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
             const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
@@ -281,13 +285,26 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             const nextInterval = DOUBLING_INTERVALS[reps] || 128;
             const nextReviewDate = addDays(lastReviewDate, nextInterval);
 
-            return {
+            const task = {
                 ...skill,
                 mainIntentionId: mainIntention?.id,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
-                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
+                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, today),
             };
-        }).sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+
+            if (isToday(task.nextReviewDate)) {
+                todaysTasks.push(task);
+            } else if (isBefore(task.nextReviewDate, today)) {
+                pendingTasks.push(task);
+            }
+        });
+        
+        const sortTasks = (tasks: any[]) => tasks.sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+
+        return { 
+            todaysReviewTasks: sortTasks(todaysTasks),
+            pendingReviewTasks: sortTasks(pendingTasks),
+        };
     }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
 
     const handleScheduleClick = (skill: { mainIntentionId?: string, name: string }) => {
@@ -397,7 +414,11 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         const routineTaskIdentifiers = new Set(routineTasks.map(rt => {
             return `${rt.details}_${rt.type}_${rt.slot}`;
         }));
-        const reviewTaskDefIds = new Set(repetitionSkillsWithDates.map(rt => rt.mainIntentionId));
+        
+        const reviewTaskDefIds = new Set([
+            ...todaysReviewTasks.map(rt => rt.mainIntentionId),
+            ...pendingReviewTasks.map(rt => rt.mainIntentionId),
+        ]);
 
         for (const slotName of slotOrder) {
             const activities = todaysSchedule[slotName as SlotName] as Activity[] | undefined;
@@ -417,7 +438,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             }
         }
         return tasks;
-    }, [schedule, todayKey, routineTasks, repetitionSkillsWithDates, allUpskillLogs, allDeepWorkLogs]);
+    }, [schedule, todayKey, routineTasks, todaysReviewTasks, pendingReviewTasks, allUpskillLogs, allDeepWorkLogs]);
 
     
     return (
@@ -433,15 +454,18 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                     </DialogDescription>
                 </DialogHeader>
                  <Tabs defaultValue="scheduled" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-5">
                         <TabsTrigger value="scheduled">
                             Scheduled <Badge variant="secondary" className="ml-2">{todaysScheduledTasks.length}</Badge>
                         </TabsTrigger>
-                        <TabsTrigger value="daily">
-                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.filter(g => !todaysCompletions.has(g.resourceId)).length}</Badge>
+                         <TabsTrigger value="pending">
+                            Pending <Badge variant="destructive" className="ml-2">{pendingReviewTasks.length}</Badge>
                         </TabsTrigger>
                         <TabsTrigger value="review">
-                            Review <Badge variant="secondary" className="ml-2">{repetitionSkillsWithDates.length}</Badge>
+                            Review <Badge variant="secondary" className="ml-2">{todaysReviewTasks.length}</Badge>
+                        </TabsTrigger>
+                        <TabsTrigger value="daily">
+                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.filter(g => !todaysCompletions.has(g.resourceId)).length}</Badge>
                         </TabsTrigger>
                         <TabsTrigger value="routine">
                             Routine <Badge variant="secondary" className="ml-2">{routineTasks.length}</Badge>
@@ -462,6 +486,46 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 ))}
                                 {todaysScheduledTasks.length === 0 && (
                                     <p className="text-center text-muted-foreground pt-12">No other tasks scheduled for today.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="pending" className="mt-4">
+                        <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {pendingReviewTasks.map(skill => (
+                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-destructive/10">
+                                        <div>
+                                            <p className="font-semibold">{skill.name}</p>
+                                            <p className="text-xs text-destructive">
+                                                Due: {format(skill.nextReviewDate, 'PPP')}
+                                            </p>
+                                        </div>
+                                        <Button size="sm" onClick={() => handleScheduleClick(skill)}>Schedule</Button>
+                                    </li>
+                                ))}
+                                {pendingReviewTasks.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No overdue review tasks.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="review" className="mt-4">
+                        <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {todaysReviewTasks.map(skill => (
+                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                                        <div>
+                                            <p className="font-semibold">{skill.name}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Due: {format(skill.nextReviewDate, 'PPP')}
+                                            </p>
+                                        </div>
+                                        <Button size="sm" onClick={() => handleScheduleClick(skill)}>Schedule</Button>
+                                    </li>
+                                ))}
+                                {todaysReviewTasks.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No skills to review today.</p>
                                 )}
                             </ul>
                         </ScrollArea>
@@ -494,26 +558,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 })}
                                 {dailyLearningGoals.length === 0 && (
                                     <p className="text-center text-muted-foreground pt-12">No active daily learning goals.</p>
-                                )}
-                            </ul>
-                        </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="review" className="mt-4">
-                        <ScrollArea className="h-80">
-                            <ul className="space-y-3 pr-4">
-                                {repetitionSkillsWithDates.map(skill => (
-                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
-                                        <div>
-                                            <p className="font-semibold">{skill.name}</p>
-                                            <p className={cn("text-xs", skill.isOverdue ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                                                Due: {format(skill.nextReviewDate, 'PPP')}
-                                            </p>
-                                        </div>
-                                        <Button size="sm" onClick={() => handleScheduleClick(skill)}>Schedule</Button>
-                                    </li>
-                                ))}
-                                {repetitionSkillsWithDates.length === 0 && (
-                                    <p className="text-center text-muted-foreground pt-12">No skills are ready for repetition.</p>
                                 )}
                             </ul>
                         </ScrollArea>
@@ -552,14 +596,13 @@ export function Header() {
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
     
-    // 1. Spaced Repetition Count
     const repetitionSkills = coreSkills.flatMap(cs => 
         cs.skillAreas.flatMap(sa => 
             sa.microSkills.filter(ms => ms.isReadyForRepetition)
         )
     );
 
-    const repetitionSkillCount = repetitionSkills.filter(skill => {
+    const dueTasks = repetitionSkills.filter(skill => {
         const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
         const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
         const completionDates = new Set<string>();
@@ -567,7 +610,7 @@ export function Header() {
             if (node.last_logged_date) completionDates.add(node.last_logged_date);
         });
         const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-        if (sortedDates.length === 0) return true;
+        if (sortedDates.length === 0) return false;
 
         let reps = 1;
         let lastReviewDate = sortedDates[0];
@@ -583,9 +626,8 @@ export function Header() {
         const nextInterval = [1, 2, 4, 8, 16, 32, 64, 128][reps] || 128;
         const nextReviewDate = addDays(lastReviewDate, nextInterval);
         return isBefore(nextReviewDate, today) || isToday(nextReviewDate);
-    }).length;
+    });
 
-    // 2. Daily Learning Goals Count
     const todaysCompletions = new Set(dailyReviewLogs.find(log => log.date === todayKey)?.completedResourceIds || []);
     const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
         if (plan.learningPlan) {
@@ -596,7 +638,6 @@ export function Header() {
         return count;
     }, 0);
     
-    // 3. Routine Tasks Count
     const routineTasks = (settings.routines || []).map(task => {
       if (task.type === 'workout') {
         const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
@@ -604,9 +645,7 @@ export function Header() {
       }
       return task;
     });
-    const routineCount = routineTasks.length;
     
-    // 4. Scheduled (non-routine, non-review) Tasks
     const todaysSchedule = schedule[todayKey] || {};
     const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
     const reviewTaskDefIds = new Set(repetitionSkills.map(rt => rt.mainIntentionId));
@@ -622,7 +661,7 @@ export function Header() {
         return !isRoutine && !isReview;
     }).length;
     
-    return repetitionSkillCount + learningGoalsCount + scheduledTaskCount;
+    return dueTasks.length + learningGoalsCount + scheduledTaskCount;
   }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs]);
 
 
