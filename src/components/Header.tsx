@@ -17,7 +17,7 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import type { Resource, AudioAnnotation, ResourcePoint, MicroSkill, Activity } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -491,3 +491,5 @@ export function Header() {
     </>
   );
 }
+
+    
