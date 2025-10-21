@@ -3,18 +3,21 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from './ui/button';
-import { useRouter, usePathname } from 'next/navigation';
+import { Button as ButtonShadCN } from './ui/button';
+import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
 import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
@@ -223,6 +226,8 @@ function NavigationMenu() {
   );
 }
 
+const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+
 function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
     const { 
         coreSkills, 
@@ -239,6 +244,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         exerciseDefinitions,
         allWorkoutLogs,
         workoutPlanRotation,
+        schedule,
     } = useAuth();
     const { toast } = useToast();
 
@@ -380,6 +386,19 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
       });
     }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
 
+    const todaysScheduledTasks = useMemo(() => {
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        const todaysSchedule = schedule[todayKey] || {};
+        const tasks: Activity[] = [];
+        for (const slotName of slotOrder) {
+            const activities = todaysSchedule[slotName];
+            if (Array.isArray(activities)) {
+                tasks.push(...activities.filter(act => !act.completed));
+            }
+        }
+        return tasks;
+    }, [schedule]);
+
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysCompletions = useMemo(() => {
         const log = dailyReviewLogs.find(log => log.date === todayKey);
@@ -398,8 +417,11 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                         A summary of your goals and review tasks for the day.
                     </DialogDescription>
                 </DialogHeader>
-                 <Tabs defaultValue="daily" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                 <Tabs defaultValue="scheduled" className="w-full">
+                    <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="scheduled">
+                            Scheduled <Badge variant="secondary" className="ml-2">{todaysScheduledTasks.length}</Badge>
+                        </TabsTrigger>
                         <TabsTrigger value="daily">
                             Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.length}</Badge>
                         </TabsTrigger>
@@ -410,6 +432,25 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                             Routine <Badge variant="secondary" className="ml-2">{routineTasks.length}</Badge>
                         </TabsTrigger>
                     </TabsList>
+                    <TabsContent value="scheduled" className="mt-4">
+                       <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {todaysScheduledTasks.map((task) => (
+                                    <li key={task.id} className="p-3 rounded-md border bg-muted/30">
+                                        <div className="flex items-start">
+                                            <div className="flex-grow">
+                                                <p className="font-semibold text-sm">{task.details}</p>
+                                                <p className="text-xs text-muted-foreground">{task.slot}</p>
+                                            </div>
+                                        </div>
+                                    </li>
+                                ))}
+                                {todaysScheduledTasks.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No tasks scheduled for today.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
                     <TabsContent value="daily" className="mt-4">
                        <ScrollArea className="h-80">
                             <ul className="space-y-3 pr-4">
@@ -483,7 +524,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -509,8 +550,12 @@ export function Header() {
     
     const routineCount = (settings.routines || []).length;
     
-    return repetitionCount + learningGoalsCount + routineCount;
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines]);
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const todaysSchedule = schedule[todayKey] || {};
+    const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => act && !act.completed).length;
+
+    return repetitionCount + learningGoalsCount + routineCount + scheduledTaskCount;
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule]);
 
   return (
     <>
