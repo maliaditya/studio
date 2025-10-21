@@ -61,7 +61,7 @@ export const getExercisesForDay = (
 
     if (overrideCategories) {
         muscleGroups = overrideCategories;
-        exercisesPerGroup = mode === 'one-muscle' ? 6 : 4;
+        exercisesPerGroup = mode === 'one-muscle' ? 6 : 2; // Corrected for override
     } else if (schedulingMode === 'sequential' && allWorkoutLogs) {
         const sortedLogs = allWorkoutLogs
             .filter(log => log.exercises.length > 0)
@@ -70,7 +70,7 @@ export const getExercisesForDay = (
         const lastWorkout = sortedLogs[0];
         
         if (mode === 'two-muscle') {
-            exercisesPerGroup = 4;
+            exercisesPerGroup = 2; // Each group gets 2 exercises
             let lastWorkoutIndex = -1;
             if (lastWorkout) {
                 const lastMuscleGroup = lastWorkout.exercises[0]?.category;
@@ -92,7 +92,7 @@ export const getExercisesForDay = (
         const dayOfWeek = getDay(date);
         if (mode === 'two-muscle') {
             muscleGroups = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
-            exercisesPerGroup = 4;
+            exercisesPerGroup = 2; // Corrected: 2 exercises per muscle group for a total of 4
         } else { // 'one-muscle' mode
             const muscle = singleMuscleDailySchedule[dayOfWeek];
             muscleGroups = muscle ? [muscle] : [];
