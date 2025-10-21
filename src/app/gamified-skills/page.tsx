@@ -10,7 +10,8 @@ import { Progress } from '@/components/ui/progress';
 import { BrainCircuit } from 'lucide-react';
 import type { CoreSkill, SkillArea, MicroSkill } from '@/types/workout';
 
-const XP_PER_LEVEL = 100; // 100 minutes of logged time = 1 level
+const XP_PER_LEVEL = 100;
+const XP_PER_LEAF_NODE = 25; // Each completed leaf task (Visualization/Action) is worth 25 XP.
 
 interface GamifiedSkillArea extends SkillArea {
   totalLevel: number;
@@ -29,7 +30,8 @@ function GamifiedSkillsPageContent() {
     offerizationPlans,
     upskillDefinitions,
     deepWorkDefinitions,
-    getDescendantLeafNodes
+    getDescendantLeafNodes,
+    permanentlyLoggedTaskIds,
   } = useAuth();
 
   const gamifiedSpecializations = useMemo((): GamifiedSpecialization[] => {
@@ -50,10 +52,10 @@ function GamifiedSkillsPageContent() {
             const upskillLeafNodes = upskillCuriosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
             const deepWorkLeafNodes = deepWorkIntentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
 
-            const upskillMinutes = upskillLeafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
-            const deepWorkMinutes = deepWorkLeafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
+            const completedUpskillNodes = upskillLeafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id));
+            const completedDeepWorkNodes = deepWorkLeafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id));
             
-            areaTotalXP += upskillMinutes + deepWorkMinutes;
+            areaTotalXP += (completedUpskillNodes.length + completedDeepWorkNodes.length) * XP_PER_LEAF_NODE;
           });
 
           const areaTotalLevel = Math.floor(areaTotalXP / XP_PER_LEVEL);
@@ -76,7 +78,7 @@ function GamifiedSkillsPageContent() {
         };
       })
       .sort((a, b) => b.totalLevel - a.totalLevel);
-  }, [coreSkills, offerizationPlans, upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes]);
+  }, [coreSkills, offerizationPlans, upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
