@@ -311,6 +311,13 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         }
     };
     
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+    const todaysCompletions = useMemo(() => {
+        const log = dailyReviewLogs.find(log => log.date === todayKey);
+        return new Set(log?.completedResourceIds || []);
+    }, [dailyReviewLogs, todayKey]);
+
     const dailyLearningGoals = useMemo(() => {
         const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string, resourceId: string }[] = [];
         const today = startOfToday();
@@ -393,7 +400,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
 
     const todaysScheduledTasks = useMemo(() => {
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
         const todaysSchedule = schedule[todayKey] || {};
         const tasks: Activity[] = [];
         
@@ -417,14 +423,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             }
         }
         return tasks;
-    }, [schedule, routineTasks, repetitionSkillsWithDates, allUpskillLogs, allDeepWorkLogs]);
-
-
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const todaysCompletions = useMemo(() => {
-        const log = dailyReviewLogs.find(log => log.date === todayKey);
-        return new Set(log?.completedResourceIds || []);
-    }, [dailyReviewLogs, todayKey]);
+    }, [schedule, todayKey, routineTasks, repetitionSkillsWithDates, allUpskillLogs, allDeepWorkLogs]);
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -444,7 +443,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                             Scheduled <Badge variant="secondary" className="ml-2">{todaysScheduledTasks.length}</Badge>
                         </TabsTrigger>
                         <TabsTrigger value="daily">
-                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.length}</Badge>
+                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.filter(g => !todaysCompletions.has(g.resourceId)).length}</Badge>
                         </TabsTrigger>
                         <TabsTrigger value="review">
                             Review <Badge variant="secondary" className="ml-2">{repetitionSkillsWithDates.length}</Badge>
@@ -548,93 +547,92 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allUpskillLogs, allDeepWorkLogs, dailyReviewLogs } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
 
-    const upcomingTaskCount = useMemo(() => {
-        const today = startOfToday();
-        
-        const repetitionSkills = coreSkills.flatMap(cs => 
-            cs.skillAreas.flatMap(sa => 
-                sa.microSkills.filter(ms => ms.isReadyForRepetition)
-            )
-        );
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  const todaysCompletions = useMemo(() => {
+      const log = dailyReviewLogs.find(log => log.date === todayKey);
+      return new Set(log?.completedResourceIds || []);
+  }, [dailyReviewLogs, todayKey]);
+    
+  const upcomingTaskCount = useMemo(() => {
+    const today = startOfToday();
+    
+    // 1. Spaced Repetition Count
+    const repetitionSkills = coreSkills.flatMap(cs => 
+        cs.skillAreas.flatMap(sa => 
+            sa.microSkills.filter(ms => ms.isReadyForRepetition)
+        )
+    );
 
-        const repetitionSkillsCount = repetitionSkills.filter(skill => {
-            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
-            const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-            const completionDates = new Set<string>();
-            allLeafNodes.forEach(node => {
-                if (node.last_logged_date) completionDates.add(node.last_logged_date);
-            });
-            const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-            if (sortedDates.length === 0) return true;
-
-            let reps = 1;
-            let lastReviewDate = sortedDates[0];
-            for (let i = 1; i < sortedDates.length; i++) {
-                const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
-                if (daysBetween <= ([1, 2, 4, 8, 16, 32, 64, 128][reps - 1] || 128)) {
-                    reps++;
-                } else {
-                    reps = 1;
-                }
-                lastReviewDate = sortedDates[i];
-            }
-            const nextInterval = [1, 2, 4, 8, 16, 32, 64, 128][reps] || 128;
-            const nextReviewDate = addDays(lastReviewDate, nextInterval);
-            return isBefore(nextReviewDate, today) || isToday(nextReviewDate);
-        }).length;
-        
-        const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
-            if (plan.learningPlan) {
-                const activeAudio = (plan.learningPlan.audioVideoResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today));
-                const activeBooks = (plan.learningPlan.bookWebpageResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today));
-                return count + activeAudio.length + activeBooks.length;
-            }
-            return count;
-        }, 0);
-        
-        const routineTasks = (settings.routines || []).map(task => {
-          if (task.type === 'workout') {
-            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-            return { ...task, details: description };
-          }
-          return task;
+    const repetitionSkillsCount = repetitionSkills.filter(skill => {
+        const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+        const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+        const completionDates = new Set<string>();
+        allLeafNodes.forEach(node => {
+            if (node.last_logged_date) completionDates.add(node.last_logged_date);
         });
-        const routineCount = routineTasks.length;
-        
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const todaysSchedule = schedule[todayKey] || {};
-        
-        const repetitionSkillsWithDates = repetitionSkills.map(skill => {
-            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
-            const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
-            return {
-                ...skill,
-                mainIntentionId: mainIntention?.id,
-            };
+        const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+        if (sortedDates.length === 0) return true; // If never reviewed, it's due.
+
+        let reps = 1;
+        let lastReviewDate = sortedDates[0];
+        for (let i = 1; i < sortedDates.length; i++) {
+            const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
+            if (daysBetween <= ([1, 2, 4, 8, 16, 32, 64, 128][reps - 1] || 128)) {
+                reps++;
+            } else {
+                reps = 1;
+            }
+            lastReviewDate = sortedDates[i];
+        }
+        const nextInterval = [1, 2, 4, 8, 16, 32, 64, 128][reps] || 128;
+        const nextReviewDate = addDays(lastReviewDate, nextInterval);
+        return isBefore(nextReviewDate, today) || isToday(nextReviewDate);
+    }).length;
+
+    // 2. Daily Learning Goals Count
+    const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
+        if (plan.learningPlan) {
+            const activeAudio = (plan.learningPlan.audioVideoResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today) && !todaysCompletions.has(res.id));
+            const activeBooks = (plan.learningPlan.bookWebpageResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today) && !todaysCompletions.has(res.id));
+            return count + activeAudio.length + activeBooks.length;
+        }
+        return count;
+    }, 0);
+    
+    // 3. Routine Tasks Count
+    const routineTasks = (settings.routines || []).map(task => {
+      if (task.type === 'workout') {
+        const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+        return { ...task, details: description };
+      }
+      return task;
+    });
+    const routineCount = routineTasks.length;
+    
+    // 4. Scheduled (non-routine, non-review) Tasks
+    const todaysSchedule = schedule[todayKey] || {};
+    const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
+    const reviewTaskDefIds = new Set(repetitionSkills.map(rt => rt.mainIntentionId));
+    
+    const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
+        if (!act || act.completed) return false;
+        const isRoutine = routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
+        const isReview = act.taskIds?.some(tid => {
+            const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+            const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === tid);
+            return taskLog && reviewTaskDefIds.has(taskLog.definitionId);
         });
+        return !isRoutine && !isReview;
+    }).length;
 
-        const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
-        const reviewTaskDefIds = new Set(repetitionSkillsWithDates.map(rt => rt.mainIntentionId));
-
-        const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
-            if (!act || act.completed) return false;
-            const isRoutine = routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
-            const isReview = act.taskIds?.some(tid => {
-                const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === tid);
-                return taskLog && reviewTaskDefIds.has(taskLog.definitionId);
-            });
-            return !isRoutine && !isReview;
-        }).length;
-
-        return repetitionSkillsCount + learningGoalsCount + routineCount + scheduledTaskCount;
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allDeepWorkLogs, allUpskillLogs]);
+    return repetitionSkillsCount + learningGoalsCount + routineCount + scheduledTaskCount;
+}, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allUpskillLogs, allDeepWorkLogs, todaysCompletions]);
 
 
   return (
@@ -685,4 +683,3 @@ export function Header() {
   );
 }
 
-    
