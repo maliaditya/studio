@@ -17,6 +17,8 @@ interface GamifiedSkillArea extends SkillArea {
   totalLevel: number;
   totalXP: number;
   progressToNextLevel: number;
+  completedMicroSkills: number;
+  totalMicroSkills: number;
 }
 
 interface GamifiedSpecialization extends CoreSkill {
@@ -44,6 +46,8 @@ function GamifiedSkillsPageContent() {
         
         const gamifiedSkillAreas = spec.skillAreas.map(area => {
           let areaTotalXP = 0;
+          let completedMicroSkillsCount = 0;
+          const totalMicroSkillsCount = area.microSkills.length;
           
           area.microSkills.forEach(microSkill => {
             const upskillCuriosities = upskillDefinitions.filter(def => def.category === microSkill.name);
@@ -51,11 +55,17 @@ function GamifiedSkillsPageContent() {
             
             const upskillLeafNodes = upskillCuriosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
             const deepWorkLeafNodes = deepWorkIntentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            
+            const allLeafNodes = [...upskillLeafNodes, ...deepWorkLeafNodes];
 
             const completedUpskillNodes = upskillLeafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id));
             const completedDeepWorkNodes = deepWorkLeafNodes.filter(node => permanentlyLoggedTaskIds.has(node.id));
             
             areaTotalXP += (completedUpskillNodes.length + completedDeepWorkNodes.length) * XP_PER_LEAF_NODE;
+
+            if (allLeafNodes.length > 0 && allLeafNodes.every(node => permanentlyLoggedTaskIds.has(node.id))) {
+                completedMicroSkillsCount++;
+            }
           });
 
           const areaTotalLevel = Math.floor(areaTotalXP / XP_PER_LEVEL);
@@ -68,6 +78,8 @@ function GamifiedSkillsPageContent() {
             totalLevel: areaTotalLevel,
             totalXP: areaTotalXP,
             progressToNextLevel: areaProgressToNextLevel,
+            completedMicroSkills: completedMicroSkillsCount,
+            totalMicroSkills: totalMicroSkillsCount,
           };
         });
         
@@ -108,15 +120,22 @@ function GamifiedSkillsPageContent() {
                         </CardHeader>
                         <CardContent className="flex-grow flex flex-col justify-end">
                             <div>
-                                <div className="flex justify-between items-center mb-1 text-sm">
-                                <p className="font-medium text-foreground">
-                                    <span className="font-bold text-primary">Lvl {area.totalLevel}</span>
-                                </p>
-                                <p className="text-muted-foreground text-xs">
-                                    ({area.totalXP % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)
-                                </p>
+                                <div className="flex justify-between items-center mb-1">
+                                    <p className="text-sm font-medium text-foreground">
+                                        <span className="font-bold text-primary">Lvl {area.totalLevel}</span>
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        ({area.totalXP % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)
+                                    </p>
                                 </div>
                                 <Progress value={area.progressToNextLevel} />
+                                {area.totalMicroSkills > 0 && (
+                                    <div className="mt-3 text-right">
+                                        <Badge variant="outline">
+                                            {area.completedMicroSkills} / {area.totalMicroSkills} Micro-Skills
+                                        </Badge>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
