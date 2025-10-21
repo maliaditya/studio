@@ -61,7 +61,7 @@ export const getExercisesForDay = (
 
     if (overrideCategories) {
         muscleGroups = overrideCategories;
-        exercisesPerGroup = mode === 'one-muscle' ? 6 : 2; // Corrected for override
+        exercisesPerGroup = mode === 'one-muscle' ? 6 : 2; 
     } else if (schedulingMode === 'sequential' && allWorkoutLogs) {
         const sortedLogs = allWorkoutLogs
             .filter(log => log.exercises.length > 0)
@@ -70,7 +70,7 @@ export const getExercisesForDay = (
         const lastWorkout = sortedLogs[0];
         
         if (mode === 'two-muscle') {
-            exercisesPerGroup = 2; // Each group gets 2 exercises
+            exercisesPerGroup = 2;
             let lastWorkoutIndex = -1;
             if (lastWorkout) {
                 const lastMuscleGroup = lastWorkout.exercises[0]?.category;
@@ -92,7 +92,7 @@ export const getExercisesForDay = (
         const dayOfWeek = getDay(date);
         if (mode === 'two-muscle') {
             muscleGroups = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
-            exercisesPerGroup = 2; // Corrected: 2 exercises per muscle group for a total of 4
+            exercisesPerGroup = 2;
         } else { // 'one-muscle' mode
             const muscle = singleMuscleDailySchedule[dayOfWeek];
             muscleGroups = muscle ? [muscle] : [];
@@ -104,7 +104,6 @@ export const getExercisesForDay = (
         return { exercises: [], description: "Rest day." };
     }
 
-    // Determine planKey based on rotation, regardless of scheduling mode
     const isoWeek = getISOWeek(date);
     if (mode === 'two-muscle') {
         if (rotationEnabled) {
@@ -182,6 +181,6 @@ export const getExercisesForDay = (
         allExercisesToAdd.push(...workoutExercisesForGroup);
     }
 
-    const description = `Added ${planKey} exercises for ${muscleGroups.join(' & ')}. Loaded ${allExercisesToAdd.length} exercises.`;
+    const description = `${muscleGroups.join(' & ')} workout added.`;
     return { exercises: allExercisesToAdd, description };
 };
