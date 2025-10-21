@@ -86,36 +86,39 @@ function GamifiedSkillsPageContent() {
       </div>
 
       {gamifiedSpecializations.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="space-y-12">
           {gamifiedSpecializations.map(spec => (
-            <Card key={spec.id} className="flex flex-col">
-              <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                  <span className="flex items-center gap-2">
-                    <BrainCircuit className="h-5 w-5 text-primary" />
-                    {spec.name}
-                  </span>
-                  <Badge variant="secondary">Lvl {spec.totalLevel}</Badge>
-                </CardTitle>
-                <CardDescription>
-                  A breakdown of your progress in this specialization.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex-grow space-y-4">
-                {spec.gamifiedMicroSkills.map(ms => (
-                  <div key={ms.id}>
-                    <div className="flex justify-between items-center mb-1 text-sm">
-                      <p className="font-medium text-foreground">{ms.name}</p>
-                      <p className="text-muted-foreground">
-                        <span className="font-bold text-primary">Lvl {ms.level}</span>
-                        <span className="text-xs"> ({ms.xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)</span>
-                      </p>
+            <div key={spec.id}>
+                <div className="flex items-center gap-4 mb-6">
+                    <BrainCircuit className="h-8 w-8 text-primary" />
+                    <div>
+                        <h2 className="text-2xl font-bold">{spec.name}</h2>
+                        <Badge variant="secondary">Total Level: {spec.totalLevel}</Badge>
                     </div>
-                    <Progress value={ms.progressToNextLevel} />
-                  </div>
+                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {spec.gamifiedMicroSkills.map(ms => (
+                    <Card key={ms.id} className="flex flex-col">
+                        <CardHeader>
+                            <CardTitle className="text-base">{ms.name}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-grow flex flex-col justify-end">
+                            <div>
+                                <div className="flex justify-between items-center mb-1 text-sm">
+                                <p className="font-medium text-foreground">
+                                    <span className="font-bold text-primary">Lvl {ms.level}</span>
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                    ({ms.xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)
+                                </p>
+                                </div>
+                                <Progress value={ms.progressToNextLevel} />
+                            </div>
+                        </CardContent>
+                    </Card>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
