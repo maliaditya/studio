@@ -24,8 +24,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
-import { getExercisesForDay } from '@/lib/workoutUtils';
 import { Checkbox } from './ui/checkbox';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -230,16 +230,16 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         currentSlot, 
         offerizationPlans,
         settings,
-        dailyReviewLogs,
-        handleToggleDailyGoalCompletion,
+        schedule,
         workoutMode,
         workoutPlans,
         exerciseDefinitions,
         allWorkoutLogs,
         workoutPlanRotation,
-        schedule,
         allUpskillLogs,
         allDeepWorkLogs,
+        dailyReviewLogs,
+        handleToggleDailyGoalCompletion,
     } = useAuth();
     const { toast } = useToast();
 
@@ -252,7 +252,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             )
         );
 
-        const skillsToReview = repetitionSkills.map(skill => {
+        return repetitionSkills.map(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
             const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
             const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
@@ -287,9 +287,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
                 isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
-        });
-
-        return skillsToReview.sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
+        }).sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
     }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
 
     const handleScheduleClick = (skill: { mainIntentionId?: string, name: string }) => {
@@ -383,15 +381,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [offerizationPlans, coreSkills]);
     
     const routineTasks = useMemo(() => {
-      return (settings.routines || []).map(task => {
-        if (task.type === 'workout') {
-          const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-          return { ...task, details: description };
-        }
-        return task;
-      });
+        return (settings.routines || []).map(task => {
+            if (task.type === 'workout') {
+                const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+                return { ...task, details: description };
+            }
+            return task;
+        });
     }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
-
+    
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
         const tasks: Activity[] = [];
@@ -420,6 +418,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         }
         return tasks;
     }, [schedule, todayKey, routineTasks, repetitionSkillsWithDates, allUpskillLogs, allDeepWorkLogs]);
+
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -519,7 +518,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                             </ul>
                         </ScrollArea>
                     </TabsContent>
-                     <TabsContent value="routine" className="mt-4">
+                    <TabsContent value="routine" className="mt-4">
                         <ScrollArea className="h-80">
                             <ul className="space-y-3 pr-4">
                                 {routineTasks.map((task, index) => (
@@ -543,7 +542,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs, handleToggleDailyGoalCompletion } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -551,6 +550,7 @@ export function Header() {
 
   const upcomingTaskCount = useMemo(() => {
     const today = startOfToday();
+    const todayKey = format(today, 'yyyy-MM-dd');
     
     // 1. Spaced Repetition Count
     const repetitionSkills = coreSkills.flatMap(cs => 
@@ -586,9 +586,7 @@ export function Header() {
     }).length;
 
     // 2. Daily Learning Goals Count
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
     const todaysCompletions = new Set(dailyReviewLogs.find(log => log.date === todayKey)?.completedResourceIds || []);
-
     const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
         if (plan.learningPlan) {
             const activeAudio = (plan.learningPlan.audioVideoResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today) && !todaysCompletions.has(res.id));
@@ -616,11 +614,16 @@ export function Header() {
     const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
         if (!act || act.completed) return false;
         const isRoutine = routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
-        return !isRoutine;
+        const isReview = act.taskIds?.some(tid => {
+            const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+            const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === tid);
+            return taskLog && reviewTaskDefIds.has(taskLog.definitionId);
+        });
+        return !isRoutine && !isReview;
     }).length;
-
+    
     return repetitionSkillCount + learningGoalsCount + scheduledTaskCount;
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs]);
 
 
   return (
