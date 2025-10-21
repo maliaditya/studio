@@ -3,7 +3,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat } from 'lucide-react';
+import { BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
@@ -14,7 +14,7 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, AudioAnnotation, ResourcePoint, MicroSkill } from '@/types/workout';
+import type { Resource, AudioAnnotation, ResourcePoint, MicroSkill, Activity } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays } from 'date-fns';
@@ -26,6 +26,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from './ui/badge';
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
   const { resources, openGeneralPopup, setPlaybackRequest } = useAuth();
@@ -218,8 +220,16 @@ function NavigationMenu() {
   );
 }
 
-function UpcomingSkillsModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
-    const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes, scheduleTaskFromMindMap, currentSlot } = useAuth();
+function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+    const { 
+        coreSkills, 
+        deepWorkDefinitions, 
+        getDescendantLeafNodes, 
+        scheduleTaskFromMindMap, 
+        currentSlot, 
+        offerizationPlans,
+        settings,
+    } = useAuth();
     const { toast } = useToast();
 
     const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
@@ -283,49 +293,161 @@ function UpcomingSkillsModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpen
         }
     };
     
+    const dailyLearningGoals = useMemo(() => {
+        const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string }[] = [];
+        const today = startOfToday();
+        
+        const plannedSpecializations = Object.entries(offerizationPlans || {})
+            .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
+            .map(([specId]) => coreSkills.find(s => s.id === specId))
+            .filter((spec): spec is NonNullable<typeof spec> => !!spec);
+            
+        plannedSpecializations.forEach(spec => {
+            const plan = offerizationPlans[spec.id]?.learningPlan;
+            if (!plan) return;
+            
+            const completed = spec.skillAreas.flatMap(sa => sa.microSkills).reduce((acc, ms) => {
+                acc.items += ms.completedItems || 0;
+                acc.hours += ms.completedHours || 0;
+                acc.pages += ms.completedPages || 0;
+                return acc;
+            }, { items: 0, hours: 0, pages: 0 });
+
+            const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
+                if (!total || !start || !end) return null;
+                const startDate = parseISO(start);
+                const endDate = parseISO(end);
+                if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
+                const remainingWork = total - completed;
+                const relevantStartDate = isBefore(startDate, today) ? today : startDate;
+                const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
+                if (remainingWork <= 0 || remainingDays <= 0) return null;
+                return (remainingWork / remainingDays).toFixed(1);
+            };
+
+            (plan.audioVideoResources || []).forEach(res => {
+                const targetItems = calculateTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
+                const targetHours = calculateTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
+                let dailyTarget = [];
+                if (targetItems) dailyTarget.push(`${targetItems} items/day`);
+                if (targetHours) dailyTarget.push(`${targetHours} h/day`);
+                
+                if (dailyTarget.length > 0) {
+                    goals.push({
+                        specName: spec.name,
+                        resourceName: res.name,
+                        dailyTarget: dailyTarget.join(' & '),
+                        progress: `${completed.items}/${res.totalItems} items & ${completed.hours.toFixed(1)}/${res.totalHours}h`
+                    });
+                }
+            });
+
+            (plan.bookWebpageResources || []).forEach(res => {
+                const targetPages = calculateTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
+                if (targetPages) {
+                    goals.push({
+                        specName: spec.name,
+                        resourceName: res.name,
+                        dailyTarget: `${targetPages} pgs/day`,
+                        progress: `${completed.pages}/${res.totalPages} pages`
+                    });
+                }
+            });
+        });
+        
+        return goals;
+    }, [offerizationPlans, coreSkills]);
+    
+    const routineTasks = useMemo(() => {
+        return settings.routines || [];
+    }, [settings.routines]);
+    
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Repeat className="h-5 w-5 text-blue-500" />
-                        Upcoming Skills for Review
+                        <Info className="h-5 w-5 text-blue-500" />
+                        Today's Learning Overview
                     </DialogTitle>
                     <DialogDescription>
-                        This is your spaced repetition queue. Review these skills to strengthen your memory.
+                        A summary of your goals and review tasks for the day.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="py-4">
-                    <ScrollArea className="h-80">
-                        <ul className="space-y-3 pr-4">
-                            {repetitionSkillsWithDates.map(skill => (
-                                <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
-                                    <div>
-                                        <p className="font-semibold">{skill.name}</p>
-                                        <p className={cn("text-xs", skill.isOverdue ? "text-destructive font-semibold" : "text-muted-foreground")}>
-                                            Due: {format(skill.nextReviewDate, 'PPP')}
-                                        </p>
-                                    </div>
-                                    <Button size="sm" onClick={() => handleScheduleClick(skill)}>Schedule</Button>
-                                </li>
-                            ))}
-                            {repetitionSkillsWithDates.length === 0 && (
-                                <p className="text-center text-muted-foreground pt-12">No skills are ready for repetition.</p>
-                            )}
-                        </ul>
-                    </ScrollArea>
-                </div>
+                 <Tabs defaultValue="daily" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="daily"><ListChecks className="mr-1 h-4 w-4" />Daily Goals</TabsTrigger>
+                        <TabsTrigger value="review"><Repeat className="mr-1 h-4 w-4" />Review</TabsTrigger>
+                        <TabsTrigger value="routine"><CalendarIcon className="mr-1 h-4 w-4" />Routine</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="daily" className="mt-4">
+                       <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {dailyLearningGoals.map((goal, index) => (
+                                    <li key={index} className="p-3 rounded-md border bg-muted/30">
+                                        <p className="font-semibold text-sm">{goal.resourceName}</p>
+                                        <p className="text-xs text-muted-foreground">{goal.specName}</p>
+                                        <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                            <Badge variant="secondary">{goal.progress}</Badge>
+                                            <Badge variant="default">{goal.dailyTarget}</Badge>
+                                        </div>
+                                    </li>
+                                ))}
+                                {dailyLearningGoals.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No active daily learning goals.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
+                    <TabsContent value="review" className="mt-4">
+                        <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {repetitionSkillsWithDates.map(skill => (
+                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                                        <div>
+                                            <p className="font-semibold">{skill.name}</p>
+                                            <p className={cn("text-xs", skill.isOverdue ? "text-destructive font-semibold" : "text-muted-foreground")}>
+                                                Due: {format(skill.nextReviewDate, 'PPP')}
+                                            </p>
+                                        </div>
+                                        <Button size="sm" onClick={() => handleScheduleClick(skill)}>Schedule</Button>
+                                    </li>
+                                ))}
+                                {repetitionSkillsWithDates.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No skills are ready for repetition.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
+                     <TabsContent value="routine" className="mt-4">
+                        <ScrollArea className="h-80">
+                            <ul className="space-y-3 pr-4">
+                                {routineTasks.map((task, index) => (
+                                    <li key={index} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                                        <div>
+                                            <p className="font-semibold text-sm">{task.details}</p>
+                                            <p className="text-xs text-muted-foreground">{task.slot} - {task.routine?.type}</p>
+                                        </div>
+                                    </li>
+                                ))}
+                                {routineTasks.length === 0 && (
+                                    <p className="text-center text-muted-foreground pt-12">No routine tasks configured.</p>
+                                )}
+                            </ul>
+                        </ScrollArea>
+                    </TabsContent>
+                </Tabs>
             </DialogContent>
         </Dialog>
     );
-};
+}
 
 export function Header() {
   const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isUpcomingSkillsModalOpen, setIsUpcomingSkillsModalOpen] = useState(false);
+  const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
 
   return (
     <>
@@ -346,9 +468,9 @@ export function Header() {
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
-              <Button variant="ghost" size="icon" className="h-8 w-8 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600" onClick={() => setIsUpcomingSkillsModalOpen(true)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600" onClick={() => setIsUpcomingTasksModalOpen(true)}>
                   <Info className="h-4 w-4" />
-                  <span className="sr-only">Upcoming Skills</span>
+                  <span className="sr-only">Upcoming Tasks</span>
               </Button>
 
               <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => setIsSupportModalOpen(true)}>
@@ -365,7 +487,7 @@ export function Header() {
       <SupportModal isOpen={isSupportModalOpen} onOpenChange={setIsSupportModalOpen} />
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
-      <UpcomingSkillsModal isOpen={isUpcomingSkillsModalOpen} onOpenChange={setIsUpcomingSkillsModalOpen} />
+      <UpcomingTasksModal isOpen={isUpcomingTasksModalOpen} onOpenChange={setIsUpcomingTasksModalOpen} />
     </>
   );
 }
