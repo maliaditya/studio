@@ -16,10 +16,10 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -330,7 +330,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 return acc;
             }, { items: 0, hours: 0, pages: 0 });
 
-            const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
+            const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined): string | null => {
                 if (!total || !start || !end) return null;
                 const startDate = parseISO(start);
                 const endDate = parseISO(end);
@@ -544,7 +544,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allDeepWorkLogs, allUpskillLogs } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -594,14 +594,43 @@ export function Header() {
             return count;
         }, 0);
         
-        const routineCount = (settings.routines || []).length;
+        const routineTasks = (settings.routines || []).map(task => {
+          if (task.type === 'workout') {
+            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+            return { ...task, details: description };
+          }
+          return task;
+        });
+        const routineCount = routineTasks.length;
         
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const todaysSchedule = schedule[todayKey] || {};
-        const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => act && !act.completed).length;
+        
+        const repetitionSkillsWithDates = repetitionSkills.map(skill => {
+            const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+            const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
+            return {
+                ...skill,
+                mainIntentionId: mainIntention?.id,
+            };
+        });
+
+        const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
+        const reviewTaskDefIds = new Set(repetitionSkillsWithDates.map(rt => rt.mainIntentionId));
+
+        const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
+            if (!act || act.completed) return false;
+            const isRoutine = routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
+            const isReview = act.taskIds?.some(tid => {
+                const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === tid);
+                return taskLog && reviewTaskDefIds.has(taskLog.definitionId);
+            });
+            return !isRoutine && !isReview;
+        }).length;
 
         return repetitionSkillsCount + learningGoalsCount + routineCount + scheduledTaskCount;
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule]);
+    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allDeepWorkLogs, allUpskillLogs]);
 
 
   return (
