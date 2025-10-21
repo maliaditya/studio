@@ -40,6 +40,38 @@ export function SkillPathWidget() {
     }, []);
 
     const nextAvailableTask = useMemo(() => {
+        const allLeafNodes = [
+            ...upskillDefinitions.filter(def => (def.linkedUpskillIds?.length ?? 0) === 0),
+            ...deepWorkDefinitions.filter(def => (def.linkedDeepWorkIds?.length ?? 0) === 0),
+        ];
+
+        const loggedLeafNodes = allLeafNodes
+            .filter(node => node.last_logged_date && !permanentlyLoggedTaskIds.has(node.id))
+            .sort((a, b) => new Date(b.last_logged_date!).getTime() - new Date(a.last_logged_date!).getTime());
+        
+        if (loggedLeafNodes.length > 0) {
+            const mostRecentLogged = loggedLeafNodes[0];
+            const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
+
+            let parentId: string | undefined;
+            for (const def of allDefs) {
+                if (def.linkedUpskillIds?.includes(mostRecentLogged.id) || def.linkedDeepWorkIds?.includes(mostRecentLogged.id)) {
+                    parentId = def.id;
+                    break;
+                }
+            }
+            
+            if (parentId) {
+                const isUpskillParent = upskillDefinitions.some(u => u.id === parentId);
+                const parentLeaves = getDescendantLeafNodes(parentId, isUpskillParent ? 'upskill' : 'deepwork');
+                const nextTaskInParent = parentLeaves.find(leaf => !permanentlyLoggedTaskIds.has(leaf.id));
+                if (nextTaskInParent) {
+                    return { ...nextTaskInParent, type: isUpskillParent ? 'upskill' : 'deepwork' };
+                }
+            }
+        }
+
+        // Fallback to original logic if no recent context is found
         const curiosities = upskillDefinitions.filter(def => (def.linkedUpskillIds?.length ?? 0) > 0);
         const intentions = deepWorkDefinitions.filter(def => (def.linkedDeepWorkIds?.length ?? 0) > 0);
         
@@ -59,6 +91,7 @@ export function SkillPathWidget() {
 
         return null;
     }, [upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds]);
+
 
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
