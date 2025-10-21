@@ -168,7 +168,7 @@ function NavigationMenu() {
     { href: '/resources', label: 'Resources' },
     { href: '/skill', label: 'Skill Tree' },
     { href: '/strategic-planning', label: 'Strategy' },
-    { href: '/code-of-conduct', label: 'Code of Conduct' },
+    { href: '/gamified-skills', label: 'Gamified Skills' },
   ];
 
   if (!isClient) {
@@ -207,6 +207,7 @@ function NavigationMenu() {
           <DropdownMenuItem asChild><Link href="/path">Path</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/charts">Charts</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/timesheet">Timesheet</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/code-of-conduct">Code of Conduct</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </nav>
