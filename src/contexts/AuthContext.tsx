@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -2123,30 +2124,102 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill and all associated tasks have been removed.' });
 };
 
-  const handleToggleMicroSkillRepetition = (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => {
-    setCoreSkills(prevSkills => {
-        return prevSkills.map(skill => {
-            if (skill.id === coreSkillId) {
-                return {
-                    ...skill,
-                    skillAreas: skill.skillAreas.map(area => {
-                        if (area.id === areaId) {
-                            return {
-                                ...area,
-                                microSkills: area.microSkills.map(ms =>
-                                    ms.id === microSkillId ? { ...ms, isReadyForRepetition: isReady } : ms
-                                )
-                            };
-                        }
-                        return area;
-                    })
-                };
-            }
-            return skill;
-        });
-    });
-  };
+const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => {
+  let updatedMicroSkill: MicroSkill | undefined;
 
+  setCoreSkills(prevSkills => {
+    return prevSkills.map(skill => {
+      if (skill.id === coreSkillId) {
+        return {
+          ...skill,
+          skillAreas: skill.skillAreas.map(area => {
+            if (area.id === areaId) {
+              const newMicroSkills = area.microSkills.map(ms => {
+                if (ms.id === microSkillId) {
+                  updatedMicroSkill = { ...ms, isReadyForRepetition: isReady };
+                  return updatedMicroSkill;
+                }
+                return ms;
+              });
+              return { ...area, microSkills: newMicroSkills };
+            }
+            return area;
+          }),
+        };
+      }
+      return skill;
+    });
+  });
+  
+  if (isReady && updatedMicroSkill) {
+      const intentions = deepWorkDefinitions.filter(def => def.category === updatedMicroSkill!.name);
+      const curiosities = upskillDefinitions.filter(def => def.category === updatedMicroSkill!.name);
+
+      const allLeafNodes = [
+          ...intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork')),
+          ...curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'))
+      ];
+      
+      const newLogs: DatedWorkout[] = [];
+
+      allLeafNodes.forEach(node => {
+          const logDate = format(new Date(), 'yyyy-MM-dd');
+          const isUpskill = upskillDefinitions.some(d => d.id === node.id);
+          const newSet: LoggedSet = {
+              id: `${Date.now()}-${Math.random()}`,
+              reps: isUpskill ? (node.estimatedDuration || 1) : 1,
+              weight: isUpskill ? 1 : (node.estimatedDuration || 1),
+              timestamp: Date.now(),
+          };
+
+          const logSetter = isUpskill ? setAllUpskillLogs : setAllDeepWorkLogs;
+          logSetter(prevLogs => {
+              const logIndex = prevLogs.findIndex(l => l.date === logDate);
+              let newLogs = [...prevLogs];
+              if (logIndex > -1) {
+                  const exerciseIndex = newLogs[logIndex].exercises.findIndex(e => e.definitionId === node.id);
+                  if (exerciseIndex > -1) {
+                      if (!newLogs[logIndex].exercises[exerciseIndex].loggedSets.some(s => s.id === newSet.id)) {
+                           newLogs[logIndex].exercises[exerciseIndex].loggedSets.push(newSet);
+                      }
+                  } else {
+                      newLogs[logIndex].exercises.push({
+                          id: `${node.id}-${logDate}`,
+                          definitionId: node.id,
+                          name: node.name,
+                          category: node.category,
+                          loggedSets: [newSet],
+                          targetSets: 1,
+                          targetReps: '1',
+                      });
+                  }
+              } else {
+                  newLogs.push({
+                      id: logDate,
+                      date: logDate,
+                      exercises: [{
+                          id: `${node.id}-${logDate}`,
+                          definitionId: node.id,
+                          name: node.name,
+                          category: node.category,
+                          loggedSets: [newSet],
+                          targetSets: 1,
+                          targetReps: '1',
+                      }]
+                  });
+              }
+              return newLogs;
+          });
+      });
+      
+      toast({
+          title: "Micro-skill Completed!",
+          description: `All child tasks for "${updatedMicroSkill.name}" have been marked as complete.`,
+      });
+  }
+
+}, [setCoreSkills, toast, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, setAllUpskillLogs, setAllDeepWorkLogs]);
+  
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
   }, [setExpandedItems]);
@@ -3486,4 +3559,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
