@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -244,8 +244,9 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         allWorkoutLogs,
         workoutPlanRotation,
         schedule,
+        upskillDefinitions,
         allUpskillLogs,
-		allDeepWorkLogs,
+        allDeepWorkLogs,
     } = useAuth();
     const { toast } = useToast();
 
@@ -474,26 +475,29 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                     <TabsContent value="daily" className="mt-4">
                        <ScrollArea className="h-80">
                             <ul className="space-y-3 pr-4">
-                                {dailyLearningGoals.map((goal, index) => (
-                                    <li key={index} className="p-3 rounded-md border bg-muted/30">
-                                        <div className="flex items-start">
-                                            <Checkbox
-                                                id={`goal-check-${goal.resourceId}`}
-                                                checked={todaysCompletions.has(goal.resourceId)}
-                                                onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
-                                                className="mr-2 mt-0.5"
-                                            />
-                                            <div className="flex-grow">
-                                                <p className="font-semibold text-sm">{goal.resourceName}</p>
-                                                <p className="text-xs text-muted-foreground">{goal.specName}</p>
-                                                <div className="flex justify-between items-center mt-1 pt-1 border-t">
-                                                    <Badge variant="secondary">{goal.progress}</Badge>
-                                                    <Badge variant="default">{goal.dailyTarget}</Badge>
+                                {dailyLearningGoals.map((goal, index) => {
+                                    const isCompletedToday = todaysCompletions.has(goal.resourceId);
+                                    return (
+                                        <li key={index} className="p-3 rounded-md border bg-muted/30">
+                                            <div className="flex items-start">
+                                                <Checkbox
+                                                    id={`goal-check-${goal.resourceId}`}
+                                                    checked={isCompletedToday}
+                                                    onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
+                                                    className="mr-2 mt-0.5"
+                                                />
+                                                <div className="flex-grow">
+                                                    <p className={cn("font-semibold text-sm", isCompletedToday && "line-through text-muted-foreground")}>{goal.resourceName}</p>
+                                                    <p className={cn("text-xs text-muted-foreground", isCompletedToday && "line-through")}>{goal.specName}</p>
+                                                    <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                                        <Badge variant="secondary" className={cn(isCompletedToday && "line-through")}>{goal.progress}</Badge>
+                                                        <Badge variant="default" className={cn(isCompletedToday && "line-through")}>{goal.dailyTarget}</Badge>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </li>
-                                ))}
+                                        </li>
+                                    );
+                                })}
                                 {dailyLearningGoals.length === 0 && (
                                     <p className="text-center text-muted-foreground pt-12">No active daily learning goals.</p>
                                 )}
@@ -544,7 +548,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, allWorkoutLogs, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allDeepWorkLogs, allUpskillLogs } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, allUpskillLogs, allDeepWorkLogs } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -680,3 +684,5 @@ export function Header() {
     </>
   );
 }
+
+    
