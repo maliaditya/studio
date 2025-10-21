@@ -8,18 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BrainCircuit } from 'lucide-react';
-import type { CoreSkill, MicroSkill } from '@/types/workout';
+import type { CoreSkill, SkillArea, MicroSkill } from '@/types/workout';
 
 const XP_PER_LEVEL = 100; // 100 minutes of logged time = 1 level
 
-interface GamifiedSkill extends MicroSkill {
-  level: number;
-  xp: number;
+interface GamifiedSkillArea extends SkillArea {
+  totalLevel: number;
+  totalXP: number;
   progressToNextLevel: number;
 }
 
 interface GamifiedSpecialization extends CoreSkill {
-  gamifiedMicroSkills: GamifiedSkill[];
+  gamifiedSkillAreas: GamifiedSkillArea[];
   totalLevel: number;
 }
 
@@ -38,11 +38,12 @@ function GamifiedSkillsPageContent() {
     return coreSkills
       .filter(skill => skill.type === 'Specialization' && plannedSpecIds.has(skill.id))
       .map(spec => {
-        let totalLevel = 0;
+        let specializationTotalLevel = 0;
         
-        const gamifiedMicroSkills = spec.skillAreas.flatMap(area =>
-          area.microSkills.map(microSkill => {
-            
+        const gamifiedSkillAreas = spec.skillAreas.map(area => {
+          let areaTotalXP = 0;
+          
+          area.microSkills.forEach(microSkill => {
             const upskillCuriosities = upskillDefinitions.filter(def => def.category === microSkill.name);
             const deepWorkIntentions = deepWorkDefinitions.filter(def => def.category === microSkill.name);
             
@@ -52,25 +53,26 @@ function GamifiedSkillsPageContent() {
             const upskillMinutes = upskillLeafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
             const deepWorkMinutes = deepWorkLeafNodes.reduce((sum, node) => sum + (node.loggedDuration || 0), 0);
             
-            const totalMinutes = upskillMinutes + deepWorkMinutes;
-            const level = Math.floor(totalMinutes / XP_PER_LEVEL);
-            const progressToNextLevel = (totalMinutes % XP_PER_LEVEL);
+            areaTotalXP += upskillMinutes + deepWorkMinutes;
+          });
 
-            totalLevel += level;
+          const areaTotalLevel = Math.floor(areaTotalXP / XP_PER_LEVEL);
+          const areaProgressToNextLevel = areaTotalXP % XP_PER_LEVEL;
 
-            return {
-              ...microSkill,
-              level,
-              xp: totalMinutes,
-              progressToNextLevel,
-            };
-          })
-        );
+          specializationTotalLevel += areaTotalLevel;
+
+          return {
+            ...area,
+            totalLevel: areaTotalLevel,
+            totalXP: areaTotalXP,
+            progressToNextLevel: areaProgressToNextLevel,
+          };
+        });
         
         return {
           ...spec,
-          gamifiedMicroSkills,
-          totalLevel,
+          gamifiedSkillAreas,
+          totalLevel: specializationTotalLevel,
         };
       })
       .sort((a, b) => b.totalLevel - a.totalLevel);
@@ -97,22 +99,22 @@ function GamifiedSkillsPageContent() {
                     </div>
                 </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {spec.gamifiedMicroSkills.map(ms => (
-                    <Card key={ms.id} className="flex flex-col">
+                {spec.gamifiedSkillAreas.map(area => (
+                    <Card key={area.id} className="flex flex-col">
                         <CardHeader>
-                            <CardTitle className="text-base">{ms.name}</CardTitle>
+                            <CardTitle className="text-base">{area.name}</CardTitle>
                         </CardHeader>
                         <CardContent className="flex-grow flex flex-col justify-end">
                             <div>
                                 <div className="flex justify-between items-center mb-1 text-sm">
                                 <p className="font-medium text-foreground">
-                                    <span className="font-bold text-primary">Lvl {ms.level}</span>
+                                    <span className="font-bold text-primary">Lvl {area.totalLevel}</span>
                                 </p>
                                 <p className="text-muted-foreground text-xs">
-                                    ({ms.xp % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)
+                                    ({area.totalXP % XP_PER_LEVEL} / {XP_PER_LEVEL} XP)
                                 </p>
                                 </div>
-                                <Progress value={ms.progressToNextLevel} />
+                                <Progress value={area.progressToNextLevel} />
                             </div>
                         </CardContent>
                     </Card>
