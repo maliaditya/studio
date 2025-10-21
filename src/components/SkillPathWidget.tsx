@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
-import { Path, Lightbulb, Flashlight, ArrowRight } from 'lucide-react';
+import { Route, Lightbulb, Flashlight, ArrowRight } from 'lucide-react';
 import type { ExerciseDefinition } from '@/types/workout';
 
 export function SkillPathWidget() {
@@ -119,7 +119,7 @@ export function SkillPathWidget() {
                 <div className="cursor-grab active:cursor-grabbing">
                     <CardHeader className="p-0 mb-3">
                         <CardTitle className="flex items-center gap-2 text-base text-primary">
-                            <Path className="h-5 w-5 text-green-500" />
+                            <Route className="h-5 w-5 text-green-500" />
                             Skill Path
                         </CardTitle>
                     </CardHeader>
