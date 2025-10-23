@@ -239,6 +239,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         allUpskillLogs,
         allDeepWorkLogs,
         handleToggleDailyGoalCompletion,
+        workoutPlanRotation,
     } = useAuth();
     const { toast } = useToast();
 
@@ -396,7 +397,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [offerizationPlans, coreSkills]);
     
     const routineTasks = useMemo(() => {
-        const { workoutPlanRotation } = useAuth();
         return (settings.routines || []).map(task => {
             if (task.type === 'workout') {
                 const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
@@ -404,7 +404,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             }
             return task;
         });
-    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, settings.workoutScheduling]);
+    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, settings.workoutScheduling, workoutPlanRotation]);
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
@@ -584,14 +584,36 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs, setIsAllResistancesPopupOpen } = useAuth();
+  const { 
+    currentUser, 
+    signOut, 
+    isDemoTokenModalOpen, 
+    setIsDemoTokenModalOpen, 
+    pushDemoDataWithToken, 
+    coreSkills, 
+    deepWorkDefinitions, 
+    getDescendantLeafNodes, 
+    offerizationPlans, 
+    settings, 
+    schedule, 
+    workoutMode, 
+    workoutPlans, 
+    exerciseDefinitions, 
+    allWorkoutLogs, 
+    dailyReviewLogs, 
+    allUpskillLogs,
+    allDeepWorkLogs,
+    openMindsetWidget,
+    workoutPlanRotation,
+    handleToggleDailyGoalCompletion,
+  } = useAuth();
+
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
 
   const upcomingTaskCount = useMemo(() => {
-    const { workoutPlanRotation } = useAuth(); // Destructure workoutPlanRotation here
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
     
@@ -604,6 +626,7 @@ export function Header() {
 
     const repetitionTasksDue = repetitionSkills.filter(skill => {
         const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+        const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
         const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
         const completionDates = new Set<string>();
         allLeafNodes.forEach(node => {
@@ -667,7 +690,7 @@ export function Header() {
     }).length;
 
     return repetitionTaskCount + learningGoalsCount + scheduledTaskCount;
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs, workoutPlanRotation, settings.workoutScheduling]);
 
 
   return (
@@ -698,7 +721,7 @@ export function Header() {
                   <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
                 )}
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsAllResistancesPopupOpen(p => !p)}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
                   <Brain className="h-4 w-4" />
                   <span className="sr-only">Mindset</span>
               </Button>
