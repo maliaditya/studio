@@ -8,7 +8,7 @@ import { subDays, startOfDay, isSameDay } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Activity } from 'lucide-react';
-import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar } from 'recharts';
+import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Bar, CartesianGrid } from 'recharts';
 
 export function TodaysPredictionModal() {
   const { isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen, habitCards, mechanismCards } = useAuth();
@@ -74,6 +74,7 @@ export function TodaysPredictionModal() {
           <div className="h-[300px] w-full">
             <ResponsiveContainer>
               <BarChart data={predictionData}>
+                <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" fontSize={10} interval={1} />
                 <YAxis fontSize={10} />
                 <Tooltip
@@ -100,4 +101,3 @@ export function TodaysPredictionModal() {
     </Dialog>
   );
 }
-
