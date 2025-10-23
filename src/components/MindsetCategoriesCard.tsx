@@ -143,7 +143,7 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
-    const [filter, setFilter] = useState<'all' | 'today' | 'lastX'>('all');
+    const [filter, setFilter] = useState<'all' | 'today' | 'lastX'>('lastX');
     const [lastXDays, setLastXDays] = useState(5);
     
     const chartData = React.useMemo(() => {
@@ -265,7 +265,6 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
 
 export function MindsetCategoriesCard() {
     const { 
-        mindProgrammingCategories,
         mindProgrammingDefinitions,
         habitCards,
         mechanismCards,
