@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -405,10 +404,13 @@ export function MindsetCategoriesCard() {
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Brain className="h-5 w-5 text-pink-500" />
-                            Resistances & Urges
+                            Resistances &amp; Urges
                         </DialogTitle>
-                        <DialogDescription>
+                        <DialogDescription className="flex justify-between items-center">
                             Review and log your encounters with mental friction.
+                            <Button variant="ghost" size="icon" onClick={() => setIsHourlyLogOpen(true)}>
+                                <LineChart className="h-4 w-4" />
+                            </Button>
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -457,6 +459,12 @@ export function MindsetCategoriesCard() {
             <LinkTechniqueModal
                 modalState={linkTechniqueModalState}
                 onOpenChange={(isOpen) => setLinkTechniqueModalState(prev => ({ ...prev, isOpen }))}
+            />
+
+            <HourlyResistanceLogDialog 
+                isOpen={isHourlyLogOpen}
+                onOpenChange={setIsHourlyLogOpen}
+                allLinkedResistances={allLinkedResistances}
             />
         </>
     );
