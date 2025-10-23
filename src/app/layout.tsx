@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -50,7 +49,6 @@ import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { RuleEquationsCard } from '@/components/RuleEquationsCard';
 import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
 import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
-import { AllResistancesPopup } from '@/components/AllResistancesPopup';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
@@ -140,7 +138,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setLinkedResistancePopup,
     stopperProgressPopup,
     setStopperProgressPopup,
-    isAllResistancesPopupOpen,
     openBrainHackPopups,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
@@ -174,7 +171,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         
         if (diff > 0) {
             const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const minutes = Math.floor((diff / 1000 * 60) % 60);
             const seconds = Math.floor((diff / 1000) % 60);
             setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
         } else { 
@@ -410,7 +407,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.spacedRepetition && <SpacedRepetitionPopup />}
-      {isAllResistancesPopupOpen && <AllResistancesPopup />}
       <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
       <StopperProgressModal 
         popupState={stopperProgressPopup}
@@ -637,3 +633,4 @@ export default function RootLayout({
     </html>
   );
 }
+

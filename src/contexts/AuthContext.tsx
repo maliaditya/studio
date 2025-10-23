@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -397,6 +396,7 @@ interface AuthContextType {
   setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, {x: number, y: number}>>>;
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
   recalculateAndFixTaskTypes: () => void;
+  openMindsetWidget: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -3178,6 +3178,71 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       .flatMap(r => r.formalization?.components || []);
   }, [selectedFormalizationSpecId, coreSkills, resources, deepWorkDefinitions, upskillDefinitions]);
 
+  useEffect(() => {
+    const user = getCurrentLocalUser();
+    if (user) {
+      setCurrentUser(user);
+      loadState(user.username);
+    }
+    setLoading(false);
+    const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
+    setThemeState(savedTheme);
+
+    const savedVolume = typeof window !== 'undefined' ? localStorage.getItem('lifeos_global_volume') : null;
+    if (savedVolume !== null) {
+        setGlobalVolumeState(parseFloat(savedVolume));
+    }
+  }, [loadState]);
+  
+   useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+      else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+      else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+      else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+      else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+      else setCurrentSlot('Night');
+    }, 60000);
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
+    else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
+    else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
+    else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
+    else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
+    else setCurrentSlot('Night');
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    let timerId: NodeJS.Timeout | undefined;
+
+    if (activeFocusSession?.state === 'running') {
+      timerId = setInterval(() => {
+        setActiveFocusSession(prev => {
+          if (!prev || prev.state !== 'running') {
+            clearInterval(timerId!);
+            return prev;
+          }
+          if (prev.secondsLeft <= 1) {
+            clearInterval(timerId!);
+            return { ...prev, secondsLeft: 0, state: 'paused' };
+          }
+          return { ...prev, secondsLeft: prev.secondsLeft - 1 };
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerId) {
+        clearInterval(timerId);
+      }
+    };
+  }, [activeFocusSession?.state, setActiveFocusSession]);
 
   useEffect(() => {
     if (isLoadingState || !currentUser) return;
@@ -3239,6 +3304,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       openGeneralPopup(playbackRequest.resourceId, null); 
     }
   }, [playbackRequest, openGeneralPopup]);
+  
+  const openMindsetWidget = () => {
+    setSettings(prev => ({
+        ...prev,
+        widgetVisibility: {
+            ...prev.widgetVisibility,
+            mindset: !prev.widgetVisibility.mindset,
+        }
+    }));
+  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -3361,6 +3436,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handleToggleDailyGoalCompletion,
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
     recalculateAndFixTaskTypes,
+    openMindsetWidget,
   };
 
   useEffect(() => {
@@ -3514,7 +3590,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
-
-
-
-
