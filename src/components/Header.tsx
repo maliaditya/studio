@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -193,11 +194,11 @@ function NavigationMenu() {
         </Button>
       ))}
        <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="flex items-center gap-1">
-            More <ChevronDown className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
+         <DropdownMenuTrigger asChild>
+           <Button variant="ghost" size="sm" className="flex items-center gap-1">
+             More <ChevronDown className="h-4 w-4" />
+           </Button>
+         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem asChild><Link href="/workout-tracker">Workout Tracker</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/mind-programming">Mind Programming</Link></DropdownMenuItem>
@@ -231,15 +232,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         offerizationPlans,
         settings,
         schedule,
+        dailyReviewLogs,
         workoutMode,
         workoutPlans,
         exerciseDefinitions,
         allWorkoutLogs,
-        dailyReviewLogs,
         handleToggleDailyGoalCompletion,
         allUpskillLogs,
         allDeepWorkLogs,
-        workoutPlanRotation,
+        workoutPlanRotation
     } = useAuth();
     const { toast } = useToast();
 
@@ -409,7 +410,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             }
             return task;
         });
-    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, settings.workoutScheduling, workoutPlanRotation]);
+    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, workoutPlanRotation, settings.workoutScheduling]);
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
@@ -608,14 +609,13 @@ export function Header() {
     allWorkoutLogs,
     handleToggleDailyGoalCompletion,
     openMindsetWidget,
+    workoutPlanRotation,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
-
-  const { workoutPlanRotation } = useAuth();
   
   const upcomingTaskCount = useMemo(() => {
     const today = startOfToday();
@@ -666,7 +666,7 @@ export function Header() {
     }, 0);
     
     // 3. Ad-hoc Scheduled Tasks
-    const routineTasksForCount = (settings.routines || []).map(task => {
+    const routineTasks = (settings.routines || []).map(task => {
         if (task.type === 'workout') {
             const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
             return { ...task, details: description };
@@ -674,12 +674,12 @@ export function Header() {
         return task;
     });
 
-    const routineTaskIdentifiersForCount = new Set(routineTasksForCount.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
+    const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
     
-    const todaysScheduleForCount = schedule[todayKey] || {};
-    const scheduledTaskCount = Object.values(todaysScheduleForCount).flat().filter(act => {
+    const todaysSchedule = schedule[todayKey] || {};
+    const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
         if (!act || act.completed) return false;
-        return !routineTaskIdentifiersForCount.has(`${act.details}_${act.type}_${act.slot}`);
+        return !routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
     }).length;
 
     return repetitionTaskCount + learningGoalsCount + scheduledTaskCount;

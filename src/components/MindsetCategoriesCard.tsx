@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -272,22 +273,14 @@ export function MindsetCategoriesCard() {
         logStopperEncounter,
         openLinkedResistancePopup,
         openStopperProgressPopup,
+        isMindsetModalOpen,
+        setIsMindsetModalOpen
     } = useAuth();
     
-    const [isClient, setIsClient] = useState(false);
-    const [view, setView] = useState<'techniques' | 'all-resistances'>('techniques');
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
     const [isHourlyLogOpen, setIsHourlyLogOpen] = useState(false);
     const [linkTechniqueModalState, setLinkTechniqueModalState] = useState({ isOpen: false, habitId: '', stopper: {} as Stopper, stage: 2 as 2 | 3 });
 
-
-    const [position, setPosition] = useState({ x: 20, y: 320 });
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
-
-    useEffect(() => {
-      setIsClient(true);
-    }, []);
 
     const allLinkedResistances = React.useMemo(() => {
         const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
@@ -376,65 +369,6 @@ export function MindsetCategoriesCard() {
         return () => clearInterval(interval);
     }, [allLinkedResistances]);
 
-    const handleMouseDown = (e: React.MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.closest('button, [role="button"]')) {
-            return;
-        }
-        setIsDragging(true);
-        setDragStartOffset({
-          x: e.clientX - position.x,
-          y: e.clientY - position.y,
-        });
-    };
-    
-    const handleMouseMove = (e: MouseEvent) => {
-        if (isDragging) {
-            setPosition({
-            x: e.clientX - dragStartOffset.x,
-            y: e.clientY - dragStartOffset.y,
-            });
-        }
-    };
-    
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
-
-    useEffect(() => {
-        if (isDragging) {
-          window.addEventListener('mousemove', handleMouseMove);
-          window.addEventListener('mouseup', handleMouseUp);
-        } else {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isDragging, dragStartOffset]);
-    
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: position.y,
-        left: position.x,
-        willChange: 'transform',
-        userSelect: isDragging ? 'none' : 'auto',
-    };
-
-    const techniquesByCategory = React.useMemo(() => {
-        const map: Record<string, typeof mindProgrammingDefinitions> = {};
-        mindProgrammingCategories.forEach(cat => {
-            map[cat] = mindProgrammingDefinitions.filter(def => def.category === cat);
-        });
-        return map;
-    }, [mindProgrammingCategories, mindProgrammingDefinitions]);
-    
-    if (!isClient) {
-        return null;
-    }
-    
     const sortedResistances = [...allLinkedResistances].sort((a, b) => {
         const aIsHot = hotResistances.has(a.stopper.id);
         const bIsHot = hotResistances.has(b.stopper.id);
@@ -464,113 +398,62 @@ export function MindsetCategoriesCard() {
         return { className: highlightClass, dormant: isDormant };
     };
 
-    const renderContent = () => {
-        if (view === 'all-resistances') {
-            return (
-                <ul className="space-y-2">
-                    {sortedResistances.map((link) => {
-                        const { className: highlightClass, dormant } = getResistanceHighlightClass(link.stopper);
-                        return (
-                            <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", highlightClass)}>
-                                <div
-                                    className="flex justify-between items-start w-full text-left"
-                                >
-                                    <div 
-                                        className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
-                                        onClick={(e) => handleResistanceClick(e, link)}
-                                    >
-                                        <p className="font-semibold">{link.stopper.text}</p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center flex-shrink-0">
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
-                                            <LineChart className="h-4 w-4 text-blue-500" />
-                                        </Button>
-                                        <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
-                                            <PlusCircle className="h-4 w-4 text-green-500" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </li>
-                        );
-                    })}
-                    {allLinkedResistances.length === 0 && (
-                        <p className="text-center text-sm text-muted-foreground py-8">
-                            No urges or resistances are linked to any techniques yet.
-                        </p>
-                    )}
-                </ul>
-            );
-        }
-
-        return (
-            <Accordion type="single" collapsible className="w-full">
-                {Object.entries(techniquesByCategory).map(([category, techniques]) => (
-                   <AccordionItem value={category} key={category}>
-                       <AccordionTrigger className="text-sm font-semibold hover:no-underline">
-                           {category}
-                       </AccordionTrigger>
-                       <AccordionContent>
-                           {techniques.length > 0 ? (
-                               <ul className="text-xs space-y-1 pl-2">
-                                   {techniques.map(tech => (
-                                     <li key={tech.id} className="flex items-center justify-between group">
-                                       <span className="text-muted-foreground">{tech.name}</span>
-                                       <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => openLinkedResistancePopup(tech.id, e)}>
-                                         <LinkIcon className="h-3 w-3 text-primary" />
-                                       </Button>
-                                     </li>
-                                   ))}
-                               </ul>
-                           ) : (
-                               <p className="text-xs text-muted-foreground italic">No techniques defined.</p>
-                           )}
-                       </AccordionContent>
-                   </AccordionItem>
-               ))}
-           </Accordion>
-        );
-    };
-
     return (
         <>
-            <motion.div
-                style={style}
-                className="fixed w-full max-w-xs z-50"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
-                transition={{ duration: 0.3 }}
-                onMouseDown={handleMouseDown}
-            >
-                <Card 
-                    className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
-                >
-                    <div className="cursor-grab active:cursor-grabbing">
-                        <CardHeader className="p-0 mb-3">
-                           <Tabs value={view} onValueChange={(v) => setView(v as 'techniques' | 'all-resistances')} className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="techniques">Techniques</TabsTrigger>
-                                    <TabsTrigger value="all-resistances">Resistances</TabsTrigger>
-                                </TabsList>
-                           </Tabs>
-                        </CardHeader>
-                    </div>
-                    <CardContent className="p-0">
-                        <ScrollArea className="h-72 pr-3">
-                            {renderContent()}
+            <Dialog open={isMindsetModalOpen} onOpenChange={setIsMindsetModalOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Brain className="h-5 w-5 text-pink-500" />
+                            Resistances & Urges
+                        </DialogTitle>
+                        <DialogDescription>
+                            Review and log your encounters with mental friction.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <ScrollArea className="h-96 pr-4">
+                             <ul className="space-y-2">
+                                {sortedResistances.map((link) => {
+                                    const { className: highlightClass, dormant } = getResistanceHighlightClass(link.stopper);
+                                    return (
+                                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", highlightClass)}>
+                                            <div
+                                                className="flex justify-between items-start w-full text-left"
+                                            >
+                                                <div 
+                                                    className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
+                                                    onClick={(e) => handleResistanceClick(e, link)}
+                                                >
+                                                    <p className="font-semibold">{link.stopper.text}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center flex-shrink-0">
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openStopperProgressPopup(link.stopper, link.habitName)}>
+                                                        <LineChart className="h-4 w-4 text-blue-500" />
+                                                    </Button>
+                                                    <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
+                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
+                                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                                {allLinkedResistances.length === 0 && (
+                                    <p className="text-center text-sm text-muted-foreground py-8">
+                                        No urges or resistances are defined in your habits yet.
+                                    </p>
+                                )}
+                            </ul>
                         </ScrollArea>
-                    </CardContent>
-                </Card>
-            </motion.div>
-            <HourlyResistanceLogDialog 
-                isOpen={isHourlyLogOpen}
-                onOpenChange={setIsHourlyLogOpen}
-                allLinkedResistances={allLinkedResistances}
-            />
+                    </div>
+                </DialogContent>
+            </Dialog>
+            
             <LinkTechniqueModal
                 modalState={linkTechniqueModalState}
                 onOpenChange={(isOpen) => setLinkTechniqueModalState(prev => ({ ...prev, isOpen }))}
@@ -578,5 +461,3 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
-
-    

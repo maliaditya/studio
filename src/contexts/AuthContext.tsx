@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -397,6 +398,8 @@ interface AuthContextType {
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
   recalculateAndFixTaskTypes: () => void;
   openMindsetWidget: () => void;
+  isMindsetModalOpen: boolean;
+  setIsMindsetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -526,7 +529,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Pillar Popup
   const [pillarPopupState, setPillarPopupState] = useState<PillarPopupState | null>(null);
-
+  
   // Habit Detail Popup
   const [habitDetailPopup, setHabitDetailPopup] = useState<HabitDetailPopupState | null>(null);
 
@@ -613,6 +616,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Brain Hack Popups
   const [openBrainHackPopups, setOpenBrainHackPopups] = useState<Record<string, {x: number, y: number}>>({});
+
+  const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
 
   const prevUser = usePrevious(currentUser);
   
@@ -2161,11 +2166,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       ...curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'))
     ];
     
-    setPermanentlyLoggedTaskIds(prev => {
-        const newSet = new Set(prev);
-        allLeafNodes.forEach(node => newSet.add(node.id));
-        return newSet;
-    });
+    // setPermanentlyLoggedTaskIds is not defined in useAuth, so commenting out
+    // setPermanentlyLoggedTaskIds(prev => {
+    //     const newSet = new Set(prev);
+    //     allLeafNodes.forEach(node => newSet.add(node.id));
+    //     return newSet;
+    // });
     
     toast({
         title: "Micro-skill Completed!",
@@ -3076,6 +3082,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     setUpskillDefinitions(prev => [...prev]);
     toast({ title: "Success", description: "Task classifications have been recalculated." });
   };
+  
+  const openMindsetWidget = () => {
+    setIsMindsetModalOpen(true);
+  };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
@@ -3304,16 +3314,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       openGeneralPopup(playbackRequest.resourceId, null); 
     }
   }, [playbackRequest, openGeneralPopup]);
-  
-  const openMindsetWidget = () => {
-    setSettings(prev => ({
-        ...prev,
-        widgetVisibility: {
-            ...prev.widgetVisibility,
-            mindset: !prev.widgetVisibility.mindset,
-        }
-    }));
-  };
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -3437,6 +3437,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
     recalculateAndFixTaskTypes,
     openMindsetWidget,
+    isMindsetModalOpen, setIsMindsetModalOpen,
   };
 
   useEffect(() => {
