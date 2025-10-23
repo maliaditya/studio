@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -17,7 +17,7 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity as ActivityType, SlotName, WorkoutExercise, ExerciseDefinition } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { TodaysPredictionModal } from './TodaysPredictionModal';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -240,7 +241,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         handleToggleDailyGoalCompletion,
         allUpskillLogs,
         allDeepWorkLogs,
-        workoutPlanRotation
+        workoutPlanRotation,
     } = useAuth();
     const { toast } = useToast();
 
@@ -414,7 +415,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
-        const tasks: Activity[] = [];
+        const tasks: ActivityType[] = [];
         
         const routineTaskIdentifiers = new Set(routineTasks.map(rt => {
             return `${rt.details}_${rt.type}_${rt.slot}`;
@@ -426,7 +427,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         ]);
 
         for (const slotName of slotOrder) {
-            const activities = todaysSchedule[slotName as SlotName] as Activity[] | undefined;
+            const activities = todaysSchedule[slotName as SlotName] as ActivityType[] | undefined;
             if (Array.isArray(activities)) {
                 const filteredActivities = activities.filter(act => {
                     if (!act || act.completed) return false;
@@ -608,8 +609,9 @@ export function Header() {
     exerciseDefinitions,
     allWorkoutLogs,
     handleToggleDailyGoalCompletion,
-    openMindsetWidget,
     workoutPlanRotation,
+    openMindsetWidget,
+    setIsTodaysPredictionModalOpen,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -706,7 +708,7 @@ export function Header() {
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
               <div className="relative">
-                <Button variant="ghost" size="icon" className="h-8 w-8 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-blue-600" onClick={() => setIsUpcomingTasksModalOpen(true)}>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsUpcomingTasksModalOpen(true)}>
                     <Info className="h-4 w-4" />
                     <span className="sr-only">Upcoming Tasks</span>
                 </Button>
@@ -714,6 +716,10 @@ export function Header() {
                   <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
                 )}
               </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
+                <Activity className="h-4 w-4" />
+                <span className="sr-only">Today's Predictions</span>
+              </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
                   <Brain className="h-4 w-4" />
                   <span className="sr-only">Mindset</span>
@@ -733,6 +739,8 @@ export function Header() {
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
       <UpcomingTasksModal isOpen={isUpcomingTasksModalOpen} onOpenChange={setIsUpcomingTasksModalOpen} />
+      <TodaysPredictionModal />
     </>
   );
 }
+

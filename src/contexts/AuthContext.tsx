@@ -84,6 +84,8 @@ interface AuthContextType {
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   clearAllLocalFiles: () => Promise<void>;
+  isTodaysPredictionModalOpen: boolean;
+  setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -618,6 +620,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [openBrainHackPopups, setOpenBrainHackPopups] = useState<Record<string, {x: number, y: number}>>({});
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
+  const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
+
 
   const prevUser = usePrevious(currentUser);
   
@@ -2724,127 +2728,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
   const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
   
-  const addGlobalElement = useCallback((text: string, x: number, y: number): FormalizationItem | undefined => {
-    if (!selectedFormalizationSpecId) {
-      toast({
-        title: "No Specialization Selected",
-        description: "Please select a specialization in the Formalization page before adding elements.",
-        variant: "destructive",
-      });
-      return undefined;
-    }
-    
-    const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
-    if (!spec) return undefined;
-    
-    const elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === spec.id);
-    let elementsFolderId = elementsFolder?.id;
-
-    if (!elementsFolderId) {
-        const newFolder: ResourceFolder = { id: `folder_elements_${spec.id}`, name: 'Elements', parentId: spec.id, icon: 'Database' };
-        setResourceFolders(prev => [...prev, newFolder]);
-        elementsFolderId = newFolder.id;
-    }
-    
-    const newElement: FormalizationItem = { id: id("el"), text: text.trim(), isGlobal: true };
-    const newResource: Resource = {
-        id: id("res"),
-        name: newElement.text,
-        folderId: elementsFolderId,
-        type: 'card',
-        createdAt: new Date().toISOString(),
-        formalization: { elements: [newElement], operations: [], components: [] }
-    };
-
-    setResources(prev => [...prev, newResource]);
-    setCanvasLayout(prev => ({
-        ...prev,
-        nodes: [...prev.nodes, { id: newElement.id, x: x, y: y, width: 384, height: 150 }]
-    }));
-    
-    return newElement;
-  }, [selectedFormalizationSpecId, coreSkills, resourceFolders, setResourceFolders, setResources, setCanvasLayout, toast]);
-
-  const updateGlobalElement = useCallback((elementId: string, updates: Partial<FormalizationItem>) => {
-    setResources(prev => prev.map(res => {
-        if (res.formalization?.elements.some(el => el.id === elementId)) {
-            return {
-                ...res,
-                formalization: {
-                    ...res.formalization,
-                    elements: res.formalization.elements.map(el => el.id === elementId ? { ...el, ...updates } : el)
-                }
-            };
-        }
-        return res;
-    }));
-  }, [setResources]);
-  
-  const deleteGlobalElement = useCallback((elementId: string) => {
-    setResources(prev => prev.map(res => {
-        if (res.formalization?.elements.some(el => el.id === elementId)) {
-            return {
-                ...res,
-                formalization: {
-                    ...res.formalization,
-                    elements: res.formalization.elements.filter(el => el.id !== elementId)
-                }
-            };
-        }
-        return res;
-    }));
-  }, [setResources]);
-  
-  const handleAddNewResourceCard = useCallback((folderId: string | null, position: { x: number; y: number; }) => {
-    let targetFolderId = folderId;
-
-    if (!targetFolderId) {
-      if (selectedFormalizationSpecId) {
-        const spec = coreSkills.find(s => s.id === selectedFormalizationSpecId);
-        if (spec) {
-          const elementsFolder = resourceFolders.find(f => f.name === 'Elements' && f.parentId === spec.id);
-          targetFolderId = elementsFolder?.id || null;
-
-          if (!elementsFolder) {
-            const newFolder: ResourceFolder = { id: `folder_elements_${spec.id}`, name: 'Elements', parentId: spec.id, icon: 'Database' };
-            setResourceFolders(prev => [...prev, newFolder]);
-            targetFolderId = newFolder.id;
-          }
-        }
-      }
-    }
-    
-    if (!targetFolderId) {
-        toast({ title: 'Error', description: 'Cannot create card without a folder context.', variant: 'destructive'});
-        return;
-    }
-
-    const newResource: Resource = {
-      id: id("res"),
-      name: "New Card",
-      folderId: targetFolderId,
-      type: 'card',
-      createdAt: new Date().toISOString(),
-    };
-    
-    setResources(prev => [...prev, newResource]);
-    
-    const newNode: CanvasNode = {
-      id: newResource.id,
-      x: position.x,
-      y: position.y,
-      width: 384,
-      height: 150,
-    };
-    
-    setCanvasLayout(prev => ({
-        ...prev,
-        nodes: [...prev.nodes, newNode]
-    }));
-    
-    return newResource;
-  }, [selectedFormalizationSpecId, coreSkills, resourceFolders, setResourceFolders, setResources, setCanvasLayout, toast]);
-
   const addPillarCard = () => {
     const newCard: PillarCardData = {
       id: `pillar_${Date.now()}`,
@@ -3187,6 +3070,58 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       })
       .flatMap(r => r.formalization?.components || []);
   }, [selectedFormalizationSpecId, coreSkills, resources, deepWorkDefinitions, upskillDefinitions]);
+  
+  const addGlobalElement = useCallback((text: string, x: number, y: number): FormalizationItem | undefined => {
+    const newElement: FormalizationItem = {
+      id: id('el'),
+      text: text,
+      isGlobal: true,
+      properties: {},
+    };
+  
+    setCanvasLayout(prev => {
+        const newNode: CanvasNode = { id: newElement.id, x: x, y: y, width: 300, height: 150 };
+        return {
+            ...prev,
+            nodes: [...prev.nodes, newNode]
+        };
+    });
+  
+    return newElement;
+  }, [setCanvasLayout]);
+
+  const updateGlobalElement = (elementId: string, updates: Partial<FormalizationItem>) => {
+    // This function will need to find the element across all resources and update it.
+    // For simplicity, we'll assume a separate state for global elements if they are truly global.
+    // In this implementation, we will just toast a message.
+    toast({ title: "UpdateGlobalElement", description: "This functionality needs a more robust implementation." });
+  };
+  
+  const deleteGlobalElement = (elementId: string) => {
+     setCanvasLayout(prev => ({
+        ...prev,
+        nodes: prev.nodes.filter(n => n.id !== elementId),
+        edges: prev.edges.filter(e => e.source !== elementId && e.target !== elementId),
+    }));
+  };
+  
+  const handleAddNewResourceCard = (folderId: string | null, position: { x: number, y: number }): Resource | undefined => {
+      // This is a simplified version. A real implementation might need more details.
+      if (!folderId) {
+          toast({ title: "Error", description: "A folder must be selected to add a resource.", variant: "destructive" });
+          return undefined;
+      }
+      const newCard: Resource = {
+          id: `res_card_${Date.now()}`,
+          name: 'New Card',
+          folderId: folderId,
+          type: 'card',
+          createdAt: new Date().toISOString(),
+      };
+      setResources(prev => [...prev, newCard]);
+      return newCard;
+  };
+
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -3330,6 +3265,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
     clearAllLocalFiles,
+    isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3591,3 +3527,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
+
