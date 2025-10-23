@@ -22,6 +22,7 @@ import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -549,30 +550,17 @@ export function MindsetCategoriesCard() {
                     className="p-4 border rounded-lg bg-card/80 backdrop-blur-sm shadow-lg"
                 >
                     <div className="cursor-grab active:cursor-grabbing">
-                        <CardHeader className="p-0 mb-3 flex flex-row justify-between items-center">
-                            {view === 'all-resistances' && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView('techniques')}>
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                            )}
-                            <CardTitle className="flex items-center gap-2 text-base text-primary">
-                                <Brain className="h-5 w-5 text-purple-500" />
-                                {view === 'techniques' ? 'Mindset Techniques' : 'All Linked Resistances'}
-                            </CardTitle>
-                            <div className="flex items-center">
-                                {view === 'all-resistances' && (
-                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsHourlyLogOpen(true)}>
-                                        <History className="h-4 w-4" />
-                                    </Button>
-                                )}
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setView(v => v === 'techniques' ? 'all-resistances' : 'techniques')}>
-                                    <Workflow className="h-4 w-4" />
-                                </Button>
-                            </div>
+                        <CardHeader className="p-0 mb-3">
+                           <Tabs value={view} onValueChange={(v) => setView(v as 'techniques' | 'all-resistances')} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="techniques">Techniques</TabsTrigger>
+                                    <TabsTrigger value="all-resistances">Resistances</TabsTrigger>
+                                </TabsList>
+                           </Tabs>
                         </CardHeader>
                     </div>
                     <CardContent className="p-0">
-                        <ScrollArea className="h-48 pr-3">
+                        <ScrollArea className="h-72 pr-3">
                             {renderContent()}
                         </ScrollArea>
                     </CardContent>
@@ -590,3 +578,5 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
+
+    
