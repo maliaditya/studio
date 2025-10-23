@@ -4,15 +4,16 @@
 import React, { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { subDays, startOfDay, isSameDay } from 'date-fns';
+import { subDays, startOfDay } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Activity, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { format } from 'date-fns';
+import type { Stopper } from '@/types/workout';
 
 export function TodaysPredictionModal() {
-  const { isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen, habitCards } = useAuth();
+  const { isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen, habitCards, mechanismCards } = useAuth();
 
   const predictionData = useMemo(() => {
     const today = startOfDay(new Date());
@@ -20,10 +21,20 @@ export function TodaysPredictionModal() {
 
     const predictions: { time: Date; text: string; type: 'Urge' | 'Resistance'; originalDate: string }[] = [];
 
-    const allLinks: { stopper: any; isUrge: boolean }[] = [];
+    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
+    
     habitCards.forEach(habit => {
+      const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+      const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+
+      // Urges are linked to the negative path
+      (negativeMechanism?.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
       (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-      (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+
+
+      // Resistances are linked to the positive path
+      (positiveMechanism?.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+       (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
     });
 
     allLinks.forEach(link => {
@@ -46,7 +57,7 @@ export function TodaysPredictionModal() {
     // Sort by time of day
     return predictions.sort((a, b) => a.time.getTime() - b.time.getTime());
 
-  }, [habitCards]);
+  }, [habitCards, mechanismCards]);
 
   return (
     <Dialog open={isTodaysPredictionModalOpen} onOpenChange={setIsTodaysPredictionModalOpen}>
