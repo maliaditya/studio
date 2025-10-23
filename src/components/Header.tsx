@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -19,8 +19,8 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays } from 'date-fns';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
@@ -239,7 +239,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         allUpskillLogs,
         allDeepWorkLogs,
         handleToggleDailyGoalCompletion,
-        workoutPlanRotation,
     } = useAuth();
     const { toast } = useToast();
 
@@ -289,7 +288,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 ...skill,
                 mainIntentionId: mainIntention?.id,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
-                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, today),
             };
 
             if (isToday(task.nextReviewDate)) {
@@ -398,6 +396,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [offerizationPlans, coreSkills]);
     
     const routineTasks = useMemo(() => {
+        const { workoutPlanRotation } = useAuth();
         return (settings.routines || []).map(task => {
             if (task.type === 'workout') {
                 const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
@@ -405,7 +404,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             }
             return task;
         });
-    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, settings.workoutScheduling]);
+    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, settings.workoutScheduling]);
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
@@ -439,7 +438,6 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         }
         return tasks;
     }, [schedule, todayKey, routineTasks, todaysReviewTasks, pendingReviewTasks, allUpskillLogs, allDeepWorkLogs]);
-
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -586,13 +584,14 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 }
 
 export function Header() {
-  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs, workoutPlanRotation } = useAuth();
+  const { currentUser, signOut, isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken, coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs, setIsAllResistancesPopupOpen } = useAuth();
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
 
   const upcomingTaskCount = useMemo(() => {
+    const { workoutPlanRotation } = useAuth(); // Destructure workoutPlanRotation here
     const today = startOfToday();
     const todayKey = format(today, 'yyyy-MM-dd');
     
@@ -668,7 +667,7 @@ export function Header() {
     }).length;
 
     return repetitionTaskCount + learningGoalsCount + scheduledTaskCount;
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs]);
+  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, allUpskillLogs, allDeepWorkLogs]);
 
 
   return (
@@ -699,7 +698,10 @@ export function Header() {
                   <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
                 )}
               </div>
-
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsAllResistancesPopupOpen(p => !p)}>
+                  <Brain className="h-4 w-4" />
+                  <span className="sr-only">Mindset</span>
+              </Button>
               <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => setIsSupportModalOpen(true)}>
                   <Heart className="mr-2 h-4 w-4 text-red-500" />
                   Support
@@ -718,5 +720,3 @@ export function Header() {
     </>
   );
 }
-
-    
