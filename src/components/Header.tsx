@@ -17,10 +17,10 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity as ActivityType, SlotName, WorkoutExercise, ExerciseDefinition } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity as ActivityType, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -612,6 +612,8 @@ export function Header() {
     workoutPlanRotation,
     openMindsetWidget,
     setIsTodaysPredictionModalOpen,
+    habitCards,
+    mechanismCards,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -686,7 +688,35 @@ export function Header() {
 
     return repetitionTaskCount + learningGoalsCount + scheduledTaskCount;
   }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, workoutPlanRotation, settings.workoutScheduling]);
+  
+  const todaysPredictionCount = useMemo(() => {
+    const today = startOfToday();
+    const fiveDaysAgo = subDays(today, 5);
 
+    let count = 0;
+    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
+    
+    habitCards.forEach(habit => {
+      const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
+      (negativeMechanism?.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
+      (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
+
+      const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
+      (positiveMechanism?.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+      (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+    });
+
+    allLinks.forEach(link => {
+      (link.stopper.timestamps || []).forEach((ts: number) => {
+        const eventDate = new Date(ts);
+        if (eventDate >= fiveDaysAgo && eventDate < today) {
+          count++;
+        }
+      });
+    });
+
+    return count;
+  }, [habitCards, mechanismCards]);
 
   return (
     <>
@@ -716,10 +746,15 @@ export function Header() {
                   <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
                 )}
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
-                <Activity className="h-4 w-4" />
-                <span className="sr-only">Today's Predictions</span>
-              </Button>
+              <div className="relative">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
+                  <Activity className="h-4 w-4" />
+                  <span className="sr-only">Today's Predictions</span>
+                </Button>
+                {todaysPredictionCount > 0 && (
+                  <Badge variant="secondary" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{todaysPredictionCount}</Badge>
+                )}
+              </div>
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
                   <Brain className="h-4 w-4" />
                   <span className="sr-only">Mindset</span>
