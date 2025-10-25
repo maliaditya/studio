@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -7,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -17,10 +16,10 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity as ActivityType, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, subDays } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -352,7 +351,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 return acc;
             }, { items: 0, hours: 0, pages: 0 });
 
-            const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined): string | null => {
+            const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
                 if (!total || !start || !end) return null;
                 const startDate = parseISO(start);
                 const endDate = parseISO(end);
@@ -415,7 +414,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
-        const tasks: ActivityType[] = [];
+        const tasks: Activity[] = [];
         
         const routineTaskIdentifiers = new Set(routineTasks.map(rt => {
             return `${rt.details}_${rt.type}_${rt.slot}`;
@@ -427,7 +426,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         ]);
 
         for (const slotName of slotOrder) {
-            const activities = todaysSchedule[slotName as SlotName] as ActivityType[] | undefined;
+            const activities = todaysSchedule[slotName as SlotName] as Activity[] | undefined;
             if (Array.isArray(activities)) {
                 const filteredActivities = activities.filter(act => {
                     if (!act || act.completed) return false;
@@ -748,7 +747,7 @@ export function Header() {
               </div>
               <div className="relative">
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
-                  <Activity className="h-4 w-4" />
+                  <ActivityIcon className="h-4 w-4" />
                   <span className="sr-only">Today's Predictions</span>
                 </Button>
                 {todaysPredictionCount > 0 && (
@@ -778,4 +777,3 @@ export function Header() {
     </>
   );
 }
-
