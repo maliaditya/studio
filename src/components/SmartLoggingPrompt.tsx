@@ -1,14 +1,13 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown, Expand } from 'lucide-react';
+import { Lightbulb, ListChecks, CheckCircle, BrainCircuit, Activity as ActivityIcon, Workflow, Zap, HeartPulse, Brain, PlusCircle, X, Trash2, ThumbsUp, ThumbsDown, Expand } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength, DailySchedule, Activity as ActivityType, DatedWorkout } from '@/types/workout';
+import type { Project, PostSessionReview, ExerciseDefinition, HabitEquation, MetaRule, Resource, Stopper, Strength, DailySchedule, Activity, DatedWorkout } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
@@ -371,7 +370,7 @@ export function SmartLoggingPrompt({
             tasks: []
         }));
     
-        const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+        const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as Activity[]) || [];
         activities.filter(a => a.completed).forEach(activity => {
             if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
                 let current = new Date(activity.focusSessionInitialStartTime);
@@ -418,7 +417,7 @@ export function SmartLoggingPrompt({
         yesterdayTasks: yesterdayHourly[index]?.tasks || [],
       }));
 
-      const todayPlannedActivities = (todaysSchedule[slot.name as keyof DailySchedule] as ActivityType[]) || [];
+      const todayPlannedActivities = (todaysSchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
       
       return {
         type: 'slot' as const,
@@ -657,3 +656,5 @@ export function SmartLoggingPrompt({
     </>
   );
 }
+
+    
