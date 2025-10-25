@@ -4,64 +4,78 @@
 import React, { useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
-import { subDays, startOfDay } from 'date-fns';
+import { subDays, startOfDay, format } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
-import { Activity, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Briefcase } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { format } from 'date-fns';
-import type { Stopper } from '@/types/workout';
+import type { Stopper, DailySchedule, Activity } from '@/types/workout';
+
+const slotOrder: { name: string; startHour: number; endHour: number }[] = [
+    { name: 'Late Night', startHour: 0, endHour: 4 },
+    { name: 'Dawn', startHour: 4, endHour: 8 },
+    { name: 'Morning', startHour: 8, endHour: 12 },
+    { name: 'Afternoon', startHour: 12, endHour: 16 },
+    { name: 'Evening', startHour: 16, endHour: 20 },
+    { name: 'Night', startHour: 20, endHour: 24 },
+];
 
 export function TodaysPredictionModal() {
-  const { isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen, habitCards, mechanismCards } = useAuth();
+  const { isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen, habitCards, mechanismCards, schedule } = useAuth();
 
   const predictionData = useMemo(() => {
     const today = startOfDay(new Date());
     const fiveDaysAgo = subDays(today, 5);
+    const todayKey = format(today, 'yyyy-MM-dd');
+    const todaysSchedule = schedule[todayKey] || {};
 
-    const predictions: { time: Date; text: string; type: 'Urge' | 'Resistance'; originalDate: string }[] = [];
+    const predictions: {
+      time: Date;
+      text: string;
+      type: 'Urge' | 'Resistance';
+      originalDate: string;
+      scheduledTasks: Activity[];
+    }[] = [];
 
     const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
     
     habitCards.forEach(habit => {
       const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-      const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-
-      // Urges are linked to the negative path
       (negativeMechanism?.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
       (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
 
-
-      // Resistances are linked to the positive path
+      const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
       (positiveMechanism?.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-       (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+      (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
     });
 
     allLinks.forEach(link => {
       (link.stopper.timestamps || []).forEach((ts: number) => {
         const eventDate = new Date(ts);
         if (eventDate >= fiveDaysAgo && eventDate < today) {
-          const predictionTime = new Date(); // Today's date
+          const predictionTime = new Date();
           predictionTime.setHours(eventDate.getHours(), eventDate.getMinutes(), 0, 0);
+
+          const predictionHour = predictionTime.getHours();
+          const relevantSlot = slotOrder.find(slot => predictionHour >= slot.startHour && predictionHour < slot.endHour);
+          const scheduledTasks = relevantSlot ? (todaysSchedule[relevantSlot.name as keyof DailySchedule] as Activity[] || []) : [];
 
           predictions.push({
             time: predictionTime,
             text: link.stopper.text,
             type: link.isUrge ? 'Urge' : 'Resistance',
             originalDate: format(eventDate, 'MMM d'),
+            scheduledTasks: scheduledTasks.filter(task => !task.completed),
           });
         }
       });
     });
 
-    // Sort by time of day
     return predictions.sort((a, b) => a.time.getTime() - b.time.getTime());
-
-  }, [habitCards, mechanismCards]);
+  }, [habitCards, mechanismCards, schedule]);
 
   return (
     <Dialog open={isTodaysPredictionModalOpen} onOpenChange={setIsTodaysPredictionModalOpen}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5 text-primary" />
@@ -80,6 +94,7 @@ export function TodaysPredictionModal() {
                         <TableRow>
                             <TableHead className="w-[100px]">Time</TableHead>
                             <TableHead>Predicted Event</TableHead>
+                            <TableHead>Scheduled Task</TableHead>
                             <TableHead className="w-[120px]">Type</TableHead>
                             <TableHead className="w-[100px] text-right">Source</TableHead>
                         </TableRow>
@@ -90,7 +105,21 @@ export function TodaysPredictionModal() {
                                 <TableCell className="font-mono">{format(item.time, 'h:mm a')}</TableCell>
                                 <TableCell className="font-medium">{item.text}</TableCell>
                                 <TableCell>
-                                    <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'Urge' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                                    {item.scheduledTasks.length > 0 ? (
+                                        <div className="flex flex-col gap-1">
+                                            {item.scheduledTasks.map(task => (
+                                                <div key={task.id} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                    <Briefcase className="h-3 w-3 flex-shrink-0" />
+                                                    <span className="truncate" title={task.details}>{task.details}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground italic">No tasks</span>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <span className={`px-2 py-1 text-xs rounded-full ${item.type === 'Urge' ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'}`}>
                                         {item.type}
                                     </span>
                                 </TableCell>
