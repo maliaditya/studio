@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAuth } from '@/contexts/AuthContext';
 import { subDays, startOfDay, format } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
-import { AlertTriangle, Briefcase } from 'lucide-react';
+import { AlertTriangle, Briefcase, Activity as ActivityIcon } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import type { Stopper, DailySchedule, Activity } from '@/types/workout';
 
@@ -78,7 +78,7 @@ export function TodaysPredictionModal() {
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5 text-primary" />
+            <ActivityIcon className="h-5 w-5 text-primary" />
             Today's Resistance Prediction
           </DialogTitle>
           <DialogDescription>
