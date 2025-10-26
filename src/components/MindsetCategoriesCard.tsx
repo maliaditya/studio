@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -272,12 +273,16 @@ export function MindsetCategoriesCard() {
         openLinkedResistancePopup,
         openStopperProgressPopup,
         isMindsetModalOpen,
-        setIsMindsetModalOpen
+        setIsMindsetModalOpen,
+        setResources,
     } = useAuth();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
     const [isHourlyLogOpen, setIsHourlyLogOpen] = useState(false);
     const [linkTechniqueModalState, setLinkTechniqueModalState] = useState({ isOpen: false, habitId: '', stopper: {} as Stopper, stage: 2 as 2 | 3 });
+    
+    const [newEntryText, setNewEntryText] = useState('');
+    const [newEntryType, setNewEntryType] = useState<'urge' | 'resistance'>('urge');
 
 
     const allLinkedResistances = React.useMemo(() => {
@@ -395,6 +400,44 @@ export function MindsetCategoriesCard() {
 
         return { className: highlightClass, dormant: isDormant };
     };
+    
+    const handleAddEntry = () => {
+        if (!newEntryText.trim()) return;
+        
+        // We need to find a habit to attach this to.
+        // For simplicity, we'll find the first habit with a negative framework.
+        const targetHabit = habitCards.find(h => {
+            const mechanism = mechanismCards.find(m => m.id === h.response?.resourceId);
+            return mechanism?.mechanismFramework === 'negative';
+        });
+
+        if (!targetHabit) {
+            // In a real scenario, you might want to prompt the user to create or select a habit.
+            console.error("No suitable habit card found to attach this new entry.");
+            return;
+        }
+        
+        const newStopper: Stopper = {
+            id: `stopper_${Date.now()}`,
+            text: newEntryText.trim(),
+            status: 'none',
+        };
+
+        setResources(prev => prev.map(r => {
+            if (r.id === targetHabit.id) {
+                const updatedResource = { ...r };
+                if (newEntryType === 'urge') {
+                    updatedResource.urges = [...(updatedResource.urges || []), newStopper];
+                } else {
+                    updatedResource.resistances = [...(updatedResource.resistances || []), newStopper];
+                }
+                return updatedResource;
+            }
+            return r;
+        }));
+
+        setNewEntryText('');
+    };
 
     return (
         <>
@@ -413,6 +456,23 @@ export function MindsetCategoriesCard() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
+                        <div className="flex gap-2 mb-4">
+                            <Input 
+                                value={newEntryText}
+                                onChange={(e) => setNewEntryText(e.target.value)}
+                                placeholder={`New ${newEntryType === 'urge' ? 'Urge' : 'Resistance'}...`}
+                                className="h-9"
+                            />
+                            <Tabs value={newEntryType} onValueChange={(v) => setNewEntryType(v as any)} className="w-[180px]">
+                                <TabsList className="grid w-full grid-cols-2 h-9">
+                                    <TabsTrigger value="urge">Urge</TabsTrigger>
+                                    <TabsTrigger value="resistance">Resist</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                            <Button onClick={handleAddEntry} size="icon" className="h-9 w-9 flex-shrink-0">
+                                <PlusCircle className="h-4 w-4" />
+                            </Button>
+                        </div>
                         <ScrollArea className="h-96 pr-4">
                              <ul className="space-y-2">
                                 {sortedResistances.map((link) => {
