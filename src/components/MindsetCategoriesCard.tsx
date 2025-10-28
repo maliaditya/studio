@@ -24,6 +24,8 @@ import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -283,6 +285,8 @@ export function MindsetCategoriesCard() {
     
     const [newEntryText, setNewEntryText] = useState('');
     const [newEntryType, setNewEntryType] = useState<'urge' | 'resistance'>('urge');
+    const [selectedHabitId, setSelectedHabitId] = useState<string>('');
+    const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
 
 
     const allLinkedResistances = React.useMemo(() => {
@@ -403,20 +407,11 @@ export function MindsetCategoriesCard() {
     
     const handleAddEntry = () => {
         if (!newEntryText.trim()) return;
-        
-        // We need to find a habit to attach this to.
-        // For simplicity, we'll find the first habit with a negative framework.
-        const targetHabit = habitCards.find(h => {
-            const mechanism = mechanismCards.find(m => m.id === h.response?.resourceId);
-            return mechanism?.mechanismFramework === 'negative';
-        });
-
-        if (!targetHabit) {
-            // In a real scenario, you might want to prompt the user to create or select a habit.
-            console.error("No suitable habit card found to attach this new entry.");
+        if (!selectedHabitId) {
+            alert('Please select a habit to associate this with.');
             return;
         }
-        
+
         const newStopper: Stopper = {
             id: `stopper_${Date.now()}`,
             text: newEntryText.trim(),
@@ -424,7 +419,7 @@ export function MindsetCategoriesCard() {
         };
 
         setResources(prev => prev.map(r => {
-            if (r.id === targetHabit.id) {
+            if (r.id === selectedHabitId) {
                 const updatedResource = { ...r };
                 if (newEntryType === 'urge') {
                     updatedResource.urges = [...(updatedResource.urges || []), newStopper];
@@ -437,6 +432,8 @@ export function MindsetCategoriesCard() {
         }));
 
         setNewEntryText('');
+        setSelectedHabitId('');
+        setIsAddPopoverOpen(false);
     };
 
     return (
@@ -456,23 +453,38 @@ export function MindsetCategoriesCard() {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                        <div className="flex gap-2 mb-4">
-                            <Input 
-                                value={newEntryText}
-                                onChange={(e) => setNewEntryText(e.target.value)}
-                                placeholder={`New ${newEntryType === 'urge' ? 'Urge' : 'Resistance'}...`}
-                                className="h-9"
-                            />
-                            <Tabs value={newEntryType} onValueChange={(v) => setNewEntryType(v as any)} className="w-[180px]">
-                                <TabsList className="grid w-full grid-cols-2 h-9">
-                                    <TabsTrigger value="urge">Urge</TabsTrigger>
-                                    <TabsTrigger value="resistance">Resist</TabsTrigger>
-                                </TabsList>
-                            </Tabs>
-                            <Button onClick={handleAddEntry} size="icon" className="h-9 w-9 flex-shrink-0">
-                                <PlusCircle className="h-4 w-4" />
-                            </Button>
-                        </div>
+                        <Popover open={isAddPopoverOpen} onOpenChange={setIsAddPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full mb-4">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Add New Entry
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-96 p-4 space-y-4">
+                                <Tabs value={newEntryType} onValueChange={(v) => setNewEntryType(v as any)} className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2">
+                                        <TabsTrigger value="urge">Urge</TabsTrigger>
+                                        <TabsTrigger value="resistance">Resistance</TabsTrigger>
+                                    </TabsList>
+                                </Tabs>
+                                <Input 
+                                    value={newEntryText}
+                                    onChange={(e) => setNewEntryText(e.target.value)}
+                                    placeholder={`Describe the ${newEntryType}...`}
+                                />
+                                <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Link to a Habit..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {habitCards.map(habit => (
+                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button onClick={handleAddEntry} className="w-full">Add</Button>
+                            </PopoverContent>
+                        </Popover>
                         <ScrollArea className="h-96 pr-4">
                              <ul className="space-y-2">
                                 {sortedResistances.map((link) => {
