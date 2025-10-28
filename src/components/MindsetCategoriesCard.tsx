@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
