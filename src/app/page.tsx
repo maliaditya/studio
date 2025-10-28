@@ -148,18 +148,24 @@ export default function LandingPage() {
                     Dock is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
                     </p>
                     <div className="mt-8 flex flex-col items-center justify-center gap-4">
-                        <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
-                            {currentUser ? 'Go to Dashboard' : 'Launch Your Dock'} <ArrowRight className="ml-2 h-5 w-5" />
-                        </Button>
+                        {currentUser ? (
+                            <>
+                                <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
+                                    Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
+                                </Button>
+                                <div className="flex items-center space-x-2">
+                                    <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
+                                    <Label htmlFor="dont-show-again" className="text-sm font-normal text-muted-foreground">Don't show this again</Label>
+                                </div>
+                            </>
+                        ) : (
+                             <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
+                                Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
+                            </Button>
+                        )}
                         <Link href="/seamless-editing-example">
                             <Button variant="link">View Seamless Editing Example</Button>
                         </Link>
-                        {currentUser && (
-                            <div className="flex items-center space-x-2">
-                                <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
-                                <Label htmlFor="dont-show-again" className="text-sm font-normal text-muted-foreground">Don't show this again</Label>
-                            </div>
-                        )}
                     </div>
                 </motion.div>
             </div>
