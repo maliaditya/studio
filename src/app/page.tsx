@@ -159,7 +159,7 @@ export default function LandingPage() {
                                 </div>
                             </>
                         ) : (
-                             <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
+                             <Button onClick={() => router.push('/login')} size="lg" className="text-base font-semibold">
                                 Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         )}
