@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -19,7 +20,7 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, subDays, isAfter } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays, startOfDay } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -174,7 +175,6 @@ function NavigationMenu() {
     { href: '/resources', label: 'Resources' },
     { href: '/skill', label: 'Skill Tree' },
     { href: '/strategic-planning', label: 'Strategy' },
-    { href: '/gamified-skills', label: 'Gamified Skills' },
   ];
 
   if (!isClient) {
@@ -207,6 +207,7 @@ function NavigationMenu() {
           <DropdownMenuItem asChild><Link href="/personal-branding">Branding</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/lead-generation">Lead Gen</Link></DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild><Link href="/gamified-skills">Gamified Skills</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/formalization">Formalization</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/patterns">Patterns</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/purpose">Purpose</Link></DropdownMenuItem>
@@ -691,7 +692,7 @@ export function Header() {
   
   const todaysPredictionCount = useMemo(() => {
     const today = startOfToday();
-    const fiveDaysAgo = subDays(today, 5);
+    const fiveDaysAgo = startOfDay(subDays(today, 5));
 
     let count = 0;
     const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
