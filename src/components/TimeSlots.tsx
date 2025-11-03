@@ -1,12 +1,10 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
+  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2, Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -25,6 +23,7 @@ import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { MissedSlotModal } from './MissedSlotModal';
+import { Dialog, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogContent } from './ui/dialog';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -123,6 +122,7 @@ export function TimeSlots({
 
   const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
+  const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
@@ -232,6 +232,9 @@ export function TimeSlots({
                     {slot.icon}
                   </Button>
                 )}
+                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOptionsModalSlot(slot.name)}>
+                    <Info className="h-4 w-4" />
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
@@ -338,6 +341,41 @@ export function TimeSlots({
       onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({...prev, isOpen}))}
       onSave={handleSaveMissedSlotReview}
     />
+     {optionsModalSlot && (
+        <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
+                    <DialogDescriptionComponent>
+                        A snapshot of your settings and plan for this time slot.
+                    </DialogDescriptionComponent>
+                </DialogHeader>
+                <div className="py-4 space-y-4 text-sm">
+                    <div>
+                        <h4 className="font-semibold text-foreground mb-1">Workout Plan</h4>
+                        <p className="text-muted-foreground">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></p>
+                        <p className="text-muted-foreground">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <h4 className="font-semibold text-foreground mb-1">Task Scheduling Level</h4>
+                        <p className="text-muted-foreground">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <h4 className="font-semibold text-foreground mb-1">Default Habit Links</h4>
+                        <ul className="list-disc list-inside text-muted-foreground">
+                            {Object.entries(settings.defaultHabitLinks).map(([type, habitId]) => {
+                                if (!habitId) return null;
+                                const habit = habitCards.find(h => h.id === habitId);
+                                return <li key={type} className="capitalize">{type.replace('-', ' ')}: <span className="font-medium text-foreground">{habit?.name || 'N/A'}</span></li>;
+                            })}
+                        </ul>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    )}
     </>
   );
 }
@@ -468,5 +506,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
-    
