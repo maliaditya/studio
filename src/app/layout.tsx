@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -177,30 +178,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         } else { 
             setRemainingTime('00:00:00'); 
         }
-
-        // --- Persistent Missed Slot Check ---
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        const daySchedule = schedule[todayKey];
-        if (daySchedule && !missedSlotModalState.isOpen) {
-            const currentSlotIndex = Object.keys(slotEndHours).indexOf(currentSlot);
-            const pastSlotNames = Object.keys(slotEndHours).slice(0, currentSlotIndex);
-
-            for (const slotName of pastSlotNames) {
-                const reviewKey = `${todayKey}-${slotName}`;
-                const reviewData = missedSlotReviews[reviewKey];
-
-                if (!reviewData || (reviewData.snoozedUntil && reviewData.snoozedUntil < Date.now())) {
-                    const allTasksInSlot = (daySchedule[slotName] as Activity[] | undefined) || [];
-                    const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
-                    // This now triggers even for empty slots
-                    setMissedSlotModalState({ isOpen: true, slotName: slotName, allTasks: allTasksInSlot, incompleteTasks: incompleteTasks });
-                    break;
-                }
-            }
-        }
     }, 1000);
     return () => clearInterval(timerInterval);
-  }, [currentSlot, schedule, missedSlotReviews, missedSlotModalState.isOpen]);
+  }, [currentSlot]);
 
 
   useEffect(() => {

@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
+import { MissedSlotModal } from './MissedSlotModal';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -120,20 +121,10 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup } = useAuth();
-  
-  const handleUpdateSubTask = (slotName: string, activityId: string, subTaskId: string, newText: string) => {
-    // This logic should now be in AuthContext
-  };
-  
-  const handleToggleSubTask = (slotName: string, activityId: string, subTaskId: string) => {
-    // This logic should now be in AuthContext
-  };
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule } = useAuth();
+  const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
+  const { toast } = useToast();
 
-  const handleDeleteSubTask = (slotName: string, activityId: string, subTaskId: string) => {
-    // This logic should now be in AuthContext
-  };
-  
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
     const currentSlotRules = settings.slotRules?.[slotName] || [];
     const isLinked = currentSlotRules.includes(ruleId);
@@ -151,6 +142,37 @@ export function TimeSlots({
     }));
   };
 
+  const handleOpenReviewModal = (slotName: string) => {
+    const allTasksInSlot = (schedule[slotName as keyof DailySchedule] as Activity[] | undefined) || [];
+    const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
+    setMissedSlotModalState({ isOpen: true, slotName: slotName, allTasks: allTasksInSlot, incompleteTasks: incompleteTasks });
+  };
+  
+  const handleSaveMissedSlotReview = (review: MissedSlotReview, newDistraction?: Activity) => {
+    setMissedSlotReviews(prev => ({
+        ...prev,
+        [review.id]: review
+    }));
+
+    if (newDistraction) {
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        setSchedule(prev => {
+            const newDaySchedule = { ...(prev[todayKey] || {}) };
+            const currentActivities = Array.isArray(newDaySchedule[newDistraction.slot]) 
+                ? newDaySchedule[newDistraction.slot] as Activity[]
+                : [];
+            
+            newDaySchedule[newDistraction.slot] = [...currentActivities, newDistraction];
+            
+            return { ...prev, [todayKey]: newDaySchedule };
+        });
+        toast({ title: 'Distraction Logged', description: 'Your unscheduled time has been logged as a distraction.' });
+    }
+
+    setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
+  };
+
+
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
     { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
@@ -160,6 +182,7 @@ export function TimeSlots({
     { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
   ];
   return (
+    <>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
@@ -205,7 +228,12 @@ export function TimeSlots({
                     {remainingTime}
                   </div>
                 ) : (
-                  slot.icon
+                  <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenReviewModal(slot.name)}>
+                        <Brain className="h-4 w-4" />
+                    </Button>
+                    {slot.icon}
+                  </div>
                 )}
               </div>
             </CardHeader>
@@ -308,6 +336,12 @@ export function TimeSlots({
         )
       })}
     </div>
+    <MissedSlotModal 
+      state={missedSlotModalState}
+      onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({...prev, isOpen}))}
+      onSave={handleSaveMissedSlotReview}
+    />
+    </>
   );
 }
 
