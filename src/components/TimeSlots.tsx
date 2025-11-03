@@ -228,12 +228,9 @@ export function TimeSlots({
                     {remainingTime}
                   </div>
                 ) : (
-                  <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenReviewModal(slot.name)}>
-                        <Brain className="h-4 w-4" />
-                    </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenReviewModal(slot.name)}>
                     {slot.icon}
-                  </div>
+                  </Button>
                 )}
               </div>
             </CardHeader>
@@ -471,3 +468,5 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
