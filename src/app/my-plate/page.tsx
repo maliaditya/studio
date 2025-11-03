@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -86,7 +85,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
     }
 
     if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
-        totalMinutes += parseInt(trimmedStr, 10);
+        totalMinutes += parseInt(trimmedStr.trim(), 10);
     }
 
     return totalMinutes;
@@ -431,7 +430,7 @@ function MyPlatePageContent() {
 
         if ((type === 'upskill' || type === 'deepwork') && detailsOverride) {
             const sourceDefs = type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-            const coreSkill = coreSkills.find(cs => cs.name === detailsOverride);
+            const coreSkill = coreSkills.find(cs => cs.name === detailsOverride && cs.type === 'Specialization');
             const microSkillName = coreSkill ? Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === coreSkill.name)?.microSkillName : detailsOverride;
 
             const existingDef = sourceDefs.find(d => d.name === detailsOverride && d.category === microSkillName);
@@ -456,7 +455,11 @@ function MyPlatePageContent() {
 
         if (!details) {
           switch (type) {
-              case 'workout': details = "Workout Session"; newActivityDuration = 90; break;
+              case 'workout': 
+                const { description: workoutDescription } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+                details = workoutDescription.replace(' workout added.', '');
+                newActivityDuration = 90;
+                break;
               case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
               case 'upskill': details = 'Learning Session'; newActivityDuration = 120; linkedEntityType = 'specialization'; break;
               case 'deepwork': details = 'Deep Work Session'; newActivityDuration = 120; linkedEntityType = 'specialization'; break;
