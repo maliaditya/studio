@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -457,7 +458,7 @@ function MyPlatePageContent() {
           switch (type) {
               case 'workout': 
                 const { description: workoutDescription } = getExercisesForDay(selectedDate, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-                details = workoutDescription.replace(' workout added.', '');
+                details = workoutDescription;
                 newActivityDuration = 90;
                 break;
               case 'mindset': details = 'Mindset Session'; newActivityDuration = 15; break;
@@ -1462,3 +1463,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
