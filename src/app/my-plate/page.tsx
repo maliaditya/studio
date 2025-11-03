@@ -85,7 +85,7 @@ const parseDurationToMinutes = (durationStr: string | undefined): number => {
         totalMinutes += parseInt(minMatch[1], 10);
     }
 
-    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr)) {
+    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr.trim())) {
         totalMinutes += parseInt(trimmedStr.trim(), 10);
     }
 
@@ -320,7 +320,10 @@ function MyPlatePageContent() {
           } else {
             // For non-completed tasks, calculate estimated duration
             switch(activity.type) {
-              case 'workout': totalMinutes = 90; break;
+              case 'workout': 
+                const { exercises: workoutExercises } = getExercisesForDay(parseISO(dateKey), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+                totalMinutes = workoutExercises.length > 0 ? 90 : 0;
+                break;
               case 'mindset': totalMinutes = 15; break;
               case 'upskill':
               case 'deepwork':
@@ -367,7 +370,7 @@ function MyPlatePageContent() {
       }
     }
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, calculateTotalEstimate, getDescendantLeafNodes]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, calculateTotalEstimate, getDescendantLeafNodes, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
 
 
   const slotDurations = useMemo(() => {
@@ -1139,7 +1142,7 @@ function MyPlatePageContent() {
           <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
             <CardHeader className="flex flex-row items-center justify-between text-center py-4">
                 <div className="flex-grow">
-                  <p className="text-sm text-muted-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
+                  <div className="text-sm text-muted-foreground">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</div>
                 </div>
                 <Popover>
                     <PopoverTrigger asChild>
@@ -1463,5 +1466,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-    

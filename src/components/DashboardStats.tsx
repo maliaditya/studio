@@ -29,10 +29,10 @@ const StatChange = ({ value }: { value: number }) => {
   const isPositive = value > 0;
 
   return (
-    <p className={cn("text-xs text-muted-foreground mt-1 flex items-center", isPositive ? "text-emerald-500" : "text-red-500")}>
+    <div className={cn("text-xs text-muted-foreground mt-1 flex items-center", isPositive ? "text-emerald-500" : "text-red-500")}>
       {isPositive ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
       {`${Math.abs(value).toFixed(0)}% vs yesterday`}
-    </p>
+    </div>
   );
 };
 
