@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -397,9 +397,9 @@ export function StatsOverviewModal({
 
             <TabsContent value="weight" className="flex-grow mt-4 min-h-0">
                  <ScrollArea className="h-full pr-4">
-                  {combinedWeightData.length > 1 ? (
+                  {combinedChartData.length > 1 ? (
                     <ChartContainer config={weightChartConfig} className="min-h-[400px] w-full">
-                         <LineChart accessibilityLayer data={combinedWeightData} margin={{ top: 5, right: 20, left: 0, bottom: 5, }}>
+                         <LineChart accessibilityLayer data={combinedChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5, }}>
                             <CartesianGrid vertical={false} strokeDasharray="3 3" />
                             <XAxis dataKey="timestamp" type="number" domain={['dataMin', 'dataMax']} tickFormatter={(unixTime) => format(new Date(unixTime), 'MMM dd')} tickLine={false} axisLine={false} tickMargin={8} />
                             <YAxis tickLine={false} axisLine={false} tickMargin={8} domain={['dataMin - 2', 'dataMax + 2']} />
