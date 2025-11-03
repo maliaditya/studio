@@ -32,8 +32,8 @@ const oneMuscleSequence: (ExerciseCategory | null)[] = ["Chest", "Triceps", "Bac
 
 /**
  * Generates a list of workout exercises for a given day based on the workout mode and plans.
- * This function handles "two-muscle" (4 exercises per group) and "one-muscle" (6 exercises per group) modes.
- * It supplements with random exercises if the plan has too few, and truncates if it has too many.
+ * This function handles "two-muscle" (all exercises for the group) and "one-muscle" (all exercises for the group) modes.
+ * It supplements with random exercises if the plan has too few, and truncates if it has too many based on mode-specific limits.
  * @param date The date for which to generate the workout.
  * @param mode The current workout mode ('one-muscle' or 'two-muscle').
  * @param plans The complete set of user-defined workout plans.
@@ -58,11 +58,10 @@ export const getExercisesForDay = (
 ): { exercises: WorkoutExercise[], description: string } => {
     let muscleGroups: ExerciseCategory[] | null = [];
     let planKey: keyof AllWorkoutPlans | null = null;
-    let exercisesPerGroup = 0;
-
+    
+    // This determines which muscle groups to train for the given day.
     if (overrideCategories) {
         muscleGroups = overrideCategories;
-        exercisesPerGroup = mode === 'one-muscle' ? 6 : 2; 
     } else if (schedulingMode === 'sequential' && allWorkoutLogs) {
         const sortedLogs = allWorkoutLogs
             .filter(log => log.exercises.length > 0)
@@ -71,7 +70,6 @@ export const getExercisesForDay = (
         const lastWorkout = sortedLogs[0];
         
         if (mode === 'two-muscle') {
-            exercisesPerGroup = 2;
             let lastWorkoutIndex = -1;
             if (lastWorkout) {
                 const lastMuscleGroup = lastWorkout.exercises[0]?.category;
@@ -79,7 +77,6 @@ export const getExercisesForDay = (
             }
             muscleGroups = twoMuscleSequence[(lastWorkoutIndex + 1) % twoMuscleSequence.length];
         } else { // one-muscle
-            exercisesPerGroup = 6;
             let lastWorkoutIndex = -1;
             if (lastWorkout) {
                 const lastMuscleGroup = lastWorkout.exercises[0]?.category;
@@ -93,11 +90,9 @@ export const getExercisesForDay = (
         const dayOfWeek = getDay(date);
         if (mode === 'two-muscle') {
             muscleGroups = (dailyMuscleGroups[dayOfWeek] || []) as ExerciseCategory[];
-            exercisesPerGroup = 2;
         } else { // 'one-muscle' mode
             const muscle = singleMuscleDailySchedule[dayOfWeek];
             muscleGroups = muscle ? [muscle] : [];
-            exercisesPerGroup = 6;
         }
     }
 
@@ -105,6 +100,7 @@ export const getExercisesForDay = (
         return { exercises: [], description: "Rest day." };
     }
 
+    // This determines which weekly plan (W1, W2, etc.) to use.
     const isoWeek = getISOWeek(date);
     if (mode === 'two-muscle') {
         if (rotationEnabled) {
@@ -136,50 +132,25 @@ export const getExercisesForDay = (
 
     for (const mg of muscleGroups) {
         const planExerciseNames = plan[mg] || [];
-        let selectedDefinitions: ExerciseDefinition[] = [];
-
+        
         for (const name of planExerciseNames) {
-            if (selectedDefinitions.length >= exercisesPerGroup) break;
             const definition = definitionsMap.get(name.toLowerCase());
             if (definition && !allAddedDefinitionIds.has(definition.id)) {
-                selectedDefinitions.push(definition);
+                allExercisesToAdd.push({
+                    id: `${definition.id}-${Date.now()}-${Math.random()}`,
+                    definitionId: definition.id,
+                    name: definition.name,
+                    category: definition.category,
+                    loggedSets: [],
+                    targetSets: DEFAULT_TARGET_SETS,
+                    targetReps: DEFAULT_TARGET_REPS,
+                    ...(findLastPerformance && { lastPerformance: findLastPerformance(definition.id) }),
+                });
                 allAddedDefinitionIds.add(definition.id);
             } else if (!definition) {
                 console.warn(`Definition not found for exercise: "${name}" in plan ${planKey}, category ${mg}`);
             }
         }
-
-        if (selectedDefinitions.length < exercisesPerGroup) {
-            const needed = exercisesPerGroup - selectedDefinitions.length;
-            const supplementPool = definitions.filter(def => 
-                def.category === mg && !allAddedDefinitionIds.has(def.id)
-            );
-            
-            for (let i = supplementPool.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [supplementPool[i], supplementPool[j]] = [supplementPool[j], supplementPool[i]];
-            }
-
-            const supplements = supplementPool.slice(0, needed);
-            selectedDefinitions.push(...supplements);
-            supplements.forEach(def => allAddedDefinitionIds.add(def.id));
-        }
-        
-        const workoutExercisesForGroup = selectedDefinitions.map(definition => {
-            const lastPerformance = findLastPerformance ? findLastPerformance(definition.id) : null;
-            return {
-                id: `${definition.id}-${Date.now()}-${Math.random()}`,
-                definitionId: definition.id,
-                name: definition.name,
-                category: definition.category,
-                loggedSets: [],
-                targetSets: DEFAULT_TARGET_SETS,
-                targetReps: DEFAULT_TARGET_REPS,
-                ...(lastPerformance && { lastPerformance }),
-            };
-        });
-
-        allExercisesToAdd.push(...workoutExercisesForGroup);
     }
 
     const description = `${muscleGroups.join(' & ')} workout added.`;
