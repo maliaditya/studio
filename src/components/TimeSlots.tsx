@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -204,7 +205,6 @@ export function TimeSlots({
     const today = startOfToday();
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
-    // 1. Get all unique dates with completed tasks in the target slot
     const loggedDates = new Set<string>();
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const scheduleDate = parseISO(dateKey);
@@ -219,7 +219,6 @@ export function TimeSlots({
     const sortedLoggedDates = Array.from(loggedDates).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
     const recentLoggedDates = new Set(sortedLoggedDates.slice(0, lastXDays));
 
-    // 2. Collect unique tasks from those recent dates
     const tasks = new Map<string, Activity>();
   
     recentLoggedDates.forEach(dateKey => {
@@ -242,8 +241,6 @@ export function TimeSlots({
                 const specializationName = findRootSpecialization(definition);
                 if (specializationName) {
                     taskDetail = specializationName;
-                } else {
-                    taskDetail = definition.name;
                 }
             }
           }
@@ -452,7 +449,13 @@ export function TimeSlots({
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {pastCompletedTasks.map(task => (
                                 <Card key={task.id}>
-                                    <CardHeader className="p-4">
+                                    <CardHeader className="p-4 relative">
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
+                                            onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                            setOptionsModalSlot(null);
+                                        }}>
+                                            <PlusCircle className="h-4 w-4" />
+                                        </Button>
                                         <CardTitle className="text-base flex items-center gap-2">
                                             {activityIcons[task.type]}
                                             {task.details}
@@ -461,15 +464,6 @@ export function TimeSlots({
                                             <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardFooter className="p-2 flex justify-end">
-                                        <Button size="sm" variant="outline" className="h-8" onClick={() => {
-                                            onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                            setOptionsModalSlot(null);
-                                        }}>
-                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                            Choose
-                                        </Button>
-                                    </CardFooter>
                                 </Card>
                             ))}
                         </div>
