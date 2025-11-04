@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper, MissedSlotReview } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
@@ -13,12 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, isToday, isBefore, startOfToday, parseISO, getHours, differenceInDays, isAfter } from 'date-fns';
+import { format, addDays, isToday, isBefore, startOfToday, parseISO, getHours, differenceInDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from './ui/separator';
 import { Progress } from './ui/progress';
@@ -608,30 +608,28 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="max-w-4xl h-[90vh] grid grid-rows-[auto,1fr] gap-0 p-0">
-                <DialogHeader className="p-6 pb-4">
-                  <div className="flex flex-row items-center justify-between">
-                      <div className="flex items-center gap-4">
-                          <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                          <Label htmlFor="last-x-days" className="text-muted-foreground flex-shrink-0">Show tasks from last</Label>
-                          <Input 
-                              id="last-x-days"
-                              type="number"
-                              value={lastXDays}
-                              onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
-                              className="w-16 h-8"
-                          />
-                          <span className="text-muted-foreground">logged days</span>
-                      </div>
-                  </div>
-                </DialogHeader>
-                <div className="grid md:grid-cols-2 lg:grid-cols-[2fr,1fr] gap-6 px-6 pb-6 min-h-0">
-                  <div className="flex flex-col gap-6 min-h-0">
+            <DialogContent className="grid grid-cols-[2fr_1fr] max-w-4xl h-[90vh] gap-6 p-0">
+                <div className="col-span-1 flex flex-col gap-6 pl-6 py-6 min-h-0">
+                    <DialogHeader>
+                      <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4 flex-grow min-h-0">
                       <div className="flex flex-col gap-4">
-                          <h3 className="font-semibold text-lg">Past Completed Tasks</h3>
-                          <ScrollArea className="h-48">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-semibold text-lg">Past Completed Tasks</h3>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Label htmlFor="last-x-days-modal" className="text-muted-foreground flex-shrink-0">Last</Label>
+                                <Input 
+                                    id="last-x-days-modal"
+                                    type="number"
+                                    value={lastXDays}
+                                    onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
+                                    className="w-16 h-8"
+                                />
+                                <span className="text-muted-foreground">logged days</span>
+                            </div>
+                        </div>
+                          <ScrollArea className="h-40">
                             {pastCompletedTasks.length > 0 ? (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
                                     {pastCompletedTasks.map(task => (
@@ -663,13 +661,38 @@ export function TimeSlots({
                             )}
                           </ScrollArea>
                       </div>
+                       <div className="flex flex-col gap-4">
+                          <h3 className="font-semibold text-lg">Past Friction</h3>
+                          <ScrollArea className="h-40">
+                              {loggedResistances.length > 0 ? (
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
+                                      {loggedResistances.map(item => (
+                                          <Card key={item.text}>
+                                              <CardContent className="p-3">
+                                                  <p className="text-sm font-medium">{item.text}</p>
+                                                  <div className="flex justify-between items-center mt-1">
+                                                      <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
+                                                      <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
+                                                  </div>
+                                              </CardContent>
+                                          </Card>
+                                      ))}
+                                  </div>
+                              ) : (
+                                  <div className="flex items-center justify-center h-full border rounded-md">
+                                      <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
+                                  </div>
+                              )}
+                          </ScrollArea>
+                      </div>
                       <div className="flex flex-col gap-4">
                           <h3 className="font-semibold text-lg">Daily Learning Goals</h3>
-                           <ScrollArea className="h-48">
+                           <ScrollArea className="h-40">
                               {dailyLearningGoals.length > 0 ? (
                                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
                                   {dailyLearningGoals.map((goal, index) => {
-                                      const isCompletedToday = dailyReviewLogs.find(log => log.date === format(new Date(), 'yyyy-MM-dd'))?.completedResourceIds.includes(goal.resourceId);
+                                      const todaysCompletions = dailyReviewLogs.find(log => log.date === format(new Date(), 'yyyy-MM-dd'))?.completedResourceIds || [];
+                                      const isCompletedToday = todaysCompletions.includes(goal.resourceId);
                                       return (
                                           <Card key={index}>
                                               <CardContent className="p-3">
@@ -701,33 +724,8 @@ export function TimeSlots({
                               )}
                           </ScrollArea>
                       </div>
-                      <div className="flex flex-col gap-4">
-                          <h3 className="font-semibold text-lg">Past Friction</h3>
-                          <ScrollArea className="h-48">
-                              {loggedResistances.length > 0 ? (
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
-                                      {loggedResistances.map(item => (
-                                          <Card key={item.text}>
-                                              <CardContent className="p-3">
-                                                  <p className="text-sm font-medium">{item.text}</p>
-                                                  <div className="flex justify-between items-center mt-1">
-                                                      <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
-                                                      <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
-                                                  </div>
-                                              </CardContent>
-                                          </Card>
-                                      ))}
-                                  </div>
-                              ) : (
-                                  <div className="flex items-center justify-center h-full border rounded-md">
-                                      <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
-                                  </div>
-                              )}
-                          </ScrollArea>
-                      </div>
-
-                       <div>
-                            <h3 className="font-semibold text-lg mb-4">Routine Tasks for this Slot</h3>
+                        <div className="flex flex-col gap-4">
+                            <h3 className="font-semibold text-lg">Routine Tasks for this Slot</h3>
                             {routineTasksForSlot.length > 0 ? (
                                 <div className="space-y-2">
                                     {routineTasksForSlot.map((task, index) => (
@@ -749,21 +747,22 @@ export function TimeSlots({
                                 </div>
                             )}
                         </div>
-                  </div>
-                  <div className="flex flex-col gap-6 min-h-0">
-                    <div className="flex flex-col gap-4">
-                      <h3 className="font-semibold text-lg">Daily Purpose</h3>
-                      <div className="space-y-2">
-                        {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
-                          <Card key={index}>
-                            <CardContent className="p-3">
-                              <p className="text-sm whitespace-pre-wrap">{line}</p>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
                     </div>
-                     <div className="flex flex-col gap-4 flex-grow min-h-0">
+                </div>
+                <div className="col-span-1 flex flex-col gap-6 bg-muted/30 p-6 border-l min-h-0">
+                    <div className="flex flex-col gap-4">
+                        <h3 className="font-semibold text-lg">Daily Purpose</h3>
+                        <div className="space-y-2">
+                            {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
+                                <Card key={index}>
+                                    <CardContent className="p-3">
+                                        <p className="text-sm whitespace-pre-wrap">{line}</p>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-4 flex-grow min-h-0">
                         <div className="flex justify-between items-center">
                             <h3 className="font-semibold text-lg">Slot Rules</h3>
                             <DropdownMenu>
@@ -806,8 +805,7 @@ export function TimeSlots({
                                 </div>
                             )}
                         </ScrollArea>
-                     </div>
-                  </div>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>
@@ -815,3 +813,4 @@ export function TimeSlots({
     </>
   );
 }
+
