@@ -576,8 +576,8 @@ export function TimeSlots({
                         <span className="text-muted-foreground">logged days</span>
                     </div>
                 </DialogHeader>
-                <div className="py-4 grid grid-cols-1 md:grid-cols-3 gap-8">
-                    <div className="md:col-span-2 space-y-8">
+                <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 space-y-8">
                         <div>
                             <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
                             {pastCompletedTasks.length > 0 ? (
@@ -634,18 +634,18 @@ export function TimeSlots({
                         </div>
                     </div>
 
-                    <div className="md:col-span-1 space-y-8">
+                    <div className="lg:col-span-1 space-y-8">
                       <div>
                           <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
                            <div className="space-y-2">
-                              {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
+                                {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
                                   <Card key={index}>
                                       <CardContent className="p-3">
                                           <p className="text-sm whitespace-pre-wrap">{line}</p>
                                       </CardContent>
                                   </Card>
-                              ))}
-                          </div>
+                                ))}
+                            </div>
                       </div>
                       <div>
                         <h3 className="font-semibold text-lg mb-4">Slot Rules</h3>
@@ -664,51 +664,6 @@ export function TimeSlots({
                                 <p className="text-sm text-muted-foreground text-center">No rules linked to this slot.</p>
                             </div>
                         )}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg mb-4">Daily Learning Goals</h3>
-                        <div className="space-y-2">
-                           {dailyLearningGoals.map((goal, index) => {
-                               const isCompletedToday = dailyReviewLogs.find(log => log.date === format(new Date(), 'yyyy-MM-dd'))?.completedResourceIds.includes(goal.resourceId);
-                               return (
-                                   <Card key={index}>
-                                       <CardContent className="p-3">
-                                            <div className="flex items-start">
-                                                <Checkbox
-                                                    id={`goal-check-modal-${goal.resourceId}`}
-                                                    checked={isCompletedToday}
-                                                    onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
-                                                    className="mr-2 mt-1"
-                                                />
-                                                <div className="flex-grow">
-                                                    <p className="font-semibold text-sm">{goal.resourceName}</p>
-                                                    <p className="text-xs text-muted-foreground">{goal.specName}</p>
-                                                    <div className="flex justify-between items-center mt-1 pt-1 border-t">
-                                                        <Badge variant="secondary">{goal.progress}</Badge>
-                                                        <Badge variant="default">{goal.dailyTarget}</Badge>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                       </CardContent>
-                                   </Card>
-                               )
-                           })}
-                           {dailyLearningGoals.length === 0 && <p className="text-center text-sm text-muted-foreground">No active learning goals.</p>}
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg mb-4">Routine Tasks for this Slot</h3>
-                        <div className="space-y-2">
-                          {routineTasksForSlot.map((task, index) => (
-                              <Card key={index}>
-                                  <CardContent className="p-3 flex items-center justify-between">
-                                      <span className="font-semibold text-sm">{task.details}</span>
-                                      <Badge variant="outline" className="capitalize">{task.routine?.type}</Badge>
-                                  </CardContent>
-                              </Card>
-                          ))}
-                          {routineTasksForSlot.length === 0 && <p className="text-center text-sm text-muted-foreground">No routine tasks for this slot.</p>}
-                        </div>
                       </div>
                     </div>
                 </div>
@@ -845,5 +800,4 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
     
