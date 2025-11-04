@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -193,7 +192,7 @@ export function TimeSlots({
             let taskDetail = activity.details;
             let taskKey: string;
             
-            if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
+             if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
               const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
               const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
               
@@ -315,6 +314,7 @@ export function TimeSlots({
                           onActivityClick={onActivityClick}
                           onRemoveActivity={onRemoveActivity}
                           setRoutine={setRoutine}
+                          context="timeslot"
                         />
                       ))
                     ) : (
@@ -394,39 +394,40 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                   <div>
                     <h4 className="font-semibold text-sm mb-2">Past Completed Tasks</h4>
-                    <ScrollArea className="h-64 border rounded-md p-2">
+                    <ScrollArea className="h-96">
                         {pastCompletedTasks.length > 0 ? (
-                            <ul className="space-y-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {pastCompletedTasks.map(task => (
-                                    <li key={task.id}>
-                                        <Card className="p-3">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    {activityIcons[task.type]}
-                                                    <span className="font-medium">{task.details}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddActivity(optionsModalSlot as SlotName, task.type, task.details)}>
-                                                        <PlusCircle className="h-4 w-4 text-green-500" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    </li>
+                                    <Card key={task.id}>
+                                        <CardHeader className="p-3">
+                                            <CardTitle className="text-sm flex items-center gap-2">
+                                                {activityIcons[task.type]}
+                                                {task.details}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardFooter className="p-2 flex justify-end">
+                                            <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                                                onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                                setOptionsModalSlot(null);
+                                            }}>
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Choose
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
                                 ))}
-                            </ul>
+                            </div>
                         ) : (
-                            <p className="text-center text-xs text-muted-foreground pt-12">No completed tasks in this slot historically.</p>
+                            <div className="flex items-center justify-center h-40 border rounded-md">
+                                <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot historically.</p>
+                            </div>
                         )}
                     </ScrollArea>
                   </div>
