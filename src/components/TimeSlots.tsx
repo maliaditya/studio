@@ -1,12 +1,10 @@
-
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper, MissedSlotReview } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Dock, Move, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
+  CheckCircle2, Circle, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -113,7 +111,7 @@ export const AgendaWidgetItem: React.FC<{
                 activity.completed ? 'bg-green-100/50 dark:bg-green-900/20' : 'hover:bg-muted/50'
             )}
         >
-            <div className="flex flex-col items-center gap-2 pt-0.5">
+            <div className="flex items-center gap-2 pt-0.5">
                 <Button
                     variant="ghost"
                     size="icon"
@@ -138,52 +136,52 @@ export const AgendaWidgetItem: React.FC<{
                     <span className="flex items-center gap-1">{activityIcons[activity.type]} {activity.type.replace('-', ' ')}</span>
                     {duration && <span>• {duration}</span>}
                 </div>
-                {context === 'timeslot' && (
-                    <div className="flex-col items-start opacity-0 group-hover:opacity-100 transition-opacity mt-2">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5">
-                                <Repeat className="h-3 w-3 mr-1"/> Repeat
-                            </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                            <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                            {activity.isRoutine && <DropdownMenuSeparator />}
-                            {activity.isRoutine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5">
-                                    <LinkIcon className="h-3 w-3 mr-1"/> Link Habit
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuLabel>Link Habit</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <ScrollArea className="h-[200px]">
-                                {habitCards.map(habit => (
-                                    <DropdownMenuCheckboxItem
-                                        key={habit.id}
-                                        checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                        onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
-                                    >
-                                        {habit.name}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                                </ScrollArea>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                        <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5" onClick={(e) => onOpenTaskContext(activity.id, e)}>
-                            <GitBranch className="h-3 w-3 mr-1"/> Context
-                        </Button>
-                        <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5 text-destructive hover:text-destructive" onClick={() => onRemoveActivity(activity.slot, activity.id)}>
-                            <Trash2 className="h-3 w-3 mr-1"/> Remove
-                        </Button>
-                    </div>
-                )}
             </div>
+             {context === 'timeslot' && (
+                <div className="flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity -space-y-1">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="xs" className="h-6 px-1.5">
+                                <Repeat className="h-3 w-3"/>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                        <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                        {activity.isRoutine && <DropdownMenuSeparator />}
+                        {activity.isRoutine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="xs" className="h-6 px-1.5">
+                                <LinkIcon className="h-3 w-3"/>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuLabel>Link Habit</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <ScrollArea className="h-[200px]">
+                            {habitCards.map(habit => (
+                                <DropdownMenuCheckboxItem
+                                    key={habit.id}
+                                    checked={(activity.habitEquationIds || []).includes(habit.id)}
+                                    onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
+                                >
+                                    {habit.name}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                            </ScrollArea>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="ghost" size="xs" className="h-6 px-1.5" onClick={(e) => onOpenTaskContext(activity.id, e)}>
+                        <GitBranch className="h-3 w-3"/>
+                    </Button>
+                    <Button variant="ghost" size="xs" className="text-destructive hover:text-destructive h-6 px-1.5" onClick={() => onRemoveActivity(activity.slot, activity.id)}>
+                        <Trash2 className="h-3 w-3"/>
+                    </Button>
+                </div>
+            )}
         </li>
     );
 };
