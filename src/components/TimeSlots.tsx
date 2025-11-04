@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, isToday, isBefore, startOfToday } from 'date-fns';
+import { format, addDays, isToday, isBefore, startOfToday, parseISO } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -121,7 +121,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const { toast } = useToast();
@@ -172,6 +172,31 @@ export function TimeSlots({
 
     setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
   };
+
+  const pastCompletedTasks = useMemo(() => {
+    if (!optionsModalSlot) return [];
+  
+    const tasks = new Map<string, Activity>();
+    const today = startOfToday();
+  
+    Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
+      const scheduleDate = parseISO(dateKey);
+      if (isBefore(scheduleDate, today)) {
+        const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
+        activities.forEach(activity => {
+          if (activity.completed) {
+            // Use details + type as a key to get unique tasks
+            const taskKey = `${activity.details}-${activity.type}`;
+            if (!tasks.has(taskKey)) {
+              tasks.set(taskKey, activity);
+            }
+          }
+        });
+      }
+    });
+  
+    return Array.from(tasks.values());
+  }, [fullSchedule, optionsModalSlot]);
 
 
   const slots = [
@@ -348,31 +373,46 @@ export function TimeSlots({
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                     <DialogDescriptionComponent>
-                        A snapshot of your settings and plan for this time slot.
+                        A snapshot of your settings and historical activity for this time slot.
                     </DialogDescriptionComponent>
                 </DialogHeader>
-                <div className="py-4 space-y-4 text-sm">
-                    <div>
-                        <h4 className="font-semibold text-foreground mb-1">Workout Plan</h4>
-                        <div className="text-muted-foreground">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></div>
-                        <div className="text-muted-foreground">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></div>
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-foreground mb-1">Task Scheduling Level</h4>
-                        <div className="text-muted-foreground">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</div>
-                    </div>
-                    <Separator />
-                    <div>
-                        <h4 className="font-semibold text-foreground mb-1">Default Habit Links</h4>
-                        <ul className="list-disc list-inside text-muted-foreground">
-                            {Object.entries(settings.defaultHabitLinks).map(([type, habitId]) => {
-                                if (!habitId) return null;
-                                const habit = habitCards.find(h => h.id === habitId);
-                                return <li key={type} className="capitalize">{type.replace('-', ' ')}: <span className="font-medium text-foreground">{habit?.name || 'N/A'}</span></li>;
-                            })}
-                        </ul>
-                    </div>
+                <div className="py-4 space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Past Completed Tasks</h4>
+                    <ScrollArea className="h-40 border rounded-md p-2">
+                        {pastCompletedTasks.length > 0 ? (
+                            <ul className="space-y-1">
+                                {pastCompletedTasks.map(task => (
+                                    <li key={task.id} className="text-sm text-muted-foreground p-1 flex items-center gap-2">
+                                        {activityIcons[task.type]}
+                                        {task.details}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-center text-xs text-muted-foreground pt-12">No completed tasks in this slot historically.</p>
+                        )}
+                    </ScrollArea>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Workout Plan</h4>
+                    <div className="text-muted-foreground text-sm">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></div>
+                    <div className="text-muted-foreground text-sm mt-1">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></div>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">Task Scheduling Level</h4>
+                    <div className="text-muted-foreground text-sm">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</div>
+                  </div>
+                  <div>
+                      <h4 className="font-semibold text-sm mb-2">Default Habit Links</h4>
+                      <ul className="list-disc list-inside text-sm text-muted-foreground">
+                          {Object.entries(settings.defaultHabitLinks).map(([type, habitId]) => {
+                              if (!habitId) return null;
+                              const habit = habitCards.find(h => h.id === habitId);
+                              return <li key={type} className="capitalize">{type.replace('-', ' ')}: <span className="font-medium text-foreground">{habit?.name || 'N/A'}</span></li>;
+                          })}
+                      </ul>
+                  </div>
                 </div>
             </DialogContent>
         </Dialog>
@@ -398,11 +438,11 @@ export const AgendaWidgetItem = ({
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
   context?: 'timeslot' | 'agenda';
 }) => {
-  const { workoutMode, workoutPlans, exerciseDefinitions, handleLinkHabit, habitCards, onOpenFocusModal, onOpenHabitPopup, activityDurations } = useAuth();
+  const { workoutMode, workoutPlans, exerciseDefinitions, handleLinkHabit, habitCards, onOpenFocusModal, onOpenHabitPopup, activityDurations, settings, allWorkoutLogs, workoutPlanRotation } = useAuth();
   
   let displayDetails = activity.details;
   if (activity.type === 'workout') {
-    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions);
+    const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
     displayDetails = description.split(' for ')[1] || "Workout";
   }
   
@@ -507,5 +547,4 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
     
