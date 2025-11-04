@@ -185,23 +185,23 @@ export function TimeSlots({
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
     const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-        let currentDef: ExerciseDefinition | undefined = taskDef;
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
-        if (!microSkillInfo) return null;
-        
-        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (!coreSkill || coreSkill.type !== 'Specialization') return null;
+      let currentDef: ExerciseDefinition | undefined = taskDef;
+      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
+      if (!microSkillInfo) return null;
+      
+      const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+      if (!coreSkill || coreSkill.type !== 'Specialization') return null;
 
-        let rootSpec = coreSkill;
-        while (rootSpec.parentId) {
-            const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
-            if (parent && parent.type === 'Specialization') {
-                rootSpec = parent;
-            } else {
-                break;
-            }
-        }
-        return rootSpec.name;
+      let rootSpec = coreSkill;
+      while (rootSpec.parentId) {
+          const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
+          if (parent && parent.type === 'Specialization') {
+              rootSpec = parent;
+          } else {
+              break;
+          }
+      }
+      return rootSpec.name;
     };
   
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
@@ -213,21 +213,24 @@ export function TimeSlots({
             let taskDetail = activity.details;
             let taskKey: string;
             
-            if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
-              const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-              const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
-              
-              if (taskLog) {
-                  const definition = allDefsMap.get(taskLog.definitionId);
-                  if (definition) {
-                      const specializationName = findRootSpecialization(definition);
-                      if (specializationName) {
-                          taskDetail = specializationName;
-                      } else {
-                          taskDetail = definition.name;
-                      }
-                  }
-              }
+            if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
+                const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
+
+                let definition;
+                if (taskLog) {
+                    definition = allDefsMap.get(taskLog.definitionId);
+                } else if (activity.details) {
+                    const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+                    definition = sourceDefs.find(d => d.name === activity.details);
+                }
+
+                if (definition) {
+                    const specializationName = findRootSpecialization(definition);
+                    if (specializationName) {
+                        taskDetail = specializationName;
+                    }
+                }
             }
   
             taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
@@ -414,41 +417,45 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-3xl">
+            <DialogContent className="sm:max-w-4xl max-h-[80vh]">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
+                    <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
                 </DialogHeader>
-                <div className="py-4">
-                  <ScrollArea className="h-96">
-                      {pastCompletedTasks.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {pastCompletedTasks.map(task => (
-                                  <Card key={task.id}>
-                                      <CardHeader className="p-3">
-                                          <CardTitle className="text-sm flex items-center gap-2">
-                                              {activityIcons[task.type]}
-                                              {task.details}
-                                          </CardTitle>
-                                      </CardHeader>
-                                      <CardFooter className="p-2 flex justify-end">
-                                          <Button size="sm" variant="outline" className="h-8" onClick={() => {
-                                              onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                              setOptionsModalSlot(null);
-                                          }}>
-                                              <PlusCircle className="mr-2 h-4 w-4" />
-                                              Choose
-                                          </Button>
-                                      </CardFooter>
-                                  </Card>
-                              ))}
-                          </div>
-                      ) : (
-                          <div className="flex items-center justify-center h-40 border rounded-md">
-                              <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot historically.</p>
-                          </div>
-                      )}
-                  </ScrollArea>
-                </div>
+                <ScrollArea className="h-[60vh] -mx-6 px-6">
+                    <div className="py-4">
+                        {pastCompletedTasks.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {pastCompletedTasks.map(task => (
+                                    <Card key={task.id}>
+                                        <CardHeader className="p-3">
+                                            <CardTitle className="text-sm flex items-center gap-2">
+                                                {activityIcons[task.type]}
+                                                {task.details}
+                                            </CardTitle>
+                                             <CardDescription>
+                                                <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardFooter className="p-2 flex justify-end">
+                                            <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                                                onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                                setOptionsModalSlot(null);
+                                            }}>
+                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                Choose
+                                            </Button>
+                                        </CardFooter>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-40 border rounded-md">
+                                <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot historically.</p>
+                            </div>
+                        )}
+                    </div>
+                </ScrollArea>
             </DialogContent>
         </Dialog>
     )}
@@ -582,6 +589,8 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+    
+
     
 
     
