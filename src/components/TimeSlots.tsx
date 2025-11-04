@@ -560,9 +560,9 @@ export function TimeSlots({
                     </div>
                      <div>
                         <h3 className="font-semibold text-lg mb-4">Slot Rules</h3>
-                        {linkedRules.length > 0 ? (
+                        {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).length > 0 ? (
                             <div className="space-y-2">
-                                {linkedRules.map(rule => (
+                                {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).map(rule => (
                                     <Card key={rule.id}>
                                         <CardContent className="p-3">
                                             <p className="text-sm">{rule.text}</p>
@@ -715,3 +715,4 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
