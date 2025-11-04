@@ -2596,86 +2596,65 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
   
   const createResourceWithHierarchy = useCallback((parent: ExerciseDefinition | Resource, pointToConvert?: ResourcePoint, type: Resource['type'] = 'card', prebuiltResource?: Resource): ExerciseDefinition | Resource | undefined => {
-    if (prebuiltResource) {
-        setResources(prev => [...prev, prebuiltResource]);
-        
-        let updatedParent;
-        if (pointToConvert) {
-            updatedParent = {
-              ...parent,
-              points: (parent.points || []).map(p => p.id === pointToConvert.id ? { ...p, type: 'card' as const, resourceId: prebuiltResource.id } : p)
-            };
-        } else {
-            updatedParent = {
-                ...parent,
-                linkedResourceIds: [...(parent.linkedResourceIds || []), prebuiltResource.id]
-            };
-        }
-
-        if ('category' in parent) {
-            const isUpskill = upskillDefinitions.some(d => d.id === parent.id);
-            if (isUpskill) {
-                setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
-            } else {
-                setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
-            }
-        } else {
-            setResources(prev => prev.map(res => res.id === parent.id ? updatedParent as Resource : res));
-        }
-        return updatedParent;
-    }
+    let newResource = prebuiltResource;
   
-    let path: string[] = ["Skills & Project Resources"];
+    if (!newResource) {
+      let path: string[] = ["Skills & Project Resources"];
+      let folderName: string | null = null;
   
-    if ('category' in parent) { // It's an ExerciseDefinition
-      const microSkillName = parent.category;
-      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === microSkillName);
-  
-      if (microSkillInfo) {
-        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (coreSkill) {
-          const domain = skillDomains.find(d => d.id === coreSkill.domainId);
-          if (domain) {
-            path.push(domain.name);
+      if ('category' in parent) {
+        const microSkillName = parent.category;
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === microSkillName);
+        if (microSkillInfo) {
+          const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+          if (coreSkill) {
+            const domain = skillDomains.find(d => d.id === coreSkill.domainId);
+            if (domain) path.push(domain.name);
+            path.push(coreSkill.name);
+            path.push(microSkillInfo.skillAreaName);
+            path.push(microSkillName);
           }
-          path.push(coreSkill.name);
-          path.push(microSkillInfo.skillAreaName);
-          path.push(microSkillName);
         }
-      }
-    } else { // It's a Resource
+      } else {
         const parentFolder = resourceFolders.find(f => f.id === parent.folderId);
         if (parentFolder) {
-            path = [parentFolder.name];
+            // Reconstruct path from parent folder
+            let currentFolder: ResourceFolder | undefined = parentFolder;
+            const tempPath: string[] = [];
+            while(currentFolder) {
+                tempPath.unshift(currentFolder.name);
+                currentFolder = resourceFolders.find(f => f.id === currentFolder!.parentId);
+            }
+            path = tempPath;
         }
-    }
-    
-    path.push(parent.name);
-
-    let currentParentId: string | null = null;
-    let updatedFolders = [...resourceFolders];
-  
-    for (const folderName of path) {
-      let folder = updatedFolders.find(f => f.name === folderName && f.parentId === currentParentId);
-      if (!folder) {
-        folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderName, parentId: currentParentId, icon: 'Folder' };
-        updatedFolders.push(folder);
       }
-      currentParentId = folder.id;
+      path.push(parent.name);
+  
+      let currentParentId: string | null = null;
+      let updatedFolders = [...resourceFolders];
+  
+      for (const folderNamePart of path) {
+        let folder = updatedFolders.find(f => f.name === folderNamePart && f.parentId === currentParentId);
+        if (!folder) {
+          folder = { id: `folder_${Date.now()}_${Math.random()}`, name: folderNamePart, parentId: currentParentId, icon: 'Folder' };
+          updatedFolders.push(folder);
+        }
+        currentParentId = folder.id;
+      }
+      setResourceFolders(updatedFolders);
+      
+      newResource = {
+        id: `res_${Date.now()}`,
+        name: pointToConvert ? pointToConvert.text : 'New Card',
+        folderId: currentParentId!,
+        type: type,
+        points: [],
+        icon: 'Library',
+        createdAt: new Date().toISOString(),
+      };
     }
   
-    const newResource: Resource = {
-      id: `res_${Date.now()}`,
-      name: pointToConvert ? pointToConvert.text : 'New Card',
-      folderId: currentParentId!,
-      type: type,
-      points: [],
-      icon: 'Library',
-      createdAt: new Date().toISOString(),
-    };
-  
-    setResourceFolders(updatedFolders);
-    setResources(prev => [...prev, newResource]);
+    setResources(prev => [...prev, newResource!]);
   
     let updatedParent;
     if (pointToConvert) {
@@ -2683,27 +2662,25 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         ...parent,
         points: (parent.points || []).map(p => 
           p.id === pointToConvert.id 
-            ? { ...p, type: 'card', resourceId: newResource.id } 
+            ? { ...p, type: 'card', text: newResource!.name, resourceId: newResource!.id } 
             : p
         ),
       };
     } else {
-      const linkPoint: ResourcePoint = {
-        id: `point_${Date.now()}`,
-        type: 'card',
-        text: newResource.name,
-        resourceId: newResource.id
-      };
-      updatedParent = {
-        ...parent,
-        linkedResourceIds: [...(parent.linkedResourceIds || []), newResource.id]
+       updatedParent = {
+          ...parent,
+          linkedResourceIds: [...(parent.linkedResourceIds || []), newResource!.id]
       };
     }
   
     if ('category' in parent) {
       const isUpskill = upskillDefinitions.some(d => d.id === parent.id);
+      const isMindProgramming = mindProgrammingDefinitions.some(d => d.id === parent.id);
+
       if (isUpskill) {
         setUpskillDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
+      } else if (isMindProgramming) {
+        setMindProgrammingDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
       } else {
         setDeepWorkDefinitions(prev => prev.map(def => def.id === parent.id ? updatedParent as ExerciseDefinition : def));
       }
@@ -2712,7 +2689,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
   
     return updatedParent;
-  }, [resourceFolders, setResourceFolders, setResources, setDeepWorkDefinitions, setUpskillDefinitions, coreSkills, skillDomains, microSkillMap]);
+  }, [resourceFolders, setResourceFolders, setResources, setDeepWorkDefinitions, setUpskillDefinitions, coreSkills, skillDomains, microSkillMap, mindProgrammingDefinitions, setMindProgrammingDefinitions]);
   
   const habitCards = useMemo(() => {
     return resources.filter(r => r.type === 'habit');
@@ -3527,5 +3504,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
