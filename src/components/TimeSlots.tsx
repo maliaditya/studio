@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -121,7 +122,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, upskillDefinitions, deepWorkDefinitions } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const { toast } = useToast();
@@ -175,12 +176,12 @@ export function TimeSlots({
 
   const pastCompletedTasks = useMemo(() => {
     if (!optionsModalSlot) return [];
-  
+
     const tasks = new Map<string, Activity>();
     const today = startOfToday();
-  
+
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-  
+
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const scheduleDate = parseISO(dateKey);
       if (isBefore(scheduleDate, today)) {
@@ -189,10 +190,10 @@ export function TimeSlots({
           if (activity.completed) {
             let taskDetail = activity.details;
             if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
-              const allLogs = [...useAuth().allUpskillLogs, ...useAuth().allDeepWorkLogs];
+              const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
               const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
-              
-              if(taskLog) {
+
+              if (taskLog) {
                   const definition = allDefsMap.get(taskLog.definitionId);
                   if (definition?.category) {
                       const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === definition.category);
@@ -210,10 +211,9 @@ export function TimeSlots({
         });
       }
     });
-  
-    return Array.from(tasks.values());
-  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, useAuth().allUpskillLogs, useAuth().allDeepWorkLogs]);
 
+    return Array.from(tasks.values());
+  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
