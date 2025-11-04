@@ -185,7 +185,7 @@ export function TimeSlots({
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
         activities.forEach(activity => {
           if (activity.completed) {
-            const taskKey = `${activity.details.toLowerCase().trim()}-${activity.type}`;
+            const taskKey = `${activity.details.trim().toLowerCase()}-${activity.type}`;
             if (!tasks.has(taskKey)) {
               tasks.set(taskKey, activity);
             }
@@ -371,9 +371,6 @@ export function TimeSlots({
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
-                    <DialogDescriptionComponent>
-                        A snapshot of your settings and historical activity for this time slot.
-                    </DialogDescriptionComponent>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                   <div>
@@ -384,7 +381,7 @@ export function TimeSlots({
                                 {pastCompletedTasks.map(task => (
                                     <li key={task.id} className="text-sm text-muted-foreground p-1 flex items-center gap-2">
                                         {activityIcons[task.type]}
-                                        {task.details}
+                                        <span>{task.details}</span>
                                     </li>
                                 ))}
                             </ul>
@@ -527,4 +524,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-    
