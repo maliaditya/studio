@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -353,13 +354,13 @@ export function TimeSlots({
                 <div className="py-4 space-y-4 text-sm">
                     <div>
                         <h4 className="font-semibold text-foreground mb-1">Workout Plan</h4>
-                        <p className="text-muted-foreground">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></p>
-                        <p className="text-muted-foreground">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></p>
+                        <div className="text-muted-foreground">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></div>
+                        <div className="text-muted-foreground">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></div>
                     </div>
                     <Separator />
                     <div>
                         <h4 className="font-semibold text-foreground mb-1">Task Scheduling Level</h4>
-                        <p className="text-muted-foreground">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</p>
+                        <div className="text-muted-foreground">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</div>
                     </div>
                     <Separator />
                     <div>
@@ -446,9 +447,9 @@ export const AgendaWidgetItem = ({
             }
         </button>
         <div className="flex-grow min-w-0">
-          <p className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
+          <div className={`font-semibold text-foreground ${activity.completed ? 'line-through text-muted-foreground' : ''}`} title={displayDetails}>
             {displayDetails}
-          </p>
+          </div>
           {linkedHabit && (
             <div className="min-w-0">
                 <p className="text-xs text-primary font-medium truncate" title={linkedHabit.name}>
@@ -506,3 +507,5 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
