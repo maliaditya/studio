@@ -573,9 +573,9 @@ export function TimeSlots({
                             </div>
                         )}
                     </div>
-                    <div>
+                     <div>
                         <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
-                        <p className="text-sm p-3 border rounded-md bg-muted/30">{purposeData.statement || "Not set for today."}</p>
+                        <p className="text-sm p-3 border rounded-md bg-muted/30 whitespace-pre-wrap">{purposeData.statement || "Not set for today."}</p>
                     </div>
                   </div>
                 </div>
@@ -712,3 +712,5 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
