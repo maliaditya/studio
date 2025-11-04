@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
@@ -128,6 +128,7 @@ export function TimeSlots({
   const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
+  const [lastXDays, setLastXDays] = useState(5);
   const { toast } = useToast();
 
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
@@ -180,70 +181,83 @@ export function TimeSlots({
   const pastCompletedTasks = useMemo(() => {
     if (!optionsModalSlot) return [];
   
-    const tasks = new Map<string, Activity>();
+    const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
+        let currentDef: ExerciseDefinition | undefined = taskDef;
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
+        if (!microSkillInfo) return null;
+        
+        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+        if (!coreSkill || coreSkill.type !== 'Specialization') return null;
+  
+        let rootSpec = coreSkill;
+        while (rootSpec.parentId) {
+            const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
+            if (parent && parent.type === 'Specialization') {
+                rootSpec = parent;
+            } else {
+                break;
+            }
+        }
+        return rootSpec.name;
+    };
+  
     const today = startOfToday();
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
-    const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-      let currentDef: ExerciseDefinition | undefined = taskDef;
-      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
-      if (!microSkillInfo) return null;
-      
-      const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-      if (!coreSkill || coreSkill.type !== 'Specialization') return null;
-
-      let rootSpec = coreSkill;
-      while (rootSpec.parentId) {
-          const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
-          if (parent && parent.type === 'Specialization') {
-              rootSpec = parent;
-          } else {
-              break;
-          }
-      }
-      return rootSpec.name;
-    };
-  
+    // 1. Get all unique dates with completed tasks in the target slot
+    const loggedDates = new Set<string>();
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const scheduleDate = parseISO(dateKey);
       if (isBefore(scheduleDate, today)) {
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-        activities.forEach(activity => {
-          if (activity.completed && activity.type !== 'interrupt') {
-            let taskDetail = activity.details;
-            let taskKey: string;
-            
-            if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
-                const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
+        if (activities.some(activity => activity.completed && activity.type !== 'interrupt')) {
+          loggedDates.add(dateKey);
+        }
+      }
+    });
 
-                let definition;
-                if (taskLog) {
-                    definition = allDefsMap.get(taskLog.definitionId);
-                } else if (activity.details) {
-                    const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-                    definition = sourceDefs.find(d => d.name === activity.details);
-                }
+    const sortedLoggedDates = Array.from(loggedDates).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
+    const recentLoggedDates = new Set(sortedLoggedDates.slice(0, lastXDays));
 
-                if (definition) {
-                    const specializationName = findRootSpecialization(definition);
-                    if (specializationName) {
-                        taskDetail = specializationName;
-                    }
-                }
-            }
+    // 2. Collect unique tasks from those recent dates
+    const tasks = new Map<string, Activity>();
   
-            taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
-            if (!tasks.has(taskKey)) {
-              tasks.set(taskKey, { ...activity, details: taskDetail });
+    recentLoggedDates.forEach(dateKey => {
+      const daySchedule = fullSchedule[dateKey];
+      const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
+      
+      activities.forEach(activity => {
+        if (activity.completed && activity.type !== 'interrupt') {
+          let taskDetail = activity.details;
+          let taskKey: string;
+  
+          if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
+            const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+            const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
+            let definition;
+            if (taskLog) {
+                definition = allDefsMap.get(taskLog.definitionId);
+            }
+            if (definition) {
+                const specializationName = findRootSpecialization(definition);
+                if (specializationName) {
+                    taskDetail = specializationName;
+                } else {
+                    taskDetail = definition.name;
+                }
             }
           }
-        });
-      }
+  
+          taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
+          if (!tasks.has(taskKey)) {
+            tasks.set(taskKey, { ...activity, details: taskDetail });
+          }
+        }
+      });
     });
   
     return Array.from(tasks.values());
-  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills]);
+  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills, lastXDays]);
 
 
   const slots = [
@@ -417,45 +431,54 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-4xl max-h-[80vh]">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                     <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
                 </DialogHeader>
-                <ScrollArea className="h-[60vh] -mx-6 px-6">
-                    <div className="py-4">
-                        {pastCompletedTasks.length > 0 ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {pastCompletedTasks.map(task => (
-                                    <Card key={task.id}>
-                                        <CardHeader className="p-3">
-                                            <CardTitle className="text-sm flex items-center gap-2">
-                                                {activityIcons[task.type]}
-                                                {task.details}
-                                            </CardTitle>
-                                             <CardDescription>
-                                                <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardFooter className="p-2 flex justify-end">
-                                            <Button size="sm" variant="outline" className="h-8" onClick={() => {
-                                                onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                                setOptionsModalSlot(null);
-                                            }}>
-                                                <PlusCircle className="mr-2 h-4 w-4" />
-                                                Choose
-                                            </Button>
-                                        </CardFooter>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center h-40 border rounded-md">
-                                <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot historically.</p>
-                            </div>
-                        )}
-                    </div>
-                </ScrollArea>
+                <div className="flex items-center gap-2 pt-4">
+                  <Label htmlFor="last-x-days">Show tasks from last</Label>
+                  <Input 
+                    id="last-x-days"
+                    type="number"
+                    value={lastXDays}
+                    onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-20 h-8"
+                  />
+                  <Label htmlFor="last-x-days">logged days</Label>
+                </div>
+                <div className="py-4">
+                    {pastCompletedTasks.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {pastCompletedTasks.map(task => (
+                                <Card key={task.id}>
+                                    <CardHeader className="p-4">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            {activityIcons[task.type]}
+                                            {task.details}
+                                        </CardTitle>
+                                        <CardDescription>
+                                            <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardFooter className="p-2 flex justify-end">
+                                        <Button size="sm" variant="outline" className="h-8" onClick={() => {
+                                            onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                            setOptionsModalSlot(null);
+                                        }}>
+                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                            Choose
+                                        </Button>
+                                    </CardFooter>
+                                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-center h-40 border rounded-md">
+                            <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
+                        </div>
+                    )}
+                </div>
             </DialogContent>
         </Dialog>
     )}
