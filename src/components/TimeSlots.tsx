@@ -428,7 +428,7 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="sm:max-w-7xl">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                     <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
@@ -448,7 +448,7 @@ export function TimeSlots({
                     {pastCompletedTasks.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {pastCompletedTasks.map(task => (
-                                <Card key={task.id}>
+                                <Card key={task.id} className="flex flex-col">
                                     <CardHeader className="p-4 relative">
                                         <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
                                             onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
@@ -460,7 +460,7 @@ export function TimeSlots({
                                             {activityIcons[task.type]}
                                             {task.details}
                                         </CardTitle>
-                                        <CardDescription>
+                                         <CardDescription>
                                             <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
                                         </CardDescription>
                                     </CardHeader>
@@ -611,3 +611,4 @@ export const AgendaWidgetItem = ({
     
 
     
+
