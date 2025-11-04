@@ -500,100 +500,96 @@ export function TimeSlots({
                         <span className="text-muted-foreground">logged days</span>
                     </div>
                 </DialogHeader>
-                <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-8">
+                <div className="py-4 grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="md:col-span-2 space-y-8">
+                        <div>
+                            <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
+                            {pastCompletedTasks.length > 0 ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {pastCompletedTasks.map(task => (
+                                        <Card key={task.id}>
+                                            <CardHeader className="p-4 relative">
+                                                <div className="absolute top-2 right-2">
+                                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
+                                                          onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                                          setOptionsModalSlot(null);
+                                                      }}>
+                                                      <PlusCircle className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                    {activityIcons[task.type]}
+                                                    {task.details}
+                                                </CardTitle>
+                                                <CardDescription>
+                                                  <Badge variant="outline" className="capitalize">{task.type.replace('-', ' ')}</Badge>
+                                                </CardDescription>
+                                            </CardHeader>
+                                        </Card>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-40 border rounded-md">
+                                    <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
+                                </div>
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-lg mb-4">Past Friction</h3>
+                            {loggedResistances.length > 0 ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    {loggedResistances.map(item => (
+                                        <Card key={item.text}>
+                                            <CardContent className="p-3">
+                                                <p className="text-sm font-medium">{item.text}</p>
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
+                                                    <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center justify-center h-40 border rounded-md">
+                                    <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="md:col-span-1 space-y-8">
                       <div>
-                          <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
-                          {pastCompletedTasks.length > 0 ? (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                  {pastCompletedTasks.map(task => (
-                                      <Card key={task.id}>
-                                          <CardHeader className="p-4 relative">
-                                              <div className="absolute top-2 right-2">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
-                                                        onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                                        setOptionsModalSlot(null);
-                                                    }}>
-                                                    <PlusCircle className="h-4 w-4" />
-                                                </Button>
-                                              </div>
-                                              <CardTitle className="text-base flex items-center gap-2">
-                                                  {activityIcons[task.type]}
-                                                  {task.details}
-                                              </CardTitle>
-                                              <CardDescription>
-                                                <Badge variant="outline" className="capitalize">{task.type.replace('-', ' ')}</Badge>
-                                              </CardDescription>
-                                          </CardHeader>
-                                      </Card>
-                                  ))}
-                              </div>
-                          ) : (
-                              <div className="flex items-center justify-center h-40 border rounded-md">
-                                  <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
-                              </div>
-                          )}
+                          <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
+                           <div className="space-y-2">
+                              {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
+                                  <Card key={index}>
+                                      <CardContent className="p-3">
+                                          <p className="text-sm whitespace-pre-wrap">{line}</p>
+                                      </CardContent>
+                                  </Card>
+                              ))}
+                          </div>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-lg mb-4">Past Friction</h3>
-                        {loggedResistances.length > 0 ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {loggedResistances.map(item => (
-                                    <Card key={item.text}>
+                        <h3 className="font-semibold text-lg mb-4">Slot Rules</h3>
+                        {(settings.slotRules?.[optionsModalSlot as SlotName] || []).length > 0 ? (
+                            <div className="space-y-2">
+                                {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).map(rule => (
+                                    <Card key={rule.id}>
                                         <CardContent className="p-3">
-                                            <p className="text-sm font-medium">{item.text}</p>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
-                                                <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
-                                            </div>
+                                            <p className="text-sm">{rule.text}</p>
                                         </CardContent>
                                     </Card>
                                 ))}
                             </div>
                         ) : (
                             <div className="flex items-center justify-center h-40 border rounded-md">
-                                <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
+                                <p className="text-sm text-muted-foreground text-center">No rules linked to this slot.</p>
                             </div>
                         )}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="space-y-8">
-                     <div>
-                      <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
-                       <div className="space-y-2">
-                            {purposeData.statement ? (
-                                purposeData.statement.split('\n').map((line, index) => (
-                                    <Card key={index}>
-                                        <CardContent className="p-3">
-                                            <p className="text-sm whitespace-pre-wrap">{line}</p>
-                                        </CardContent>
-                                    </Card>
-                                ))
-                            ) : (
-                                <p className="text-sm p-3 border rounded-md bg-muted/30">Not set for today.</p>
-                            )}
-                        </div>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg mb-4">Slot Rules</h3>
-                      {(settings.slotRules?.[optionsModalSlot as SlotName] || []).length > 0 ? (
-                          <div className="space-y-2">
-                              {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).map(rule => (
-                                  <Card key={rule.id}>
-                                      <CardContent className="p-3">
-                                          <p className="text-sm">{rule.text}</p>
-                                      </CardContent>
-                                  </Card>
-                              ))}
-                          </div>
-                      ) : (
-                          <div className="flex items-center justify-center h-40 border rounded-md">
-                              <p className="text-sm text-muted-foreground text-center">No rules linked to this slot.</p>
-                          </div>
-                      )}
-                    </div>
-                  </div>
                 </div>
             </DialogContent>
         </Dialog>
