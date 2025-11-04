@@ -1,10 +1,9 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
@@ -183,8 +182,7 @@ export function TimeSlots({
     if (!optionsModalSlot) return [];
   
     const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-        let currentDef: ExerciseDefinition | undefined = taskDef;
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === taskDef.category);
         if (!microSkillInfo) return null;
         
         const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
@@ -226,7 +224,7 @@ export function TimeSlots({
       const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
       
       activities.forEach(activity => {
-        if (activity.completed && activity.type !== 'interrupt') {
+        if (activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction') {
           let taskDetail = activity.details;
           let taskKey: string;
   
@@ -241,6 +239,8 @@ export function TimeSlots({
                 const specializationName = findRootSpecialization(definition);
                 if (specializationName) {
                     taskDetail = specializationName;
+                } else {
+                    taskDetail = definition.name;
                 }
             }
           }
@@ -268,7 +268,7 @@ export function TimeSlots({
     if (!slot) return [];
 
     const resistancesMap = new Map<string, { text: string; type: 'Urge' | 'Resistance'; count: number; dates: Set<string> }>();
-    const allLinks: { stopper: any; isUrge: boolean }[] = [];
+    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
 
     habitCards.forEach(habit => {
         const negMech = mechanismCards.find(m => m.id === habit.response?.resourceId);
@@ -280,40 +280,23 @@ export function TimeSlots({
         if (habit.resistances) allLinks.push(...habit.resistances.map(s => ({ stopper: s, isUrge: false })));
     });
 
-    const loggedDates = new Set<string>();
     allLinks.forEach(link => {
         (link.stopper.timestamps || []).forEach((ts: number) => {
-            const eventDate = new Date(ts);
-            const eventHour = getHours(eventDate);
+            const eventHour = getHours(new Date(ts));
             if (eventHour >= slot.start && eventHour < slot.end) {
-                loggedDates.add(format(eventDate, 'yyyy-MM-dd'));
-            }
-        });
-    });
-    
-    const sortedLoggedDates = Array.from(loggedDates).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
-    const recentLoggedDates = new Set(sortedLoggedDates.slice(0, lastXDays));
-    
-    allLinks.forEach(link => {
-        (link.stopper.timestamps || []).forEach((ts: number) => {
-            const eventDate = format(new Date(ts), 'yyyy-MM-dd');
-            if (recentLoggedDates.has(eventDate)) {
-                const eventHour = getHours(new Date(ts));
-                if (eventHour >= slot.start && eventHour < slot.end) {
-                    const key = link.stopper.text;
-                    if (!resistancesMap.has(key)) {
-                        resistancesMap.set(key, { text: key, type: link.isUrge ? 'Urge' : 'Resistance', count: 0, dates: new Set() });
-                    }
-                    const entry = resistancesMap.get(key)!;
-                    entry.count += 1;
-                    entry.dates.add(eventDate);
+                const key = link.stopper.text;
+                if (!resistancesMap.has(key)) {
+                    resistancesMap.set(key, { text: key, type: link.isUrge ? 'Urge' : 'Resistance', count: 0, dates: new Set() });
                 }
+                const entry = resistancesMap.get(key)!;
+                entry.count += 1;
+                entry.dates.add(format(new Date(ts), 'yyyy-MM-dd'));
             }
         });
     });
 
     return Array.from(resistancesMap.values()).sort((a,b) => b.count - a.count);
-  }, [optionsModalSlot, habitCards, mechanismCards, lastXDays]);
+  }, [optionsModalSlot, habitCards, mechanismCards]);
 
 
   const slots = [
@@ -514,7 +497,7 @@ export function TimeSlots({
                           {pastCompletedTasks.map(task => (
                               <Card key={task.id} className="flex flex-col">
                                   <CardHeader className="p-4 relative">
-                                       <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
+                                      <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
                                               onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
                                               setOptionsModalSlot(null);
                                           }}>
@@ -562,7 +545,7 @@ export function TimeSlots({
                       </div>
                   ) : (
                       <div className="flex items-center justify-center h-40 border rounded-md">
-                          <p className="text-sm text-muted-foreground text-center">No urges or resistances logged in this slot for the selected period.</p>
+                          <p className="text-sm text-muted-foreground text-center">No urges or resistances logged in this slot.</p>
                       </div>
                   )}
 
@@ -700,8 +683,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-    
-
-    
-
-    
