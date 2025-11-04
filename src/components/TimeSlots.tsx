@@ -123,7 +123,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions } = useAuth();
+  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, purposeData } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const [lastXDays, setLastXDays] = useState(5);
@@ -483,23 +483,20 @@ export function TimeSlots({
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
             <DialogContent className="max-w-7xl">
-                <DialogHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
-                            <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
-                        </div>
-                         <div className="flex items-center gap-2 text-sm">
-                            <Label htmlFor="last-x-days" className="text-muted-foreground flex-shrink-0">Show tasks from last</Label>
-                            <Input 
-                                id="last-x-days"
-                                type="number"
-                                value={lastXDays}
-                                onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
-                                className="w-16 h-8"
-                            />
-                            <span className="text-muted-foreground">logged days</span>
-                        </div>
+                <DialogHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                        <Label htmlFor="last-x-days" className="text-muted-foreground flex-shrink-0">Show tasks from last</Label>
+                        <Input 
+                            id="last-x-days"
+                            type="number"
+                            value={lastXDays}
+                            onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-16 h-8"
+                        />
+                        <span className="text-muted-foreground">logged days</span>
                     </div>
                 </DialogHeader>
                 <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -576,9 +573,9 @@ export function TimeSlots({
                             </div>
                         )}
                     </div>
-                     <div>
+                    <div>
                         <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
-                        <p className="text-sm p-3 border rounded-md bg-muted/30">{settings.currentPurpose || "Not set for today."}</p>
+                        <p className="text-sm p-3 border rounded-md bg-muted/30">{purposeData.statement || "Not set for today."}</p>
                     </div>
                   </div>
                 </div>
@@ -715,4 +712,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
