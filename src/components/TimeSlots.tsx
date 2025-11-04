@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, isToday, isBefore, startOfToday, parseISO, getHours } from 'date-fns';
+import { format, addDays, isToday, isBefore, startOfToday, parseISO, getHours, differenceInDays, isAfter } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -123,7 +123,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, purposeData } = useAuth();
+  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, purposeData, offerizationPlans, dailyReviewLogs, handleToggleDailyGoalCompletion } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const [lastXDays, setLastXDays] = useState(5);
@@ -311,6 +311,82 @@ export function TimeSlots({
 
     return Array.from(resistancesMap.values()).sort((a,b) => b.count - a.count);
   }, [optionsModalSlot, habitCards, mechanismCards, fullSchedule]);
+
+  const routineTasksForSlot = useMemo(() => {
+    if (!optionsModalSlot) return [];
+    return (settings.routines || []).filter(task => task.slot === optionsModalSlot);
+  }, [optionsModalSlot, settings.routines]);
+  
+  const dailyLearningGoals = useMemo(() => {
+    const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string, resourceId: string }[] = [];
+    const today = startOfToday();
+    
+    const plannedSpecializations = Object.entries(offerizationPlans || {})
+        .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
+        .map(([specId]) => coreSkills.find(s => s.id === specId))
+        .filter((spec): spec is NonNullable<typeof spec> => !!spec);
+        
+    plannedSpecializations.forEach(spec => {
+        const plan = offerizationPlans[spec.id]?.learningPlan;
+        if (!plan) return;
+        
+        const completed = spec.skillAreas.flatMap(sa => sa.microSkills).reduce((acc, ms) => {
+            acc.items += ms.completedItems || 0;
+            acc.hours += ms.completedHours || 0;
+            acc.pages += ms.completedPages || 0;
+            return acc;
+        }, { items: 0, hours: 0, pages: 0 });
+
+        const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
+            if (!total || !start || !end) return null;
+            const startDate = parseISO(start);
+            const endDate = parseISO(end);
+            
+            if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
+            
+            const remainingWork = total - completed;
+            const relevantStartDate = isBefore(startDate, today) ? today : startDate;
+            const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
+        
+            if (remainingWork <= 0 || remainingDays <= 0) return null;
+        
+            return (remainingWork / remainingDays).toFixed(1);
+        };
+
+        (plan.audioVideoResources || []).forEach(res => {
+            const targetItems = calculateTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
+            const targetHours = calculateTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
+            let dailyTarget = [];
+            if (targetItems) dailyTarget.push(`${targetItems} items/day`);
+            if (targetHours) dailyTarget.push(`${targetHours} h/day`);
+            
+            if (dailyTarget.length > 0) {
+                goals.push({
+                    specName: spec.name,
+                    resourceName: res.name,
+                    dailyTarget: dailyTarget.join(' & '),
+                    progress: `${completed.items}/${res.totalItems} items & ${completed.hours.toFixed(1)}/${res.totalHours}h`,
+                    resourceId: res.id,
+                });
+            }
+        });
+
+        (plan.bookWebpageResources || []).forEach(res => {
+            const targetPages = calculateTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
+            if (targetPages) {
+                goals.push({
+                    specName: spec.name,
+                    resourceName: res.name,
+                    dailyTarget: `${targetPages} pgs/day`,
+                    progress: `${completed.pages}/${res.totalPages} pages`,
+                    resourceId: res.id,
+                });
+            }
+        });
+    });
+    
+    return goals;
+}, [offerizationPlans, coreSkills]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -589,6 +665,51 @@ export function TimeSlots({
                             </div>
                         )}
                       </div>
+                      <div>
+                        <h3 className="font-semibold text-lg mb-4">Daily Learning Goals</h3>
+                        <div className="space-y-2">
+                           {dailyLearningGoals.map((goal, index) => {
+                               const isCompletedToday = dailyReviewLogs.find(log => log.date === format(new Date(), 'yyyy-MM-dd'))?.completedResourceIds.includes(goal.resourceId);
+                               return (
+                                   <Card key={index}>
+                                       <CardContent className="p-3">
+                                            <div className="flex items-start">
+                                                <Checkbox
+                                                    id={`goal-check-modal-${goal.resourceId}`}
+                                                    checked={isCompletedToday}
+                                                    onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
+                                                    className="mr-2 mt-1"
+                                                />
+                                                <div className="flex-grow">
+                                                    <p className="font-semibold text-sm">{goal.resourceName}</p>
+                                                    <p className="text-xs text-muted-foreground">{goal.specName}</p>
+                                                    <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                                        <Badge variant="secondary">{goal.progress}</Badge>
+                                                        <Badge variant="default">{goal.dailyTarget}</Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                       </CardContent>
+                                   </Card>
+                               )
+                           })}
+                           {dailyLearningGoals.length === 0 && <p className="text-center text-sm text-muted-foreground">No active learning goals.</p>}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-lg mb-4">Routine Tasks for this Slot</h3>
+                        <div className="space-y-2">
+                          {routineTasksForSlot.map((task, index) => (
+                              <Card key={index}>
+                                  <CardContent className="p-3 flex items-center justify-between">
+                                      <span className="font-semibold text-sm">{task.details}</span>
+                                      <Badge variant="outline" className="capitalize">{task.routine?.type}</Badge>
+                                  </CardContent>
+                              </Card>
+                          ))}
+                          {routineTasksForSlot.length === 0 && <p className="text-center text-sm text-muted-foreground">No routine tasks for this slot.</p>}
+                        </div>
+                      </div>
                     </div>
                 </div>
             </DialogContent>
@@ -724,3 +845,5 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
