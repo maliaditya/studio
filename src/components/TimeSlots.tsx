@@ -183,23 +183,23 @@ export function TimeSlots({
     if (!optionsModalSlot) return [];
   
     const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-        let currentDef: ExerciseDefinition | undefined = taskDef;
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
-        if (!microSkillInfo) return null;
-        
-        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (!coreSkill || coreSkill.type !== 'Specialization') return null;
-  
-        let rootSpec = coreSkill;
-        while (rootSpec.parentId) {
-            const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
-            if (parent && parent.type === 'Specialization') {
-                rootSpec = parent;
-            } else {
-                break;
-            }
-        }
-        return rootSpec.name;
+      let currentDef: ExerciseDefinition | undefined = taskDef;
+      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
+      if (!microSkillInfo) return null;
+      
+      const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+      if (!coreSkill || coreSkill.type !== 'Specialization') return null;
+
+      let rootSpec = coreSkill;
+      while (rootSpec.parentId) {
+          const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
+          if (parent && parent.type === 'Specialization') {
+              rootSpec = parent;
+          } else {
+              break;
+          }
+      }
+      return rootSpec.name;
     };
   
     const today = startOfToday();
@@ -255,7 +255,6 @@ export function TimeSlots({
   
     return Array.from(tasks.values());
   }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills, lastXDays]);
-
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -430,23 +429,27 @@ export function TimeSlots({
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
             <DialogContent className="sm:max-w-7xl">
                 <DialogHeader>
-                    <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
-                    <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
+                            <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
+                        </div>
+                         <div className="flex items-center gap-2 text-sm">
+                            <Label htmlFor="last-x-days" className="text-muted-foreground">Show last</Label>
+                            <Input 
+                                id="last-x-days"
+                                type="number"
+                                value={lastXDays}
+                                onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
+                                className="w-16 h-8"
+                            />
+                            <span className="text-muted-foreground">logged days</span>
+                        </div>
+                    </div>
                 </DialogHeader>
-                <div className="flex items-center gap-2 pt-4">
-                  <Label htmlFor="last-x-days">Show tasks from last</Label>
-                  <Input 
-                    id="last-x-days"
-                    type="number"
-                    value={lastXDays}
-                    onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-20 h-8"
-                  />
-                  <Label htmlFor="last-x-days">logged days</Label>
-                </div>
                 <div className="py-4">
                     {pastCompletedTasks.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                             {pastCompletedTasks.map(task => (
                                 <Card key={task.id} className="flex flex-col">
                                     <CardHeader className="p-4 relative">
@@ -460,7 +463,7 @@ export function TimeSlots({
                                             {activityIcons[task.type]}
                                             {task.details}
                                         </CardTitle>
-                                         <CardDescription>
+                                        <CardDescription>
                                             <Badge variant="outline">{task.type.replace('-', ' ')}</Badge>
                                         </CardDescription>
                                     </CardHeader>
@@ -611,4 +614,3 @@ export const AgendaWidgetItem = ({
     
 
     
-
