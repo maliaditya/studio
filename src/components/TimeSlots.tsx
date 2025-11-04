@@ -127,7 +127,7 @@ export function TimeSlots({
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const [lastXDays, setLastXDays] = useState(5);
-  const { toast } = useAuth();
+  const { toast } = useToast();
 
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
     const currentSlotRules = settings.slotRules?.[slotName] || [];
@@ -180,7 +180,10 @@ export function TimeSlots({
     if (!optionsModalSlot) return [];
   
     const loggedDates = new Set<string>();
-    Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
+    const dateEntries = Object.entries(fullSchedule);
+  
+    for (let i = dateEntries.length - 1; i >= 0; i--) {
+      const [dateKey, daySchedule] = dateEntries[i];
       const scheduleDate = parseISO(dateKey);
       if (isBefore(scheduleDate, startOfToday())) {
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
@@ -188,14 +191,12 @@ export function TimeSlots({
           loggedDates.add(dateKey);
         }
       }
-    });
-
-    const sortedLoggedDates = Array.from(loggedDates).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
-    const recentLoggedDates = new Set(sortedLoggedDates.slice(0, lastXDays));
+      if (loggedDates.size >= lastXDays) break;
+    }
 
     const tasks = new Map<string, Activity>();
   
-    recentLoggedDates.forEach(dateKey => {
+    loggedDates.forEach(dateKey => {
       const daySchedule = fullSchedule[dateKey];
       const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
       
@@ -499,7 +500,7 @@ export function TimeSlots({
                         <span className="text-muted-foreground">logged days</span>
                     </div>
                 </DialogHeader>
-                <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="py-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2">
                       <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
                       {pastCompletedTasks.length > 0 ? (
@@ -573,9 +574,21 @@ export function TimeSlots({
                             </div>
                         )}
                     </div>
-                     <div>
+                    <div>
                         <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
-                        <p className="text-sm p-3 border rounded-md bg-muted/30 whitespace-pre-wrap">{purposeData.statement || "Not set for today."}</p>
+                        <div className="space-y-2">
+                            {purposeData.statement ? (
+                                purposeData.statement.split('\n').map((line, index) => (
+                                    <Card key={index}>
+                                        <CardContent className="p-3">
+                                            <p className="text-sm">{line}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))
+                            ) : (
+                                <p className="text-sm p-3 border rounded-md bg-muted/30">Not set for today.</p>
+                            )}
+                        </div>
                     </div>
                   </div>
                 </div>
@@ -712,5 +725,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
-    
