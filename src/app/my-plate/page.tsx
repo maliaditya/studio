@@ -1235,6 +1235,8 @@ function MyPlatePageContent() {
                 onActivityClick={handleActivityClick}
                 slotDurations={slotDurations}
                 setRoutine={toggleRoutine}
+                deepWorkDefinitions={deepWorkDefinitions}
+                upskillDefinitions={upskillDefinitions}
               />
             </CardContent>
           </Card>

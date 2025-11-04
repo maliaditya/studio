@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition } from '@/types/workout';
 import {
   CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2, Info
 } from 'lucide-react';
@@ -99,6 +99,8 @@ interface TimeSlotsProps {
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
   slotDurations: Record<string, { logged: number; total: number }>;
   setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
+  deepWorkDefinitions: ExerciseDefinition[];
+  upskillDefinitions: ExerciseDefinition[];
 }
 
 const pillars = [
@@ -119,6 +121,8 @@ export function TimeSlots({
   onActivityClick,
   slotDurations,
   setRoutine,
+  deepWorkDefinitions,
+  upskillDefinitions,
 }: TimeSlotsProps) {
 
   const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs } = useAuth();
@@ -178,7 +182,6 @@ export function TimeSlots({
   
     const tasks = new Map<string, Activity>();
     const today = startOfToday();
-    
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
@@ -391,7 +394,7 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                 </DialogHeader>
