@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode } from '@/types/workout';
 import {
@@ -189,21 +188,21 @@ export function TimeSlots({
         activities.forEach(activity => {
           if (activity.completed) {
             let taskDetail = activity.details;
+            let taskKey: string;
+
             if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
-              const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+              const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
               const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
 
               if (taskLog) {
                   const definition = allDefsMap.get(taskLog.definitionId);
-                  if (definition?.category) {
-                      const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === definition.category);
-                      if (microSkillInfo) {
-                          taskDetail = microSkillInfo.coreSkillName;
-                      }
+                  if (definition) {
+                      taskDetail = definition.name; // Use the definition name directly
                   }
               }
             }
-            const taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
+
+            taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
             if (!tasks.has(taskKey)) {
               tasks.set(taskKey, { ...activity, details: taskDetail });
             }
@@ -214,6 +213,7 @@ export function TimeSlots({
 
     return Array.from(tasks.values());
   }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs]);
+
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
