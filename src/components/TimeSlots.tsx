@@ -122,7 +122,7 @@ export function TimeSlots({
 }: TimeSlotsProps) {
 
   const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
-  const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
+  const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -175,12 +175,12 @@ export function TimeSlots({
 
   const pastCompletedTasks = useMemo(() => {
     if (!optionsModalSlot) return [];
-
+  
     const tasks = new Map<string, Activity>();
     const today = startOfToday();
-
+  
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
+  
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const scheduleDate = parseISO(dateKey);
       if (isBefore(scheduleDate, today)) {
@@ -189,19 +189,22 @@ export function TimeSlots({
           if (activity.completed) {
             let taskDetail = activity.details;
             let taskKey: string;
-
+  
             if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
               const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
               const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
-
+              
               if (taskLog) {
                   const definition = allDefsMap.get(taskLog.definitionId);
                   if (definition) {
-                      taskDetail = definition.name; // Use the definition name directly
+                    const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === definition.category);
+                    if (microSkillInfo) {
+                        taskDetail = microSkillInfo.coreSkillName;
+                    }
                   }
               }
             }
-
+  
             taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
             if (!tasks.has(taskKey)) {
               tasks.set(taskKey, { ...activity, details: taskDetail });
@@ -210,7 +213,7 @@ export function TimeSlots({
         });
       }
     });
-
+  
     return Array.from(tasks.values());
   }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs]);
 
@@ -541,3 +544,5 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
+
+    
