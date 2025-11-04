@@ -121,11 +121,9 @@ export function TimeSlots({
   onActivityClick,
   slotDurations,
   setRoutine,
-  deepWorkDefinitions,
-  upskillDefinitions,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const [lastXDays, setLastXDays] = useState(5);
@@ -181,34 +179,12 @@ export function TimeSlots({
   const pastCompletedTasks = useMemo(() => {
     if (!optionsModalSlot) return [];
   
-    const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === taskDef.category);
-        if (!microSkillInfo) return null;
-        
-        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-        if (!coreSkill || coreSkill.type !== 'Specialization') return null;
-  
-        let rootSpec = coreSkill;
-        while (rootSpec.parentId) {
-            const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
-            if (parent && parent.type === 'Specialization') {
-                rootSpec = parent;
-            } else {
-                break;
-            }
-        }
-        return rootSpec.name;
-    };
-  
-    const today = startOfToday();
-    const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-  
     const loggedDates = new Set<string>();
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const scheduleDate = parseISO(dateKey);
-      if (isBefore(scheduleDate, today)) {
+      if (isBefore(scheduleDate, startOfToday())) {
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-        if (activities.some(activity => activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction')) {
+        if (activities.some(activity => activity.completed)) {
           loggedDates.add(dateKey);
         }
       }
@@ -224,38 +200,57 @@ export function TimeSlots({
       const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
       
       activities.forEach(activity => {
-        if (activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction') {
-          let taskDetail = activity.details;
-          let taskKey: string;
-  
-          if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
-            const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-            const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
-            let definition;
-            if (taskLog) {
-                definition = allDefsMap.get(taskLog.definitionId);
-            }
-            if (definition) {
-                const specializationName = findRootSpecialization(definition);
-                if (specializationName) {
-                    taskDetail = specializationName;
-                } else {
-                    taskDetail = definition.name;
+        if (activity.completed && activity.type !== 'interrupt') {
+            const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
+                const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === taskDef.category);
+                if (!microSkillInfo) return null;
+                
+                const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+                if (!coreSkill || coreSkill.type !== 'Specialization') return null;
+          
+                let rootSpec = coreSkill;
+                while (rootSpec.parentId) {
+                    const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
+                    if (parent && parent.type === 'Specialization') {
+                        rootSpec = parent;
+                    } else {
+                        break;
+                    }
+                }
+                return rootSpec.name;
+            };
+
+            let taskDetail = activity.details;
+            let taskKey: string;
+            
+            if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
+                const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
+                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
+                let definition;
+                if (taskLog) {
+                    definition = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === taskLog.definitionId);
+                }
+                if (definition) {
+                    const specializationName = findRootSpecialization(definition);
+                    if (specializationName) {
+                        taskDetail = specializationName;
+                    } else {
+                        taskDetail = definition.name;
+                    }
                 }
             }
-          }
-  
-          taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
-          if (!tasks.has(taskKey)) {
-            tasks.set(taskKey, { ...activity, details: taskDetail });
-          }
+          
+            taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
+            if (!tasks.has(taskKey)) {
+                tasks.set(taskKey, { ...activity, details: taskDetail });
+            }
         }
       });
     });
   
     return Array.from(tasks.values());
   }, [fullSchedule, optionsModalSlot, lastXDays, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills]);
-
+  
   const loggedResistances = useMemo(() => {
     if (!optionsModalSlot) return [];
   
@@ -294,8 +289,7 @@ export function TimeSlots({
             }
         });
     });
-
-    // Add distractions
+    
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
       const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
       activities.forEach(activity => {
@@ -496,7 +490,7 @@ export function TimeSlots({
                             <DialogDescriptionComponent>Based on your history for this time slot.</DialogDescriptionComponent>
                         </div>
                          <div className="flex items-center gap-2 text-sm">
-                            <Label htmlFor="last-x-days" className="text-muted-foreground">Show tasks from last</Label>
+                            <Label htmlFor="last-x-days" className="text-muted-foreground flex-shrink-0">Show tasks from last</Label>
                             <Input 
                                 id="last-x-days"
                                 type="number"
@@ -508,20 +502,22 @@ export function TimeSlots({
                         </div>
                     </div>
                 </DialogHeader>
-                <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
+                <div className="py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2">
                       <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
                       {pastCompletedTasks.length > 0 ? (
                           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                               {pastCompletedTasks.map(task => (
-                                  <Card key={task.id} className="flex flex-col">
+                                  <Card key={task.id}>
                                       <CardHeader className="p-4 relative">
-                                          <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
-                                                  onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                                  setOptionsModalSlot(null);
-                                              }}>
-                                              <PlusCircle className="h-4 w-4" />
-                                          </Button>
+                                          <div className="absolute top-2 right-2">
+                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
+                                                    onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                                    setOptionsModalSlot(null);
+                                                }}>
+                                                <PlusCircle className="h-4 w-4" />
+                                            </Button>
+                                          </div>
                                           <CardTitle className="text-base flex items-center gap-2">
                                               {activityIcons[task.type]}
                                               {task.details}
@@ -539,32 +535,51 @@ export function TimeSlots({
                           </div>
                       )}
                   </div>
-                  <div>
-                      <h3 className="font-semibold text-lg mb-4">Past Friction</h3>
-                       {loggedResistances.length > 0 ? (
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                              {loggedResistances.map(item => (
-                                  <Card key={item.text} className="flex flex-col">
-                                      <CardHeader className="p-4">
-                                          <CardTitle className="text-base flex items-center gap-2">
-                                              {item.type === 'Urge' ? <AlertCircle className="h-4 w-4 text-red-500" /> : <Wind className="h-4 w-4 text-yellow-500" />}
-                                              <span className="truncate" title={item.text}>{item.text}</span>
-                                          </CardTitle>
-                                          <CardDescription>
-                                              <Badge variant={item.type === 'Urge' ? 'destructive' : 'secondary'} className="capitalize">{item.type}</Badge>
-                                          </CardDescription>
-                                      </CardHeader>
-                                      <CardFooter className="p-4 pt-0">
-                                          <p className="text-xs text-muted-foreground">Logged {item.count} time(s) across {item.dates.size} day(s).</p>
-                                      </CardFooter>
-                                  </Card>
-                              ))}
-                          </div>
-                      ) : (
-                          <div className="flex items-center justify-center h-40 border rounded-md">
-                              <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
-                          </div>
-                      )}
+                  <div className="space-y-8">
+                    <div>
+                        <h3 className="font-semibold text-lg mb-4">Past Friction</h3>
+                        {loggedResistances.length > 0 ? (
+                            <div className="space-y-2">
+                                {loggedResistances.map(item => (
+                                    <Card key={item.text}>
+                                        <CardContent className="p-3">
+                                            <p className="text-sm font-medium">{item.text}</p>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
+                                                <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-40 border rounded-md">
+                                <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
+                            </div>
+                        )}
+                    </div>
+                     <div>
+                        <h3 className="font-semibold text-lg mb-4">Slot Rules</h3>
+                        {linkedRules.length > 0 ? (
+                            <div className="space-y-2">
+                                {linkedRules.map(rule => (
+                                    <Card key={rule.id}>
+                                        <CardContent className="p-3">
+                                            <p className="text-sm">{rule.text}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-40 border rounded-md">
+                                <p className="text-sm text-muted-foreground text-center">No rules linked to this slot.</p>
+                            </div>
+                        )}
+                    </div>
+                     <div>
+                        <h3 className="font-semibold text-lg mb-4">Daily Purpose</h3>
+                        <p className="text-sm p-3 border rounded-md bg-muted/30">{settings.currentPurpose || "Not set for today."}</p>
+                    </div>
                   </div>
                 </div>
             </DialogContent>
