@@ -1,11 +1,12 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper, MissedSlotReview } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
+  CheckCircle2, Circle, Dock, Move, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -112,21 +113,23 @@ export const AgendaWidgetItem: React.FC<{
                 activity.completed ? 'bg-green-100/50 dark:bg-green-900/20' : 'hover:bg-muted/50'
             )}
         >
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 mt-0.5"
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onToggleComplete(activity.slot, activity.id, !activity.completed);
-                }}
-            >
-                {activity.completed ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                ) : (
-                    <Circle className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                )}
-            </Button>
+            <div className="flex flex-col items-center gap-2 pt-0.5">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleComplete(activity.slot, activity.id, !activity.completed);
+                    }}
+                >
+                    {activity.completed ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                    ) : (
+                        <Circle className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                    )}
+                </Button>
+            </div>
             <div className="flex-grow min-w-0">
                 <p className={cn("font-medium text-sm", activity.completed && 'line-through text-muted-foreground')}>
                     {activity.details}
@@ -135,51 +138,51 @@ export const AgendaWidgetItem: React.FC<{
                     <span className="flex items-center gap-1">{activityIcons[activity.type]} {activity.type.replace('-', ' ')}</span>
                     {duration && <span>• {duration}</span>}
                 </div>
-            </div>
-            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                 {context === 'timeslot' && (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                        <Repeat className="h-4 w-4"/>
-                    </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                    {activity.isRoutine && <DropdownMenuSeparator />}
-                    {activity.isRoutine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                )}
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                         <Button variant="ghost" size="icon" className="h-7 w-7">
-                            <LinkIcon className="h-4 w-4"/>
+                    <div className="flex-col items-start opacity-0 group-hover:opacity-100 transition-opacity mt-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5">
+                                <Repeat className="h-3 w-3 mr-1"/> Repeat
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                            <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                            {activity.isRoutine && <DropdownMenuSeparator />}
+                            {activity.isRoutine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5">
+                                    <LinkIcon className="h-3 w-3 mr-1"/> Link Habit
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                                <DropdownMenuLabel>Link Habit</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <ScrollArea className="h-[200px]">
+                                {habitCards.map(habit => (
+                                    <DropdownMenuCheckboxItem
+                                        key={habit.id}
+                                        checked={(activity.habitEquationIds || []).includes(habit.id)}
+                                        onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
+                                    >
+                                        {habit.name}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                </ScrollArea>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5" onClick={(e) => onOpenTaskContext(activity.id, e)}>
+                            <GitBranch className="h-3 w-3 mr-1"/> Context
                         </Button>
-                    </DropdownMenuTrigger>
-                     <DropdownMenuContent>
-                        <DropdownMenuLabel>Link Habit</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <ScrollArea className="h-[200px]">
-                        {habitCards.map(habit => (
-                            <DropdownMenuCheckboxItem
-                                key={habit.id}
-                                checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
-                            >
-                                {habit.name}
-                            </DropdownMenuCheckboxItem>
-                        ))}
-                        </ScrollArea>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => onOpenTaskContext(activity.id, e)}>
-                    <GitBranch className="h-4 w-4"/>
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => onRemoveActivity(activity.slot, activity.id)}>
-                    <Trash2 className="h-4 w-4"/>
-                </Button>
+                        <Button variant="ghost" size="xs" className="text-xs h-6 px-1.5 text-destructive hover:text-destructive" onClick={() => onRemoveActivity(activity.slot, activity.id)}>
+                            <Trash2 className="h-3 w-3 mr-1"/> Remove
+                        </Button>
+                    </div>
+                )}
             </div>
         </li>
     );
