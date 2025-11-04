@@ -14,7 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays } from 'date-fns';
+import { format, addDays, isToday } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -34,7 +34,7 @@ interface TodaysScheduleCardProps {
   activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
-  onLogLearning: (activity: Activity, progress: number, duration: number) => void;
+  onLogLearning: (activity: Activity, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
   onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
