@@ -64,7 +64,7 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={handleBlur}
-        className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1"
+        className="editable-placeholder w-full min-h-[1.5rem] resize-none overflow-hidden bg-transparent border-none focus-visible:ring-1 p-1"
         rows={1}
       />
       <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 flex-shrink-0" onClick={(e) => {e.stopPropagation(); onDelete(point.id);}}>
