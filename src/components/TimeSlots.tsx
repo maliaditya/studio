@@ -185,8 +185,7 @@ export function TimeSlots({
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
         activities.forEach(activity => {
           if (activity.completed) {
-            // Use details + type as a key to get unique tasks, ignoring case
-            const taskKey = `${activity.details.toLowerCase()}-${activity.type}`;
+            const taskKey = `${activity.details.toLowerCase().trim()}-${activity.type}`;
             if (!tasks.has(taskKey)) {
               tasks.set(taskKey, activity);
             }
@@ -393,25 +392,6 @@ export function TimeSlots({
                             <p className="text-center text-xs text-muted-foreground pt-12">No completed tasks in this slot historically.</p>
                         )}
                     </ScrollArea>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Workout Plan</h4>
-                    <div className="text-muted-foreground text-sm">Mode: <Badge variant="secondary">{workoutMode.replace('-', ' ')}</Badge></div>
-                    <div className="text-muted-foreground text-sm mt-1">Scheduling: <Badge variant="secondary">{settings.workoutScheduling === 'day-of-week' ? 'Day of Week' : 'Sequential'}</Badge></div>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm mb-2">Task Scheduling Level</h4>
-                    <div className="text-muted-foreground text-sm">You are scheduling tasks at <Badge variant="secondary">Level {settings.schedulingLevel || 3}</Badge>.</div>
-                  </div>
-                  <div>
-                      <h4 className="font-semibold text-sm mb-2">Default Habit Links</h4>
-                      <ul className="list-disc list-inside text-sm text-muted-foreground">
-                          {Object.entries(settings.defaultHabitLinks).map(([type, habitId]) => {
-                              if (!habitId) return null;
-                              const habit = habitCards.find(h => h.id === habitId);
-                              return <li key={type} className="capitalize">{type.replace('-', ' ')}: <span className="font-medium text-foreground">{habit?.name || 'N/A'}</span></li>;
-                          })}
-                      </ul>
                   </div>
                 </div>
             </DialogContent>
