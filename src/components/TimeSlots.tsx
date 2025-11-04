@@ -121,7 +121,7 @@ export function TimeSlots({
   setRoutine,
 }: TimeSlotsProps) {
 
-  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, upskillDefinitions, deepWorkDefinitions, allUpskillLogs, allDeepWorkLogs } = useAuth();
+  const { settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs } = useAuth();
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const { toast } = useToast();
@@ -172,13 +172,13 @@ export function TimeSlots({
 
     setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
   };
-
+  
   const pastCompletedTasks = useMemo(() => {
     if (!optionsModalSlot) return [];
   
     const tasks = new Map<string, Activity>();
     const today = startOfToday();
-  
+    
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
     Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
@@ -189,7 +189,7 @@ export function TimeSlots({
           if (activity.completed) {
             let taskDetail = activity.details;
             let taskKey: string;
-  
+            
             if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.taskIds && activity.taskIds.length > 0) {
               const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
               const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === activity.taskIds![0]);
@@ -199,7 +199,10 @@ export function TimeSlots({
                   if (definition) {
                     const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === definition.category);
                     if (microSkillInfo) {
-                        taskDetail = microSkillInfo.coreSkillName;
+                        const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
+                        if (coreSkill) {
+                           taskDetail = coreSkill.name;
+                        }
                     }
                   }
               }
@@ -215,7 +218,7 @@ export function TimeSlots({
     });
   
     return Array.from(tasks.values());
-  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs]);
+  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills]);
 
 
   const slots = [
@@ -388,20 +391,34 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
                   <div>
                     <h4 className="font-semibold text-sm mb-2">Past Completed Tasks</h4>
-                    <ScrollArea className="h-40 border rounded-md p-2">
+                    <ScrollArea className="h-64 border rounded-md p-2">
                         {pastCompletedTasks.length > 0 ? (
-                            <ul className="space-y-1">
+                            <ul className="space-y-2">
                                 {pastCompletedTasks.map(task => (
-                                    <li key={task.id} className="text-sm text-muted-foreground p-1 flex items-center gap-2">
-                                        {activityIcons[task.type]}
-                                        <span>{task.details}</span>
+                                    <li key={task.id}>
+                                        <Card className="p-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    {activityIcons[task.type]}
+                                                    <span className="font-medium">{task.details}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddActivity(optionsModalSlot as SlotName, task.type, task.details)}>
+                                                        <PlusCircle className="h-4 w-4 text-green-500" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </Card>
                                     </li>
                                 ))}
                             </ul>
@@ -544,5 +561,3 @@ export const AgendaWidgetItem = ({
   
   return <li>{itemContent}</li>;
 };
-
-    
