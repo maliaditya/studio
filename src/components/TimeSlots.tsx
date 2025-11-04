@@ -183,10 +183,10 @@ export function TimeSlots({
     const tasks = new Map<string, Activity>();
     const today = startOfToday();
     const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
+  
     const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-        let currentDef = taskDef;
-        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef.category);
+        let currentDef: ExerciseDefinition | undefined = taskDef;
+        const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentDef!.category);
         if (!microSkillInfo) return null;
         
         const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
@@ -209,7 +209,7 @@ export function TimeSlots({
       if (isBefore(scheduleDate, today)) {
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
         activities.forEach(activity => {
-          if (activity.completed) {
+          if (activity.completed && activity.type !== 'interrupt') {
             let taskDetail = activity.details;
             let taskKey: string;
             
@@ -224,7 +224,7 @@ export function TimeSlots({
                       if (specializationName) {
                           taskDetail = specializationName;
                       } else {
-                          taskDetail = definition.category; // Fallback to category/micro-skill
+                          taskDetail = definition.name;
                       }
                   }
               }
