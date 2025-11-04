@@ -129,7 +129,7 @@ export function TimeSlots({
   const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
   const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
   const [lastXDays, setLastXDays] = useState(5);
-  const { toast } = useToast();
+  const { toast } = useAuth();
 
   const handleLinkRule = (slotName: SlotName, ruleId: string) => {
     const currentSlotRules = settings.slotRules?.[slotName] || [];
@@ -208,7 +208,7 @@ export function TimeSlots({
       const scheduleDate = parseISO(dateKey);
       if (isBefore(scheduleDate, today)) {
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-        if (activities.some(activity => activity.completed && activity.type !== 'interrupt')) {
+        if (activities.some(activity => activity.completed && activity.type !== 'interrupt' && activity.type !== 'distraction')) {
           loggedDates.add(dateKey);
         }
       }
@@ -254,8 +254,8 @@ export function TimeSlots({
     });
   
     return Array.from(tasks.values());
-  }, [fullSchedule, optionsModalSlot, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills, lastXDays]);
-  
+  }, [fullSchedule, optionsModalSlot, lastXDays, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills]);
+
   const loggedResistances = useMemo(() => {
     if (!optionsModalSlot) return [];
   
@@ -267,7 +267,7 @@ export function TimeSlots({
     const slot = slotTimes[optionsModalSlot as SlotName];
     if (!slot) return [];
 
-    const resistancesMap = new Map<string, { text: string; type: 'Urge' | 'Resistance'; count: number; dates: Set<string> }>();
+    const resistancesMap = new Map<string, { text: string; type: 'Urge' | 'Resistance' | 'Distraction'; count: number; dates: Set<string> }>();
     const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
 
     habitCards.forEach(habit => {
@@ -295,9 +295,27 @@ export function TimeSlots({
         });
     });
 
-    return Array.from(resistancesMap.values()).sort((a,b) => b.count - a.count);
-  }, [optionsModalSlot, habitCards, mechanismCards]);
+    // Add distractions
+    Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
+      const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
+      activities.forEach(activity => {
+          if (activity.type === 'distraction' && activity.completedAt) {
+              const eventHour = getHours(new Date(activity.completedAt));
+              if (eventHour >= slot.start && eventHour < slot.end) {
+                  const key = activity.details;
+                  if (!resistancesMap.has(key)) {
+                      resistancesMap.set(key, { text: key, type: 'Distraction', count: 0, dates: new Set() });
+                  }
+                  const entry = resistancesMap.get(key)!;
+                  entry.count += 1;
+                  entry.dates.add(dateKey);
+              }
+          }
+      });
+    });
 
+    return Array.from(resistancesMap.values()).sort((a,b) => b.count - a.count);
+  }, [optionsModalSlot, habitCards, mechanismCards, fullSchedule]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -490,65 +508,64 @@ export function TimeSlots({
                         </div>
                     </div>
                 </DialogHeader>
-                <div className="py-4">
-                  <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
-                  {pastCompletedTasks.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                          {pastCompletedTasks.map(task => (
-                              <Card key={task.id} className="flex flex-col">
-                                  <CardHeader className="p-4 relative">
-                                      <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
-                                              onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                              setOptionsModalSlot(null);
-                                          }}>
-                                          <PlusCircle className="h-4 w-4" />
-                                          <span className="sr-only">Choose</span>
-                                      </Button>
-                                      <CardTitle className="text-base flex items-center gap-2">
-                                          {activityIcons[task.type]}
-                                          {task.details}
-                                      </CardTitle>
-                                      <CardDescription>
-                                          <Badge variant="outline" className="capitalize">{task.type.replace('-', ' ')}</Badge>
-                                      </CardDescription>
-                                  </CardHeader>
-                              </Card>
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="flex items-center justify-center h-40 border rounded-md">
-                          <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
-                      </div>
-                  )}
-
-                  <Separator className="my-6" />
-
-                  <h3 className="font-semibold text-lg mb-4">Past Resistances & Urges</h3>
-                   {loggedResistances.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                          {loggedResistances.map(item => (
-                              <Card key={item.text} className="flex flex-col">
-                                  <CardHeader className="p-4">
-                                      <CardTitle className="text-base flex items-center gap-2">
-                                          {item.type === 'Urge' ? <AlertCircle className="h-4 w-4 text-red-500" /> : <Wind className="h-4 w-4 text-yellow-500" />}
-                                          <span className="truncate" title={item.text}>{item.text}</span>
-                                      </CardTitle>
-                                      <CardDescription>
-                                          <Badge variant={item.type === 'Urge' ? 'destructive' : 'secondary'} className="capitalize">{item.type}</Badge>
-                                      </CardDescription>
-                                  </CardHeader>
-                                  <CardFooter className="p-4 pt-0">
-                                      <p className="text-xs text-muted-foreground">Logged {item.count} time(s) across {item.dates.size} day(s).</p>
-                                  </CardFooter>
-                              </Card>
-                          ))}
-                      </div>
-                  ) : (
-                      <div className="flex items-center justify-center h-40 border rounded-md">
-                          <p className="text-sm text-muted-foreground text-center">No urges or resistances logged in this slot.</p>
-                      </div>
-                  )}
-
+                <div className="py-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div>
+                      <h3 className="font-semibold text-lg mb-4">Past Completed Tasks</h3>
+                      {pastCompletedTasks.length > 0 ? (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {pastCompletedTasks.map(task => (
+                                  <Card key={task.id} className="flex flex-col">
+                                      <CardHeader className="p-4 relative">
+                                          <Button size="icon" variant="ghost" className="h-8 w-8 absolute top-2 right-2" onClick={() => {
+                                                  onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
+                                                  setOptionsModalSlot(null);
+                                              }}>
+                                              <PlusCircle className="h-4 w-4" />
+                                          </Button>
+                                          <CardTitle className="text-base flex items-center gap-2">
+                                              {activityIcons[task.type]}
+                                              {task.details}
+                                          </CardTitle>
+                                          <CardDescription>
+                                            <Badge variant="outline" className="capitalize">{task.type.replace('-', ' ')}</Badge>
+                                          </CardDescription>
+                                      </CardHeader>
+                                  </Card>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="flex items-center justify-center h-40 border rounded-md">
+                              <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
+                          </div>
+                      )}
+                  </div>
+                  <div>
+                      <h3 className="font-semibold text-lg mb-4">Past Friction</h3>
+                       {loggedResistances.length > 0 ? (
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                              {loggedResistances.map(item => (
+                                  <Card key={item.text} className="flex flex-col">
+                                      <CardHeader className="p-4">
+                                          <CardTitle className="text-base flex items-center gap-2">
+                                              {item.type === 'Urge' ? <AlertCircle className="h-4 w-4 text-red-500" /> : <Wind className="h-4 w-4 text-yellow-500" />}
+                                              <span className="truncate" title={item.text}>{item.text}</span>
+                                          </CardTitle>
+                                          <CardDescription>
+                                              <Badge variant={item.type === 'Urge' ? 'destructive' : 'secondary'} className="capitalize">{item.type}</Badge>
+                                          </CardDescription>
+                                      </CardHeader>
+                                      <CardFooter className="p-4 pt-0">
+                                          <p className="text-xs text-muted-foreground">Logged {item.count} time(s) across {item.dates.size} day(s).</p>
+                                      </CardFooter>
+                                  </Card>
+                              ))}
+                          </div>
+                      ) : (
+                          <div className="flex items-center justify-center h-40 border rounded-md">
+                              <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
+                          </div>
+                      )}
+                  </div>
                 </div>
             </DialogContent>
         </Dialog>
