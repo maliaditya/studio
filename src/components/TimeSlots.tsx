@@ -185,8 +185,8 @@ export function TimeSlots({
         const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
         activities.forEach(activity => {
           if (activity.completed) {
-            // Use details + type as a key to get unique tasks
-            const taskKey = `${activity.details}-${activity.type}`;
+            // Use details + type as a key to get unique tasks, ignoring case
+            const taskKey = `${activity.details.toLowerCase()}-${activity.type}`;
             if (!tasks.has(taskKey)) {
               tasks.set(taskKey, activity);
             }
