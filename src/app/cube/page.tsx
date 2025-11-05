@@ -93,8 +93,8 @@ const CubePageContent = () => {
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        const onClick = (event: MouseEvent) => {
-            if (!currentMount || selectedSpec) return; // Don't allow clicking in detail view
+        const handleCanvasClick = (event: MouseEvent) => {
+            if (!currentMount || selectedSpec) return;
             const rect = currentMount.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
@@ -110,7 +110,7 @@ const CubePageContent = () => {
                 }
             }
         };
-        currentMount.addEventListener('click', onClick);
+        currentMount.addEventListener('click', handleCanvasClick);
 
         let animationFrameId: number;
         const animate = () => {
@@ -138,10 +138,14 @@ const CubePageContent = () => {
         window.addEventListener('resize', handleResize);
 
         return () => {
-            window.removeEventListener('resize', handleResize);
-            currentMount.removeEventListener('click', onClick);
-            currentMount.innerHTML = '';
             cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('resize', handleResize);
+            currentMount.removeEventListener('click', handleCanvasClick);
+            if (renderer.domElement.parentElement) {
+                renderer.domElement.parentElement.removeChild(renderer.domElement);
+            }
+            renderer.dispose();
+            controls.dispose();
         };
     }, [plannedSpecializations, selectedSpec]);
 
