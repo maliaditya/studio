@@ -50,16 +50,20 @@ const CubePageContent = () => {
         
         // --- Inner Cubes for Specializations ---
         const innerCubes: THREE.LineSegments[] = [];
+        const spacing = 0.75; // Total grid size will be 2 * spacing = 1.5, which fits within the 2x2x2 cube
+        
         plannedSpecializations.forEach((spec, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
             const edges = new THREE.EdgesGeometry(geometry);
             const material = new THREE.LineBasicMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
             const cube = new THREE.LineSegments(edges, material);
 
-            // Position inner cubes randomly within the main cube
-            cube.position.x = (Math.random() - 0.5) * 1.5;
-            cube.position.y = (Math.random() - 0.5) * 1.5;
-            cube.position.z = (Math.random() - 0.5) * 1.5;
+            // Position inner cubes in a 3x3x3 grid
+            const x = (index % 3) - 1; // -> -1, 0, 1
+            const y = Math.floor((index / 3) % 3) - 1; // -> -1, 0, 1
+            const z = Math.floor(index / 9) - 1; // -> -1, 0, 1
+            
+            cube.position.set(x * spacing, y * spacing, z * spacing);
             
             scene.add(cube);
             innerCubes.push(cube);
