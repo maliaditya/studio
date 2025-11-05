@@ -21,6 +21,7 @@ type Label = {
 const CubePageContent = () => {
     const { coreSkills, offerizationPlans } = useAuth();
     const mountRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     const [labels, setLabels] = useState<Label[]>([]);
     const [selectedSpec, setSelectedSpec] = useState<CoreSkill | null>(null);
     const innerCubesRef = useRef<THREE.Mesh[]>([]);
@@ -34,7 +35,8 @@ const CubePageContent = () => {
 
     useEffect(() => {
         const currentMount = mountRef.current;
-        if (!currentMount) return;
+        const currentCanvas = canvasRef.current;
+        if (!currentMount || !currentCanvas) return;
 
         innerCubesRef.current = [];
 
@@ -42,10 +44,9 @@ const CubePageContent = () => {
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
         camera.position.z = 5;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ canvas: currentCanvas, antialias: true, alpha: true });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        currentMount.appendChild(renderer.domElement);
         
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
@@ -110,7 +111,7 @@ const CubePageContent = () => {
                 }
             }
         };
-        currentMount.addEventListener('click', handleCanvasClick);
+        currentCanvas.addEventListener('click', handleCanvasClick);
 
         let animationFrameId: number;
         const animate = () => {
@@ -118,7 +119,7 @@ const CubePageContent = () => {
             controls.update();
             setLabels(prevLabels => prevLabels.map((label, index) => {
                 const cubePosition = innerCubesRef.current[index]?.position;
-                if (!cubePosition) return label;
+                if (!cubePosition || !currentMount) return label;
                 const vector = cubePosition.clone().project(camera);
                 const x = (vector.x + 1) / 2 * currentMount.clientWidth;
                 const y = -(vector.y - 1) / 2 * currentMount.clientHeight;
@@ -140,10 +141,11 @@ const CubePageContent = () => {
         return () => {
             cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
-            currentMount.removeEventListener('click', handleCanvasClick);
+            currentCanvas.removeEventListener('click', handleCanvasClick);
             controls.dispose();
-
-            // Safely dispose of Three.js objects
+            renderer.dispose();
+            
+            // Dispose geometries and materials
             scene.traverse(object => {
                 if (object instanceof THREE.Mesh) {
                     object.geometry.dispose();
@@ -154,9 +156,6 @@ const CubePageContent = () => {
                     }
                 }
             });
-            renderer.dispose();
-            
-            currentMount.innerHTML = '';
         };
     }, [plannedSpecializations, selectedSpec]);
 
@@ -171,6 +170,7 @@ const CubePageContent = () => {
                 {selectedSpec ? `Skills for: ${selectedSpec.name}` : 'Strategic Specializations'}
             </h1>
             <div ref={mountRef} className="w-[800px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700 relative">
+                <canvas ref={canvasRef} className="w-full h-full" />
                 {labels.map(label => (
                     <div
                         key={label.id}
