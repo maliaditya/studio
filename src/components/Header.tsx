@@ -214,6 +214,7 @@ function NavigationMenu() {
           <DropdownMenuItem asChild><Link href="/path">Path</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/charts">Charts</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/timesheet">Timesheet</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/cube">3D Cube</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/code-of-conduct">Code of Conduct</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -553,8 +554,8 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                                     <p className={cn("font-semibold text-sm", isCompletedToday && "line-through text-muted-foreground")} title={goal.resourceName}>{goal.resourceName}</p>
                                                     <p className={cn("text-xs text-muted-foreground", isCompletedToday && "line-through")}>{goal.specName}</p>
                                                     <div className="flex justify-between items-center mt-1 pt-1 border-t">
-                                                        <Badge variant="secondary" className={cn(isCompletedToday && "line-through")}>{goal.progress}</Badge>
-                                                        <Badge variant="default" className={cn(isCompletedToday && "line-through")}>{goal.dailyTarget}</Badge>
+                                                        <Badge variant="secondary" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.progress}</Badge>
+                                                        <Badge variant="default" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.dailyTarget}</Badge>
                                                     </div>
                                                 </div>
                                             </div>
