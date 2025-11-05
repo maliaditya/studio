@@ -33,10 +33,10 @@ const CubePageContent = () => {
     }, [coreSkills, offerizationPlans]);
 
     useEffect(() => {
-        if (!mountRef.current || selectedSpec) return;
+        if (!mountRef.current) return;
 
         const currentMount = mountRef.current;
-        innerCubesRef.current = []; // Clear previous cubes
+        innerCubesRef.current = [];
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
@@ -62,10 +62,11 @@ const CubePageContent = () => {
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
         scene.add(wireframeCube);
         
+        const itemsToDisplay = selectedSpec ? selectedSpec.skillAreas : plannedSpecializations;
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
-        const spacing = 0.75;
+        const spacing = selectedSpec ? 0.5 : 0.75;
         
-        plannedSpecializations.forEach((spec, index) => {
+        itemsToDisplay.forEach((item, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
             const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
             const cube = new THREE.Mesh(geometry, material);
@@ -75,14 +76,14 @@ const CubePageContent = () => {
             const z = Math.floor(index / 9) - 1;
             
             cube.position.set(x * spacing, y * spacing, z * spacing);
-            cube.userData = { id: spec.id }; // Attach specialization ID
+            cube.userData = { id: item.id };
             
             scene.add(cube);
             innerCubesRef.current.push(cube);
 
             initialLabels.push({
-                id: spec.id,
-                text: spec.name,
+                id: item.id,
+                text: item.name,
                 position: cube.position.clone(),
             });
         });
@@ -93,7 +94,7 @@ const CubePageContent = () => {
         const mouse = new THREE.Vector2();
 
         const onClick = (event: MouseEvent) => {
-            if (!currentMount) return;
+            if (!currentMount || selectedSpec) return; // Don't allow clicking in detail view
             const rect = currentMount.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
@@ -139,52 +140,22 @@ const CubePageContent = () => {
         return () => {
             window.removeEventListener('resize', handleResize);
             currentMount.removeEventListener('click', onClick);
-            if (currentMount && renderer.domElement) {
-                currentMount.innerHTML = ''; // Clear the mount point
-            }
+            currentMount.innerHTML = '';
             cancelAnimationFrame(animationFrameId);
-            mainGeometry.dispose();
-            mainLineMaterial.dispose();
-            mainEdges.dispose();
-            innerCubesRef.current.forEach(cube => {
-                cube.geometry.dispose();
-                (cube.material as THREE.Material).dispose();
-            });
-            renderer.dispose();
         };
     }, [plannedSpecializations, selectedSpec]);
 
-    if (selectedSpec) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-8">
-                <Button onClick={() => setSelectedSpec(null)} className="absolute top-8 left-8">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Cubes
-                </Button>
-                <Card className="w-full max-w-2xl bg-gray-800/50 border-gray-700">
-                    <CardHeader>
-                        <CardTitle className="text-2xl text-primary">{selectedSpec.name}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {selectedSpec.skillAreas.map(area => (
-                                <div key={area.id}>
-                                    <h4 className="font-semibold text-lg text-gray-300">{area.name}</h4>
-                                    <ul className="list-disc list-inside ml-4 mt-2 text-gray-400">
-                                        {area.microSkills.map(ms => <li key={ms.id}>{ms.name}</li>)}
-                                    </ul>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        )
-    }
-
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white relative">
-            <h1 className="text-3xl font-bold mb-4">Strategic Specializations</h1>
-            <div ref={mountRef} className="w-[600px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700 relative">
+            {selectedSpec && (
+                <Button onClick={() => setSelectedSpec(null)} className="absolute top-8 left-8 z-20">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Specializations
+                </Button>
+            )}
+            <h1 className="text-3xl font-bold mb-4">
+                {selectedSpec ? `Skills for: ${selectedSpec.name}` : 'Strategic Specializations'}
+            </h1>
+            <div ref={mountRef} className="w-[800px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700 relative">
                 {labels.map(label => (
                     <div
                         key={label.id}
@@ -193,6 +164,7 @@ const CubePageContent = () => {
                             left: `${label.screenPosition.x}px`,
                             top: `${label.screenPosition.y}px`,
                             transform: 'translate(10px, -50%)',
+                            zIndex: 1,
                         }}
                     >
                         {label.text}
