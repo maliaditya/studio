@@ -33,9 +33,9 @@ const CubePageContent = () => {
     }, [coreSkills, offerizationPlans]);
 
     useEffect(() => {
-        if (!mountRef.current) return;
-
         const currentMount = mountRef.current;
+        if (!currentMount) return;
+
         innerCubesRef.current = [];
 
         const scene = new THREE.Scene();
@@ -56,7 +56,7 @@ const CubePageContent = () => {
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        const mainGeometry = new THREE.BoxGeometry(2, 2, 2);
+        const mainGeometry = new THREE.BoxGeometry(selectedSpec ? 4 : 5, selectedSpec ? 4 : 5, selectedSpec ? 4 : 5);
         const mainEdges = new THREE.EdgesGeometry(mainGeometry);
         const mainLineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
@@ -64,7 +64,7 @@ const CubePageContent = () => {
         
         const itemsToDisplay = selectedSpec ? selectedSpec.skillAreas : plannedSpecializations;
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
-        const spacing = selectedSpec ? 0.5 : 0.75;
+        const spacing = selectedSpec ? 1.0 : 1.5;
         
         itemsToDisplay.forEach((item, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
@@ -141,11 +141,25 @@ const CubePageContent = () => {
             cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
             currentMount.removeEventListener('click', handleCanvasClick);
-            if (renderer.domElement.parentElement) {
-                renderer.domElement.parentElement.removeChild(renderer.domElement);
-            }
+            
+            // Dispose of Three.js objects
+            scene.children.forEach(obj => {
+                if (obj instanceof THREE.Mesh) {
+                    obj.geometry.dispose();
+                    if (Array.isArray(obj.material)) {
+                        obj.material.forEach(material => material.dispose());
+                    } else {
+                        obj.material.dispose();
+                    }
+                }
+            });
             renderer.dispose();
             controls.dispose();
+            
+            // Clear the canvas container
+            while (currentMount.firstChild) {
+                currentMount.removeChild(currentMount.firstChild);
+            }
         };
     }, [plannedSpecializations, selectedSpec]);
 
