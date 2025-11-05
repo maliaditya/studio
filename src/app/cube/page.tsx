@@ -64,7 +64,7 @@ const CubePageContent = () => {
         
         const itemsToDisplay = selectedSpec ? selectedSpec.skillAreas : plannedSpecializations;
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
-        const spacing = selectedSpec ? 1.0 : 1.5;
+        const spacing = 1.5;
         
         itemsToDisplay.forEach((item, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
@@ -141,24 +141,25 @@ const CubePageContent = () => {
             cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
             currentMount.removeEventListener('click', handleCanvasClick);
-            
-            // Dispose of Three.js objects
-            scene.children.forEach(obj => {
-                if (obj instanceof THREE.Mesh) {
-                    obj.geometry.dispose();
-                    if (Array.isArray(obj.material)) {
-                        obj.material.forEach(material => material.dispose());
+            controls.dispose();
+
+            // Safely dispose of Three.js objects
+            scene.traverse(object => {
+                if (object instanceof THREE.Mesh) {
+                    object.geometry.dispose();
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
                     } else {
-                        obj.material.dispose();
+                        object.material.dispose();
                     }
                 }
             });
             renderer.dispose();
-            controls.dispose();
             
-            // Clear the canvas container
-            while (currentMount.firstChild) {
-                currentMount.removeChild(currentMount.firstChild);
+            // Clear the container without directly removing the canvas element
+            // that React might still be tracking.
+            if (currentMount) {
+                currentMount.innerHTML = '';
             }
         };
     }, [plannedSpecializations, selectedSpec]);
