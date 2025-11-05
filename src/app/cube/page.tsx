@@ -36,6 +36,14 @@ const CubePageContent = () => {
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         currentMount.appendChild(renderer.domElement);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
 
         // Controls
         const controls = new OrbitControls(camera, renderer.domElement);
@@ -49,14 +57,13 @@ const CubePageContent = () => {
         scene.add(wireframeCube);
         
         // --- Inner Cubes for Specializations ---
-        const innerCubes: THREE.LineSegments[] = [];
+        const innerCubes: THREE.Mesh[] = [];
         const spacing = 0.75; // Total grid size will be 2 * spacing = 1.5, which fits within the 2x2x2 cube
         
         plannedSpecializations.forEach((spec, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-            const edges = new THREE.EdgesGeometry(geometry);
-            const material = new THREE.LineBasicMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
-            const cube = new THREE.LineSegments(edges, material);
+            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
+            const cube = new THREE.Mesh(geometry, material);
 
             // Position inner cubes in a 3x3x3 grid
             const x = (index % 3) - 1; // -> -1, 0, 1
@@ -92,7 +99,7 @@ const CubePageContent = () => {
         // Cleanup
         return () => {
             window.removeEventListener('resize', handleResize);
-            if (currentMount) {
+            if (currentMount && renderer.domElement) {
                 currentMount.removeChild(renderer.domElement);
             }
             cancelAnimationFrame(animationFrameId);
@@ -100,9 +107,10 @@ const CubePageContent = () => {
             mainLineMaterial.dispose();
             mainEdges.dispose();
             innerCubes.forEach(cube => {
-                (cube.geometry as THREE.BufferGeometry).dispose();
-                ((cube.material) as THREE.Material).dispose();
+                cube.geometry.dispose();
+                (cube.material as THREE.Material).dispose();
             });
+            renderer.dispose();
         };
     }, [plannedSpecializations]);
 
