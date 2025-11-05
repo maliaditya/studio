@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import type { CoreSkill, SkillArea } from '@/types/workout';
+import type { CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,12 +19,13 @@ type Label = {
 };
 
 const CubePageContent = () => {
-    const { coreSkills, offerizationPlans } = useAuth();
+    const { coreSkills, offerizationPlans, deepWorkDefinitions, upskillDefinitions } = useAuth();
     const mountRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [labels, setLabels] = useState<Label[]>([]);
     const [selectedSpec, setSelectedSpec] = useState<CoreSkill | null>(null);
     const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
+    const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
     const innerCubesRef = useRef<THREE.Mesh[]>([]);
 
     const plannedSpecializations = useMemo(() => {
@@ -59,7 +60,9 @@ const CubePageContent = () => {
         controls.enableDamping = true;
 
         let mainGeometry;
-        if (selectedSkillArea) {
+        if (selectedMicroSkill) {
+            mainGeometry = new THREE.BoxGeometry(4, 4, 4);
+        } else if (selectedSkillArea) {
             mainGeometry = new THREE.BoxGeometry(4, 4, 4);
         } else if (selectedSpec) {
             mainGeometry = new THREE.BoxGeometry(4, 4, 4);
@@ -72,8 +75,12 @@ const CubePageContent = () => {
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
         scene.add(wireframeCube);
         
-        let itemsToDisplay: { id: string; name: string; }[] = [];
-        if (selectedSkillArea) {
+        let itemsToDisplay: (ExerciseDefinition | { id: string, name: string })[] = [];
+        if (selectedMicroSkill) {
+            const intentions = deepWorkDefinitions.filter(def => def.category === selectedMicroSkill.name);
+            const curiosities = upskillDefinitions.filter(def => def.category === selectedMicroSkill.name);
+            itemsToDisplay = [...intentions, ...curiosities];
+        } else if (selectedSkillArea) {
             itemsToDisplay = selectedSkillArea.microSkills;
         } else if (selectedSpec) {
             itemsToDisplay = selectedSpec.skillAreas;
@@ -123,14 +130,13 @@ const CubePageContent = () => {
             if (intersects.length > 0) {
                 const clickedItemData = intersects[0].object.userData.itemData;
                 
-                if (selectedSpec && !selectedSkillArea) {
-                    // We are in skill area view, clicked a skill area
+                if (selectedSkillArea && !selectedMicroSkill) {
+                    setSelectedMicroSkill(clickedItemData as MicroSkill);
+                } else if (selectedSpec && !selectedSkillArea) {
                     setSelectedSkillArea(clickedItemData as SkillArea);
                 } else if (!selectedSpec) {
-                    // We are in specialization view, clicked a specialization
                     setSelectedSpec(clickedItemData as CoreSkill);
                 }
-                // If selectedSkillArea is set, clicks do nothing further for now.
             }
         };
         currentCanvas.addEventListener('click', handleCanvasClick);
@@ -166,7 +172,6 @@ const CubePageContent = () => {
             currentCanvas.removeEventListener('click', handleCanvasClick);
             controls.dispose();
             
-            // Dispose Three.js objects
             scene.traverse(object => {
                 if (object instanceof THREE.Mesh) {
                     object.geometry.dispose();
@@ -179,10 +184,12 @@ const CubePageContent = () => {
             });
             renderer.dispose();
         };
-    }, [plannedSpecializations, selectedSpec, selectedSkillArea]);
+    }, [plannedSpecializations, selectedSpec, selectedSkillArea, selectedMicroSkill, deepWorkDefinitions, upskillDefinitions]);
 
     const handleBack = () => {
-        if (selectedSkillArea) {
+        if (selectedMicroSkill) {
+            setSelectedMicroSkill(null);
+        } else if (selectedSkillArea) {
             setSelectedSkillArea(null);
         } else if (selectedSpec) {
             setSelectedSpec(null);
@@ -190,6 +197,9 @@ const CubePageContent = () => {
     };
     
     const getTitle = () => {
+        if (selectedMicroSkill) {
+            return `Tasks for: ${selectedMicroSkill.name}`;
+        }
         if (selectedSkillArea) {
             return `Micro-Skills for: ${selectedSkillArea.name}`;
         }
@@ -201,7 +211,7 @@ const CubePageContent = () => {
 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white relative">
-            {(selectedSpec || selectedSkillArea) && (
+            {(selectedSpec || selectedSkillArea || selectedMicroSkill) && (
                 <Button onClick={handleBack} className="absolute top-8 left-8 z-20">
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
