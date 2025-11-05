@@ -70,9 +70,6 @@ const CubePageContent = () => {
         const animate = () => {
             animationFrameId = requestAnimationFrame(animate);
 
-            wireframeCube.rotation.x += 0.002;
-            wireframeCube.rotation.y += 0.002;
-
             innerCubes.forEach((cube, index) => {
                 cube.rotation.x += 0.005 + (index * 0.0005);
                 cube.rotation.y += 0.005 + (index * 0.0005);
