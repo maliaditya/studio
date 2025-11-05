@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import type { CoreSkill } from '@/types/workout';
+import type { CoreSkill, SkillArea } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ const CubePageContent = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [labels, setLabels] = useState<Label[]>([]);
     const [selectedSpec, setSelectedSpec] = useState<CoreSkill | null>(null);
+    const [selectedSkillArea, setSelectedSkillArea] = useState<SkillArea | null>(null);
     const innerCubesRef = useRef<THREE.Mesh[]>([]);
 
     const plannedSpecializations = useMemo(() => {
@@ -57,13 +58,29 @@ const CubePageContent = () => {
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        const mainGeometry = new THREE.BoxGeometry(selectedSpec ? 4 : 5, selectedSpec ? 4 : 5, selectedSpec ? 4 : 5);
+        let mainGeometry;
+        if (selectedSkillArea) {
+            mainGeometry = new THREE.BoxGeometry(4, 4, 4);
+        } else if (selectedSpec) {
+            mainGeometry = new THREE.BoxGeometry(4, 4, 4);
+        } else {
+            mainGeometry = new THREE.BoxGeometry(5, 5, 5);
+        }
+
         const mainEdges = new THREE.EdgesGeometry(mainGeometry);
         const mainLineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
         scene.add(wireframeCube);
         
-        const itemsToDisplay = selectedSpec ? selectedSpec.skillAreas : plannedSpecializations;
+        let itemsToDisplay: { id: string; name: string; }[] = [];
+        if (selectedSkillArea) {
+            itemsToDisplay = selectedSkillArea.microSkills;
+        } else if (selectedSpec) {
+            itemsToDisplay = selectedSpec.skillAreas;
+        } else {
+            itemsToDisplay = plannedSpecializations;
+        }
+
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
         const spacing = 1.5;
         
@@ -77,7 +94,7 @@ const CubePageContent = () => {
             const z = Math.floor(index / 9) - 1;
             
             cube.position.set(x * spacing, y * spacing, z * spacing);
-            cube.userData = { id: item.id };
+            cube.userData = { id: item.id, itemData: item };
             
             scene.add(cube);
             innerCubesRef.current.push(cube);
@@ -95,7 +112,7 @@ const CubePageContent = () => {
         const mouse = new THREE.Vector2();
 
         const handleCanvasClick = (event: MouseEvent) => {
-            if (!currentMount || selectedSpec) return;
+            if (!currentMount) return;
             const rect = currentMount.getBoundingClientRect();
             mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
             mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
@@ -104,11 +121,16 @@ const CubePageContent = () => {
             const intersects = raycaster.intersectObjects(innerCubesRef.current);
 
             if (intersects.length > 0) {
-                const clickedId = intersects[0].object.userData.id;
-                const spec = plannedSpecializations.find(s => s.id === clickedId);
-                if (spec) {
-                    setSelectedSpec(spec);
+                const clickedItemData = intersects[0].object.userData.itemData;
+                
+                if (selectedSpec && !selectedSkillArea) {
+                    // We are in skill area view, clicked a skill area
+                    setSelectedSkillArea(clickedItemData as SkillArea);
+                } else if (!selectedSpec) {
+                    // We are in specialization view, clicked a specialization
+                    setSelectedSpec(clickedItemData as CoreSkill);
                 }
+                // If selectedSkillArea is set, clicks do nothing further for now.
             }
         };
         currentCanvas.addEventListener('click', handleCanvasClick);
@@ -117,10 +139,10 @@ const CubePageContent = () => {
         const animate = () => {
             animationFrameId = requestAnimationFrame(animate);
             controls.update();
-            setLabels(prevLabels => prevLabels.map((label, index) => {
-                const cubePosition = innerCubesRef.current[index]?.position;
-                if (!cubePosition || !currentMount) return label;
-                const vector = cubePosition.clone().project(camera);
+            setLabels(prevLabels => prevLabels.map((label) => {
+                const cube = innerCubesRef.current.find(c => c.userData.id === label.id);
+                if (!cube || !currentMount) return label;
+                const vector = cube.position.clone().project(camera);
                 const x = (vector.x + 1) / 2 * currentMount.clientWidth;
                 const y = -(vector.y - 1) / 2 * currentMount.clientHeight;
                 return { ...label, screenPosition: { x, y } };
@@ -143,9 +165,8 @@ const CubePageContent = () => {
             window.removeEventListener('resize', handleResize);
             currentCanvas.removeEventListener('click', handleCanvasClick);
             controls.dispose();
-            renderer.dispose();
             
-            // Dispose geometries and materials
+            // Dispose Three.js objects
             scene.traverse(object => {
                 if (object instanceof THREE.Mesh) {
                     object.geometry.dispose();
@@ -156,18 +177,37 @@ const CubePageContent = () => {
                     }
                 }
             });
+            renderer.dispose();
         };
-    }, [plannedSpecializations, selectedSpec]);
+    }, [plannedSpecializations, selectedSpec, selectedSkillArea]);
+
+    const handleBack = () => {
+        if (selectedSkillArea) {
+            setSelectedSkillArea(null);
+        } else if (selectedSpec) {
+            setSelectedSpec(null);
+        }
+    };
+    
+    const getTitle = () => {
+        if (selectedSkillArea) {
+            return `Micro-Skills for: ${selectedSkillArea.name}`;
+        }
+        if (selectedSpec) {
+            return `Skill Areas for: ${selectedSpec.name}`;
+        }
+        return 'Strategic Specializations';
+    };
 
     return (
         <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white relative">
-            {selectedSpec && (
-                <Button onClick={() => setSelectedSpec(null)} className="absolute top-8 left-8 z-20">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Specializations
+            {(selectedSpec || selectedSkillArea) && (
+                <Button onClick={handleBack} className="absolute top-8 left-8 z-20">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
             )}
             <h1 className="text-3xl font-bold mb-4">
-                {selectedSpec ? `Skills for: ${selectedSpec.name}` : 'Strategic Specializations'}
+                {getTitle()}
             </h1>
             <div ref={mountRef} className="w-[800px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700 relative">
                 <canvas ref={canvasRef} className="w-full h-full" />
