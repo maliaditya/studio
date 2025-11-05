@@ -1,21 +1,29 @@
 
 "use client";
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CoreSkill } from '@/types/workout';
 
+type Label = {
+    id: string;
+    text: string;
+    position: THREE.Vector3;
+    screenPosition: { x: number; y: number };
+};
+
 const CubePageContent = () => {
     const { coreSkills, offerizationPlans } = useAuth();
     const mountRef = useRef<HTMLDivElement>(null);
+    const [labels, setLabels] = useState<Label[]>([]);
 
     const plannedSpecializations = useMemo(() => {
         if (!coreSkills || !offerizationPlans) return [];
         return coreSkills.filter(skill => 
-            skill.type === 'Specialization' && offerizationPlans[skill.id]
+            skill.type === 'Specialization' && offerizationPlans && offerizationPlans[skill.id]
         );
     }, [coreSkills, offerizationPlans]);
 
@@ -44,7 +52,6 @@ const CubePageContent = () => {
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
-
         // Controls
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
@@ -56,25 +63,34 @@ const CubePageContent = () => {
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
         scene.add(wireframeCube);
         
-        // --- Inner Cubes for Specializations ---
+        // --- Inner Cubes and Labels ---
         const innerCubes: THREE.Mesh[] = [];
-        const spacing = 0.75; // Total grid size will be 2 * spacing = 1.5, which fits within the 2x2x2 cube
+        const initialLabels: Omit<Label, 'screenPosition'>[] = [];
+        const spacing = 0.75;
         
         plannedSpecializations.forEach((spec, index) => {
             const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
             const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
             const cube = new THREE.Mesh(geometry, material);
 
-            // Position inner cubes in a 3x3x3 grid
-            const x = (index % 3) - 1; // -> -1, 0, 1
-            const y = Math.floor((index / 3) % 3) - 1; // -> -1, 0, 1
-            const z = Math.floor(index / 9) - 1; // -> -1, 0, 1
+            const x = (index % 3) - 1;
+            const y = Math.floor((index / 3) % 3) - 1;
+            const z = Math.floor(index / 9) - 1;
             
             cube.position.set(x * spacing, y * spacing, z * spacing);
             
             scene.add(cube);
             innerCubes.push(cube);
+
+            initialLabels.push({
+                id: spec.id,
+                text: spec.name,
+                position: cube.position.clone(),
+            });
         });
+
+        // Initialize labels state
+        setLabels(initialLabels.map(l => ({ ...l, screenPosition: { x: -1000, y: -1000 } })));
 
         // Animation loop
         let animationFrameId: number;
@@ -82,6 +98,16 @@ const CubePageContent = () => {
             animationFrameId = requestAnimationFrame(animate);
 
             controls.update();
+
+            // Update label positions
+            setLabels(prevLabels => prevLabels.map((label, index) => {
+                const cubePosition = innerCubes[index].position;
+                const vector = cubePosition.clone().project(camera);
+                const x = (vector.x + 1) / 2 * currentMount.clientWidth;
+                const y = -(vector.y - 1) / 2 * currentMount.clientHeight;
+                return { ...label, screenPosition: { x, y } };
+            }));
+
             renderer.render(scene, camera);
         };
         animate();
@@ -115,22 +141,27 @@ const CubePageContent = () => {
     }, [plannedSpecializations]);
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white">
+        <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white relative">
             <h1 className="text-3xl font-bold mb-4">Strategic Specializations</h1>
-             {plannedSpecializations.length > 0 ? (
-                <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 mb-4 text-sm">
-                    {plannedSpecializations.map(spec => (
-                        <li key={spec.id}>{spec.name}</li>
-                    ))}
-                </ul>
-            ) : (
-                <p className="mb-4 text-muted-foreground">No specializations with strategic plans found.</p>
-            )}
-            <div ref={mountRef} className="w-[600px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700" />
+            <div ref={mountRef} className="w-[600px] h-[600px] max-w-full max-h-full rounded-lg border border-gray-700 relative">
+                {/* Labels will be rendered here */}
+                {labels.map(label => (
+                    <div
+                        key={label.id}
+                        className="absolute text-xs bg-black/50 p-1 rounded-md"
+                        style={{
+                            left: `${label.screenPosition.x}px`,
+                            top: `${label.screenPosition.y}px`,
+                            transform: 'translate(10px, -50%)', // Offset from the cube's center
+                        }}
+                    >
+                        {label.text}
+                    </div>
+                ))}
+            </div>
         </div>
     );
 };
-
 
 export default function CubePage() {
   return (
