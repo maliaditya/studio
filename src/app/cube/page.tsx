@@ -156,11 +156,7 @@ const CubePageContent = () => {
             });
             renderer.dispose();
             
-            // Clear the container without directly removing the canvas element
-            // that React might still be tracking.
-            if (currentMount) {
-                currentMount.innerHTML = '';
-            }
+            currentMount.innerHTML = '';
         };
     }, [plannedSpecializations, selectedSpec]);
 
