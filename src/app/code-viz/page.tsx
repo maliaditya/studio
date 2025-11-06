@@ -90,7 +90,6 @@ const parseCodeToStructure = (code: string): CodeConcept => {
         relationships[parent].push(child);
     }
     
-    // Build the tree
     const rootNodes: CodeConcept[] = [];
     const allNodes: Record<string, CodeConcept> = {};
 
@@ -119,8 +118,6 @@ const parseCodeToStructure = (code: string): CodeConcept => {
         }
     });
     
-    // For this specific visualization, we want a single root. 
-    // Let's create a "root" if there are multiple top-level items.
     if (rootNodes.length === 1 && rootNodes[0].type === 'renderer') {
         return rootNodes[0];
     }
@@ -284,55 +281,63 @@ const CodeVizPageContent = () => {
             currentCanvas.removeEventListener('click', onCanvasClick);
             controls.dispose();
             renderer.dispose();
+            scene.traverse(object => {
+                if (object instanceof THREE.Mesh) {
+                    object.geometry.dispose();
+                    if (Array.isArray(object.material)) {
+                        object.material.forEach(material => material.dispose());
+                    } else {
+                        object.material.dispose();
+                    }
+                }
+            });
         };
     }, [viewStack, codeStructure]);
 
     return (
-        <div className="flex flex-col h-screen bg-gray-900 text-white p-4 gap-4">
-            <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                 <div>
-                    <h1 className="text-2xl font-bold mb-2">Code Visualizer</h1>
-                    <Textarea 
-                        value={code}
-                        onChange={e => setCode(e.target.value)}
-                        className="bg-gray-800 border-gray-700 text-gray-200 font-mono h-48 lg:h-64"
-                        placeholder="Paste your three.js code here..."
-                    />
-                    <Button onClick={handleVisualize} className="mt-2">Visualize</Button>
+        <div className="grid grid-cols-1 lg:grid-cols-2 h-screen bg-gray-900 text-white p-4 gap-4">
+            <div className="flex flex-col gap-4 h-full">
+                <div className="flex items-center gap-2">
+                    {viewStack.length > 1 && (
+                        <Button onClick={handleBack} variant="outline" size="sm">
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    )}
+                    <h2 className="text-xl font-bold">
+                        Current View: <span className="text-primary">{currentView.name}</span>
+                    </h2>
                 </div>
-                <div className="relative">
-                    <div className="flex items-center gap-2 mb-2">
-                        {viewStack.length > 1 && (
-                            <Button onClick={handleBack} variant="outline" size="sm">
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                            </Button>
-                        )}
-                        <h2 className="text-xl font-bold">
-                            Current View: {currentView.name}
-                        </h2>
-                    </div>
-                    <div ref={mountRef} className="w-full h-64 rounded-lg border border-gray-700 relative">
-                        <canvas ref={canvasRef} className="w-full h-full" />
-                        {labels.map(label => (
-                            <div
-                                key={label.id}
-                                className="absolute text-xs bg-black/50 p-1 rounded-md pointer-events-none"
-                                style={{
-                                    left: `${label.screenPosition.x}px`,
-                                    top: `${label.screenPosition.y}px`,
-                                    transform: 'translate(10px, -50%)',
-                                    zIndex: 1,
-                                }}
-                            >
-                                {label.text}
-                            </div>
-                        ))}
-                    </div>
+                <div ref={mountRef} className="w-full flex-grow rounded-lg border border-gray-700 relative">
+                    <canvas ref={canvasRef} className="w-full h-full" />
+                    {labels.map(label => (
+                        <div
+                            key={label.id}
+                            className="absolute text-xs bg-black/50 p-1 rounded-md pointer-events-none"
+                            style={{
+                                left: `${label.screenPosition.x}px`,
+                                top: `${label.screenPosition.y}px`,
+                                transform: 'translate(10px, -50%)',
+                                zIndex: 1,
+                            }}
+                        >
+                            {label.text}
+                        </div>
+                    ))}
+                </div>
+                <div className="flex-shrink-0 text-center text-muted-foreground text-sm">
+                    <p>Click on an inner cube to drill down. Use your mouse to rotate and zoom.</p>
                 </div>
             </div>
-             <div className="flex-grow text-center text-muted-foreground text-sm mt-2">
-                <p>Click on an inner cube to drill down into its contents.</p>
-             </div>
+            <div className="flex flex-col gap-4 h-full">
+                <h1 className="text-2xl font-bold">Code Editor</h1>
+                <Textarea 
+                    value={code}
+                    onChange={e => setCode(e.target.value)}
+                    className="bg-gray-800 border-gray-700 text-gray-200 font-mono flex-grow"
+                    placeholder="Paste your three.js code here..."
+                />
+                <Button onClick={handleVisualize} className="mt-2">Visualize</Button>
+            </div>
         </div>
     );
 };
@@ -345,3 +350,4 @@ export default function CodeVizPage() {
     </AuthGuard>
   );
 }
+
