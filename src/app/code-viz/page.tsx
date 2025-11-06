@@ -7,7 +7,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 
 type Label = {
     id: string;
@@ -19,56 +19,154 @@ type Label = {
 type CodeConcept = {
     id: string;
     name: string;
-    children?: CodeConcept[];
-    type: 'renderer' | 'scene' | 'camera' | 'mesh';
+    type: 'renderer' | 'scene' | 'camera' | 'mesh' | 'geometry' | 'material' | 'variable' | 'unknown';
+    children: CodeConcept[];
 };
 
-// Hardcoded structure based on the user's three.js example
-const codeStructure: CodeConcept = {
-    id: 'renderer',
-    name: 'Renderer',
-    type: 'renderer',
-    children: [
-        {
-            id: 'scene',
-            name: 'Scene',
-            type: 'scene',
-            children: [
-                { id: 'mesh', name: 'Mesh', type: 'mesh', children: [] },
-                // Note: Camera is also added to scene, but for viz clarity, we show it alongside scene.
-            ],
-        },
-        { id: 'camera', name: 'Camera', type: 'camera', children: [] },
-    ],
-};
+const defaultCode = `
+import * as THREE from 'three'
 
+// Canvas
+const canvas = document.querySelector('canvas.webgl')
+
+// Scene
+const scene = new THREE.Scene()
+
+/**
+ * Objects
+ */
+const geometry = new THREE.BoxGeometry(1, 1, 1)
+const material = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+const mesh = new THREE.Mesh(geometry, material)
+scene.add(mesh)
+
+/**
+ * Sizes
+ */
+const sizes = {
+    width: 800,
+    height: 600
+}
+
+/**
+ * Camera
+ */
+const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height)
+camera.position.z = 3
+scene.add(camera)
+
+/**
+ * Renderer
+ */
+const renderer = new THREE.WebGLRenderer({
+    canvas: canvas
+})
+renderer.setSize(sizes.width, sizes.height)
+renderer.render(scene, camera)
+`;
+
+const parseCodeToStructure = (code: string): CodeConcept => {
+    const definitions: Record<string, Partial<CodeConcept> & { variableName: string }> = {};
+    const relationships: Record<string, string[]> = {};
+
+    const variableRegex = /(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*new\s+THREE\.([a-zA-Z0-9_]+)/g;
+    let match;
+    while ((match = variableRegex.exec(code)) !== null) {
+        const [, variableName, type] = match;
+        definitions[variableName] = { 
+            variableName,
+            id: variableName,
+            name: `${variableName} (${type})`,
+            type: type.toLowerCase() as CodeConcept['type'] || 'unknown'
+        };
+    }
+    
+    const addRegex = /(\w+)\.add\(\s*(\w+)\s*\)/g;
+    while ((match = addRegex.exec(code)) !== null) {
+        const [, parent, child] = match;
+        if (!relationships[parent]) {
+            relationships[parent] = [];
+        }
+        relationships[parent].push(child);
+    }
+    
+    // Build the tree
+    const rootNodes: CodeConcept[] = [];
+    const allNodes: Record<string, CodeConcept> = {};
+
+    Object.keys(definitions).forEach(name => {
+        allNodes[name] = {
+            ...definitions[name],
+            children: [],
+        } as CodeConcept;
+    });
+
+    Object.keys(relationships).forEach(parentName => {
+        if (allNodes[parentName]) {
+            const childrenNames = relationships[parentName];
+            childrenNames.forEach(childName => {
+                if (allNodes[childName]) {
+                    allNodes[parentName].children.push(allNodes[childName]);
+                }
+            });
+        }
+    });
+
+    const childNames = new Set(Object.values(relationships).flat());
+    Object.keys(allNodes).forEach(name => {
+        if (!childNames.has(name)) {
+            rootNodes.push(allNodes[name]);
+        }
+    });
+    
+    // For this specific visualization, we want a single root. 
+    // Let's create a "root" if there are multiple top-level items.
+    if (rootNodes.length === 1 && rootNodes[0].type === 'renderer') {
+        return rootNodes[0];
+    }
+
+    return {
+        id: 'root',
+        name: 'Visualization Root',
+        type: 'scene',
+        children: rootNodes
+    };
+};
 
 const CodeVizPageContent = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [labels, setLabels] = useState<Label[]>([]);
     const innerObjectsRef = useRef<THREE.Mesh[]>([]);
+
+    const [code, setCode] = useState(defaultCode);
+    const [codeStructure, setCodeStructure] = useState<CodeConcept>(() => parseCodeToStructure(defaultCode));
     
     const [viewStack, setViewStack] = useState<CodeConcept[]>([codeStructure]);
     const currentView = viewStack[viewStack.length - 1];
 
+    const handleVisualize = () => {
+        const structure = parseCodeToStructure(code);
+        setCodeStructure(structure);
+        setViewStack([structure]);
+    };
+
     const handleObjectClick = (clickedId: string) => {
-        const clickedConcept = findConceptById(currentView, clickedId);
+        const findConceptById = (root: CodeConcept, id: string): CodeConcept | null => {
+            if (root.id === id) return root;
+            if (root.children) {
+                for (const child of root.children) {
+                    const found = findConceptById(child, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        const clickedConcept = findConceptById(codeStructure, clickedId);
         if (clickedConcept && clickedConcept.children && clickedConcept.children.length > 0) {
             setViewStack(prev => [...prev, clickedConcept]);
         }
     };
-    
-    const findConceptById = (root: CodeConcept, id: string): CodeConcept | null => {
-        if (root.id === id) return root;
-        if (root.children) {
-            for (const child of root.children) {
-                const found = findConceptById(child, id);
-                if (found) return found;
-            }
-        }
-        return null;
-    }
 
     const handleBack = () => {
         if (viewStack.length > 1) {
@@ -77,11 +175,14 @@ const CodeVizPageContent = () => {
     };
     
     useEffect(() => {
+        setViewStack([codeStructure]);
+    }, [codeStructure]);
+    
+    useEffect(() => {
         const currentMount = mountRef.current;
         const currentCanvas = canvasRef.current;
         if (!currentMount || !currentCanvas) return;
 
-        // --- Scene Setup ---
         innerObjectsRef.current = [];
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
@@ -90,31 +191,27 @@ const CodeVizPageContent = () => {
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         
-        // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
-        // --- Controls ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // --- Main Wireframe Cube ---
         const mainGeometry = new THREE.BoxGeometry(6, 6, 6);
         const mainEdges = new THREE.EdgesGeometry(mainGeometry);
         const mainLineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
         const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
         scene.add(wireframeCube);
         
-        // --- Inner Content Cubes ---
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
         const itemsToDisplay = currentView.children || [];
         
         itemsToDisplay.forEach((item, index) => {
             const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 100}, 70%, 60%)`) });
+            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 60}, 70%, 60%)`) });
             const mesh = new THREE.Mesh(geometry, material);
 
             const angle = (index / itemsToDisplay.length) * Math.PI * 2;
@@ -134,7 +231,6 @@ const CodeVizPageContent = () => {
 
         setLabels(initialLabels.map(l => ({ ...l, screenPosition: { x: -1000, y: -1000 } })));
 
-        // --- Click Handler ---
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
@@ -154,7 +250,6 @@ const CodeVizPageContent = () => {
         };
         currentCanvas.addEventListener('click', onCanvasClick);
 
-        // --- Animation Loop ---
         let animationFrameId: number;
         const animate = () => {
             animationFrameId = requestAnimationFrame(animate);
@@ -174,7 +269,6 @@ const CodeVizPageContent = () => {
         };
         animate();
         
-        // --- Resize Handler ---
         const handleResize = () => {
             if (currentMount) {
                 camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
@@ -184,59 +278,59 @@ const CodeVizPageContent = () => {
         };
         window.addEventListener('resize', handleResize);
 
-        // --- Cleanup ---
         return () => {
             cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
             currentCanvas.removeEventListener('click', onCanvasClick);
             controls.dispose();
-            
-            scene.traverse(object => {
-                if (object instanceof THREE.Mesh) {
-                    object.geometry.dispose();
-                    if (Array.isArray(object.material)) {
-                        object.material.forEach(material => material.dispose());
-                    } else {
-                        object.material.dispose();
-                    }
-                }
-            });
             renderer.dispose();
         };
-    }, [viewStack]);
+    }, [viewStack, codeStructure]);
 
     return (
-        <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4 gap-4">
-            <div className="w-full max-w-4xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {viewStack.length > 1 && (
-                        <Button onClick={handleBack} variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                    )}
-                    <h1 className="text-2xl font-bold">
-                        {currentView.name}
-                    </h1>
+        <div className="flex flex-col h-screen bg-gray-900 text-white p-4 gap-4">
+            <div className="flex-shrink-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                 <div>
+                    <h1 className="text-2xl font-bold mb-2">Code Visualizer</h1>
+                    <Textarea 
+                        value={code}
+                        onChange={e => setCode(e.target.value)}
+                        className="bg-gray-800 border-gray-700 text-gray-200 font-mono h-48 lg:h-64"
+                        placeholder="Paste your three.js code here..."
+                    />
+                    <Button onClick={handleVisualize} className="mt-2">Visualize</Button>
+                </div>
+                <div className="relative">
+                    <div className="flex items-center gap-2 mb-2">
+                        {viewStack.length > 1 && (
+                            <Button onClick={handleBack} variant="outline" size="sm">
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                            </Button>
+                        )}
+                        <h2 className="text-xl font-bold">
+                            Current View: {currentView.name}
+                        </h2>
+                    </div>
+                    <div ref={mountRef} className="w-full h-64 rounded-lg border border-gray-700 relative">
+                        <canvas ref={canvasRef} className="w-full h-full" />
+                        {labels.map(label => (
+                            <div
+                                key={label.id}
+                                className="absolute text-xs bg-black/50 p-1 rounded-md pointer-events-none"
+                                style={{
+                                    left: `${label.screenPosition.x}px`,
+                                    top: `${label.screenPosition.y}px`,
+                                    transform: 'translate(10px, -50%)',
+                                    zIndex: 1,
+                                }}
+                            >
+                                {label.text}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
-            <div ref={mountRef} className="w-full max-w-4xl h-[600px] rounded-lg border border-gray-700 relative">
-                <canvas ref={canvasRef} className="w-full h-full" />
-                {labels.map(label => (
-                    <div
-                        key={label.id}
-                        className="absolute text-xs bg-black/50 p-1 rounded-md pointer-events-none"
-                        style={{
-                            left: `${label.screenPosition.x}px`,
-                            top: `${label.screenPosition.y}px`,
-                            transform: 'translate(10px, -50%)',
-                            zIndex: 1,
-                        }}
-                    >
-                        {label.text}
-                    </div>
-                ))}
-            </div>
-             <div className="w-full max-w-4xl text-center text-muted-foreground text-sm mt-2">
+             <div className="flex-grow text-center text-muted-foreground text-sm mt-2">
                 <p>Click on an inner cube to drill down into its contents.</p>
              </div>
         </div>
