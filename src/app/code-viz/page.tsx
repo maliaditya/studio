@@ -23,6 +23,11 @@ type CodeConcept = {
     children: CodeConcept[];
 };
 
+type CodeVisualization = {
+    imports: string[];
+    sceneGraph: CodeConcept | null;
+}
+
 const defaultCode = `
 import * as THREE from 'three'
 
@@ -65,12 +70,20 @@ renderer.setSize(sizes.width, sizes.height)
 renderer.render(scene, camera)
 `;
 
-const parseCodeToStructure = (code: string): CodeConcept => {
+const parseCodeToStructure = (code: string): CodeVisualization => {
     const definitions: Record<string, Partial<CodeConcept> & { variableName: string }> = {};
     const relationships: Record<string, string[]> = {};
+    const imports: string[] = [];
 
-    const variableRegex = /(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*new\s+THREE\.([a-zA-Z0-9_]+)/g;
+    // Parse imports
+    const importRegex = /import\s+.*\s+from\s+['"](.+)['"]/g;
     let match;
+    while ((match = importRegex.exec(code)) !== null) {
+        imports.push(match[1]);
+    }
+
+    // Parse variable declarations
+    const variableRegex = /(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*new\s+THREE\.([a-zA-Z0-9_]+)/g;
     while ((match = variableRegex.exec(code)) !== null) {
         const [, variableName, type] = match;
         definitions[variableName] = { 
@@ -81,6 +94,7 @@ const parseCodeToStructure = (code: string): CodeConcept => {
         };
     }
     
+    // Parse scene graph relationships (.add)
     const addRegex = /(\w+)\.add\(\s*(\w+)\s*\)/g;
     while ((match = addRegex.exec(code)) !== null) {
         const [, parent, child] = match;
@@ -113,20 +127,32 @@ const parseCodeToStructure = (code: string): CodeConcept => {
 
     const childNames = new Set(Object.values(relationships).flat());
     Object.keys(allNodes).forEach(name => {
+        // A root node is one that is defined but never added to another node.
         if (!childNames.has(name)) {
             rootNodes.push(allNodes[name]);
         }
     });
     
-    if (rootNodes.length === 1 && rootNodes[0].type === 'renderer') {
-        return rootNodes[0];
+    let sceneGraphRoot: CodeConcept | null = null;
+    if (rootNodes.length > 0) {
+        // If there's a renderer, it's a good root. Otherwise, create a synthetic root.
+        const rendererNode = rootNodes.find(n => n.type === 'renderer');
+        if (rendererNode) {
+            sceneGraphRoot = rendererNode;
+        } else {
+             sceneGraphRoot = {
+                id: 'root',
+                name: 'Visualization Root',
+                type: 'scene',
+                children: rootNodes
+            };
+        }
     }
 
+
     return {
-        id: 'root',
-        name: 'Visualization Root',
-        type: 'scene',
-        children: rootNodes
+        imports,
+        sceneGraph: sceneGraphRoot
     };
 };
 
@@ -137,18 +163,20 @@ const CodeVizPageContent = () => {
     const innerObjectsRef = useRef<THREE.Mesh[]>([]);
 
     const [code, setCode] = useState(defaultCode);
-    const [codeStructure, setCodeStructure] = useState<CodeConcept>(() => parseCodeToStructure(defaultCode));
+    const [codeStructure, setCodeStructure] = useState<CodeVisualization>(() => parseCodeToStructure(defaultCode));
     
-    const [viewStack, setViewStack] = useState<CodeConcept[]>([codeStructure]);
+    const [viewStack, setViewStack] = useState<(CodeConcept | null)[]>([codeStructure.sceneGraph]);
     const currentView = viewStack[viewStack.length - 1];
 
     const handleVisualize = () => {
         const structure = parseCodeToStructure(code);
         setCodeStructure(structure);
-        setViewStack([structure]);
+        setViewStack([structure.sceneGraph]);
     };
 
     const handleObjectClick = (clickedId: string) => {
+        if (!codeStructure.sceneGraph) return;
+
         const findConceptById = (root: CodeConcept, id: string): CodeConcept | null => {
             if (root.id === id) return root;
             if (root.children) {
@@ -159,7 +187,7 @@ const CodeVizPageContent = () => {
             }
             return null;
         }
-        const clickedConcept = findConceptById(codeStructure, clickedId);
+        const clickedConcept = findConceptById(codeStructure.sceneGraph, clickedId);
         if (clickedConcept && clickedConcept.children && clickedConcept.children.length > 0) {
             setViewStack(prev => [...prev, clickedConcept]);
         }
@@ -172,7 +200,7 @@ const CodeVizPageContent = () => {
     };
     
     useEffect(() => {
-        setViewStack([codeStructure]);
+        setViewStack([codeStructure.sceneGraph]);
     }, [codeStructure]);
     
     useEffect(() => {
@@ -183,7 +211,7 @@ const CodeVizPageContent = () => {
         innerObjectsRef.current = [];
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
-        camera.position.z = 10;
+        camera.position.z = 15;
         const renderer = new THREE.WebGLRenderer({ canvas: currentCanvas, antialias: true, alpha: true });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -197,33 +225,63 @@ const CodeVizPageContent = () => {
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
+        // Main scene graph wireframe
         const mainGeometry = new THREE.BoxGeometry(6, 6, 6);
         const mainEdges = new THREE.EdgesGeometry(mainGeometry);
         const mainLineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
-        const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
-        scene.add(wireframeCube);
+        const mainWireframe = new THREE.LineSegments(mainEdges, mainLineMaterial);
+        mainWireframe.position.x = 5;
+        scene.add(mainWireframe);
+
+        // Imports wireframe
+        const importGeometry = new THREE.BoxGeometry(4, 4, 4);
+        const importEdges = new THREE.EdgesGeometry(importGeometry);
+        const importWireframe = new THREE.LineSegments(importEdges, mainLineMaterial);
+        importWireframe.position.x = -7;
+        scene.add(importWireframe);
+        
+        // Line connecting the two main cubes
+        const connectorPoints = [mainWireframe.position.clone().setX(mainWireframe.position.x - 3), importWireframe.position.clone().setX(importWireframe.position.x + 2)];
+        const connectorGeometry = new THREE.BufferGeometry().setFromPoints(connectorPoints);
+        const connectorLine = new THREE.Line(connectorGeometry, new THREE.LineDashedMaterial({ color: 0xaaaaaa, dashSize: 0.5, gapSize: 0.2 }));
+        connectorLine.computeLineDistances();
+        scene.add(connectorLine);
         
         const initialLabels: Omit<Label, 'screenPosition'>[] = [];
-        const itemsToDisplay = currentView.children || [];
         
-        itemsToDisplay.forEach((item, index) => {
-            const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 60}, 70%, 60%)`) });
-            const mesh = new THREE.Mesh(geometry, material);
+        // Render scene graph cubes
+        if(currentView) {
+            const itemsToDisplay = currentView.children || [];
+            itemsToDisplay.forEach((item, index) => {
+                const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 60}, 70%, 60%)`) });
+                const mesh = new THREE.Mesh(geometry, material);
 
-            const angle = (index / itemsToDisplay.length) * Math.PI * 2;
-            const radius = 2.5;
-            mesh.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
-            mesh.userData = { id: item.id };
+                const angle = (index / itemsToDisplay.length) * Math.PI * 2;
+                const radius = 2.5;
+                mesh.position.set(mainWireframe.position.x + Math.cos(angle) * radius, mainWireframe.position.y + Math.sin(angle) * radius, 0);
+                mesh.userData = { id: item.id };
+                
+                scene.add(mesh);
+                innerObjectsRef.current.push(mesh);
+
+                initialLabels.push({ id: item.id, text: item.name, position: mesh.position.clone() });
+            });
+        }
+        
+        // Render import cubes
+        codeStructure.imports.forEach((imp, index) => {
+            const geometry = new THREE.BoxGeometry(1, 1, 1);
+            const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            mesh.position.set(importWireframe.position.x, importWireframe.position.y + (index * 1.5) - ((codeStructure.imports.length - 1) * 0.75), 0);
+            mesh.userData = { id: `import-${imp}` };
             
             scene.add(mesh);
             innerObjectsRef.current.push(mesh);
 
-            initialLabels.push({
-                id: item.id,
-                text: item.name,
-                position: mesh.position.clone(),
-            });
+            initialLabels.push({ id: `import-${imp}`, text: `import '${imp}'`, position: mesh.position.clone() });
         });
 
         setLabels(initialLabels.map(l => ({ ...l, screenPosition: { x: -1000, y: -1000 } })));
@@ -242,7 +300,9 @@ const CodeVizPageContent = () => {
 
             if (intersects.length > 0) {
                 const clickedId = intersects[0].object.userData.id;
-                handleObjectClick(clickedId);
+                if (!clickedId.startsWith('import-')) {
+                    handleObjectClick(clickedId);
+                }
             }
         };
         currentCanvas.addEventListener('click', onCanvasClick);
@@ -294,6 +354,12 @@ const CodeVizPageContent = () => {
         };
     }, [viewStack, codeStructure]);
 
+    const getBreadcrumbTitle = () => {
+        if (!currentView) return 'Imports';
+        if (viewStack.length === 1) return 'Top Level';
+        return viewStack.map(v => v?.name || '...').join(' > ');
+    }
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-2 h-screen bg-gray-900 text-white p-4 gap-4">
             <div className="flex flex-col gap-4 h-full">
@@ -303,8 +369,8 @@ const CodeVizPageContent = () => {
                             <ArrowLeft className="mr-2 h-4 w-4" /> Back
                         </Button>
                     )}
-                    <h2 className="text-xl font-bold">
-                        Current View: <span className="text-primary">{currentView.name}</span>
+                    <h2 className="text-lg font-bold truncate">
+                        Current View: <span className="text-primary">{getBreadcrumbTitle()}</span>
                     </h2>
                 </div>
                 <div ref={mountRef} className="w-full flex-grow rounded-lg border border-gray-700 relative">
@@ -350,4 +416,3 @@ export default function CodeVizPage() {
     </AuthGuard>
   );
 }
-
