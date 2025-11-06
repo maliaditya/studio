@@ -5,8 +5,8 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Label = {
@@ -19,135 +19,106 @@ type Label = {
 type CodeConcept = {
     id: string;
     name: string;
-    type: 'function' | 'class' | 'object' | 'variable';
+    children?: CodeConcept[];
+    type: 'renderer' | 'scene' | 'camera' | 'mesh';
 };
+
+// Hardcoded structure based on the user's three.js example
+const codeStructure: CodeConcept = {
+    id: 'renderer',
+    name: 'Renderer',
+    type: 'renderer',
+    children: [
+        {
+            id: 'scene',
+            name: 'Scene',
+            type: 'scene',
+            children: [
+                { id: 'mesh', name: 'Mesh', type: 'mesh', children: [] },
+                // Note: Camera is also added to scene, but for viz clarity, we show it alongside scene.
+            ],
+        },
+        { id: 'camera', name: 'Camera', type: 'camera', children: [] },
+    ],
+};
+
 
 const CodeVizPageContent = () => {
     const mountRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [labels, setLabels] = useState<Label[]>([]);
     const innerObjectsRef = useRef<THREE.Mesh[]>([]);
-    const [code, setCode] = useState(
-`class MyClass {
-  constructor() {
-    this.value = 42;
-  }
-}
+    
+    const [viewStack, setViewStack] = useState<CodeConcept[]>([codeStructure]);
+    const currentView = viewStack[viewStack.length - 1];
 
-function myFunction(param) {
-  return param * 2;
-}
-
-const myObject = { key: 'value' };
-let myVariable = "hello world";
-const anotherObject = new MyClass();
-`
-    );
-    const [concepts, setConcepts] = useState<CodeConcept[]>([]);
-
-    const parseCode = useCallback((codeToParse: string): CodeConcept[] => {
-        const foundConcepts: CodeConcept[] = [];
-        const lines = codeToParse.split('\n');
-        
-        const functionRegex = /function\s+([a-zA-Z0-9_]+)\s*\(/;
-        const classRegex = /class\s+([a-zA-Z0-9_]+)/;
-        const objectRegex = /(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=\s*(?:\{|new\s+[a-zA-Z0-9_]+)/;
-        const variableRegex = /(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=/;
-
-        lines.forEach((line, index) => {
-            const classMatch = line.match(classRegex);
-            if (classMatch) {
-                foundConcepts.push({ id: `c_${index}`, name: classMatch[1], type: 'class' });
-                return;
-            }
-
-            const functionMatch = line.match(functionRegex);
-            if (functionMatch) {
-                foundConcepts.push({ id: `f_${index}`, name: functionMatch[1], type: 'function' });
-                return;
-            }
-
-            const objectMatch = line.match(objectRegex);
-            if (objectMatch) {
-                // Avoid re-matching already found classes
-                if (!foundConcepts.some(c => c.name === objectMatch[1] && c.type === 'class')) {
-                    foundConcepts.push({ id: `o_${index}`, name: objectMatch[1], type: 'object' });
-                    return;
-                }
-            }
-
-            const variableMatch = line.match(variableRegex);
-            if (variableMatch) {
-                // Ensure it's not one of the other types we already found
-                if (!foundConcepts.some(c => c.name === variableMatch[1])) {
-                    foundConcepts.push({ id: `v_${index}`, name: variableMatch[1], type: 'variable' });
-                }
-            }
-        });
-
-        return foundConcepts;
-    }, []);
-
-    const handleVisualize = () => {
-        const parsed = parseCode(code);
-        setConcepts(parsed);
+    const handleObjectClick = (clickedId: string) => {
+        const clickedConcept = findConceptById(currentView, clickedId);
+        if (clickedConcept && clickedConcept.children && clickedConcept.children.length > 0) {
+            setViewStack(prev => [...prev, clickedConcept]);
+        }
     };
     
-    useEffect(() => {
-        // Initial parse on load
-        handleVisualize();
-    }, []);
+    const findConceptById = (root: CodeConcept, id: string): CodeConcept | null => {
+        if (root.id === id) return root;
+        if (root.children) {
+            for (const child of root.children) {
+                const found = findConceptById(child, id);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
 
+    const handleBack = () => {
+        if (viewStack.length > 1) {
+            setViewStack(prev => prev.slice(0, -1));
+        }
+    };
+    
     useEffect(() => {
         const currentMount = mountRef.current;
         const currentCanvas = canvasRef.current;
         if (!currentMount || !currentCanvas) return;
 
+        // --- Scene Setup ---
         innerObjectsRef.current = [];
-
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
         camera.position.z = 10;
-
         const renderer = new THREE.WebGLRenderer({ canvas: currentCanvas, antialias: true, alpha: true });
         renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         
+        // --- Lighting ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
+        // --- Controls ---
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        const initialLabels: Omit<Label, 'screenPosition'>[] = [];
+        // --- Main Wireframe Cube ---
+        const mainGeometry = new THREE.BoxGeometry(6, 6, 6);
+        const mainEdges = new THREE.EdgesGeometry(mainGeometry);
+        const mainLineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const wireframeCube = new THREE.LineSegments(mainEdges, mainLineMaterial);
+        scene.add(wireframeCube);
         
-        concepts.forEach((item, index) => {
-            let geometry, dimensions;
-            switch(item.type) {
-                case 'function':
-                    geometry = new THREE.BoxGeometry(2, 1, 0.5);
-                    break;
-                case 'class':
-                    geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-                    break;
-                case 'object':
-                    geometry = new THREE.SphereGeometry(0.7, 32, 32);
-                    break;
-                case 'variable':
-                    geometry = new THREE.SphereGeometry(0.3, 32, 32);
-                    break;
-                default:
-                    geometry = new THREE.BoxGeometry(1, 1, 1);
-            }
-            
-            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 60}, 70%, 60%)`) });
+        // --- Inner Content Cubes ---
+        const initialLabels: Omit<Label, 'screenPosition'>[] = [];
+        const itemsToDisplay = currentView.children || [];
+        
+        itemsToDisplay.forEach((item, index) => {
+            const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            const material = new THREE.MeshStandardMaterial({ color: new THREE.Color(`hsl(${index * 100}, 70%, 60%)`) });
             const mesh = new THREE.Mesh(geometry, material);
 
-            const angle = (index / concepts.length) * Math.PI * 2;
-            const radius = 4;
+            const angle = (index / itemsToDisplay.length) * Math.PI * 2;
+            const radius = 2.5;
             mesh.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
             mesh.userData = { id: item.id };
             
@@ -163,6 +134,27 @@ const anotherObject = new MyClass();
 
         setLabels(initialLabels.map(l => ({ ...l, screenPosition: { x: -1000, y: -1000 } })));
 
+        // --- Click Handler ---
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        const onCanvasClick = (event: MouseEvent) => {
+            if (!currentMount) return;
+            const rect = currentMount.getBoundingClientRect();
+            mouse.x = ((event.clientX - rect.left) / currentMount.clientWidth) * 2 - 1;
+            mouse.y = -((event.clientY - rect.top) / currentMount.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(innerObjectsRef.current);
+
+            if (intersects.length > 0) {
+                const clickedId = intersects[0].object.userData.id;
+                handleObjectClick(clickedId);
+            }
+        };
+        currentCanvas.addEventListener('click', onCanvasClick);
+
+        // --- Animation Loop ---
         let animationFrameId: number;
         const animate = () => {
             animationFrameId = requestAnimationFrame(animate);
@@ -181,7 +173,8 @@ const anotherObject = new MyClass();
             renderer.render(scene, camera);
         };
         animate();
-
+        
+        // --- Resize Handler ---
         const handleResize = () => {
             if (currentMount) {
                 camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
@@ -191,9 +184,11 @@ const anotherObject = new MyClass();
         };
         window.addEventListener('resize', handleResize);
 
+        // --- Cleanup ---
         return () => {
             cancelAnimationFrame(animationFrameId);
             window.removeEventListener('resize', handleResize);
+            currentCanvas.removeEventListener('click', onCanvasClick);
             controls.dispose();
             
             scene.traverse(object => {
@@ -208,25 +203,23 @@ const anotherObject = new MyClass();
             });
             renderer.dispose();
         };
-    }, [concepts]);
+    }, [viewStack]);
 
     return (
-        <div className="flex flex-col xl:flex-row h-screen bg-gray-900 text-white p-4 gap-4">
-            <Card className="xl:w-1/3 bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                    <CardTitle>Code Input</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4 h-[calc(100%-80px)]">
-                    <Textarea 
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
-                        placeholder="Paste your JavaScript code here..."
-                        className="bg-gray-900/80 border-gray-600 text-gray-200 font-mono h-full flex-grow text-xs"
-                    />
-                    <Button onClick={handleVisualize}>Visualize Code</Button>
-                </CardContent>
-            </Card>
-            <div ref={mountRef} className="flex-grow min-h-0 rounded-lg border border-gray-700 relative">
+        <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white p-4 gap-4">
+            <div className="w-full max-w-4xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    {viewStack.length > 1 && (
+                        <Button onClick={handleBack} variant="outline" size="sm">
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    )}
+                    <h1 className="text-2xl font-bold">
+                        {currentView.name}
+                    </h1>
+                </div>
+            </div>
+            <div ref={mountRef} className="w-full max-w-4xl h-[600px] rounded-lg border border-gray-700 relative">
                 <canvas ref={canvasRef} className="w-full h-full" />
                 {labels.map(label => (
                     <div
@@ -243,6 +236,9 @@ const anotherObject = new MyClass();
                     </div>
                 ))}
             </div>
+             <div className="w-full max-w-4xl text-center text-muted-foreground text-sm mt-2">
+                <p>Click on an inner cube to drill down into its contents.</p>
+             </div>
         </div>
     );
 };
